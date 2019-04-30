@@ -1,0 +1,18 @@
+service: vttc
+
+provider:
+  name: aws
+  runtime: nodejs8.10
+  region: us-west-2
+
+functions:
+  vttc:
+    handler: handler.vttc
+    events:
+      - http:
+          path: /
+          method: get
+          cors: true
+
+plugins:
+  - serverless-offline
