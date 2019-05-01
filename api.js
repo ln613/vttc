@@ -1,16 +1,21 @@
 // const fs = require('fs');
-// const MongoClient = require('mongodb').MongoClient;
-// const cd = require('cloudinary');
-// const { sortWith, ascend, descend, prop, fromPairs, toPairs, merge, filter, map, unnest, pipe, find, isNil, last, pick } = require('ramda');
+const MongoClient = require('mongodb').MongoClient;
+const cd = require('cloudinary');
+const { sortWith, ascend, descend, prop, fromPairs, toPairs, merge, filter, map, unnest, pipe, find, isNil, last, pick } = require('ramda');
 // const { tap, config, json2js, adjustRating, newRating, serial, toDateOnly } = require('./utils');
 // const moment = require('moment');
 // const { findById } = require('@ln613/util');
 
-// const allDocs = ['cats', 'players', 'products', 'tournaments'];
+require('dotenv').config({ path: './.env' });
 
-// let db = null;
-// if (config) cd.config({ cloud_name: 'vttc', api_key: config.cloudinary_key, api_secret: config.cloudinary_secret });
-// const e = {};
+const allDocs = ['cats', 'players', 'products', 'tournaments'];
+
+let db = null;
+const e = {};
+
+e.connectDB = async () => db || (db = await MongoClient.connect(process.env.DB).then(x => x.db()));
+
+cd.config({ cloud_name: 'vttc', api_key: process.env.cloudinary_key, api_secret: process.env.cloudinary_secret });
 
 // e.initdb = mongoURL => {
 //   if (db || mongoURL == null) return;
@@ -53,18 +58,16 @@
 
 // e.count = doc => db.collection(doc).count()
 
-// e.get = doc => db.collection(doc).find({}, { _id: 0 }).toArray()
+e.get = doc => db.collection(doc).find().project({ _id: 0 }).toArray()
 
-// e.getIdName = doc => db.collection(doc).find({}, { _id: 0, id: 1, name: 1 }).toArray()
+e.getIdName = doc => db.collection(doc).find().project({ _id: 0, id: 1, name: 1 }).toArray()
 
-// e.getIdName = doc => db.collection(doc).find({}, { _id: 0, id: 1, name: 1 }).toArray()
+e.getById = (doc, id) => db.collection(doc).findOne({ id: +id }, { projection: { _id: 0 }})
 
-// e.getById = (doc, id) => db.collection(doc).findOne({ id: +id }, { _id: 0 })
-
-// e.search = (doc, prop, val, fields) => db.collection(doc).find(
-//     (!prop || prop === '_') ? {} : { [prop]: isNaN(+val) ? new RegExp(val, 'i') : +val},
-//     merge({ _id: 0, id: 1, name: 1 }, fields ? fromPairs(fields.split(',').map(x => [x, 1])) : {})
-// ).toArray()
+e.search = (doc, prop, val, fields) => db.collection(doc)
+  .find(prop ? { [prop]: isNaN(+val) ? new RegExp(val, 'i') : +val } : {})
+  .project(merge({ _id: 0, id: 1, name: 1 }, fields ? fromPairs(fields.split(',').map(x => [x, 1])) : {}))
+  .toArray()
 
 // e.add = (doc, obj) => db.collection(doc).insert(obj);
 
@@ -82,23 +85,23 @@
 
 // e.cdList = () => cd.v2.api.resources({ max_results: 500 }).then(r => sortWith([ascend(prop('public_id'))], r.resources))
 
-// e.cdVersion = () => cd.v2.api.resources({ max_results: 500 }).then(r => sortWith([descend(prop('version'))], r.resources)[0].version)
+e.cdVersion = () => cd.v2.api.resources({ max_results: 500 }).then(r => sortWith([descend(prop('version'))], r.resources)[0].version)
 
-// e.getPlayerGames = id => db.collection('tournaments').aggregate([
-//   { $unwind: '$games' },
-//   { $match: { $or: [ { 'games.p1': +id }, { 'games.p2': +id } ], 'games.isDouble': { $ne: true }, isSingle: { $ne: true } } },
-//   { $project: { games: 1, _id: 0, name: 1 } }
-// ]).toArray().then(r => r.map(x => ({name: x.name, games: x.games, pid: id})))
+e.getPlayerGames = id => db.collection('tournaments').aggregate([
+  { $unwind: '$games' },
+  { $match: { $or: [ { 'games.p1': +id }, { 'games.p2': +id } ], 'games.isDouble': { $ne: true }, isSingle: { $ne: true } } },
+  { $project: { games: 1, _id: 0, name: 1 } }
+]).toArray().then(r => r.map(x => ({name: x.name, games: x.games, pid: id})))
 
-// e.getPlayerRating = (id, date) => db.collection('tournaments').aggregate([
-//   { $unwind: '$games' },
-//   { $match: { $or: [ { 'games.p1': +id }, { 'games.p2': +id }, { 'games.p1': id.toString() }, { 'games.p2': id.toString() } ] } },
-//   //{ $match: { 'games.date': { $lte: date === '_' ? new Date() : new Date(date) } } },
-//   { $sort: { 'games.date': -1, 'games.id': -1 } },
-//   { $limit: 1 },
-//   { $replaceRoot: { newRoot: '$games'} },
-//   { $project: { rating: { $cond: [{ $eq: ['$p1', id] }, { $add: ['$p1Rating', '$p1Diff'] }, { $add: ['$p2Rating', '$p2Diff'] }] } } }
-// ]).toArray().then(x => x[0].rating)
+e.getPlayerRating = (id, date) => db.collection('tournaments').aggregate([
+  { $unwind: '$games' },
+  { $match: { $or: [ { 'games.p1': +id }, { 'games.p2': +id }, { 'games.p1': id.toString() }, { 'games.p2': id.toString() } ] } },
+  //{ $match: { 'games.date': { $lte: date === '_' ? new Date() : new Date(date) } } },
+  { $sort: { 'games.date': -1, 'games.id': -1 } },
+  { $limit: 1 },
+  { $replaceRoot: { newRoot: '$games'} },
+  { $project: { rating: { $cond: [{ $eq: ['$p1', id] }, { $add: ['$p1Rating', '$p1Diff'] }, { $add: ['$p2Rating', '$p2Diff'] }] } } }
+]).toArray().then(x => x[0].rating)
 
 // e.changeResult = g1 => db.collection('tournaments').aggregate([
 //   { $unwind: '$games' },
@@ -209,4 +212,4 @@
 //   { $limit: 1 }
 // ]).toArray().then(x => x[0].id)
 
-// module.exports = e;
+module.exports = e;

@@ -146,4 +146,27 @@ e.tap = x => R.tap(console.log, R.isNil(x) ? 'null' : x);
 
 // e.toDateOnly = d => R.is(String, d) ? R.take(10, d) : moment(d).add(8, 'hours').format('YYYY-MM-DD');
 
+e.res = (body, code, cookie) => ({
+  statusCode: code || 200,
+  headers: R.merge(cookie ? { 'Set-Cookie': cookie } : {}, {
+    'Access-Control-Allow-Origin': '*'
+  }),
+  body: JSON.stringify(body)
+});
+
+e.policy = (id, r) => ({
+  principalId: 'offlineContext_authorizer_principalId',
+  policyDocument: {
+    Version: '2012-10-17',
+    Statement: [
+      {
+        Action: 'execute-api:Invoke',
+        Effect: 'Allow',
+        Resource: r
+      },
+    ],
+  },
+  //context: { user: 'offlineContext_authorizer_principalId' }
+});
+
 module.exports = e;

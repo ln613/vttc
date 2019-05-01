@@ -6,13 +6,30 @@ provider:
   region: us-west-2
 
 functions:
-  vttc:
-    handler: handler.vttc
+  authorize:
+    handler: handler.authorize
+  login:
+    handler: handler.login
+    events:
+      - http:
+          path: /login
+          method: post
+          cors: true
+  api:
+    handler: handler.api
     events:
       - http:
           path: /
           method: get
           cors: true
+  admin:
+    handler: handler.admin
+    events:
+      - http:
+          path: /
+          method: post
+          cors: true
+          authorizer: authorize
 
 plugins:
   - serverless-offline
