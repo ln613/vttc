@@ -15,21 +15,30 @@ functions:
           path: /login
           method: post
           cors: true
+  logout:
+    handler: handler.logout
+    events:
+      - http:
+          path: /logout
+          method: post
+          cors: true
   api:
     handler: handler.api
     events:
       - http:
-          path: /
+          path: /api
           method: get
           cors: true
   admin:
     handler: handler.admin
     events:
       - http:
-          path: /
-          method: post
+          path: /admin
+          method: any
           cors: true
-          authorizer: authorize
+          authorizer:
+            name: authorize
+            type: request
 
 plugins:
   - serverless-offline
