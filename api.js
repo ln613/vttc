@@ -1,10 +1,10 @@
 const fs = require('fs');
 const MongoClient = require('mongodb').MongoClient;
 const cd = require('cloudinary');
-const { sortWith, ascend, descend, prop, fromPairs, toPairs, merge, filter, map, unnest, pipe, find, isNil, last, pick } = require('ramda');
+const { sortWith, ascend, descend, prop, fromPairs, toPairs, merge, filter, map, unnest, pipe, find, findIndex, isNil, last, pick, groupBy } = require('ramda');
 const { tap, json2js, adjustRating, newRating, serial, toDateOnly, rrSchedule, rrScheduleTeam, group, sortTeam, gengames } = require('./utils');
 const moment = require('moment');
-const { findById } = require('@ln613/util');
+const { findById, split2 } = require('@ln613/util');
 
 require('dotenv').config({ path: './.env' });
 
@@ -169,19 +169,19 @@ e.genrr = body => {
   const standing = body.standing;
   const koStanding = body.koStanding || [];
 
-  e.getById('tournaments', id).then(t => {
+  return e.getById('tournaments', id).then(t => {
     if (t.isSingle) {
       if (t.players && !t.schedules) {
         const s = rrSchedule(t.players, true);
         return e.update('tournaments', {
           id,
-          schedules: s.map((x, i) => ({ id: i + 1, matches: x, date: moment(t.startDate).add(i, 'week').toDate() }))
+          schedules: s.map((x, i) => ({ id: i + 1, matches: x, date: toDateOnly(moment(t.startDate).add(i, 'week').toDate()) }))
         }).then(_ => s);
       } else {
         return 'N/A';
       }
     } else {
-      if (t.teams && t.teams.length > 0 && !isNil(t.teams[0].group)) {
+      if (t.teams && t.teams.length > 0 && !isNil(t.teams[0].group)) { // teams are grouped
         const groups = groupBy(x => x.group, t.teams);
         const hasKO = find(s => s.ko, t.schedules || []);
         const hasKOStanding = find(s => s.ko === koStanding.length, t.schedules || []);
@@ -192,7 +192,7 @@ e.genrr = body => {
             group: g,
             id: +g
           }));
-          return e.update('tournaments', { id, schedules });
+          return e.update('tournaments', { id, schedules }).then(_ => schedules);
         } else if ((standing && !hasKO) || hasKOStanding) {
           const matches = (hasKOStanding ?
             range(0, koStanding.length / 2).map((n, i) => ({ home: koStanding[n], away: koStanding[koStanding.length - n - 1], id: i + 1 })) :
@@ -201,12 +201,13 @@ e.genrr = body => {
               { home: standing[n][1].id, away: standing[standing.length - n - 1][0].id, id: i * 2 + 2 }
             ]))
           ).map(x => ({ ...x, games: gengames(t, x.home, x.away) }));
-          return e.update('tournaments', { id, schedules: [...t.schedules, { date: t.startDate, ko: hasKOStanding ? koStanding.length / 2 : standing.length, matches, id: t.schedules.length + 1 }] });
+          const schedules = [...t.schedules, { date: t.startDate, ko: hasKOStanding ? koStanding.length / 2 : standing.length, matches, id: t.schedules.length + 1 }];
+          return e.update('tournaments', { id, schedules }).then(_ => schedules);
         } else {
           return 'N/A';
         }
-      } else if (!t.has2half && t.teams && t.schedules) {
-        const sd = t.startDate2 || moment(last(t.schedules).date).add(1, 'week').toDate();
+      } else if (!t.has2half && t.teams && t.schedules && standing) { // generate schedule for 2nd half, already has schedule and current standing is sent
+        const sd = t.startDate2 || toDateOnly(moment(last(t.schedules).date).add(1, 'week').toDate());
         const tt = split2(standing.map(x => find(y => y.name === x.team, t.teams)));
         const s1 = rrScheduleTeam(tt[0], sd, tables ? tables[0] : [5, 6, 7]);
         const s2 = rrScheduleTeam(tt[1], sd, tables ? tables[1] : [1, 2, 3]);
@@ -230,9 +231,9 @@ e.genrr = body => {
 }
 
 e.gengroup = id => e.getById('tournaments', id).then(t => {
-  if (!t.isSingle && t.teams && t.teams.length > 0 && isNil(t.teams[0].group) && isNil(t.games) && isNil(t.schedules)) {
+  if (!t.isSingle && t.teams && t.teams.length > 0 && isNil(t.teams[0].group) && isNil(t.games) && isNil(t.schedules)) { // teams are not yet grouped, no games and no schedules
     const teams = group(sortTeam(t.teams));
-    return e.update('tournaments', { id, teams });
+    return e.update('tournaments', { id, teams }).then(_ => teams);
   } else {
     return 'N/A';
   }
@@ -247,8 +248,8 @@ e.nogame = body => {
       if (n === -1) {
         return 'N/A';
       } else {
-        const schedules = t.schedules.map((s, i) => i >= n ? {...s, date: moment(s.date).add(1, 'week').toDate()} : s);
-        return e.update('tournaments', { id, schedules });
+        const schedules = t.schedules.map((s, i) => i >= n ? {...s, date: toDateOnly(moment(s.date).add(1, 'week').toDate())} : s);
+        return e.update('tournaments', { id, schedules }).then(_ => schedules);
       }
     } else {
       return 'N/A';

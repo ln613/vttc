@@ -34,7 +34,7 @@ module.exports.api = async (event, context) => {
 module.exports.admin = async (event, context) => {
   context.callbackWaitsForEmptyEventLoop = false;
   const q = event.queryStringParameters;
-  const body = event.body;
+  const body = JSON.parse(event.body);
   const method = event.httpMethod;
   await connectDB();
   let r = 'no action';
