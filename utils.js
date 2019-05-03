@@ -98,11 +98,11 @@ e.gengames = (t, t1, t2) => {
 
 e.toDateOnly = d => R.is(String, d) ? R.take(10, d) : moment(d).add(8, 'hours').format('YYYY-MM-DD');
 
-e.res = (body, code, cookie) => ({
+e.res = (body, code) => ({
   statusCode: code || 200,
-  headers: R.merge(cookie ? { 'Set-Cookie': cookie } : {}, {
-    'Access-Control-Allow-Origin': 'http://localhost:3001'
-  }),
+  headers: {
+    'Access-Control-Allow-Origin': '*'
+  },
   body: JSON.stringify(body)
 });
 

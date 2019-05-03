@@ -2,7 +2,7 @@
 
 const jwt = require('jsonwebtoken');
 const { connectDB, get, getIdName, getById, search, getPlayerRating, getPlayerGames, cdList, cdVersion, initdata, backup, updateRating, genrr, gengroup, nogame, getNewGameId, addToList, add, replaceList, replace, update, count } = require('./api');
-const { tap, res, policy, parseCookie } = require('./utils');
+const { tap, res, policy } = require('./utils');
 
 module.exports.api = async (event, context) => {
   context.callbackWaitsForEmptyEventLoop = false;
