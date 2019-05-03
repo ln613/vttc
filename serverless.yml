@@ -36,9 +36,7 @@ functions:
           path: /admin
           method: any
           cors: true
-          authorizer:
-            name: authorize
-            type: request
+          authorizer: authorize
 
 plugins:
   - serverless-offline

@@ -101,7 +101,7 @@ e.toDateOnly = d => R.is(String, d) ? R.take(10, d) : moment(d).add(8, 'hours').
 e.res = (body, code, cookie) => ({
   statusCode: code || 200,
   headers: R.merge(cookie ? { 'Set-Cookie': cookie } : {}, {
-    'Access-Control-Allow-Origin': '*'
+    'Access-Control-Allow-Origin': 'http://localhost:3001'
   }),
   body: JSON.stringify(body)
 });
@@ -111,6 +111,6 @@ e.policy = r => ({
   policyDocument: { Statement: [ { Action: 'execute-api:Invoke', Effect: 'Allow', Resource: r }, ] }
 });
 
-e.parseCookie = r => R.fromPairs(r.multiValueHeaders.cookie.map(c => c.split('=')));
+e.parseCookie = r => R.fromPairs((r.multiValueHeaders.cookie || []).map(c => c.split('=')));
 
 module.exports = e;

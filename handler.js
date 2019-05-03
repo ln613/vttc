@@ -93,7 +93,7 @@ module.exports.admin = async (event, context) => {
 };
 
 module.exports.authorize = async event => {
-    await jwt.verify(parseCookie(event).vttc_token, process.env.JWT_SECRET);
+    await jwt.verify(event.authorizationToken, process.env.JWT_SECRET);
     return policy(event.methodArn.replace('random-account-id', '*').replace('random-api-id', '*'));
 };
 
@@ -101,14 +101,14 @@ module.exports.login = async event => {
   const { username, password } = JSON.parse(event.body);
 
   if (username != process.env.ADMIN_USER || password != process.env.ADMIN_PASSWORD) {
-    return res('Login failed', 401, 'vttc_token=;');
+    return res({ isAuthenticated: false }, 401);
   } else {
     const token = jwt.sign({}, process.env.JWT_SECRET, { expiresIn: '24h' });
-    return res('Login successful', 200, 'vttc_token=' + token + ';');
+    return res({ isAuthenticated: true, token });
   };
 };
 
-module.exports.logout = async event => res('Logged out', 200, 'vttc_token=;');
+module.exports.logout = async event => res({ isAuthenticated: false });
 
 
 // https://raw.githubusercontent.com/ln613/n2/master/data/db.json
