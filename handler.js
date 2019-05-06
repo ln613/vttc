@@ -47,7 +47,11 @@ module.exports.admin = async (event, context) => {
       r = await backup();
     }
   } else if (method === 'POST') {
-    if (q.genrr) {
+    if (q.cd) {
+      r = await cdList();
+    } else if (q.newgameid) {
+      r = await getNewGameId();
+    } else if (q.genrr) {
       r = await genrr(body);
     } else if (q.gengroup) {
       r = await gengroup(+body.id);
@@ -55,6 +59,8 @@ module.exports.admin = async (event, context) => {
       r = await nogame(body);
     } else if (q.doc && q.id && q.list) {
       r = await addToList(q.doc, q.id, q.list, body);
+    } else if (q.doc && q.count) {
+      r = await count(q.doc);
     } else if (q.doc) {
       r = await add(q.doc, body);
     }
@@ -78,14 +84,6 @@ module.exports.admin = async (event, context) => {
   } else if (method === 'PURGE') {
     if (q.doc) {
       r = await drop(q.doc);
-    }
-  } else if (method === 'GET') {
-    if (q.cd) {
-      r = await cdList();
-    } else if (q.doc && q.count) {
-      r = await count(q.doc);
-    } else if (q.newgameid) {
-      r = await getNewGameId();
     }
   }
 
