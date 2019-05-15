@@ -1,34 +1,57 @@
 'use strict';
 
+const fs = require('fs');
 const jwt = require('jsonwebtoken');
+const cloudconvert = new (require('cloudconvert'))(process.env.CLOUDCONVERT_APIKEY);
 const { connectDB, get, getIdName, getById, search, getPlayerRating, getPlayerGames, cdList, cdVersion, initdata, backup, updateRating, genrr, gengroup, nogame, getNewGameId, addToList, add, replaceList, replace, update, count } = require('./api');
 const { tap, res, policy } = require('./utils');
 
-module.exports.api = async (event, context) => {
+module.exports.api = async (event, context, cb) => {
   context.callbackWaitsForEmptyEventLoop = false;
-  const { doc, id, fields, prop, val, idname, player_rating, rating_date, player_games, lookup } = event.queryStringParameters;
-  await connectDB();
-  let r = {};
+  // const { doc, id, fields, prop, val, idname, player_rating, rating_date, player_games, lookup } = event.queryStringParameters;
+  // await connectDB();
+  //let r = {};
 
-  if (lookup) {
-    const version = await cdVersion();
-    const cats = await get('cats');
-    r = { cats, cdVersion: version };
-  } else if (idname) {
-    r = await getIdName(doc);
-  } else if (id && doc) {
-    r = await getById(doc, id);
-  } else if (fields || prop) {
-    r = await search(doc, prop, val, fields);
-  } else if (player_rating) {
-    r = await getPlayerRating(id, rating_date);
-  } else if (player_games) {
-    r = await getPlayerGames(id);
-  } else if (doc) {
-    r = await get(doc);
-  }
+  // if (lookup) {
+  //   const version = await cdVersion();
+  //   const cats = await get('cats');
+  //   r = { cats, cdVersion: version };
+  // } else if (idname) {
+  //   r = await getIdName(doc);
+  // } else if (id && doc) {
+  //   r = await getById(doc, id);
+  // } else if (fields || prop) {
+  //   r = await search(doc, prop, val, fields);
+  // } else if (player_rating) {
+  //   r = await getPlayerRating(id, rating_date);
+  // } else if (player_games) {
+  //   r = await getPlayerGames(id);
+  // } else if (doc) {
+  //   r = await get(doc);
+  // }
+  await convert();
+  const f = fs.readFileSync('/tmp/s2.png');
+  return {
+   statusCode: 200,
+   headers: 
+   {
+     'Content-Type': 'image/png'
+   },
+     body: f.toString('base64'),
+     isBase64Encoded: true
+   };
 
-  return res(r);
+  // try {
+  //   fs.createReadStream(process.env.LAMBDA_TASK_ROOT + '/s1.docx')
+  //     //.pipe(cloudconvert.convert({ inputformat: 'docx', outputformat: 'png' }))
+  //     //.pipe(fs.createWriteStream('/tmp/s1.docx'))
+  //     .on('finish', function() {
+  //       return res('done');
+  //     })
+  // } catch (e) {
+  //   r = e;
+  //   return res(r);
+  // }
 };
 
 module.exports.admin = async (event, context) => {
@@ -110,3 +133,14 @@ module.exports.logout = async event => res({ isAuthenticated: false });
 
 
 // https://raw.githubusercontent.com/ln613/n2/master/data/db.json
+
+function sleep(millis) {
+    return new Promise(resolve => setTimeout(resolve, millis));
+}
+
+const convert = async () => new Promise(resolve => fs.createReadStream(process.env.LAMBDA_TASK_ROOT + '/s2.docx')
+  .pipe(cloudconvert.convert({ inputformat: 'docx', outputformat: 'png' }))
+  .pipe(fs.createWriteStream('/tmp/s2.png'))
+  //.pipe(fs.createWriteStream('/tmp/s2.docx'))
+  .on('finish', resolve)
+);
