@@ -2,9 +2,12 @@
 
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
+const cd = require('cloudinary');
 const cloudconvert = new (require('cloudconvert'))(process.env.CLOUDCONVERT_APIKEY);
 const { connectDB, get, getIdName, getById, search, getPlayerRating, getPlayerGames, cdList, cdVersion, initdata, backup, updateRating, genrr, gengroup, nogame, getNewGameId, addToList, add, replaceList, replace, update, count } = require('./api');
 const { tap, res, policy } = require('./utils');
+
+cd.config({ cloud_name: 'vttc', api_key: process.env.CLOUDINARY_KEY, api_secret: process.env.CLOUDINARY_SECRET });
 
 module.exports.api = async (event, context, cb) => {
   context.callbackWaitsForEmptyEventLoop = false;
@@ -29,17 +32,17 @@ module.exports.api = async (event, context, cb) => {
   // } else if (doc) {
   //   r = await get(doc);
   // }
-  await convert();
-  const f = fs.readFileSync('/tmp/s2.png');
-  return {
-   statusCode: 200,
-   headers: 
-   {
-     'Content-Type': 'image/png'
-   },
-     body: f.toString('base64'),
-     isBase64Encoded: true
-   };
+  
+  const url = await convert();
+  await cd.v2.uploader.upload('http:' + url, { folder: 'docs' });
+  return res('done');
+  
+  //const f = fs.readFileSync('/tmp/s2.png');
+  // return {
+  //   statusCode: 200,
+  //   body: f.toString('base64'),
+  //   isBase64Encoded: true
+  // };
 
   // try {
   //   fs.createReadStream(process.env.LAMBDA_TASK_ROOT + '/s1.docx')
@@ -138,9 +141,8 @@ function sleep(millis) {
     return new Promise(resolve => setTimeout(resolve, millis));
 }
 
-const convert = async () => new Promise(resolve => fs.createReadStream(process.env.LAMBDA_TASK_ROOT + '/s2.docx')
-  .pipe(cloudconvert.convert({ inputformat: 'docx', outputformat: 'png' }))
-  .pipe(fs.createWriteStream('/tmp/s2.png'))
-  //.pipe(fs.createWriteStream('/tmp/s2.docx'))
-  .on('finish', resolve)
+const convert = async () => new Promise(resolve => //fs.createReadStream(process.env.LAMBDA_TASK_ROOT + '/s2.docx').pipe(
+  cloudconvert.createProcess({ inputformat: 'docx', outputformat: 'png' },
+    (e, c) => c.start({ input: 'download', file: process.env.SRC_DOC, outputformat: 'png' },
+      (e, s) => s.wait((e, o) => resolve(o.data.output.url))))
 );
