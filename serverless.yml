@@ -6,37 +6,14 @@ provider:
   region: us-west-2
 
 functions:
-  authorize:
-    handler: handler.authorize
-  login:
-    handler: handler.login
+  convert:
+    handler: handler.convert
     events:
       - http:
-          path: /login
+          path: /
           method: post
           cors: true
-  logout:
-    handler: handler.logout
-    events:
-      - http:
-          path: /logout
-          method: post
-          cors: true
-  api:
-    handler: handler.api
-    events:
-      - http:
-          path: /api
-          method: get
-          cors: true
-  admin:
-    handler: handler.admin
-    events:
-      - http:
-          path: /admin
-          method: any
-          cors: true
-          authorizer: authorize
 
 plugins:
   - serverless-offline
+  - serverless-dotenv-plugin
