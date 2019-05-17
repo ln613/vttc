@@ -8,6 +8,8 @@ provider:
 functions:
   convert:
     handler: handler.convert
+    timeout: 60
+    memorySize: 512
     events:
       - http:
           path: /

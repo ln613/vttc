@@ -14,4 +14,6 @@ e.res = (body, code) => ({
   body: JSON.stringify(body)
 });
 
+e.cdVersion = () => cd.v2.api.resources({ max_results: 500 }).then(r => R.sortWith([R.descend(R.prop('version'))], r.resources)[0].version);
+
 module.exports = e;
