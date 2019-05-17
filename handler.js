@@ -10,10 +10,10 @@ const tmp = '/tmp/1.docx';
 cd.config({ cloud_name: 'vttc', api_key: process.env.CLOUDINARY_KEY, api_secret: process.env.CLOUDINARY_SECRET });
 
 module.exports.convert = async (event, context, cb) => {
+  context.callbackWaitsForEmptyEventLoop = false;
   let data = {};
 
   try {
-    context.callbackWaitsForEmptyEventLoop = false;
     const contentType = event.headers['Content-Type'] || event.headers['content-type'];
 
     if (!startsWith('multipart/form-data', trim(contentType)))
@@ -21,19 +21,19 @@ module.exports.convert = async (event, context, cb) => {
     
     const result = multipart.parse(event, true);
     
-    fs.writeFileSync(tmp, result.f1.content);
+    //fs.writeFileSync(tmp, result.f1.content);
 
-    // await cd.v2.uploader.upload('data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,' + new Buffer(fs.readFileSync(tmp)).toString('base64'), { folder: 'docs' });
+    await cd.v2.uploader.upload(tap(result.f1.content), { folder: 'docs' });
 
     // const ver = await cdVersion();
 
     // const url = await convert1(ver, result.f1.filename);
 
-    data = await convert();
+    //data = await convert();
 
-    await sleep(3000);
+    // await sleep(3000);
 
-    await cd.v2.uploader.upload('https:' + data.output.url, { folder: 'docs' });
+    //await cd.v2.uploader.upload('https:' + data.output.url, { folder: 'docs' });
 
     return res(data);
   } catch (e) {
