@@ -6,8 +6,8 @@ provider:
   region: us-west-2
 
 functions:
-  convert:
-    handler: handler.convert
+  cdupload:
+    handler: handler.cdupload
     timeout: 60
     memorySize: 512
     events:
