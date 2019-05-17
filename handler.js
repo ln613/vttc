@@ -21,19 +21,19 @@ module.exports.convert = async (event, context, cb) => {
     
     const result = multipart.parse(event, true);
     
-    //fs.writeFileSync(tmp, result.f1.content);
+    fs.writeFileSync(tmp, result.f1.content);
 
-    await cd.v2.uploader.upload(tap(result.f1.content), { folder: 'docs' });
+    //await cd.v2.uploader.upload(tap(result.f1.content), { folder: 'docs' });
 
     // const ver = await cdVersion();
 
     // const url = await convert1(ver, result.f1.filename);
 
-    //data = await convert();
+    data = await convert();
 
     // await sleep(3000);
 
-    //await cd.v2.uploader.upload('https:' + data.output.url, { folder: 'docs' });
+    await cd.v2.uploader.upload('https:' + data.output.url, { folder: 'docs' });
 
     return res(data);
   } catch (e) {
