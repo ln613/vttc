@@ -1,0 +1,13 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[dev]
+  port = 8888
+  command = "npm run dev:client"
+  autoLaunch = false
+
+[functions]
+  node_bundler = "esbuild"
+  included_files = ["netlify/functions/**"]
