@@ -13,7 +13,7 @@ export const connectDB = async () => {
   await client.connect()
 
   const env = process.env.NETLIFY_DEV ? 'dev' : (process.env.CONTEXT === 'production' ? '' : 'qa')
-  const dbName = env ? `vttc-${env}` : 'vttc'
+  const dbName = 'vttc' // env ? `vttc-${env}` : 'vttc'
 
   cachedClient = client
   cachedDb = client.db(dbName)
