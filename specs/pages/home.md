@@ -15,5 +15,5 @@ title: h1
 
 ### Player list
 
-Show the full name and rating of all players (from players collection in db)
+Show the full name (firstName + lastName) and rating of all players (from players collection in db)
 

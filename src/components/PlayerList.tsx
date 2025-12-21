@@ -38,6 +38,6 @@ export const PlayerList = () => {
 
 const PlayerItem = ({ player }: { player: Player }) => (
   <li>
-    {player.fullName} - {player.rating}
+    {player.firstName} {player.lastName} - {player.rating}
   </li>
 )

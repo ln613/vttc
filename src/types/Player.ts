@@ -1,5 +1,6 @@
 export interface Player {
   id: string
-  fullName: string
+  firstName: string
+  lastName: string
   rating: number
 }
