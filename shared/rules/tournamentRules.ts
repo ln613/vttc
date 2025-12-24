@@ -1,5 +1,5 @@
 import type { Player } from '../types/Player'
-import type { Team, Tournament } from '../types/Tournament'
+import type { Team } from '../types/Tournament'
 
 /**
  * Get the tournament type based on number of players per team

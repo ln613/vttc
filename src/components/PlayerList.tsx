@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { Player } from '../types/Player'
+import type { Player } from '../../shared/types/Player'
 import { api } from '../utils/api'
 
 export const PlayerList = () => {
