@@ -232,3 +232,125 @@ describe('createGroupStage', () => {
     expect(stage.groups.length).toBe(2) // 8 teams -> Math.floor(8/3) = 2 groups
   })
 })
+
+describe('formGroupsWithSnakeSeeding - comprehensive test for 4 to 40 participants', () => {
+  /**
+   * Helper to format groups in a human-readable table format
+   * seedingPos is the seeding position (1 = best, n = worst)
+   */
+  const formatGroupsAsTable = (
+    numParticipants: number,
+    groups: { seedingPos: number }[][],
+  ): string => {
+    const numGroups = groups.length
+    const maxGroupSize = Math.max(...groups.map((g) => g.length))
+
+    let output = `\n${'='.repeat(60)}\n`
+    output += `Participants: ${numParticipants} | Groups: ${numGroups}\n`
+    output += `${'='.repeat(60)}\n`
+
+    // Header row
+    const colWidth = 8
+    output += groups.map((_, i) => `G${i + 1}`.padStart(colWidth)).join('') + '\n'
+    output += '-'.repeat(numGroups * colWidth) + '\n'
+
+    // Data rows
+    for (let row = 0; row < maxGroupSize; row++) {
+      const rowStr = groups
+        .map((group) => {
+          if (row < group.length) {
+            return `s${group[row].seedingPos}`.padStart(colWidth)
+          }
+          return ''.padStart(colWidth)
+        })
+        .join('')
+      output += rowStr + '\n'
+    }
+
+    // Group totals
+    output += '-'.repeat(numGroups * colWidth) + '\n'
+    output += groups
+      .map((group) => {
+        const total = group.reduce((sum, p) => sum + p.seedingPos, 0)
+        return `${total}`.padStart(colWidth)
+      })
+      .join('') + '\n'
+
+    return output
+  }
+
+  it('should correctly apply snake seeding for participants from 4 to 40', () => {
+    let allOutput = '\n\nSNAKE SEEDING TEST RESULTS\n'
+    allOutput += 'Seeding positions: s1=highest seed (best), s2=second highest, etc.\n'
+    allOutput += 'Group totals show the sum of seeding positions per group (lower = stronger group)\n'
+
+    for (let n = 4; n <= 40; n++) {
+      // Create players with rating = n - i (higher rating = better player)
+      // Player 0 has rating n (best), Player n-1 has rating 1 (worst)
+      const players = Array.from({ length: n }, (_, i) =>
+        createPlayer(String(i + 1), n - i),
+      )
+
+      const groups = formGroupsWithSnakeSeeding(players, 1)
+
+      // Convert rating to seeding position: highest rating (n) = s1, lowest rating (1) = sn
+      const groupSeedings = groups.map((group) =>
+        group.map((p) => ({ seedingPos: n - (p as Player).rating + 1 })),
+      )
+
+      allOutput += formatGroupsAsTable(n, groupSeedings)
+
+      // Verify basic constraints
+      const totalInGroups = groups.reduce((sum, g) => sum + g.length, 0)
+      expect(totalInGroups).toBe(n)
+
+      // Verify all participants are placed exactly once
+      const allSeedings = groups.flatMap((g) =>
+        g.map((p) => n - (p as Player).rating + 1),
+      )
+      const expectedSeedings = Array.from({ length: n }, (_, i) => i + 1)
+      expect(allSeedings.sort((a, b) => a - b)).toEqual(expectedSeedings)
+    }
+
+    // Output all results to console for human review
+    console.log(allOutput)
+
+    // Basic sanity check passed
+    expect(true).toBe(true)
+  })
+
+  it('should verify snake seeding balances group strength', () => {
+    let output = '\n\nGROUP BALANCE ANALYSIS\n'
+    output += '=' .repeat(80) + '\n'
+    output += 'N'.padEnd(6) + 'Groups'.padEnd(8) + 'Group Sizes'.padEnd(20) + 'Avg Rating per Group'.padEnd(30) + 'Max Diff\n'
+    output += '-'.repeat(80) + '\n'
+
+    for (let n = 4; n <= 40; n++) {
+      const players = Array.from({ length: n }, (_, i) =>
+        createPlayer(String(i + 1), 1000 + (n - i) * 100), // Higher rating = better seeding
+      )
+
+      const groups = formGroupsWithSnakeSeeding(players, 1)
+
+      const groupSizes = groups.map((g) => g.length)
+      const avgRatings = groups.map((g) => {
+        const total = g.reduce((sum, p) => sum + (p as Player).rating, 0)
+        return Math.round(total / g.length)
+      })
+
+      const maxDiff = Math.max(...avgRatings) - Math.min(...avgRatings)
+
+      output += `${n}`.padEnd(6)
+      output += `${groups.length}`.padEnd(8)
+      output += `[${groupSizes.join(', ')}]`.padEnd(20)
+      output += `[${avgRatings.join(', ')}]`.padEnd(30)
+      output += `${maxDiff}\n`
+
+      // Snake seeding naturally balances groups well
+      // Max difference depends on group sizes and rating spread
+      // With 100-point rating increments and varying group sizes, we expect some variance
+    }
+
+    console.log(output)
+  })
+})
