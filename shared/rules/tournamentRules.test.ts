@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import type { Player } from '../types/Player'
-import type { Team } from '../types/Tournament'
+import type { Team, ParticipantWithGroupInfo, GroupParticipant } from '../types/Tournament'
+import type { Match, Game } from '../types/Match'
+import { DEFAULT_GAME_CONFIG, DEFAULT_MATCH_CONFIG } from '../types/Match'
 import {
   getTournamentType,
   calculateNumberOfGroups,
@@ -10,6 +12,22 @@ import {
   sortBySeeding,
   formGroupsWithSnakeSeeding,
   createGroupStage,
+  // Group ranking
+  calculateGroupStats,
+  getMatchWinner,
+  getHeadToHeadWinner,
+  rankGroupParticipants,
+  // Knockout stage
+  isPowerOf2,
+  calculateNumberOfRounds,
+  calculateRound2Participants,
+  calculateRemainingParticipants,
+  getKnockoutRoundName,
+  calculateByeCount,
+  calculateSnakeRankingSeeding,
+  createKnockoutStage,
+  createKnockoutMatches,
+  wereInSameGroup,
 } from './tournamentRules'
 
 // Helper to create test players
@@ -352,5 +370,635 @@ describe('formGroupsWithSnakeSeeding - comprehensive test for 4 to 40 participan
     }
 
     console.log(output)
+  })
+})
+
+// ==================== GROUP RANKING TESTS ====================
+
+// Helper to create a match result
+const createMatchResult = (
+  id: string,
+  p1: Player,
+  p2: Player,
+  gamesWon1: number,
+  gamesWon2: number,
+  games: { score1: number; score2: number }[],
+): Match => ({
+  id,
+  config: DEFAULT_MATCH_CONFIG,
+  side1: [p1],
+  side2: [p2],
+  games: games.map((g, i) => ({
+    id: `${id}-game-${i}`,
+    config: DEFAULT_GAME_CONFIG,
+    score1: g.score1,
+    score2: g.score2,
+    winningSide: g.score1 > g.score2 ? 1 : 2,
+  })),
+  gamesWon1,
+  gamesWon2,
+  winningSide: gamesWon1 > gamesWon2 ? 1 : gamesWon2 > gamesWon1 ? 2 : undefined,
+})
+
+describe('Group Ranking', () => {
+  describe('getMatchWinner', () => {
+    it('should return side 1 when they won more games', () => {
+      const p1 = createPlayer('1', 1500)
+      const p2 = createPlayer('2', 1400)
+      const match = createMatchResult('m1', p1, p2, 2, 1, [
+        { score1: 11, score2: 5 },
+        { score1: 5, score2: 11 },
+        { score1: 11, score2: 8 },
+      ])
+      expect(getMatchWinner(match)).toBe(1)
+    })
+
+    it('should return side 2 when they won more games', () => {
+      const p1 = createPlayer('1', 1500)
+      const p2 = createPlayer('2', 1400)
+      const match = createMatchResult('m1', p1, p2, 0, 2, [
+        { score1: 5, score2: 11 },
+        { score1: 8, score2: 11 },
+      ])
+      expect(getMatchWinner(match)).toBe(2)
+    })
+
+    it('should return undefined when tied', () => {
+      const p1 = createPlayer('1', 1500)
+      const p2 = createPlayer('2', 1400)
+      const match = createMatchResult('m1', p1, p2, 1, 1, [
+        { score1: 11, score2: 5 },
+        { score1: 5, score2: 11 },
+      ])
+      expect(getMatchWinner(match)).toBeUndefined()
+    })
+  })
+
+  describe('calculateGroupStats', () => {
+    it('should calculate correct stats for a participant', () => {
+      const p1 = createPlayer('1', 1500)
+      const p2 = createPlayer('2', 1400)
+      const p3 = createPlayer('3', 1300)
+
+      const matches: Match[] = [
+        // p1 vs p2: p1 wins 2-0
+        createMatchResult('m1', p1, p2, 2, 0, [
+          { score1: 11, score2: 5 },
+          { score1: 11, score2: 8 },
+        ]),
+        // p1 vs p3: p1 wins 2-1
+        createMatchResult('m2', p1, p3, 2, 1, [
+          { score1: 11, score2: 7 },
+          { score1: 9, score2: 11 },
+          { score1: 11, score2: 6 },
+        ]),
+      ]
+
+      const stats = calculateGroupStats(p1, matches)
+
+      expect(stats.matchesPlayed).toBe(2)
+      expect(stats.matchesWon).toBe(2)
+      expect(stats.matchesLost).toBe(0)
+      expect(stats.gamesWon).toBe(4) // 2 + 2
+      expect(stats.gamesLost).toBe(1) // 0 + 1
+      expect(stats.gameDifference).toBe(3) // 4 - 1
+      // Points: (11+5) + (11+8) + (11+7) + (9+11) + (11+6) = 90 total
+      // p1 points: 11 + 11 + 11 + 9 + 11 = 53
+      // p1 lost: 5 + 8 + 7 + 11 + 6 = 37
+      expect(stats.pointsWon).toBe(53)
+      expect(stats.pointsLost).toBe(37)
+      expect(stats.pointDifference).toBe(16)
+    })
+  })
+
+  describe('getHeadToHeadWinner', () => {
+    it('should return winner of head-to-head match', () => {
+      const p1 = createPlayer('1', 1500)
+      const p2 = createPlayer('2', 1400)
+
+      const matches: Match[] = [
+        createMatchResult('m1', p1, p2, 2, 1, [
+          { score1: 11, score2: 5 },
+          { score1: 5, score2: 11 },
+          { score1: 11, score2: 8 },
+        ]),
+      ]
+
+      expect(getHeadToHeadWinner(p1, p2, matches)).toBe(p1)
+    })
+
+    it('should return undefined if no head-to-head match', () => {
+      const p1 = createPlayer('1', 1500)
+      const p2 = createPlayer('2', 1400)
+      const p3 = createPlayer('3', 1300)
+
+      const matches: Match[] = [
+        createMatchResult('m1', p1, p3, 2, 0, [
+          { score1: 11, score2: 5 },
+          { score1: 11, score2: 8 },
+        ]),
+      ]
+
+      expect(getHeadToHeadWinner(p1, p2, matches)).toBeUndefined()
+    })
+  })
+
+  describe('rankGroupParticipants', () => {
+    it('should rank by matches won first', () => {
+      const p1 = createPlayer('1', 1500)
+      const p2 = createPlayer('2', 1400)
+      const p3 = createPlayer('3', 1300)
+
+      const matches: Match[] = [
+        createMatchResult('m1', p1, p2, 2, 0, [
+          { score1: 11, score2: 5 },
+          { score1: 11, score2: 8 },
+        ]),
+        createMatchResult('m2', p1, p3, 2, 0, [
+          { score1: 11, score2: 7 },
+          { score1: 11, score2: 6 },
+        ]),
+        createMatchResult('m3', p2, p3, 2, 0, [
+          { score1: 11, score2: 9 },
+          { score1: 11, score2: 8 },
+        ]),
+      ]
+
+      const participants: GroupParticipant[] = [
+        { participant: p1, stats: calculateGroupStats(p1, matches) },
+        { participant: p2, stats: calculateGroupStats(p2, matches) },
+        { participant: p3, stats: calculateGroupStats(p3, matches) },
+      ]
+
+      const ranked = rankGroupParticipants(participants, matches)
+
+      expect(ranked[0].participant).toBe(p1) // 2 wins
+      expect(ranked[0].ranking).toBe(1)
+      expect(ranked[1].participant).toBe(p2) // 1 win
+      expect(ranked[1].ranking).toBe(2)
+      expect(ranked[2].participant).toBe(p3) // 0 wins
+      expect(ranked[2].ranking).toBe(3)
+    })
+
+    it('should use head-to-head for 2-way tie', () => {
+      const p1 = createPlayer('1', 1500)
+      const p2 = createPlayer('2', 1400)
+      const p3 = createPlayer('3', 1300)
+
+      // p1 beats p3, p2 beats p3, p2 beats p1
+      // So p1: 1 win, p2: 2 wins, p3: 0 wins
+      // Wait, let's create a 2-way tie: p1 beats p2, p1 beats p3, p2 beats p3
+      // Actually that's p1: 2 wins, p2: 1 win, p3: 0 wins - no tie
+      
+      // For a 2-way tie, let's do: p1 beats p2, p2 beats p3, p3 beats p1
+      // p1: 1 win, p2: 1 win, p3: 1 win - 3-way tie
+      
+      // Let's just test a simple 2-way tie between p1 and p2
+      // p1 beats p3, p2 beats p3 (p1 and p2 both have 1 win, head-to-head decides)
+      // But they need to have played each other for head-to-head
+      
+      // Scenario: p1 beats p3, p2 beats p3, p1 beats p2 (h2h)
+      // That makes p1: 2 wins, p2: 1 win - no tie
+      
+      // Let's do: 4 players, p1 beats p2, p1 beats p3, p2 beats p4, p3 beats p4, p3 beats p2 (but that won't create tie)
+      
+      // Simplest 2-way tie: 3 players, p1 beats p2, p2 beats p3, p3 beats p1 (circular, all have 1 win each)
+      // That's actually a 3-way tie
+
+      // For 2-way tie, need 4 players where 2 have same wins
+      const p4 = createPlayer('4', 1200)
+
+      // p1: beats p2, beats p3 (2 wins)
+      // p2: beats p4 (1 win)
+      // p3: beats p4 (1 win)
+      // p4: 0 wins
+      // p2 and p3 are tied at 1 win, head-to-head between them decides
+
+      const matchesTie: Match[] = [
+        createMatchResult('m1', p1, p2, 2, 0, [
+          { score1: 11, score2: 5 },
+          { score1: 11, score2: 8 },
+        ]),
+        createMatchResult('m2', p1, p3, 2, 0, [
+          { score1: 11, score2: 7 },
+          { score1: 11, score2: 6 },
+        ]),
+        createMatchResult('m3', p2, p4, 2, 0, [
+          { score1: 11, score2: 3 },
+          { score1: 11, score2: 4 },
+        ]),
+        createMatchResult('m4', p3, p4, 2, 0, [
+          { score1: 11, score2: 5 },
+          { score1: 11, score2: 5 },
+        ]),
+        // Head-to-head: p3 beats p2
+        createMatchResult('m5', p2, p3, 0, 2, [
+          { score1: 8, score2: 11 },
+          { score1: 9, score2: 11 },
+        ]),
+        // Additional matches to complete round robin
+        createMatchResult('m6', p1, p4, 2, 0, [
+          { score1: 11, score2: 2 },
+          { score1: 11, score2: 3 },
+        ]),
+      ]
+
+      const participantsTie: GroupParticipant[] = [
+        { participant: p1, stats: calculateGroupStats(p1, matchesTie) },
+        { participant: p2, stats: calculateGroupStats(p2, matchesTie) },
+        { participant: p3, stats: calculateGroupStats(p3, matchesTie) },
+        { participant: p4, stats: calculateGroupStats(p4, matchesTie) },
+      ]
+
+      const rankedTie = rankGroupParticipants(participantsTie, matchesTie)
+
+      expect(rankedTie[0].participant).toBe(p1) // 3 wins
+      expect(rankedTie[0].ranking).toBe(1)
+      // p2 and p3 both have 1 win, p3 beat p2 head-to-head
+      expect(rankedTie[1].participant).toBe(p3) // 1 win, beat p2 h2h
+      expect(rankedTie[1].ranking).toBe(2)
+      expect(rankedTie[2].participant).toBe(p2) // 1 win, lost to p3 h2h
+      expect(rankedTie[2].ranking).toBe(3)
+      expect(rankedTie[3].participant).toBe(p4) // 0 wins
+      expect(rankedTie[3].ranking).toBe(4)
+    })
+  })
+})
+
+// ==================== KNOCKOUT STAGE TESTS ====================
+
+describe('Knockout Stage', () => {
+  describe('isPowerOf2', () => {
+    it('should return true for powers of 2', () => {
+      expect(isPowerOf2(1)).toBe(true)
+      expect(isPowerOf2(2)).toBe(true)
+      expect(isPowerOf2(4)).toBe(true)
+      expect(isPowerOf2(8)).toBe(true)
+      expect(isPowerOf2(16)).toBe(true)
+      expect(isPowerOf2(32)).toBe(true)
+    })
+
+    it('should return false for non-powers of 2', () => {
+      expect(isPowerOf2(0)).toBe(false)
+      expect(isPowerOf2(3)).toBe(false)
+      expect(isPowerOf2(5)).toBe(false)
+      expect(isPowerOf2(6)).toBe(false)
+      expect(isPowerOf2(7)).toBe(false)
+      expect(isPowerOf2(9)).toBe(false)
+    })
+  })
+
+  describe('calculateNumberOfRounds', () => {
+    it('should calculate correct number of rounds', () => {
+      expect(calculateNumberOfRounds(2)).toBe(1)
+      expect(calculateNumberOfRounds(4)).toBe(2)
+      expect(calculateNumberOfRounds(8)).toBe(3)
+      expect(calculateNumberOfRounds(16)).toBe(4)
+      expect(calculateNumberOfRounds(32)).toBe(5)
+    })
+
+    it('should handle non-power-of-2 participants', () => {
+      expect(calculateNumberOfRounds(3)).toBe(2) // ceil(log2(3)) = 2
+      expect(calculateNumberOfRounds(5)).toBe(3) // ceil(log2(5)) = 3
+      expect(calculateNumberOfRounds(6)).toBe(3)
+      expect(calculateNumberOfRounds(9)).toBe(4)
+    })
+  })
+
+  describe('calculateRound2Participants', () => {
+    it('should return N/2 for powers of 2', () => {
+      expect(calculateRound2Participants(8)).toBe(4)
+      expect(calculateRound2Participants(16)).toBe(8)
+      expect(calculateRound2Participants(32)).toBe(16)
+    })
+
+    it('should return next lower power of 2 for non-powers', () => {
+      expect(calculateRound2Participants(6)).toBe(4) // 2^floor(log2(6)) = 4
+      expect(calculateRound2Participants(9)).toBe(8)
+      expect(calculateRound2Participants(10)).toBe(8)
+      expect(calculateRound2Participants(12)).toBe(8)
+    })
+  })
+
+  describe('calculateRemainingParticipants', () => {
+    it('should return correct sequence for 8 participants', () => {
+      const remaining = calculateRemainingParticipants(8)
+      expect(remaining).toEqual([8, 4, 2])
+    })
+
+    it('should return correct sequence for 6 participants', () => {
+      const remaining = calculateRemainingParticipants(6)
+      // Round 1: 6, Round 2: 4, Round 3: 2
+      expect(remaining).toEqual([6, 4, 2])
+    })
+
+    it('should return correct sequence for 9 participants', () => {
+      const remaining = calculateRemainingParticipants(9)
+      // Round 1: 9, Round 2: 8, Round 3: 4, Round 4: 2
+      expect(remaining).toEqual([9, 8, 4, 2])
+    })
+  })
+
+  describe('getKnockoutRoundName', () => {
+    it('should return Final for 2 participants', () => {
+      const result = getKnockoutRoundName(2, 8)
+      expect(result.name).toBe('Final')
+      expect(result.shortName).toBe('F')
+    })
+
+    it('should return Semifinal for 4 participants', () => {
+      const result = getKnockoutRoundName(4, 8)
+      expect(result.name).toBe('Semifinal')
+      expect(result.shortName).toBe('SF')
+    })
+
+    it('should return Quarterfinal for 8 participants', () => {
+      const result = getKnockoutRoundName(8, 16)
+      expect(result.name).toBe('Quarterfinal')
+      expect(result.shortName).toBe('QF')
+    })
+
+    it('should return Round of N for larger tournaments', () => {
+      const result = getKnockoutRoundName(16, 16)
+      expect(result.name).toBe('Round of 16')
+      expect(result.shortName).toBe('R16')
+    })
+  })
+
+  describe('calculateByeCount', () => {
+    it('should return 0 for power of 2 participants', () => {
+      expect(calculateByeCount(8)).toBe(0)
+      expect(calculateByeCount(16)).toBe(0)
+    })
+
+    it('should calculate correct bye count for non-power of 2', () => {
+      // 6 participants, N2 = 4, byes = 2*4 - 6 = 2
+      expect(calculateByeCount(6)).toBe(2)
+      // 9 participants, N2 = 8, byes = 2*8 - 9 = 7
+      expect(calculateByeCount(9)).toBe(7)
+      // 5 participants, N2 = 4, byes = 2*4 - 5 = 3
+      expect(calculateByeCount(5)).toBe(3)
+    })
+  })
+
+  describe('calculateSnakeRankingSeeding', () => {
+    it('should order participants by snake ranking', () => {
+      // Example from spec: 9 players in 3 groups, top 2 advance
+      // Group results:
+      //     G1    G2    G3
+      // R1  Tom   Joe   Tony
+      // R2  John  Frank Glen
+      
+      // Seeding should be: Tom, Joe, Tony, Glen, Frank, John
+      // R1 goes left to right: Tom (G1), Joe (G2), Tony (G3)
+      // R2 goes right to left: Glen (G3), Frank (G2), John (G1)
+
+      const tom = createPlayer('Tom', 1000)
+      const joe = createPlayer('Joe', 1100)
+      const tony = createPlayer('Tony', 1300)
+      const john = createPlayer('John', 1500)
+      const frank = createPlayer('Frank', 800)
+      const glen = createPlayer('Glen', 700)
+
+      const advanced: ParticipantWithGroupInfo[] = [
+        { participant: tom, groupIndex: 0, ranking: 1 },
+        { participant: john, groupIndex: 0, ranking: 2 },
+        { participant: joe, groupIndex: 1, ranking: 1 },
+        { participant: frank, groupIndex: 1, ranking: 2 },
+        { participant: tony, groupIndex: 2, ranking: 1 },
+        { participant: glen, groupIndex: 2, ranking: 2 },
+      ]
+
+      const seeded = calculateSnakeRankingSeeding(advanced)
+      const names = seeded.map((s) => (s.participant as Player).id)
+
+      // R1 (odd): G1, G2, G3 order -> Tom, Joe, Tony
+      // R2 (even): G3, G2, G1 order -> Glen, Frank, John
+      expect(names).toEqual(['Tom', 'Joe', 'Tony', 'Glen', 'Frank', 'John'])
+    })
+  })
+
+  describe('wereInSameGroup', () => {
+    it('should return true for participants from same group', () => {
+      const p1: ParticipantWithGroupInfo = {
+        participant: createPlayer('1', 1500),
+        groupIndex: 0,
+        ranking: 1,
+      }
+      const p2: ParticipantWithGroupInfo = {
+        participant: createPlayer('2', 1400),
+        groupIndex: 0,
+        ranking: 2,
+      }
+      expect(wereInSameGroup(p1, p2)).toBe(true)
+    })
+
+    it('should return false for participants from different groups', () => {
+      const p1: ParticipantWithGroupInfo = {
+        participant: createPlayer('1', 1500),
+        groupIndex: 0,
+        ranking: 1,
+      }
+      const p2: ParticipantWithGroupInfo = {
+        participant: createPlayer('2', 1400),
+        groupIndex: 1,
+        ranking: 1,
+      }
+      expect(wereInSameGroup(p1, p2)).toBe(false)
+    })
+  })
+
+  describe('createKnockoutStage', () => {
+    it('should create knockout stage with correct number of rounds', () => {
+      const participants: ParticipantWithGroupInfo[] = Array.from(
+        { length: 8 },
+        (_, i) => ({
+          participant: createPlayer(String(i + 1), 1500 - i * 50),
+          groupIndex: i % 4,
+          ranking: Math.floor(i / 4) + 1,
+        }),
+      )
+
+      const stage = createKnockoutStage(participants, 1, { isEliminationEvent: false })
+
+      expect(stage.type).toBe('knockout')
+      expect(stage.numberOfRounds).toBe(3) // 8 -> 4 -> 2 -> 1
+      expect(stage.rounds.length).toBe(3)
+      expect(stage.rounds[0].name).toBe('Quarterfinal')
+      expect(stage.rounds[1].name).toBe('Semifinal')
+      expect(stage.rounds[2].name).toBe('Final')
+    })
+
+    it('should assign byes correctly for 6 participants', () => {
+      const participants: ParticipantWithGroupInfo[] = Array.from(
+        { length: 6 },
+        (_, i) => ({
+          participant: createPlayer(String(i + 1), 1500 - i * 50),
+          groupIndex: i % 3,
+          ranking: Math.floor(i / 3) + 1,
+        }),
+      )
+
+      const stage = createKnockoutStage(participants, 1, { isEliminationEvent: false })
+
+      // 6 participants, 2 byes
+      const byeCount = stage.seedingList.filter((s) => s.hasBye).length
+      expect(byeCount).toBe(2)
+
+      // Top 2 seeds should have byes
+      expect(stage.seedingList[0].hasBye).toBe(true)
+      expect(stage.seedingList[1].hasBye).toBe(true)
+      expect(stage.seedingList[2].hasBye).toBe(false)
+    })
+  })
+
+  describe('createKnockoutMatches', () => {
+    it('should avoid same-group matches when possible', () => {
+      // 4 participants from 2 groups
+      const p1: ParticipantWithGroupInfo = {
+        participant: createPlayer('G1R1', 1500),
+        groupIndex: 0,
+        ranking: 1,
+      }
+      const p2: ParticipantWithGroupInfo = {
+        participant: createPlayer('G2R1', 1400),
+        groupIndex: 1,
+        ranking: 1,
+      }
+      const p3: ParticipantWithGroupInfo = {
+        participant: createPlayer('G2R2', 1300),
+        groupIndex: 1,
+        ranking: 2,
+      }
+      const p4: ParticipantWithGroupInfo = {
+        participant: createPlayer('G1R2', 1200),
+        groupIndex: 0,
+        ranking: 2,
+      }
+
+      const seedingList = [
+        { seed: 1, participant: p1, hasBye: false },
+        { seed: 2, participant: p2, hasBye: false },
+        { seed: 3, participant: p3, hasBye: false },
+        { seed: 4, participant: p4, hasBye: false },
+      ]
+
+      const matches = createKnockoutMatches(seedingList)
+
+      // Should pair: G1R1 vs G2R2 (different groups), G2R1 vs G1R2 (different groups)
+      // Not: G1R1 vs G1R2 (same group)
+      expect(matches.length).toBe(2)
+
+      // Check that no match has same-group participants
+      for (const match of matches) {
+        if (match.participant1 && match.participant2) {
+          expect(wereInSameGroup(match.participant1, match.participant2)).toBe(false)
+        }
+      }
+    })
+
+    it('should include bye matches', () => {
+      const p1: ParticipantWithGroupInfo = {
+        participant: createPlayer('1', 1500),
+        groupIndex: 0,
+        ranking: 1,
+      }
+      const p2: ParticipantWithGroupInfo = {
+        participant: createPlayer('2', 1400),
+        groupIndex: 1,
+        ranking: 1,
+      }
+      const p3: ParticipantWithGroupInfo = {
+        participant: createPlayer('3', 1300),
+        groupIndex: 2,
+        ranking: 1,
+      }
+
+      const seedingList = [
+        { seed: 1, participant: p1, hasBye: true },
+        { seed: 2, participant: p2, hasBye: false },
+        { seed: 3, participant: p3, hasBye: false },
+      ]
+
+      const matches = createKnockoutMatches(seedingList)
+
+      // 1 bye match + 1 regular match
+      expect(matches.length).toBe(2)
+
+      const byeMatch = matches.find((m) => m.isBye2)
+      expect(byeMatch).toBeDefined()
+      expect(byeMatch!.participant1).toBe(p1)
+      expect(byeMatch!.winner).toBe(p1)
+    })
+  })
+
+  describe('Knockout Stage - Spec Example', () => {
+    it('should match the spec example with 6 participants from 3 groups', () => {
+      // From spec:
+      // John - 1500, Peter - 1400, Tony - 1300, Sam - 1200, Joe - 1100, Tom - 1000, Phil - 900, Frank - 800, Glen - 700
+      // Group results:
+      //     G1    G2    G3
+      // R1  Tom   Joe   Tony
+      // R2  John  Frank Glen
+      // R3  Phil  Peter Sam
+      
+      // First 2 from each group advance
+      // Seeding: Tom, Joe, Tony, Glen, Frank, John
+      // Byes: 6 participants, N2 = 4, byes = 2*4 - 6 = 2
+      // Top 2 (Tom, Joe) have bye
+      // Matches: Tony vs John, Glen vs Frank
+
+      const tom = createPlayer('Tom', 1000)
+      const joe = createPlayer('Joe', 1100)
+      const tony = createPlayer('Tony', 1300)
+      const john = createPlayer('John', 1500)
+      const frank = createPlayer('Frank', 800)
+      const glen = createPlayer('Glen', 700)
+
+      const advanced: ParticipantWithGroupInfo[] = [
+        { participant: tom, groupIndex: 0, ranking: 1 },
+        { participant: john, groupIndex: 0, ranking: 2 },
+        { participant: joe, groupIndex: 1, ranking: 1 },
+        { participant: frank, groupIndex: 1, ranking: 2 },
+        { participant: tony, groupIndex: 2, ranking: 1 },
+        { participant: glen, groupIndex: 2, ranking: 2 },
+      ]
+
+      const stage = createKnockoutStage(advanced, 1, { isEliminationEvent: false })
+
+      // Verify seeding order
+      const seedNames = stage.seedingList.map(
+        (s) => (s.participant.participant as Player).id,
+      )
+      expect(seedNames).toEqual(['Tom', 'Joe', 'Tony', 'Glen', 'Frank', 'John'])
+
+      // Verify byes
+      expect(stage.seedingList[0].hasBye).toBe(true) // Tom
+      expect(stage.seedingList[1].hasBye).toBe(true) // Joe
+      expect(stage.seedingList[2].hasBye).toBe(false) // Tony
+      expect(stage.seedingList[3].hasBye).toBe(false) // Glen
+      expect(stage.seedingList[4].hasBye).toBe(false) // Frank
+      expect(stage.seedingList[5].hasBye).toBe(false) // John
+
+      // Verify first round matches
+      const firstRound = stage.rounds[0]
+      expect(firstRound.matches.length).toBe(4) // 2 byes + 2 matches
+
+      // Find the actual matches (not byes)
+      const realMatches = firstRound.matches.filter((m) => !m.isBye2)
+      expect(realMatches.length).toBe(2)
+
+      // Check the pairings: Tony vs John, Glen vs Frank
+      // Tony (G3) should not play Glen (G3 - same group), so Tony vs John
+      // Glen should play Frank (both from different groups than their opponents)
+      const matchPairs = realMatches.map((m) => {
+        const p1Name = (m.participant1!.participant as Player).id
+        const p2Name = (m.participant2!.participant as Player).id
+        return [p1Name, p2Name].sort()
+      })
+
+      expect(matchPairs).toContainEqual(['John', 'Tony'])
+      expect(matchPairs).toContainEqual(['Frank', 'Glen'])
+    })
   })
 })
