@@ -11,12 +11,14 @@ interface TournamentEditProps {
   initialData?: {
     name: string
     type: string
+    teamSize: string | null
     date: Date | null
     cover: File | string | null
   }
   onSave?: (data: {
     name: string
     type: string
+    teamSize: string | null
     date: Date | null
     cover: File | string | null
   }) => void
@@ -31,6 +33,9 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
 }) => {
   const [name, setName] = useState(initialData?.name || '')
   const [type, setType] = useState(initialData?.type || 'Single')
+  const [teamSize, setTeamSize] = useState<string | null>(
+    initialData?.teamSize || null,
+  )
   const [date, setDate] = useState<Date | null>(initialData?.date || null)
   const [cover, setCover] = useState<File | string | null>(
     initialData?.cover || null,
@@ -72,7 +77,7 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
     if (!validateForm()) {
       return
     }
-    onSave?.({ name, type, date, cover })
+    onSave?.({ name, type, teamSize, date, cover })
   }
 
   const handleCancel = () => {
@@ -97,8 +102,23 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
           label="Type"
           options={['Single', 'Team']}
           selectedValue={type}
-          onChange={setType}
+          onChange={(value) => {
+            setType(value)
+            if (value === 'Single') {
+              setTeamSize(null)
+            } else if (!teamSize) {
+              setTeamSize('2')
+            }
+          }}
         />
+        {type === 'Team' && (
+          <SingleSelectTags
+            label="Team Size"
+            options={['2', '3', '4']}
+            selectedValue={teamSize || '2'}
+            onChange={setTeamSize}
+          />
+        )}
         <DatePicker label="Date" value={date} onChange={setDate} />
         <MediaUpload label="Cover" value={cover} onChange={setCover} />
         <div style={buttonContainerStyle}>
