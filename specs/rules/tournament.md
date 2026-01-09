@@ -43,6 +43,21 @@ s6    s5    s4
 s7    s8    s9
       s11   s10
 
+#### Match schedule
+
+Group of 3:
+- the 1st match is between seed 2 and seed 3
+- the 2nd match is between seed 1 and seed 3
+- the 3rd match is between seed 1 and seed 2
+
+Group of 4:
+- the 1st match is between seed 1 and seed 4
+- the 2nd match is between seed 2 and seed 3
+- the 3rd match is between seed 1 and seed 3
+- the 4th match is between seed 2 and seed 4
+- the 5th match is between seed 3 and seed 4
+- the 6th match is between seed 1 and seed 2
+
 #### Ranking
 
 The ranking of the teams/players in a group is determined based on the following order:
@@ -55,7 +70,6 @@ The ranking of the teams/players in a group is determined based on the following
     b. Number of total games won (GW)
     c. Number of total points won - Number of total points lost (Point Difference, PD, in all games in all matches)
     d. Number of total points won PW
-
 
 #### Advancement
 
@@ -135,3 +149,61 @@ In the previous example, in the first round, Tom and Joe will have a bye, Tony v
 - if there are still duplicates in the seeding list, keep the highest seed for each participant
 
 In the previous example, if John beat Tony and Glen beat Frank in the first round, then the 2nd round seeding is Tom, Joe, John, Glen, and the 2nd round matches will be Tom vs Glen, Joe vs John.
+
+## Pre-defined Tournament Formats
+
+## Shared abbreviations
+
+BON = best of n matches
+GS = Goup Stage
+KO = Knockout Stage
+KO1 = Knockout Stage before Semifinal
+KO2 = Knockout Stage - Semifinal and Final
+
+## Shared inputs
+
+BON:
+- GS BON = 3
+- KO1 BON = 3
+- KO2 BON = 5
+
+SB:
+- sex = both
+
+### Open Single
+
+- nop = 1
+- stages: GS, KO
+- no rating limit, no age limit
+
+#### input
+
+- SB
+- BON
+
+### Rated Single
+
+- nop = 1
+- stages: GS, KO
+- no age limit
+- the rating of any participant must be <= the rating limit 
+
+### input
+
+- rating limit *
+- SB
+- BON
+
+### Age Single
+
+- nop = 1
+- stages: GS, KO
+- no rating limit
+- the age of any participant must be under (<=) or over (>=) the age limit, e.g., U19, under 19-year old, O40, over 40-year old
+
+### input
+
+- Under (U) or Over (O) *
+- age limit *
+- SB
+- BON

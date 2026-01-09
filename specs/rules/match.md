@@ -55,7 +55,7 @@ A team match is a series of matches (MS) between 2 teams with 2 or more players 
 
 - home team: A,B
 - away team: X,Y
-- input params when starting the team match:
+- input params when generating the team match schedule:
   - which team is home team
   - who is A
   - who is X
@@ -65,7 +65,7 @@ A team match is a series of matches (MS) between 2 teams with 2 or more players 
 
 - home team: A,B,C
 - away team: X,Y,Z
-- input params when starting the team match:
+- input params when generating the team match schedule:
   - which team is home team
   - who is A,B
   - who is X,Y
@@ -75,7 +75,7 @@ A team match is a series of matches (MS) between 2 teams with 2 or more players 
 
 - home team: A,B,C,D
 - away team: X,Y,Z,W
-- input params when starting the team match:
+- input params when generating the team match schedule:
   - which team is home team
   - who is A,B,C
   - who is X,Y,Z

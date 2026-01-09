@@ -8,6 +8,54 @@ export interface Team {
 }
 
 /**
+ * Sex/Gender filter options
+ */
+export type SexFilter = 'male' | 'female' | 'both'
+
+/**
+ * Age limit type (Under or Over)
+ */
+export type AgeLimitType = 'U' | 'O'
+
+/**
+ * Tournament format types
+ */
+export type TournamentFormatType = 'openSingle' | 'ratedSingle' | 'ageSingle'
+
+/**
+ * Best of N configuration
+ */
+export interface BestOfNConfig {
+  groupStage: 1 | 3 | 5 | 7
+  knockoutBeforeSemifinal: 1 | 3 | 5 | 7
+  semifinalAndFinal: 1 | 3 | 5 | 7
+}
+
+/**
+ * Tournament format configuration
+ */
+export interface TournamentFormat {
+  type: TournamentFormatType
+  nop: number
+  stages: ('group' | 'knockout')[]
+  sex: SexFilter
+  bestOfN: BestOfNConfig
+  ratingLimit?: number // For rated events
+  ageLimitType?: AgeLimitType // U for under, O for over
+  ageLimit?: number // Age limit value
+}
+
+/**
+ * Tournament participant (player or team)
+ */
+export interface Participant {
+  id: string
+  players: Player[]
+  teamName?: string
+  rating: number // Computed rating for seeding
+}
+
+/**
  * Participant with group and ranking information (for knockout stage seeding)
  */
 export interface ParticipantWithGroupInfo {
@@ -119,6 +167,9 @@ export interface Tournament {
   name: string
   date: string
   nop: number
+  format: TournamentFormat
+  maxParticipants: number // 0 = unlimited
+  participants: Participant[]
   stages: Stage[]
 }
 
@@ -142,3 +193,45 @@ export const DEFAULT_KNOCKOUT_STAGE_CONFIG: KnockoutStageConfig = {
 export const ELIMINATION_EVENT_CONFIG: KnockoutStageConfig = {
   isEliminationEvent: true,
 }
+
+/**
+ * Default Best of N configuration
+ */
+export const DEFAULT_BEST_OF_N: BestOfNConfig = {
+  groupStage: 3,
+  knockoutBeforeSemifinal: 3,
+  semifinalAndFinal: 5,
+}
+
+/**
+ * Pre-defined Tournament Formats
+ */
+export const OPEN_SINGLE_FORMAT: TournamentFormat = {
+  type: 'openSingle',
+  nop: 1,
+  stages: ['group', 'knockout'],
+  sex: 'both',
+  bestOfN: DEFAULT_BEST_OF_N,
+}
+
+export const RATED_SINGLE_FORMAT = (ratingLimit: number): TournamentFormat => ({
+  type: 'ratedSingle',
+  nop: 1,
+  stages: ['group', 'knockout'],
+  sex: 'both',
+  bestOfN: DEFAULT_BEST_OF_N,
+  ratingLimit,
+})
+
+export const AGE_SINGLE_FORMAT = (
+  ageLimitType: AgeLimitType,
+  ageLimit: number,
+): TournamentFormat => ({
+  type: 'ageSingle',
+  nop: 1,
+  stages: ['group', 'knockout'],
+  sex: 'both',
+  bestOfN: DEFAULT_BEST_OF_N,
+  ageLimitType,
+  ageLimit,
+})
