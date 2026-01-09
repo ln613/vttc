@@ -63,6 +63,7 @@ const MediaUpload: React.FC<MediaUploadProps> = ({
     right: '8px',
     width: '28px',
     height: '28px',
+    padding: 0,
     borderRadius: '50%',
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     color: '#fff',
@@ -73,6 +74,7 @@ const MediaUpload: React.FC<MediaUploadProps> = ({
     justifyContent: 'center',
     fontSize: '16px',
     fontWeight: 'bold',
+    lineHeight: 1,
     transition: 'opacity 0.2s ease',
   }
 

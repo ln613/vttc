@@ -57,7 +57,7 @@ const MultiSelectTags: React.FC<MultiSelectTagsProps> = ({
     const isSelected = selectedValues.includes(option)
     return {
       padding: '8px 16px',
-      borderRadius: '2px',
+      borderRadius: '4px',
       cursor: singleSelect && isSelected ? 'default' : 'pointer',
       backgroundColor: isSelected ? '#3498db' : 'transparent',
       color: isSelected ? '#fff' : '#333',

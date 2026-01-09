@@ -8,7 +8,7 @@ A list of individually selectable tags
 
 - wrappable
 - when not selected: black text
-- when selected: blue bg, white text, rounded corner (2px)
+- when selected: blue bg, white text, rounded corner (4px)
 - max 4 rows, vertical scrollable
 
 ### Interaction
