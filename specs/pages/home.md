@@ -4,6 +4,7 @@
 
 Vertical
 
+- shared header
 - title VTTC
 - player list
 
