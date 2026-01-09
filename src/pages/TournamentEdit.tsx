@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Header } from '../components/Header'
 import Input from '../components/Input'
 import SingleSelectTags from '../components/SingleSelectTags'
+import Select from '../components/Select'
 import DatePicker from '../components/DatePicker'
 import MediaUpload from '../components/MediaUpload'
 import Button from '../components/Button'
@@ -12,6 +13,10 @@ interface TournamentEditProps {
     name: string
     type: string
     singleFormat: string | null
+    ratingType: string | null
+    ratingValue: string | null
+    ageType: string | null
+    ageValue: string | null
     stages: string | null
     teamSize: string | null
     date: Date | null
@@ -21,6 +26,10 @@ interface TournamentEditProps {
     name: string
     type: string
     singleFormat: string | null
+    ratingType: string | null
+    ratingValue: string | null
+    ageType: string | null
+    ageValue: string | null
     stages: string | null
     teamSize: string | null
     date: Date | null
@@ -30,6 +39,25 @@ interface TournamentEditProps {
 }
 
 const SINGLE_FORMAT_OPTIONS = ['Open Single', 'Rated Single', 'Age Single']
+
+const generateRatingOptions = () => {
+  const options = []
+  for (let i = 100; i <= 3000; i += 50) {
+    options.push({ value: String(i), label: String(i) })
+  }
+  return options
+}
+
+const generateAgeOptions = () => {
+  const options = []
+  for (let i = 10; i <= 80; i++) {
+    options.push({ value: String(i), label: String(i) })
+  }
+  return options
+}
+
+const RATING_OPTIONS = generateRatingOptions()
+const AGE_OPTIONS = generateAgeOptions()
 
 const TournamentEdit: React.FC<TournamentEditProps> = ({
   isEdit = false,
@@ -41,6 +69,18 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
   const [type, setType] = useState(initialData?.type || 'Single')
   const [singleFormat, setSingleFormat] = useState<string | null>(
     initialData?.singleFormat || 'Open Single',
+  )
+  const [ratingType, setRatingType] = useState<string | null>(
+    initialData?.ratingType || 'Under',
+  )
+  const [ratingValue, setRatingValue] = useState<string | null>(
+    initialData?.ratingValue || '1500',
+  )
+  const [ageType, setAgeType] = useState<string | null>(
+    initialData?.ageType || 'Under',
+  )
+  const [ageValue, setAgeValue] = useState<string | null>(
+    initialData?.ageValue || '18',
   )
   const [stages, setStages] = useState<string | null>(
     initialData?.stages || 'Group + Knockout',
@@ -78,6 +118,13 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
     marginTop: '24px',
   }
 
+  const inlineRowStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    marginBottom: '16px',
+  }
+
   const validateForm = (): boolean => {
     if (!name.trim()) {
       return false
@@ -89,7 +136,19 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
     if (!validateForm()) {
       return
     }
-    onSave?.({ name, type, singleFormat, stages, teamSize, date, cover })
+    onSave?.({
+      name,
+      type,
+      singleFormat,
+      ratingType: singleFormat === 'Rated Single' ? ratingType : null,
+      ratingValue: singleFormat === 'Rated Single' ? ratingValue : null,
+      ageType: singleFormat === 'Age Single' ? ageType : null,
+      ageValue: singleFormat === 'Age Single' ? ageValue : null,
+      stages,
+      teamSize,
+      date,
+      cover,
+    })
   }
 
   const handleCancel = () => {
@@ -137,6 +196,40 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
               selectedValue={singleFormat || 'Open Single'}
               onChange={setSingleFormat}
             />
+            {singleFormat === 'Rated Single' && (
+              <div style={inlineRowStyle}>
+                <SingleSelectTags
+                  label="Rating"
+                  options={['Under', 'Over']}
+                  selectedValue={ratingType || 'Under'}
+                  onChange={setRatingType}
+                />
+                <Select
+                  label=""
+                  name="ratingValue"
+                  value={ratingValue || '1500'}
+                  onChange={setRatingValue}
+                  options={RATING_OPTIONS}
+                />
+              </div>
+            )}
+            {singleFormat === 'Age Single' && (
+              <div style={inlineRowStyle}>
+                <SingleSelectTags
+                  label="Age"
+                  options={['Under', 'Over']}
+                  selectedValue={ageType || 'Under'}
+                  onChange={setAgeType}
+                />
+                <Select
+                  label=""
+                  name="ageValue"
+                  value={ageValue || '18'}
+                  onChange={setAgeValue}
+                  options={AGE_OPTIONS}
+                />
+              </div>
+            )}
             <SingleSelectTags
               label="Stages"
               options={[

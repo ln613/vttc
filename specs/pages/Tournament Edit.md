@@ -18,6 +18,8 @@ Vertical
 ## Single Section
 
 - Type: single select tags (the pre-defined Single formats)
+- Rating (if "Rated Single" seleceted): single select tags "Under", "Over" followed by dropdown (100 to 3000, every 50)
+- Age (if "Age Single" seleceted): single select tags "Under", "Over" followed by dropdown (10 to 80) 
 - Stages: single select tags "Group + Knockout", "Group Only (Big Round Robin)", "Knockout Only"
 
 ## Team Section
