@@ -20,8 +20,21 @@ Vertical
 - Type: single select tags (the pre-defined Single formats)
 - Rating (if "Rated Single" seleceted): single select tags "Under", "Over" followed by dropdown (100 to 3000, every 50, align bottom)
 - Age (if "Age Single" seleceted): single select tags "Under", "Over" followed by dropdown (10 to 80, align bottom) 
-- Stages: single select tags "Group + Knockout", "Group Only (Big Round Robin)", "Knockout Only"
+- Stages
+- Number of Games
 
 ## Team Section
 
 - Team Size: single select tags "2", "3", "4" 
+- Stages
+- Number of Matches
+- Number of Games
+
+## Stages Section
+
+- Stages: single select tags "Group + Knockout", "Group Only (Big Round Robin)", "Knockout Only"
+
+## Number of Games/Matches Section
+
+- Group Stage (if selected stages contains Group): single select tags "Best of 3" (default), "Best of 5"
+- Knockout Stage (if selected stages contains Knockout): single select tags "Best of 3", "Best of 3 before Quarterfinal", "Best of 3 before Semifinal" (default), "Best of 5"

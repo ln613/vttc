@@ -19,6 +19,9 @@ interface TournamentEditProps {
     ageValue: string | null
     stages: string | null
     teamSize: string | null
+    groupGames: string | null
+    knockoutGames: string | null
+    numberOfMatches: string | null
     date: Date | null
     cover: File | string | null
   }
@@ -32,6 +35,9 @@ interface TournamentEditProps {
     ageValue: string | null
     stages: string | null
     teamSize: string | null
+    groupGames: string | null
+    knockoutGames: string | null
+    numberOfMatches: string | null
     date: Date | null
     cover: File | string | null
   }) => void
@@ -39,6 +45,18 @@ interface TournamentEditProps {
 }
 
 const SINGLE_FORMAT_OPTIONS = ['Open Single', 'Rated Single', 'Age Single']
+const STAGES_OPTIONS = [
+  'Group + Knockout',
+  'Group Only (Big Round Robin)',
+  'Knockout Only',
+]
+const GROUP_GAMES_OPTIONS = ['Best of 3', 'Best of 5']
+const KNOCKOUT_GAMES_OPTIONS = [
+  'Best of 3',
+  'Best of 3 before Quarterfinal',
+  'Best of 3 before Semifinal',
+  'Best of 5',
+]
 
 const generateRatingOptions = () => {
   const options = []
@@ -58,6 +76,16 @@ const generateAgeOptions = () => {
 
 const RATING_OPTIONS = generateRatingOptions()
 const AGE_OPTIONS = generateAgeOptions()
+
+const hasGroupStage = (stages: string | null): boolean => {
+  return (
+    stages === 'Group + Knockout' || stages === 'Group Only (Big Round Robin)'
+  )
+}
+
+const hasKnockoutStage = (stages: string | null): boolean => {
+  return stages === 'Group + Knockout' || stages === 'Knockout Only'
+}
 
 const TournamentEdit: React.FC<TournamentEditProps> = ({
   isEdit = false,
@@ -87,6 +115,15 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
   )
   const [teamSize, setTeamSize] = useState<string | null>(
     initialData?.teamSize || null,
+  )
+  const [groupGames, setGroupGames] = useState<string | null>(
+    initialData?.groupGames || 'Best of 3',
+  )
+  const [knockoutGames, setKnockoutGames] = useState<string | null>(
+    initialData?.knockoutGames || 'Best of 3 before Semifinal',
+  )
+  const [numberOfMatches, setNumberOfMatches] = useState<string | null>(
+    initialData?.numberOfMatches || 'Best of 3',
   )
   const [date, setDate] = useState<Date | null>(initialData?.date || null)
   const [cover, setCover] = useState<File | string | null>(
@@ -139,13 +176,16 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
     onSave?.({
       name,
       type,
-      singleFormat,
+      singleFormat: type === 'Single' ? singleFormat : null,
       ratingType: singleFormat === 'Rated Single' ? ratingType : null,
       ratingValue: singleFormat === 'Rated Single' ? ratingValue : null,
       ageType: singleFormat === 'Age Single' ? ageType : null,
       ageValue: singleFormat === 'Age Single' ? ageValue : null,
       stages,
-      teamSize,
+      teamSize: type === 'Team' ? teamSize : null,
+      groupGames: hasGroupStage(stages) ? groupGames : null,
+      knockoutGames: hasKnockoutStage(stages) ? knockoutGames : null,
+      numberOfMatches: type === 'Team' ? numberOfMatches : null,
       date,
       cover,
     })
@@ -154,6 +194,36 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
   const handleCancel = () => {
     onCancel?.()
   }
+
+  const renderStagesSection = () => (
+    <SingleSelectTags
+      label="Stages"
+      options={STAGES_OPTIONS}
+      selectedValue={stages || 'Group + Knockout'}
+      onChange={setStages}
+    />
+  )
+
+  const renderNumberOfGamesSection = () => (
+    <>
+      {hasGroupStage(stages) && (
+        <SingleSelectTags
+          label="Group Stage"
+          options={GROUP_GAMES_OPTIONS}
+          selectedValue={groupGames || 'Best of 3'}
+          onChange={setGroupGames}
+        />
+      )}
+      {hasKnockoutStage(stages) && (
+        <SingleSelectTags
+          label="Knockout Stage"
+          options={KNOCKOUT_GAMES_OPTIONS}
+          selectedValue={knockoutGames || 'Best of 3 before Semifinal'}
+          onChange={setKnockoutGames}
+        />
+      )}
+    </>
+  )
 
   return (
     <div style={containerStyle}>
@@ -181,9 +251,11 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
                 setStages('Group + Knockout')
               }
             } else {
-              setStages(null)
               if (!teamSize) {
                 setTeamSize('2')
+              }
+              if (!stages) {
+                setStages('Group + Knockout')
               }
             }
           }}
@@ -230,25 +302,27 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
                 />
               </div>
             )}
-            <SingleSelectTags
-              label="Stages"
-              options={[
-                'Group + Knockout',
-                'Group Only (Big Round Robin)',
-                'Knockout Only',
-              ]}
-              selectedValue={stages || 'Group + Knockout'}
-              onChange={setStages}
-            />
+            {renderStagesSection()}
+            {renderNumberOfGamesSection()}
           </>
         )}
         {type === 'Team' && (
-          <SingleSelectTags
-            label="Team Size"
-            options={['2', '3', '4']}
-            selectedValue={teamSize || '2'}
-            onChange={setTeamSize}
-          />
+          <>
+            <SingleSelectTags
+              label="Team Size"
+              options={['2', '3', '4']}
+              selectedValue={teamSize || '2'}
+              onChange={setTeamSize}
+            />
+            {renderStagesSection()}
+            <SingleSelectTags
+              label="Number of Matches"
+              options={GROUP_GAMES_OPTIONS}
+              selectedValue={numberOfMatches || 'Best of 3'}
+              onChange={setNumberOfMatches}
+            />
+            {renderNumberOfGamesSection()}
+          </>
         )}
         <DatePicker label="Date" value={date} onChange={setDate} />
         <MediaUpload label="Cover" value={cover} onChange={setCover} />
