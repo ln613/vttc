@@ -6,6 +6,10 @@ Vertical
 
 - shared header
 - title VTTC
+- button "Hello" (blue)
+- button "Save" (green)
+- button "Submit" (amber)
+- button "Cancel" (red)
 - player list
 
 ## Style
