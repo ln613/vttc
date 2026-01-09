@@ -120,7 +120,7 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
 
   const inlineRowStyle: React.CSSProperties = {
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     gap: '12px',
     marginBottom: '16px',
   }
