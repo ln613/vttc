@@ -43,3 +43,17 @@ The component to upload a single media file
 - on remove button click: remove the selected media
 - on upload (upload will be triggered by the page/form that uses the media upload component):
   - for image: Upload the image to cloudinary under Home/{folder} folder (for deletion, extract public_id from url)
+
+## Date Picker
+
+### Style
+
+- show the date in the format MMM d, yyyy
+- the date box is read only, blue border, black text, rounded corner (4px)
+- the calendar shows the full month, with left/right button at bottom to go to prev/next month. Show year on top
+
+### Interaction
+
+- on date box click: show the calendar below the date box (align left). click anywhere outside the calendar hide the calendar.
+- when a day on the calendar is clicked: show it in the date box and hide the calendar
+- when the year on the calendar is clicked: show the year dropdown to select a year

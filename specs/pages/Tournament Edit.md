@@ -8,6 +8,7 @@ Vertical
 - title "Add Tournament" or "Edit Tournament"
 - input "Name" *
 - single select tags "Single", "Team"
+- date picker
 - image upload "cover"
 - button "Cancel" (red)
 - button "Save" (blue)
@@ -15,5 +16,3 @@ Vertical
 ## Style
 
 title: h1, align left
-
-

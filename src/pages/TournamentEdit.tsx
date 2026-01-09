@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Header } from '../components/Header'
 import Input from '../components/Input'
 import SingleSelectTags from '../components/SingleSelectTags'
+import DatePicker from '../components/DatePicker'
 import MediaUpload from '../components/MediaUpload'
 import Button from '../components/Button'
 
@@ -10,9 +11,15 @@ interface TournamentEditProps {
   initialData?: {
     name: string
     type: string
+    date: Date | null
     cover: File | string | null
   }
-  onSave?: (data: { name: string; type: string; cover: File | string | null }) => void
+  onSave?: (data: {
+    name: string
+    type: string
+    date: Date | null
+    cover: File | string | null
+  }) => void
   onCancel?: () => void
 }
 
@@ -24,6 +31,7 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
 }) => {
   const [name, setName] = useState(initialData?.name || '')
   const [type, setType] = useState(initialData?.type || 'Single')
+  const [date, setDate] = useState<Date | null>(initialData?.date || null)
   const [cover, setCover] = useState<File | string | null>(
     initialData?.cover || null,
   )
@@ -64,7 +72,7 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
     if (!validateForm()) {
       return
     }
-    onSave?.({ name, type, cover })
+    onSave?.({ name, type, date, cover })
   }
 
   const handleCancel = () => {
@@ -91,6 +99,7 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
           selectedValue={type}
           onChange={setType}
         />
+        <DatePicker label="Date" value={date} onChange={setDate} />
         <MediaUpload label="Cover" value={cover} onChange={setCover} />
         <div style={buttonContainerStyle}>
           <Button color="#e74c3c" onClick={handleCancel}>
