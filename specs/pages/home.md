@@ -10,6 +10,8 @@ Vertical
 - button "Save" (green)
 - button "Submit" (amber)
 - button "Cancel" (red)
+- input "Email Address" *
+- dropdown "Country" (All american countries)
 - player list
 
 ## Style
