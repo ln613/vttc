@@ -17,7 +17,8 @@ Vertical
 
 ## Single Section
 
-- Stages: single select tags "Group + Knockout", "Group Only", "Knockout Only"
+- Type: single select tags (the pre-defined Single formats)
+- Stages: single select tags "Group + Knockout", "Group Only (Big Round Robin)", "Knockout Only"
 
 ## Team Section
 

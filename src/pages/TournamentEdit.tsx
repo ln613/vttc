@@ -11,6 +11,7 @@ interface TournamentEditProps {
   initialData?: {
     name: string
     type: string
+    singleFormat: string | null
     stages: string | null
     teamSize: string | null
     date: Date | null
@@ -19,6 +20,7 @@ interface TournamentEditProps {
   onSave?: (data: {
     name: string
     type: string
+    singleFormat: string | null
     stages: string | null
     teamSize: string | null
     date: Date | null
@@ -26,6 +28,8 @@ interface TournamentEditProps {
   }) => void
   onCancel?: () => void
 }
+
+const SINGLE_FORMAT_OPTIONS = ['Open Single', 'Rated Single', 'Age Single']
 
 const TournamentEdit: React.FC<TournamentEditProps> = ({
   isEdit = false,
@@ -35,6 +39,9 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
 }) => {
   const [name, setName] = useState(initialData?.name || '')
   const [type, setType] = useState(initialData?.type || 'Single')
+  const [singleFormat, setSingleFormat] = useState<string | null>(
+    initialData?.singleFormat || 'Open Single',
+  )
   const [stages, setStages] = useState<string | null>(
     initialData?.stages || 'Group + Knockout',
   )
@@ -82,7 +89,7 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
     if (!validateForm()) {
       return
     }
-    onSave?.({ name, type, stages, teamSize, date, cover })
+    onSave?.({ name, type, singleFormat, stages, teamSize, date, cover })
   }
 
   const handleCancel = () => {
@@ -123,12 +130,24 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
           }}
         />
         {type === 'Single' && (
-          <SingleSelectTags
-            label="Stages"
-            options={['Group + Knockout', 'Group Only', 'Knockout Only']}
-            selectedValue={stages || 'Group + Knockout'}
-            onChange={setStages}
-          />
+          <>
+            <SingleSelectTags
+              label="Type"
+              options={SINGLE_FORMAT_OPTIONS}
+              selectedValue={singleFormat || 'Open Single'}
+              onChange={setSingleFormat}
+            />
+            <SingleSelectTags
+              label="Stages"
+              options={[
+                'Group + Knockout',
+                'Group Only (Big Round Robin)',
+                'Knockout Only',
+              ]}
+              selectedValue={stages || 'Group + Knockout'}
+              onChange={setStages}
+            />
+          </>
         )}
         {type === 'Team' && (
           <SingleSelectTags
