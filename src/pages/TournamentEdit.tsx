@@ -11,6 +11,7 @@ interface TournamentEditProps {
   initialData?: {
     name: string
     type: string
+    stages: string | null
     teamSize: string | null
     date: Date | null
     cover: File | string | null
@@ -18,6 +19,7 @@ interface TournamentEditProps {
   onSave?: (data: {
     name: string
     type: string
+    stages: string | null
     teamSize: string | null
     date: Date | null
     cover: File | string | null
@@ -33,6 +35,9 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
 }) => {
   const [name, setName] = useState(initialData?.name || '')
   const [type, setType] = useState(initialData?.type || 'Single')
+  const [stages, setStages] = useState<string | null>(
+    initialData?.stages || 'Group + Knockout',
+  )
   const [teamSize, setTeamSize] = useState<string | null>(
     initialData?.teamSize || null,
   )
@@ -77,7 +82,7 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
     if (!validateForm()) {
       return
     }
-    onSave?.({ name, type, teamSize, date, cover })
+    onSave?.({ name, type, stages, teamSize, date, cover })
   }
 
   const handleCancel = () => {
@@ -106,11 +111,25 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
             setType(value)
             if (value === 'Single') {
               setTeamSize(null)
-            } else if (!teamSize) {
-              setTeamSize('2')
+              if (!stages) {
+                setStages('Group + Knockout')
+              }
+            } else {
+              setStages(null)
+              if (!teamSize) {
+                setTeamSize('2')
+              }
             }
           }}
         />
+        {type === 'Single' && (
+          <SingleSelectTags
+            label="Stages"
+            options={['Group + Knockout', 'Group Only', 'Knockout Only']}
+            selectedValue={stages || 'Group + Knockout'}
+            onChange={setStages}
+          />
+        )}
         {type === 'Team' && (
           <SingleSelectTags
             label="Team Size"
