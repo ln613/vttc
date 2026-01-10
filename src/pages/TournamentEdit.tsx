@@ -51,9 +51,10 @@ const generateAgeOptions = () => {
   return options
 }
 
-const generateTopPlayersCountOptions = () => {
+const generateTopPlayersCountOptions = (teamSize: string | null) => {
   const options = []
-  for (let i = 1; i <= 5; i++) {
+  const maxCount = teamSize ? parseInt(teamSize, 10) : 3
+  for (let i = 1; i <= maxCount; i++) {
     options.push({ value: String(i), label: String(i) })
   }
   return options
@@ -77,7 +78,6 @@ const generateMaxPointsGivenOptions = () => {
 
 const RATING_OPTIONS = generateRatingOptions()
 const AGE_OPTIONS = generateAgeOptions()
-const TOP_PLAYERS_COUNT_OPTIONS = generateTopPlayersCountOptions()
 const HANDICAP_DIFFERENCE_OPTIONS = generateHandicapDifferenceOptions()
 const MAX_POINTS_GIVEN_OPTIONS = generateMaxPointsGivenOptions()
 
@@ -88,6 +88,7 @@ interface TournamentEditFormData {
   teamSize: string | null
   restriction: TournamentRestriction
   ratingLimit: string
+  topPlayersRatingEnabled: boolean
   topPlayersCount: string
   topPlayersRatingLimit: string
   ageLimitType: AgeLimitType
@@ -137,6 +138,9 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
   )
   const [ratingLimit, setRatingLimit] = useState(
     initialData?.ratingLimit || '1500',
+  )
+  const [topPlayersRatingEnabled, setTopPlayersRatingEnabled] = useState(
+    initialData?.topPlayersRatingEnabled || false,
   )
   const [topPlayersCount, setTopPlayersCount] = useState(
     initialData?.topPlayersCount || '2',
@@ -241,10 +245,12 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
       teamSize: type === 'Team' ? teamSize : null,
       restriction,
       ratingLimit: restriction === 'Rated' ? ratingLimit : '1500',
+      topPlayersRatingEnabled:
+        restriction === 'Rated' && type === 'Team' ? topPlayersRatingEnabled : false,
       topPlayersCount:
-        restriction === 'Rated' && type === 'Team' ? topPlayersCount : '2',
+        restriction === 'Rated' && type === 'Team' && topPlayersRatingEnabled ? topPlayersCount : '2',
       topPlayersRatingLimit:
-        restriction === 'Rated' && type === 'Team' ? topPlayersRatingLimit : '2500',
+        restriction === 'Rated' && type === 'Team' && topPlayersRatingEnabled ? topPlayersRatingLimit : '2500',
       ageLimitType: restriction === 'Age' ? ageLimitType : 'U',
       ageLimit: restriction === 'Age' ? ageLimit : '20',
       stages,
@@ -289,28 +295,43 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
           <>
             <h3 style={sectionTitleStyle}>Top Players Rating</h3>
             <div style={inlineRowMiddleNoMarginStyle}>
-              <span style={{ fontWeight: 500 }}>
-                The combined rating of the top
-              </span>
-              <Select
+              <Toggle
                 label=""
-                name="topPlayersCount"
-                value={topPlayersCount}
-                onChange={setTopPlayersCount}
-                options={TOP_PLAYERS_COUNT_OPTIONS}
+                value={topPlayersRatingEnabled}
+                onChange={setTopPlayersRatingEnabled}
                 noMargin
               />
-              <span style={{ fontWeight: 500 }}>
-                players must be under
-              </span>
-              <Select
-                label=""
-                name="topPlayersRatingLimit"
-                value={topPlayersRatingLimit}
-                onChange={setTopPlayersRatingLimit}
-                options={RATING_OPTIONS}
-                noMargin
-              />
+              {topPlayersRatingEnabled && (
+                <>
+                  <span style={{ fontWeight: 500 }}>
+                    The combined rating of the top
+                  </span>
+                  <Select
+                    label=""
+                    name="topPlayersCount"
+                    value={topPlayersCount}
+                    onChange={(value) => {
+                      const maxCount = teamSize ? parseInt(teamSize, 10) : 3
+                      if (parseInt(value, 10) <= maxCount) {
+                        setTopPlayersCount(value)
+                      }
+                    }}
+                    options={generateTopPlayersCountOptions(teamSize)}
+                    noMargin
+                  />
+                  <span style={{ fontWeight: 500 }}>
+                    players must be under
+                  </span>
+                  <Select
+                    label=""
+                    name="topPlayersRatingLimit"
+                    value={topPlayersRatingLimit}
+                    onChange={setTopPlayersRatingLimit}
+                    options={RATING_OPTIONS}
+                    noMargin
+                  />
+                </>
+              )}
             </div>
           </>
         )}
@@ -341,12 +362,14 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
   }
 
   const renderStagesSection = () => (
-    <SingleSelectTags
-      label="Stages"
-      options={STAGES_OPTIONS}
-      selectedValue={stages}
-      onChange={(value) => setStages(value as StagesType)}
-    />
+    <div style={restriction === 'Rated' ? { marginTop: '24px' } : undefined}>
+      <SingleSelectTags
+        label="Stages"
+        options={STAGES_OPTIONS}
+        selectedValue={stages}
+        onChange={(value) => setStages(value as StagesType)}
+      />
+    </div>
   )
 
   const renderNumberOfGamesSection = () => (
@@ -486,7 +509,14 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
             label="Team Size"
             options={TEAM_SIZE_OPTIONS}
             selectedValue={teamSize || '3'}
-            onChange={setTeamSize}
+            onChange={(newTeamSize) => {
+              setTeamSize(newTeamSize)
+              const newTeamSizeNum = parseInt(newTeamSize, 10)
+              const currentTopPlayersCount = parseInt(topPlayersCount, 10)
+              if (currentTopPlayersCount > newTeamSizeNum) {
+                setTopPlayersCount(newTeamSize)
+              }
+            }}
           />
         )}
         <SingleSelectTags
