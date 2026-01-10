@@ -22,6 +22,7 @@ Vertical
 - Age (if "Age Single" seleceted): single select tags "Under", "Over" followed by dropdown (10 to 80, align bottom) 
 - Stages
 - Number of Games section
+- Handicap: toggle (default false)
 
 ## Team Section
 

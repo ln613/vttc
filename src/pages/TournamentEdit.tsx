@@ -6,6 +6,7 @@ import Select from '../components/Select'
 import DatePicker from '../components/DatePicker'
 import MediaUpload from '../components/MediaUpload'
 import Button from '../components/Button'
+import Toggle from '../components/Toggle'
 
 interface TournamentEditProps {
   isEdit?: boolean
@@ -23,6 +24,7 @@ interface TournamentEditProps {
     knockoutGames: string | null
     groupMatches: string | null
     knockoutMatches: string | null
+    handicap: boolean
     date: Date | null
     cover: File | string | null
   }
@@ -40,6 +42,7 @@ interface TournamentEditProps {
     knockoutGames: string | null
     groupMatches: string | null
     knockoutMatches: string | null
+    handicap: boolean
     date: Date | null
     cover: File | string | null
   }) => void
@@ -130,6 +133,9 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
   const [knockoutMatches, setKnockoutMatches] = useState<string | null>(
     initialData?.knockoutMatches || 'Best of 3 before Semifinal',
   )
+  const [handicap, setHandicap] = useState<boolean>(
+    initialData?.handicap || false,
+  )
   const [date, setDate] = useState<Date | null>(initialData?.date || null)
   const [cover, setCover] = useState<File | string | null>(
     initialData?.cover || null,
@@ -201,6 +207,7 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
       knockoutGames: hasKnockoutStage(stages) ? knockoutGames : null,
       groupMatches: type === 'Team' && hasGroupStage(stages) ? groupMatches : null,
       knockoutMatches: type === 'Team' && hasKnockoutStage(stages) ? knockoutMatches : null,
+      handicap: type === 'Single' ? handicap : false,
       date,
       cover,
     })
@@ -342,6 +349,7 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
             )}
             {renderStagesSection()}
             {renderNumberOfGamesSection()}
+            <Toggle label="Handicap" value={handicap} onChange={setHandicap} />
           </>
         )}
         {type === 'Team' && (
