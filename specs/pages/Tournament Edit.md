@@ -7,6 +7,7 @@ Vertical
 - shared header
 - title "Add Tournament" or "Edit Tournament" (h1, align left)
 - input "Name" *
+- Sex: single select tags "All", "Man", "Woman", "Mixed"
 - single select tags "Single", "Team"
 - if "Single" selected, show single section
 - if "Team" selected, show team section

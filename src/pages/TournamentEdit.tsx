@@ -7,11 +7,15 @@ import DatePicker from '../components/DatePicker'
 import MediaUpload from '../components/MediaUpload'
 import Button from '../components/Button'
 import Toggle from '../components/Toggle'
+import type { ParticipantSex } from '../../shared/types'
+
+const SEX_OPTIONS: ParticipantSex[] = ['All', 'Man', 'Woman', 'Mixed']
 
 interface TournamentEditProps {
   isEdit?: boolean
   initialData?: {
     name: string
+    sex: ParticipantSex
     type: string
     singleFormat: string | null
     ratingType: string | null
@@ -30,6 +34,7 @@ interface TournamentEditProps {
   }
   onSave?: (data: {
     name: string
+    sex: ParticipantSex
     type: string
     singleFormat: string | null
     ratingType: string | null
@@ -99,6 +104,7 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
   onCancel,
 }) => {
   const [name, setName] = useState(initialData?.name || '')
+  const [sex, setSex] = useState<ParticipantSex>(initialData?.sex || 'All')
   const [type, setType] = useState(initialData?.type || 'Single')
   const [singleFormat, setSingleFormat] = useState<string | null>(
     initialData?.singleFormat || 'Open Single',
@@ -195,6 +201,7 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
     }
     onSave?.({
       name,
+      sex,
       type,
       singleFormat: type === 'Single' ? singleFormat : null,
       ratingType: singleFormat === 'Rated Single' ? ratingType : null,
@@ -283,6 +290,12 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
           value={name}
           onChange={setName}
           required
+        />
+        <SingleSelectTags
+          label="Sex"
+          options={SEX_OPTIONS}
+          selectedValue={sex}
+          onChange={(value) => setSex(value as ParticipantSex)}
         />
         <SingleSelectTags
           label="Type"

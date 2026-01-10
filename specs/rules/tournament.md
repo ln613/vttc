@@ -5,7 +5,7 @@ A tournament has the following fields:
 - name
 - date: a tournament is a single day event
 - nop: number of players per team
-- type (derived): single (nop = 1), team (nop > 1)
+- type: single (nop = 1), double (nop = 2), team (nop > 1)
 - stages: 
 
 ## Stage
@@ -150,6 +150,16 @@ In the previous example, in the first round, Tom and Joe will have a bye, Tony v
 
 In the previous example, if John beat Tony and Glen beat Frank in the first round, then the 2nd round seeding is Tom, Joe, John, Glen, and the 2nd round matches will be Tom vs Glen, Joe vs John.
 
+## Participant Sex
+
+- All: No restriction, both men and women can participate
+- Man: Only for men
+- Woman: Only for women
+- Mixed:
+  - For single tournament, same as All.
+  - For double tournament, each participant must be 1 man + 1 woman.
+  - For team tournament, each participant must have at least 1 woman.
+
 ## Pre-defined Tournament Formats
 
 ## Shared abbreviations
@@ -168,7 +178,7 @@ BON:
 - KO2 BON = 5
 
 SB:
-- sex = both
+- sex = All
 
 ### Open Single
 

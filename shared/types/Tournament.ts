@@ -8,9 +8,30 @@ export interface Team {
 }
 
 /**
- * Sex/Gender filter options
+ * Participant Sex options
+ * - All: No restriction, both men and women can participate
+ * - Man: Only for men
+ * - Woman: Only for women
+ * - Mixed: For single same as All; For double must be 1 man + 1 woman; For team must have at least 1 woman
  */
-export type SexFilter = 'male' | 'female' | 'both'
+export type ParticipantSex = 'All' | 'Man' | 'Woman' | 'Mixed'
+
+/**
+ * Tournament type derived from nop (number of players per team)
+ * - single: nop = 1
+ * - double: nop = 2
+ * - team: nop > 2
+ */
+export type TournamentType = 'single' | 'double' | 'team'
+
+/**
+ * Get tournament type from nop
+ */
+export const getTournamentType = (nop: number): TournamentType => {
+  if (nop === 1) return 'single'
+  if (nop === 2) return 'double'
+  return 'team'
+}
 
 /**
  * Age limit type (Under or Over)
@@ -38,7 +59,7 @@ export interface TournamentFormat {
   type: TournamentFormatType
   nop: number
   stages: ('group' | 'knockout')[]
-  sex: SexFilter
+  sex: ParticipantSex
   bestOfN: BestOfNConfig
   ratingLimit?: number // For rated events
   ageLimitType?: AgeLimitType // U for under, O for over
@@ -210,7 +231,7 @@ export const OPEN_SINGLE_FORMAT: TournamentFormat = {
   type: 'openSingle',
   nop: 1,
   stages: ['group', 'knockout'],
-  sex: 'both',
+  sex: 'All',
   bestOfN: DEFAULT_BEST_OF_N,
 }
 
@@ -218,7 +239,7 @@ export const RATED_SINGLE_FORMAT = (ratingLimit: number): TournamentFormat => ({
   type: 'ratedSingle',
   nop: 1,
   stages: ['group', 'knockout'],
-  sex: 'both',
+  sex: 'All',
   bestOfN: DEFAULT_BEST_OF_N,
   ratingLimit,
 })
@@ -230,7 +251,7 @@ export const AGE_SINGLE_FORMAT = (
   type: 'ageSingle',
   nop: 1,
   stages: ['group', 'knockout'],
-  sex: 'both',
+  sex: 'All',
   bestOfN: DEFAULT_BEST_OF_N,
   ageLimitType,
   ageLimit,
