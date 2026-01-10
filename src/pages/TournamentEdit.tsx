@@ -21,7 +21,8 @@ interface TournamentEditProps {
     teamSize: string | null
     groupGames: string | null
     knockoutGames: string | null
-    numberOfMatches: string | null
+    groupMatches: string | null
+    knockoutMatches: string | null
     date: Date | null
     cover: File | string | null
   }
@@ -37,7 +38,8 @@ interface TournamentEditProps {
     teamSize: string | null
     groupGames: string | null
     knockoutGames: string | null
-    numberOfMatches: string | null
+    groupMatches: string | null
+    knockoutMatches: string | null
     date: Date | null
     cover: File | string | null
   }) => void
@@ -122,8 +124,11 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
   const [knockoutGames, setKnockoutGames] = useState<string | null>(
     initialData?.knockoutGames || 'Best of 3 before Semifinal',
   )
-  const [numberOfMatches, setNumberOfMatches] = useState<string | null>(
-    initialData?.numberOfMatches || 'Best of 3',
+  const [groupMatches, setGroupMatches] = useState<string | null>(
+    initialData?.groupMatches || 'Best of 3',
+  )
+  const [knockoutMatches, setKnockoutMatches] = useState<string | null>(
+    initialData?.knockoutMatches || 'Best of 3 before Semifinal',
   )
   const [date, setDate] = useState<Date | null>(initialData?.date || null)
   const [cover, setCover] = useState<File | string | null>(
@@ -147,6 +152,15 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
     textAlign: 'left',
     marginBottom: '24px',
     color: '#333',
+  }
+
+  const sectionTitleStyle: React.CSSProperties = {
+    fontSize: '14px',
+    fontWeight: 700,
+    marginTop: '24px',
+    marginBottom: '8px',
+    color: '#333',
+    textAlign: 'left',
   }
 
   const buttonContainerStyle: React.CSSProperties = {
@@ -185,7 +199,8 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
       teamSize: type === 'Team' ? teamSize : null,
       groupGames: hasGroupStage(stages) ? groupGames : null,
       knockoutGames: hasKnockoutStage(stages) ? knockoutGames : null,
-      numberOfMatches: type === 'Team' ? numberOfMatches : null,
+      groupMatches: type === 'Team' && hasGroupStage(stages) ? groupMatches : null,
+      knockoutMatches: type === 'Team' && hasKnockoutStage(stages) ? knockoutMatches : null,
       date,
       cover,
     })
@@ -206,6 +221,7 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
 
   const renderNumberOfGamesSection = () => (
     <>
+      <h3 style={sectionTitleStyle}>Number of Games</h3>
       {hasGroupStage(stages) && (
         <SingleSelectTags
           label="Group Stage"
@@ -220,6 +236,28 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
           options={KNOCKOUT_GAMES_OPTIONS}
           selectedValue={knockoutGames || 'Best of 3 before Semifinal'}
           onChange={setKnockoutGames}
+        />
+      )}
+    </>
+  )
+
+  const renderNumberOfMatchesSection = () => (
+    <>
+      <h3 style={sectionTitleStyle}>Number of Matches</h3>
+      {hasGroupStage(stages) && (
+        <SingleSelectTags
+          label="Group Stage"
+          options={GROUP_GAMES_OPTIONS}
+          selectedValue={groupMatches || 'Best of 3'}
+          onChange={setGroupMatches}
+        />
+      )}
+      {hasKnockoutStage(stages) && (
+        <SingleSelectTags
+          label="Knockout Stage"
+          options={KNOCKOUT_GAMES_OPTIONS}
+          selectedValue={knockoutMatches || 'Best of 3 before Semifinal'}
+          onChange={setKnockoutMatches}
         />
       )}
     </>
@@ -263,7 +301,7 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
         {type === 'Single' && (
           <>
             <SingleSelectTags
-              label="Type"
+              label="Format"
               options={SINGLE_FORMAT_OPTIONS}
               selectedValue={singleFormat || 'Open Single'}
               onChange={setSingleFormat}
@@ -315,12 +353,7 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
               onChange={setTeamSize}
             />
             {renderStagesSection()}
-            <SingleSelectTags
-              label="Number of Matches"
-              options={GROUP_GAMES_OPTIONS}
-              selectedValue={numberOfMatches || 'Best of 3'}
-              onChange={setNumberOfMatches}
-            />
+            {renderNumberOfMatchesSection()}
             {renderNumberOfGamesSection()}
           </>
         )}
