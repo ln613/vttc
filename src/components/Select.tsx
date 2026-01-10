@@ -15,6 +15,7 @@ interface SelectProps {
   required?: boolean
   disabled?: boolean
   className?: string
+  noMargin?: boolean
 }
 
 const Select: React.FC<SelectProps> = ({
@@ -27,6 +28,7 @@ const Select: React.FC<SelectProps> = ({
   required = false,
   disabled = false,
   className = '',
+  noMargin = false,
 }) => {
   const labelStyle: React.CSSProperties = {
     display: 'block',
@@ -63,7 +65,7 @@ const Select: React.FC<SelectProps> = ({
   }
 
   const containerStyle: React.CSSProperties = {
-    marginBottom: '16px',
+    marginBottom: noMargin ? 0 : '16px',
   }
 
   const handleFocus = (e: React.FocusEvent<HTMLSelectElement>) => {
@@ -82,10 +84,12 @@ const Select: React.FC<SelectProps> = ({
 
   return (
     <div style={containerStyle} className={className}>
-      <label htmlFor={name} style={labelStyle}>
-        {label}
-        {required && <span style={requiredStyle}>*</span>}
-      </label>
+      {label && (
+        <label htmlFor={name} style={labelStyle}>
+          {label}
+          {required && <span style={requiredStyle}>*</span>}
+        </label>
+      )}
       <select
         id={name}
         name={name}

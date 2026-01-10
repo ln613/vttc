@@ -60,4 +60,4 @@ Select the number of participants who will advance from the group stage, only vi
 
 ## Handicap Section
 
-- Handicap: toggle (default false), Difference: dropdown (100 to 400, every 50, default 200, visible if toggle is true), Max Points Given: (1 to 10, default 5, visible if toggle is true)
+- toggle (default false, align left), Difference: dropdown (100 to 400, every 50, default 200, visible if toggle is true, align middle), Max Points Given: (1 to 10, default 5, visible if toggle is true, align middle)

@@ -401,29 +401,32 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
   const renderHandicapSection = () => (
     <>
       <h3 style={sectionTitleStyle}>Handicap</h3>
-      <div style={inlineRowStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
         <Toggle
-          label="Handicap"
+          label=""
           value={handicapEnabled}
           onChange={setHandicapEnabled}
+          noMargin
         />
         {handicapEnabled && (
           <>
-            <span style={{ fontWeight: 500, marginBottom: '8px' }}>Difference:</span>
+            <span style={{ fontWeight: 500 }}>Difference:</span>
             <Select
               label=""
               name="handicapDifference"
               value={handicapDifference}
               onChange={setHandicapDifference}
               options={HANDICAP_DIFFERENCE_OPTIONS}
+              noMargin
             />
-            <span style={{ fontWeight: 500, marginBottom: '8px' }}>Max Points Given:</span>
+            <span style={{ fontWeight: 500 }}>Max Points Given:</span>
             <Select
               label=""
               name="handicapMaxPoints"
               value={handicapMaxPoints}
               onChange={setHandicapMaxPoints}
               options={MAX_POINTS_GIVEN_OPTIONS}
+              noMargin
             />
           </>
         )}

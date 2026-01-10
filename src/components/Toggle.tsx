@@ -4,14 +4,15 @@ interface ToggleProps {
   label: string
   value: boolean
   onChange: (value: boolean) => void
+  noMargin?: boolean
 }
 
-const Toggle: React.FC<ToggleProps> = ({ label, value, onChange }) => {
+const Toggle: React.FC<ToggleProps> = ({ label, value, onChange, noMargin = false }) => {
   const containerStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
-    marginBottom: '16px',
+    marginBottom: noMargin ? 0 : '16px',
   }
 
   const labelStyle: React.CSSProperties = {
@@ -56,7 +57,7 @@ const Toggle: React.FC<ToggleProps> = ({ label, value, onChange }) => {
 
   return (
     <div style={containerStyle}>
-      <span style={labelStyle}>{label}</span>
+      {label && <span style={labelStyle}>{label}</span>}
       <div style={toggleContainerStyle} onClick={handleToggle}>
         <div style={toggleTrackStyle} />
         <div style={toggleThumbStyle} />
