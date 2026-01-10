@@ -25,7 +25,7 @@ The number of groups are determined by the total number of Teams/Players (N):
 - N = 32: 8 groups 
 - otherwise, Math.floor(N / 3) groups
 
-#### Seeding
+#### Seeding (Rating based seeding, RBS)
 
 - nop = 1: the player's rating
 - nop = 2 or 3: the combined rating of the 2 or 3 players in the team
@@ -114,7 +114,7 @@ R = Math.ceil(Math.log2(N))
 
 #### 1st round Seeding
 
-- For EE, seeding is the same as group stage seeding method
+- For EE, seeding is rating based (RBS), just like the group stage seeding
 - For GE, seeding is determined by the "snake ranking"
 
 For example, John - 1500, Peter - 1400, Tony - 1300, Sam - 1200, Joe - 1100, Tom - 1000, Phil - 900, Frank - 800, Glen - 700, and the group result/ranking is:
@@ -160,60 +160,14 @@ In the previous example, if John beat Tony and Glen beat Frank in the first roun
   - For double tournament, each participant must be 1 man + 1 woman.
   - For team tournament, each participant must have at least 1 woman.
 
-## Pre-defined Tournament Formats
+## Tournament Restriction
 
-## Shared abbreviations
-
-BON = best of n matches
-GS = Goup Stage
-KO = Knockout Stage
-KO1 = Knockout Stage before Semifinal
-KO2 = Knockout Stage - Semifinal and Final
-
-## Shared inputs
-
-BON:
-- GS BON = 3
-- KO1 BON = 3
-- KO2 BON = 5
-
-SB:
-- sex = All
-
-### Open Single
-
-- nop = 1
-- stages: GS, KO
-- no rating limit, no age limit
-
-#### input
-
-- SB
-- BON
-
-### Rated Single
-
-- nop = 1
-- stages: GS, KO
-- no age limit
-- the rating of any participant must be <= the rating limit 
-
-### input
-
-- rating limit *
-- SB
-- BON
-
-### Age Single
-
-- nop = 1
-- stages: GS, KO
-- no rating limit
-- the age of any participant must be under (<=) or over (>=) the age limit, e.g., U19, under 19-year old, O40, over 40-year old
-
-### input
-
-- Under (U) or Over (O) *
-- age limit *
-- SB
-- BON
+- Open: no rating limit, no age limit
+- Rated:
+  1. the rating of:
+    - any participant in single event
+    - the combined rating of any pair in double event
+    - the combined rating of all players in any team in team event
+    must be under (<=) the rating limit (RL)
+  2. for team event with nop > 2, the combined rating of the top N (default 2) players in any team must be under (<=) the top players rating limit (TPRL)
+- Age: the age of any participant must be under (<=) or over (>=) the age limit, e.g., U19, under 19-year old, O40, over 40-year old

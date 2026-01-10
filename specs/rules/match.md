@@ -29,11 +29,13 @@ No need to win by 2 after 10:10, whoever reachs 11 points wins the game
 
 - The player(s) with higher rating/combined rating will give points to the other side
 - Gives 1 point every D in rating difference, D = 200 by default
-- Max points given is 5
+- Max points given, MP = 5 by default
 - Handicap game cannot be short or long game
 - Handicap game can be golden game
 
-For example, a game between A (1521) and B (907) will start from 0:3
+For example:
+- a single game between A (1521) and B (907) will start from 0:3
+- a double game between A (312) + B (966) and X (1023) + Y (982) with D = 100 and MP = 6 will start from 6:0
 
 ## Matches
 

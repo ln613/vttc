@@ -7,55 +7,20 @@ import DatePicker from '../components/DatePicker'
 import MediaUpload from '../components/MediaUpload'
 import Button from '../components/Button'
 import Toggle from '../components/Toggle'
-import type { ParticipantSex } from '../../shared/types'
+import type {
+  ParticipantSex,
+  TournamentType,
+  TournamentRestriction,
+  StagesType,
+  QualifiersCount,
+  AgeLimitType,
+} from '../../shared/types'
 
 const SEX_OPTIONS: ParticipantSex[] = ['All', 'Man', 'Woman', 'Mixed']
-
-interface TournamentEditProps {
-  isEdit?: boolean
-  initialData?: {
-    name: string
-    sex: ParticipantSex
-    type: string
-    singleFormat: string | null
-    ratingType: string | null
-    ratingValue: string | null
-    ageType: string | null
-    ageValue: string | null
-    stages: string | null
-    teamSize: string | null
-    groupGames: string | null
-    knockoutGames: string | null
-    groupMatches: string | null
-    knockoutMatches: string | null
-    handicap: boolean
-    date: Date | null
-    cover: File | string | null
-  }
-  onSave?: (data: {
-    name: string
-    sex: ParticipantSex
-    type: string
-    singleFormat: string | null
-    ratingType: string | null
-    ratingValue: string | null
-    ageType: string | null
-    ageValue: string | null
-    stages: string | null
-    teamSize: string | null
-    groupGames: string | null
-    knockoutGames: string | null
-    groupMatches: string | null
-    knockoutMatches: string | null
-    handicap: boolean
-    date: Date | null
-    cover: File | string | null
-  }) => void
-  onCancel?: () => void
-}
-
-const SINGLE_FORMAT_OPTIONS = ['Open Single', 'Rated Single', 'Age Single']
-const STAGES_OPTIONS = [
+const TYPE_OPTIONS: TournamentType[] = ['Single', 'Double', 'Team']
+const TEAM_SIZE_OPTIONS = ['2', '3', '4']
+const RESTRICTION_OPTIONS: TournamentRestriction[] = ['Open', 'Rated', 'Age']
+const STAGES_OPTIONS: StagesType[] = [
   'Group + Knockout',
   'Group Only (Big Round Robin)',
   'Knockout Only',
@@ -67,6 +32,8 @@ const KNOCKOUT_GAMES_OPTIONS = [
   'Best of 3 before Semifinal',
   'Best of 5',
 ]
+const QUALIFIERS_OPTIONS: QualifiersCount[] = ['Top 1', 'Top 2', 'Top 3', 'All']
+const AGE_LIMIT_TYPE_OPTIONS: AgeLimitType[] = ['U', 'O']
 
 const generateRatingOptions = () => {
   const options = []
@@ -84,16 +51,72 @@ const generateAgeOptions = () => {
   return options
 }
 
-const RATING_OPTIONS = generateRatingOptions()
-const AGE_OPTIONS = generateAgeOptions()
-
-const hasGroupStage = (stages: string | null): boolean => {
-  return (
-    stages === 'Group + Knockout' || stages === 'Group Only (Big Round Robin)'
-  )
+const generateTopPlayersCountOptions = () => {
+  const options = []
+  for (let i = 1; i <= 5; i++) {
+    options.push({ value: String(i), label: String(i) })
+  }
+  return options
 }
 
-const hasKnockoutStage = (stages: string | null): boolean => {
+const generateHandicapDifferenceOptions = () => {
+  const options = []
+  for (let i = 100; i <= 400; i += 50) {
+    options.push({ value: String(i), label: String(i) })
+  }
+  return options
+}
+
+const generateMaxPointsGivenOptions = () => {
+  const options = []
+  for (let i = 1; i <= 10; i++) {
+    options.push({ value: String(i), label: String(i) })
+  }
+  return options
+}
+
+const RATING_OPTIONS = generateRatingOptions()
+const AGE_OPTIONS = generateAgeOptions()
+const TOP_PLAYERS_COUNT_OPTIONS = generateTopPlayersCountOptions()
+const HANDICAP_DIFFERENCE_OPTIONS = generateHandicapDifferenceOptions()
+const MAX_POINTS_GIVEN_OPTIONS = generateMaxPointsGivenOptions()
+
+interface TournamentEditFormData {
+  name: string
+  sex: ParticipantSex
+  type: TournamentType
+  teamSize: string | null
+  restriction: TournamentRestriction
+  ratingLimit: string
+  topPlayersCount: string
+  topPlayersRatingLimit: string
+  ageLimitType: AgeLimitType
+  ageLimit: string
+  stages: StagesType
+  groupGames: string
+  knockoutGames: string
+  groupMatches: string
+  knockoutMatches: string
+  qualifiers: QualifiersCount
+  handicapEnabled: boolean
+  handicapDifference: string
+  handicapMaxPoints: string
+  date: Date | null
+  cover: File | string | null
+}
+
+interface TournamentEditProps {
+  isEdit?: boolean
+  initialData?: Partial<TournamentEditFormData>
+  onSave?: (data: TournamentEditFormData) => void
+  onCancel?: () => void
+}
+
+const hasGroupStage = (stages: StagesType): boolean => {
+  return stages === 'Group + Knockout' || stages === 'Group Only (Big Round Robin)'
+}
+
+const hasKnockoutStage = (stages: StagesType): boolean => {
   return stages === 'Group + Knockout' || stages === 'Knockout Only'
 }
 
@@ -105,42 +128,52 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
 }) => {
   const [name, setName] = useState(initialData?.name || '')
   const [sex, setSex] = useState<ParticipantSex>(initialData?.sex || 'All')
-  const [type, setType] = useState(initialData?.type || 'Single')
-  const [singleFormat, setSingleFormat] = useState<string | null>(
-    initialData?.singleFormat || 'Open Single',
-  )
-  const [ratingType, setRatingType] = useState<string | null>(
-    initialData?.ratingType || 'Under',
-  )
-  const [ratingValue, setRatingValue] = useState<string | null>(
-    initialData?.ratingValue || '1500',
-  )
-  const [ageType, setAgeType] = useState<string | null>(
-    initialData?.ageType || 'Under',
-  )
-  const [ageValue, setAgeValue] = useState<string | null>(
-    initialData?.ageValue || '18',
-  )
-  const [stages, setStages] = useState<string | null>(
-    initialData?.stages || 'Group + Knockout',
-  )
+  const [type, setType] = useState<TournamentType>(initialData?.type || 'Single')
   const [teamSize, setTeamSize] = useState<string | null>(
     initialData?.teamSize || null,
   )
-  const [groupGames, setGroupGames] = useState<string | null>(
+  const [restriction, setRestriction] = useState<TournamentRestriction>(
+    initialData?.restriction || 'Open',
+  )
+  const [ratingLimit, setRatingLimit] = useState(
+    initialData?.ratingLimit || '1500',
+  )
+  const [topPlayersCount, setTopPlayersCount] = useState(
+    initialData?.topPlayersCount || '2',
+  )
+  const [topPlayersRatingLimit, setTopPlayersRatingLimit] = useState(
+    initialData?.topPlayersRatingLimit || '2500',
+  )
+  const [ageLimitType, setAgeLimitType] = useState<AgeLimitType>(
+    initialData?.ageLimitType || 'U',
+  )
+  const [ageLimit, setAgeLimit] = useState(initialData?.ageLimit || '20')
+  const [stages, setStages] = useState<StagesType>(
+    initialData?.stages || 'Group + Knockout',
+  )
+  const [groupGames, setGroupGames] = useState(
     initialData?.groupGames || 'Best of 3',
   )
-  const [knockoutGames, setKnockoutGames] = useState<string | null>(
+  const [knockoutGames, setKnockoutGames] = useState(
     initialData?.knockoutGames || 'Best of 3 before Semifinal',
   )
-  const [groupMatches, setGroupMatches] = useState<string | null>(
+  const [groupMatches, setGroupMatches] = useState(
     initialData?.groupMatches || 'Best of 3',
   )
-  const [knockoutMatches, setKnockoutMatches] = useState<string | null>(
+  const [knockoutMatches, setKnockoutMatches] = useState(
     initialData?.knockoutMatches || 'Best of 3 before Semifinal',
   )
-  const [handicap, setHandicap] = useState<boolean>(
-    initialData?.handicap || false,
+  const [qualifiers, setQualifiers] = useState<QualifiersCount>(
+    initialData?.qualifiers || 'Top 2',
+  )
+  const [handicapEnabled, setHandicapEnabled] = useState(
+    initialData?.handicapEnabled || false,
+  )
+  const [handicapDifference, setHandicapDifference] = useState(
+    initialData?.handicapDifference || '200',
+  )
+  const [handicapMaxPoints, setHandicapMaxPoints] = useState(
+    initialData?.handicapMaxPoints || '5',
   )
   const [date, setDate] = useState<Date | null>(initialData?.date || null)
   const [cover, setCover] = useState<File | string | null>(
@@ -189,10 +222,7 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
   }
 
   const validateForm = (): boolean => {
-    if (!name.trim()) {
-      return false
-    }
-    return true
+    return !!name.trim()
   }
 
   const handleSave = () => {
@@ -203,18 +233,27 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
       name,
       sex,
       type,
-      singleFormat: type === 'Single' ? singleFormat : null,
-      ratingType: singleFormat === 'Rated Single' ? ratingType : null,
-      ratingValue: singleFormat === 'Rated Single' ? ratingValue : null,
-      ageType: singleFormat === 'Age Single' ? ageType : null,
-      ageValue: singleFormat === 'Age Single' ? ageValue : null,
-      stages,
       teamSize: type === 'Team' ? teamSize : null,
-      groupGames: hasGroupStage(stages) ? groupGames : null,
-      knockoutGames: hasKnockoutStage(stages) ? knockoutGames : null,
-      groupMatches: type === 'Team' && hasGroupStage(stages) ? groupMatches : null,
-      knockoutMatches: type === 'Team' && hasKnockoutStage(stages) ? knockoutMatches : null,
-      handicap: type === 'Single' ? handicap : false,
+      restriction,
+      ratingLimit: restriction === 'Rated' ? ratingLimit : '1500',
+      topPlayersCount:
+        restriction === 'Rated' && type === 'Team' ? topPlayersCount : '2',
+      topPlayersRatingLimit:
+        restriction === 'Rated' && type === 'Team' ? topPlayersRatingLimit : '2500',
+      ageLimitType: restriction === 'Age' ? ageLimitType : 'U',
+      ageLimit: restriction === 'Age' ? ageLimit : '20',
+      stages,
+      groupGames: hasGroupStage(stages) ? groupGames : 'Best of 3',
+      knockoutGames: hasKnockoutStage(stages) ? knockoutGames : 'Best of 3 before Semifinal',
+      groupMatches: type === 'Team' && hasGroupStage(stages) ? groupMatches : 'Best of 3',
+      knockoutMatches:
+        type === 'Team' && hasKnockoutStage(stages)
+          ? knockoutMatches
+          : 'Best of 3 before Semifinal',
+      qualifiers: hasGroupStage(stages) ? qualifiers : 'Top 2',
+      handicapEnabled,
+      handicapDifference: handicapEnabled ? handicapDifference : '200',
+      handicapMaxPoints: handicapEnabled ? handicapMaxPoints : '5',
       date,
       cover,
     })
@@ -224,12 +263,77 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
     onCancel?.()
   }
 
+  const renderRatingSection = () => {
+    if (restriction !== 'Rated') return null
+
+    return (
+      <>
+        <div style={inlineRowStyle}>
+          <span style={{ fontWeight: 500, marginBottom: '8px' }}>Rating: Under</span>
+          <Select
+            label=""
+            name="ratingLimit"
+            value={ratingLimit}
+            onChange={setRatingLimit}
+            options={RATING_OPTIONS}
+          />
+        </div>
+        {type === 'Team' && (
+          <div style={inlineRowStyle}>
+            <span style={{ fontWeight: 500, marginBottom: '8px' }}>
+              The combined rating of the top
+            </span>
+            <Select
+              label=""
+              name="topPlayersCount"
+              value={topPlayersCount}
+              onChange={setTopPlayersCount}
+              options={TOP_PLAYERS_COUNT_OPTIONS}
+            />
+            <span style={{ fontWeight: 500, marginBottom: '8px' }}>
+              players must be under
+            </span>
+            <Select
+              label=""
+              name="topPlayersRatingLimit"
+              value={topPlayersRatingLimit}
+              onChange={setTopPlayersRatingLimit}
+              options={RATING_OPTIONS}
+            />
+          </div>
+        )}
+      </>
+    )
+  }
+
+  const renderAgeSection = () => {
+    if (restriction !== 'Age') return null
+
+    return (
+      <div style={inlineRowStyle}>
+        <SingleSelectTags
+          label="Age"
+          options={['Under', 'Over']}
+          selectedValue={ageLimitType === 'U' ? 'Under' : 'Over'}
+          onChange={(value) => setAgeLimitType(value === 'Under' ? 'U' : 'O')}
+        />
+        <Select
+          label=""
+          name="ageLimit"
+          value={ageLimit}
+          onChange={setAgeLimit}
+          options={AGE_OPTIONS}
+        />
+      </div>
+    )
+  }
+
   const renderStagesSection = () => (
     <SingleSelectTags
       label="Stages"
       options={STAGES_OPTIONS}
-      selectedValue={stages || 'Group + Knockout'}
-      onChange={setStages}
+      selectedValue={stages}
+      onChange={(value) => setStages(value as StagesType)}
     />
   )
 
@@ -240,7 +344,7 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
         <SingleSelectTags
           label="Group Stage"
           options={GROUP_GAMES_OPTIONS}
-          selectedValue={groupGames || 'Best of 3'}
+          selectedValue={groupGames}
           onChange={setGroupGames}
         />
       )}
@@ -248,32 +352,82 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
         <SingleSelectTags
           label="Knockout Stage"
           options={KNOCKOUT_GAMES_OPTIONS}
-          selectedValue={knockoutGames || 'Best of 3 before Semifinal'}
+          selectedValue={knockoutGames}
           onChange={setKnockoutGames}
         />
       )}
     </>
   )
 
-  const renderNumberOfMatchesSection = () => (
+  const renderNumberOfMatchesSection = () => {
+    if (type !== 'Team') return null
+
+    return (
+      <>
+        <h3 style={sectionTitleStyle}>Number of Matches</h3>
+        {hasGroupStage(stages) && (
+          <SingleSelectTags
+            label="Group Stage"
+            options={GROUP_GAMES_OPTIONS}
+            selectedValue={groupMatches}
+            onChange={setGroupMatches}
+          />
+        )}
+        {hasKnockoutStage(stages) && (
+          <SingleSelectTags
+            label="Knockout Stage"
+            options={KNOCKOUT_GAMES_OPTIONS}
+            selectedValue={knockoutMatches}
+            onChange={setKnockoutMatches}
+          />
+        )}
+      </>
+    )
+  }
+
+  const renderQualifiersSection = () => {
+    if (!hasGroupStage(stages)) return null
+
+    return (
+      <SingleSelectTags
+        label="Number of Qualifiers"
+        options={QUALIFIERS_OPTIONS}
+        selectedValue={qualifiers}
+        onChange={(value) => setQualifiers(value as QualifiersCount)}
+      />
+    )
+  }
+
+  const renderHandicapSection = () => (
     <>
-      <h3 style={sectionTitleStyle}>Number of Matches</h3>
-      {hasGroupStage(stages) && (
-        <SingleSelectTags
-          label="Group Stage"
-          options={GROUP_GAMES_OPTIONS}
-          selectedValue={groupMatches || 'Best of 3'}
-          onChange={setGroupMatches}
+      <h3 style={sectionTitleStyle}>Handicap</h3>
+      <div style={inlineRowStyle}>
+        <Toggle
+          label="Handicap"
+          value={handicapEnabled}
+          onChange={setHandicapEnabled}
         />
-      )}
-      {hasKnockoutStage(stages) && (
-        <SingleSelectTags
-          label="Knockout Stage"
-          options={KNOCKOUT_GAMES_OPTIONS}
-          selectedValue={knockoutMatches || 'Best of 3 before Semifinal'}
-          onChange={setKnockoutMatches}
-        />
-      )}
+        {handicapEnabled && (
+          <>
+            <span style={{ fontWeight: 500, marginBottom: '8px' }}>Difference:</span>
+            <Select
+              label=""
+              name="handicapDifference"
+              value={handicapDifference}
+              onChange={setHandicapDifference}
+              options={HANDICAP_DIFFERENCE_OPTIONS}
+            />
+            <span style={{ fontWeight: 500, marginBottom: '8px' }}>Max Points Given:</span>
+            <Select
+              label=""
+              name="handicapMaxPoints"
+              value={handicapMaxPoints}
+              onChange={setHandicapMaxPoints}
+              options={MAX_POINTS_GIVEN_OPTIONS}
+            />
+          </>
+        )}
+      </div>
     </>
   )
 
@@ -299,85 +453,40 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
         />
         <SingleSelectTags
           label="Type"
-          options={['Single', 'Team']}
+          options={TYPE_OPTIONS}
           selectedValue={type}
           onChange={(value) => {
-            setType(value)
-            if (value === 'Single') {
+            const newType = value as TournamentType
+            setType(newType)
+            if (newType === 'Team' && !teamSize) {
+              setTeamSize('3')
+            }
+            if (newType !== 'Team') {
               setTeamSize(null)
-              if (!stages) {
-                setStages('Group + Knockout')
-              }
-            } else {
-              if (!teamSize) {
-                setTeamSize('2')
-              }
-              if (!stages) {
-                setStages('Group + Knockout')
-              }
             }
           }}
         />
-        {type === 'Single' && (
-          <>
-            <SingleSelectTags
-              label="Format"
-              options={SINGLE_FORMAT_OPTIONS}
-              selectedValue={singleFormat || 'Open Single'}
-              onChange={setSingleFormat}
-            />
-            {singleFormat === 'Rated Single' && (
-              <div style={inlineRowStyle}>
-                <SingleSelectTags
-                  label="Rating"
-                  options={['Under', 'Over']}
-                  selectedValue={ratingType || 'Under'}
-                  onChange={setRatingType}
-                />
-                <Select
-                  label=""
-                  name="ratingValue"
-                  value={ratingValue || '1500'}
-                  onChange={setRatingValue}
-                  options={RATING_OPTIONS}
-                />
-              </div>
-            )}
-            {singleFormat === 'Age Single' && (
-              <div style={inlineRowStyle}>
-                <SingleSelectTags
-                  label="Age"
-                  options={['Under', 'Over']}
-                  selectedValue={ageType || 'Under'}
-                  onChange={setAgeType}
-                />
-                <Select
-                  label=""
-                  name="ageValue"
-                  value={ageValue || '18'}
-                  onChange={setAgeValue}
-                  options={AGE_OPTIONS}
-                />
-              </div>
-            )}
-            {renderStagesSection()}
-            {renderNumberOfGamesSection()}
-            <Toggle label="Handicap" value={handicap} onChange={setHandicap} />
-          </>
-        )}
         {type === 'Team' && (
-          <>
-            <SingleSelectTags
-              label="Team Size"
-              options={['2', '3', '4']}
-              selectedValue={teamSize || '2'}
-              onChange={setTeamSize}
-            />
-            {renderStagesSection()}
-            {renderNumberOfMatchesSection()}
-            {renderNumberOfGamesSection()}
-          </>
+          <SingleSelectTags
+            label="Team Size"
+            options={TEAM_SIZE_OPTIONS}
+            selectedValue={teamSize || '3'}
+            onChange={setTeamSize}
+          />
         )}
+        <SingleSelectTags
+          label="Restriction"
+          options={RESTRICTION_OPTIONS}
+          selectedValue={restriction}
+          onChange={(value) => setRestriction(value as TournamentRestriction)}
+        />
+        {renderRatingSection()}
+        {renderAgeSection()}
+        {renderStagesSection()}
+        {renderNumberOfMatchesSection()}
+        {renderNumberOfGamesSection()}
+        {renderQualifiersSection()}
+        {renderHandicapSection()}
         <DatePicker label="Date" value={date} onChange={setDate} />
         <MediaUpload label="Cover" value={cover} onChange={setCover} />
         <div style={buttonContainerStyle}>

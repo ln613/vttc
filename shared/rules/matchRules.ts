@@ -9,6 +9,7 @@ import type {
   TeamMatchConfig,
   TeamAssignment,
   GameType,
+  HandicapParams,
 } from '../types/Match'
 import {
   DEFAULT_GAME_CONFIG,
@@ -16,8 +17,9 @@ import {
   LONG_GAME_CONFIG,
   DEFAULT_MATCH_CONFIG,
   SEMIFINAL_MATCH_CONFIG,
-  HANDICAP_RATING_DIVISOR,
-  MAX_HANDICAP_POINTS,
+  DEFAULT_HANDICAP_RATING_DIVISOR,
+  DEFAULT_MAX_HANDICAP_POINTS,
+  DEFAULT_HANDICAP_PARAMS,
 } from '../types/Match'
 
 // ==================== GAME RULES ====================
@@ -25,12 +27,18 @@ import {
 /**
  * Validate game configuration
  */
-export const validateGameConfig = (config: GameConfig): void => {
+export const validateGameConfig = (
+  config: GameConfig,
+  maxHandicapPoints: number = DEFAULT_MAX_HANDICAP_POINTS,
+): void => {
   if (config.targetPoints <= 0) {
     throw new Error('Target points must be positive')
   }
-  if (config.handicap !== undefined && (config.handicap < 0 || config.handicap > MAX_HANDICAP_POINTS)) {
-    throw new Error(`Handicap must be between 0 and ${MAX_HANDICAP_POINTS}`)
+  if (
+    config.handicap !== undefined &&
+    (config.handicap < 0 || config.handicap > maxHandicapPoints)
+  ) {
+    throw new Error(`Handicap must be between 0 and ${maxHandicapPoints}`)
   }
   // Handicap game cannot be short (7 points) or long (21 points)
   if (config.type === 'handicap' && config.targetPoints !== 11) {
@@ -123,14 +131,16 @@ export const shouldAlternateServe = (
 
 /**
  * Calculate handicap points based on rating difference
+ * D = rating difference divisor (default 200)
+ * MP = max points given (default 5)
  */
 export const calculateHandicap = (
   rating1: number,
   rating2: number,
-  divisor: number = HANDICAP_RATING_DIVISOR,
+  params: HandicapParams = DEFAULT_HANDICAP_PARAMS,
 ): { side: 1 | 2; points: number } => {
   const diff = Math.abs(rating1 - rating2)
-  const points = Math.min(Math.floor(diff / divisor), MAX_HANDICAP_POINTS)
+  const points = Math.min(Math.floor(diff / params.divisor), params.maxPoints)
 
   // Higher rated player gives points to lower rated
   const side: 1 | 2 = rating1 > rating2 ? 2 : 1
@@ -152,10 +162,11 @@ export const createHandicapGameConfig = (
   side1Players: Player[],
   side2Players: Player[],
   isGolden: boolean = false,
+  handicapParams: HandicapParams = DEFAULT_HANDICAP_PARAMS,
 ): GameConfig => {
   const rating1 = getSideRating(side1Players)
   const rating2 = getSideRating(side2Players)
-  const { points } = calculateHandicap(rating1, rating2)
+  const { points } = calculateHandicap(rating1, rating2, handicapParams)
 
   return {
     type: 'handicap',
@@ -171,10 +182,11 @@ export const createHandicapGameConfig = (
 export const getHandicapStartingScore = (
   side1Players: Player[],
   side2Players: Player[],
+  handicapParams: HandicapParams = DEFAULT_HANDICAP_PARAMS,
 ): { score1: number; score2: number } => {
   const rating1 = getSideRating(side1Players)
   const rating2 = getSideRating(side2Players)
-  const { side, points } = calculateHandicap(rating1, rating2)
+  const { side, points } = calculateHandicap(rating1, rating2, handicapParams)
 
   return {
     score1: side === 1 ? points : 0,

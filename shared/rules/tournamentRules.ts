@@ -44,7 +44,7 @@ export const calculateNumberOfGroups = (totalParticipants: number): number => {
 }
 
 /**
- * Calculate seeding value for a player
+ * Calculate seeding value for a player (Rating Based Seeding - RBS)
  */
 export const getPlayerSeeding = (player: Player): number => {
   return player.rating
@@ -52,6 +52,7 @@ export const getPlayerSeeding = (player: Player): number => {
 
 /**
  * Calculate seeding value for a team based on number of players per team (nop)
+ * Rating Based Seeding (RBS):
  * - nop = 1: the player's rating
  * - nop = 2 or 3: the combined rating of the 2 or 3 players in the team
  * - nop > 3: the combined rating of the top 3 players in the team
@@ -1218,35 +1219,40 @@ export const validateAddParticipant = (
     errors.push('Tournament has reached maximum participants')
   }
 
-  // Check rating requirement
-  if (tournament.format.ratingLimit !== undefined) {
+  // Check rating requirement for Rated tournaments
+  if (
+    tournament.format.restriction === 'Rated' &&
+    tournament.format.ratedConfig
+  ) {
+    const { ratingLimit } = tournament.format.ratedConfig
     for (const player of players) {
-      if (!meetsRatingRequirement(player, tournament.format.ratingLimit)) {
+      if (!meetsRatingRequirement(player, ratingLimit)) {
         errors.push(
-          `Player ${player.firstName} ${player.lastName} rating (${player.rating}) exceeds limit (${tournament.format.ratingLimit})`,
+          `Player ${player.firstName} ${player.lastName} rating (${player.rating}) exceeds limit (${ratingLimit})`,
         )
       }
     }
   }
 
-  // Check age requirement
+  // Check age requirement for Age tournaments
   if (
-    tournament.format.ageLimitType !== undefined &&
-    tournament.format.ageLimit !== undefined
+    tournament.format.restriction === 'Age' &&
+    tournament.format.ageConfig
   ) {
+    const { ageLimitType, ageLimit } = tournament.format.ageConfig
     for (const player of players) {
       if (
         !meetsAgeRequirement(
           player,
-          tournament.format.ageLimitType,
-          tournament.format.ageLimit,
+          ageLimitType,
+          ageLimit,
           tournament.date,
         )
       ) {
         const requirement =
-          tournament.format.ageLimitType === 'U'
-            ? `under ${tournament.format.ageLimit}`
-            : `over ${tournament.format.ageLimit}`
+          ageLimitType === 'U'
+            ? `under ${ageLimit}`
+            : `over ${ageLimit}`
         errors.push(
           `Player ${player.firstName} ${player.lastName} does not meet age requirement (${requirement})`,
         )

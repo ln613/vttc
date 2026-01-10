@@ -134,9 +134,25 @@ export const FINAL_MATCH_CONFIG: MatchConfig = {
 /**
  * Handicap game points difference divisor (default 200)
  */
-export const HANDICAP_RATING_DIVISOR = 200
+export const DEFAULT_HANDICAP_RATING_DIVISOR = 200
 
 /**
- * Maximum handicap points
+ * Maximum handicap points (default 5)
  */
-export const MAX_HANDICAP_POINTS = 5
+export const DEFAULT_MAX_HANDICAP_POINTS = 5
+
+/**
+ * Handicap configuration for a game/match
+ */
+export interface HandicapParams {
+  divisor: number // D = rating difference divisor
+  maxPoints: number // MP = max points given
+}
+
+/**
+ * Default handicap parameters
+ */
+export const DEFAULT_HANDICAP_PARAMS: HandicapParams = {
+  divisor: DEFAULT_HANDICAP_RATING_DIVISOR,
+  maxPoints: DEFAULT_MAX_HANDICAP_POINTS,
+}
