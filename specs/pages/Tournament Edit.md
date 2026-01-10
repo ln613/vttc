@@ -27,8 +27,8 @@ Vertical
 
 Visible if the selected Restriction is Rated
 
-- Rating: "Under" + dropdown (100 to 3000, every 50, default 1500, align bottom)
-- Top Players Rating (visible if selected type is Team): "The combined rating of the top" + dropdown (1 to 5) + "Players must be under" + dropdown (100 to 3000, every 50, default 2500, align bottom)
+- Rating: "Under" + dropdown (100 to 3000, every 50, default 1500, align middle)
+- Top Players Rating (visible if selected type is Team): "The combined rating of the top" + dropdown (1 to 5, align middle) + "Players must be under" + dropdown (100 to 3000, every 50, default 2500, align middle)
 
 ## Age Section
 

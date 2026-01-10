@@ -188,7 +188,6 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
 
   const contentStyle: React.CSSProperties = {
     padding: '24px',
-    maxWidth: '600px',
   }
 
   const titleStyle: React.CSSProperties = {
@@ -219,6 +218,12 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
     alignItems: 'flex-end',
     gap: '12px',
     marginBottom: '16px',
+  }
+
+  const inlineRowMiddleNoMarginStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
   }
 
   const validateForm = (): boolean => {
@@ -268,39 +273,46 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
 
     return (
       <>
-        <div style={inlineRowStyle}>
-          <span style={{ fontWeight: 500, marginBottom: '8px' }}>Rating: Under</span>
+        <h3 style={sectionTitleStyle}>Rating</h3>
+        <div style={inlineRowMiddleNoMarginStyle}>
+          <span style={{ fontWeight: 500 }}>Under</span>
           <Select
             label=""
             name="ratingLimit"
             value={ratingLimit}
             onChange={setRatingLimit}
             options={RATING_OPTIONS}
+            noMargin
           />
         </div>
         {type === 'Team' && (
-          <div style={inlineRowStyle}>
-            <span style={{ fontWeight: 500, marginBottom: '8px' }}>
-              The combined rating of the top
-            </span>
-            <Select
-              label=""
-              name="topPlayersCount"
-              value={topPlayersCount}
-              onChange={setTopPlayersCount}
-              options={TOP_PLAYERS_COUNT_OPTIONS}
-            />
-            <span style={{ fontWeight: 500, marginBottom: '8px' }}>
-              players must be under
-            </span>
-            <Select
-              label=""
-              name="topPlayersRatingLimit"
-              value={topPlayersRatingLimit}
-              onChange={setTopPlayersRatingLimit}
-              options={RATING_OPTIONS}
-            />
-          </div>
+          <>
+            <h3 style={sectionTitleStyle}>Top Players Rating</h3>
+            <div style={inlineRowMiddleNoMarginStyle}>
+              <span style={{ fontWeight: 500 }}>
+                The combined rating of the top
+              </span>
+              <Select
+                label=""
+                name="topPlayersCount"
+                value={topPlayersCount}
+                onChange={setTopPlayersCount}
+                options={TOP_PLAYERS_COUNT_OPTIONS}
+                noMargin
+              />
+              <span style={{ fontWeight: 500 }}>
+                players must be under
+              </span>
+              <Select
+                label=""
+                name="topPlayersRatingLimit"
+                value={topPlayersRatingLimit}
+                onChange={setTopPlayersRatingLimit}
+                options={RATING_OPTIONS}
+                noMargin
+              />
+            </div>
+          </>
         )}
       </>
     )
