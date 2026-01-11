@@ -247,10 +247,11 @@ const validateAddParticipantRules = (event, players) => {
   // Check for duplicate players in input
   const playerIds = new Set()
   for (const player of players) {
-    if (playerIds.has(player._id)) {
-      errors.push(`Duplicate player: ${player._id}`)
+    const playerId = player._id.toString()
+    if (playerIds.has(playerId)) {
+      errors.push(`Duplicate player: ${playerId}`)
     }
-    playerIds.add(player._id)
+    playerIds.add(playerId)
   }
 
   // Check max participants
@@ -284,7 +285,9 @@ const validateAddParticipantRules = (event, players) => {
 
   // Check if player is already in event
   for (const player of players) {
-    const existing = event.participants.find((p) => p.players.some((pl) => pl._id === player._id))
+    const existing = event.participants.find((p) =>
+      p.players.some((pl) => pl._id.toString() === player._id.toString()),
+    )
     if (existing) {
       errors.push(`Player ${player.firstName} ${player.lastName} is already in the event`)
     }
@@ -823,8 +826,8 @@ const createKnockoutStage = (participants, nop, config, event) => {
 }
 
 const isSameParticipant = (p1, p2) => {
-  const id1 = p1._id || p1.participant?._id
-  const id2 = p2._id || p2.participant?._id
+  const id1 = (p1._id || p1.participant?._id)?.toString()
+  const id2 = (p2._id || p2.participant?._id)?.toString()
   return id1 === id2
 }
 
@@ -1144,9 +1147,9 @@ const calculateGroupStats = (participant, matches) => {
 }
 
 const getParticipantSideInMatch = (match, participant) => {
-  const participantId = participant._id || participant.participant?._id
-  if (match.side1.some((p) => p._id === participantId)) return 1
-  if (match.side2.some((p) => p._id === participantId)) return 2
+  const participantId = (participant._id || participant.participant?._id)?.toString()
+  if (match.side1.some((p) => p._id?.toString() === participantId)) return 1
+  if (match.side2.some((p) => p._id?.toString() === participantId)) return 2
   return undefined
 }
 
@@ -1210,8 +1213,8 @@ const getHeadToHeadWinner = (p1, p2, matches) => {
 }
 
 const isSameParticipantEntity = (p1, p2) => {
-  const id1 = p1._id || p1.participant?._id
-  const id2 = p2._id || p2.participant?._id
+  const id1 = (p1._id || p1.participant?._id)?.toString()
+  const id2 = (p2._id || p2.participant?._id)?.toString()
   return id1 === id2
 }
 
