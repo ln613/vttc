@@ -3,7 +3,7 @@ import { apiGet } from '../utils/api'
 import { createStore, createAsyncState, type AsyncState } from './createStore'
 
 export interface Tournament {
-  id: string
+  _id: string
   name: string
   type: TournamentType
   stages: ('group' | 'knockout')[]
@@ -34,9 +34,9 @@ export const tournamentActions = {
     }
   },
 
-  getTournamentById: (id: string): Tournament | undefined => {
+  getTournamentById: (_id: string): Tournament | undefined => {
     const state = tournamentStore.getState()
-    return state.data?.find((t) => t.id === id)
+    return state.data?.find((t) => t._id === _id)
   },
 }
 

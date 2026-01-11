@@ -36,19 +36,19 @@ import {
 } from './matchRules'
 
 // Helper to create test players
-const createPlayer = (id: string, rating: number): Player => ({
-  id,
-  firstName: `Player${id}`,
+const createPlayer = (_id: string, rating: number): Player => ({
+  _id,
+  firstName: `Player${_id}`,
   lastName: 'Test',
   rating,
 })
 
 // Helper to create test teams
-const createTeam = (id: string, playerRatings: number[]): Team => ({
-  id,
-  name: `Team${id}`,
+const createTeam = (_id: string, playerRatings: number[]): Team => ({
+  _id,
+  name: `Team${_id}`,
   players: playerRatings.map((rating, index) =>
-    createPlayer(`${id}-${index}`, rating),
+    createPlayer(`${_id}-${index}`, rating),
   ),
 })
 
@@ -249,7 +249,7 @@ describe('Game Rules', () => {
   describe('createGame', () => {
     it('should create a game with default config', () => {
       const game = createGame('game-1')
-      expect(game.id).toBe('game-1')
+      expect(game._id).toBe('game-1')
       expect(game.config).toEqual(DEFAULT_GAME_CONFIG)
       expect(game.score1).toBe(0)
       expect(game.score2).toBe(0)
@@ -436,7 +436,7 @@ describe('Match Rules', () => {
       const p2 = createPlayer('2', 1400)
       const match = createMatch('match-1', [p1], [p2])
 
-      expect(match.id).toBe('match-1')
+      expect(match._id).toBe('match-1')
       expect(match.side1).toEqual([p1])
       expect(match.side2).toEqual([p2])
       expect(match.games).toEqual([])
@@ -453,7 +453,7 @@ describe('Match Rules', () => {
       const match = createMatch('match-1', [p1], [p2])
 
       const game: Game = {
-        id: 'game-1',
+        _id: 'game-1',
         config: DEFAULT_GAME_CONFIG,
         score1: 11,
         score2: 5,
@@ -473,7 +473,7 @@ describe('Match Rules', () => {
       let match = createMatch('match-1', [p1], [p2])
 
       const game1: Game = {
-        id: 'game-1',
+        _id: 'game-1',
         config: DEFAULT_GAME_CONFIG,
         score1: 11,
         score2: 5,
@@ -482,7 +482,7 @@ describe('Match Rules', () => {
       match = addGameToMatch(match, game1)
 
       const game2: Game = {
-        id: 'game-2',
+        _id: 'game-2',
         config: DEFAULT_GAME_CONFIG,
         score1: 11,
         score2: 7,
@@ -501,14 +501,14 @@ describe('Match Rules', () => {
 
       // Add 2 winning games
       match = addGameToMatch(match, {
-        id: 'game-1',
+        _id: 'game-1',
         config: DEFAULT_GAME_CONFIG,
         score1: 11,
         score2: 5,
         winningSide: 1,
       })
       match = addGameToMatch(match, {
-        id: 'game-2',
+        _id: 'game-2',
         config: DEFAULT_GAME_CONFIG,
         score1: 11,
         score2: 5,
@@ -517,7 +517,7 @@ describe('Match Rules', () => {
 
       expect(() =>
         addGameToMatch(match, {
-          id: 'game-3',
+          _id: 'game-3',
           config: DEFAULT_GAME_CONFIG,
           score1: 11,
           score2: 5,

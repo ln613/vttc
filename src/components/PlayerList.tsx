@@ -15,7 +15,7 @@ export const PlayerList = () => {
   return (
     <ul>
       {players.map((player) => (
-        <PlayerItem key={player.id} player={player} />
+        <PlayerItem key={player._id} player={player} />
       ))}
     </ul>
   )

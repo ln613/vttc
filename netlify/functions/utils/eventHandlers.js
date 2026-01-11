@@ -1,4 +1,4 @@
-import { getDB } from './db.js'
+import { getDB, toObjectId } from './db.js'
 
 const EVENTS_COLLECTION = 'events'
 const TOURNAMENTS_COLLECTION = 'tournaments'
@@ -33,7 +33,7 @@ export const saveEvent = async (body) => {
   validateSaveEventInput(body)
 
   const {
-    id,
+    _id,
     tournamentId,
     date,
     maxParticipants = 0,
@@ -52,10 +52,10 @@ export const saveEvent = async (body) => {
   const eventsCollection = db.collection(EVENTS_COLLECTION)
   const tournamentsCollection = db.collection(TOURNAMENTS_COLLECTION)
 
-  const isEdit = id != null
+  const isEdit = _id != null
 
   // Get tournament
-  const tournament = await tournamentsCollection.findOne({ id: tournamentId })
+  const tournament = await tournamentsCollection.findOne({ _id: toObjectId(tournamentId) })
   if (!tournament) {
     throwError('Tournament not found')
   }
@@ -70,7 +70,7 @@ export const saveEvent = async (body) => {
       throwError('An event with the same name and date already exists')
     }
   } else {
-    const existing = await eventsCollection.findOne({ id })
+    const existing = await eventsCollection.findOne({ _id: toObjectId(_id) })
     if (!existing) {
       throwError('Event not found')
     }
@@ -85,11 +85,11 @@ export const saveEvent = async (body) => {
     }
   }
 
-  // Copy tournament fields (except id and name) to event and add event-specific fields
-  const { id: _tournamentId, name: _tournamentName, ...tournamentFields } = tournament
+  // Copy tournament fields (except _id and name) to event and add event-specific fields
+  const { _id: _tournamentId, name: _tournamentName, ...tournamentFields } = tournament
   const event = {
     ...tournamentFields,
-    id: isEdit ? id : generateId(),
+    ...(isEdit && { _id: toObjectId(_id) }),
     tournamentId,
     date,
     maxParticipants,
@@ -131,13 +131,13 @@ export const saveEvent = async (body) => {
   })
 
   if (isEdit) {
-    await eventsCollection.updateOne({ id }, { $set: event })
+    await eventsCollection.updateOne({ _id: toObjectId(_id) }, { $set: event })
+    return { ...event, _id }
   } else {
     event.createdAt = new Date().toISOString()
-    await eventsCollection.insertOne(event)
+    const result = await eventsCollection.insertOne(event)
+    return { ...event, _id: result.insertedId.toString() }
   }
-
-  return event
 }
 
 const validateSaveEventInput = (body) => {
@@ -178,10 +178,10 @@ export const getEvents = async (params = {}) => {
  * Get event by ID
  */
 export const getEvent = async (params) => {
-  if (!params.id) throwError('Event ID is required')
+  if (!params._id) throwError('Event ID is required')
 
   const db = getDB()
-  const event = await db.collection(EVENTS_COLLECTION).findOne({ id: params.id })
+  const event = await db.collection(EVENTS_COLLECTION).findOne({ _id: toObjectId(params._id) })
   if (!event) throwError('Event not found')
   return event
 }
@@ -192,18 +192,18 @@ export const getEvent = async (params) => {
 export const addParticipant = async (body) => {
   validateAddParticipantInput(body)
 
-  const { id, playerIds, teamName } = body
+  const { _id, playerIds, teamName } = body
 
   const db = getDB()
   const collection = db.collection(EVENTS_COLLECTION)
   const playersCollection = db.collection('players')
 
   // Get event
-  const event = await collection.findOne({ id })
+  const event = await collection.findOne({ _id: toObjectId(_id) })
   if (!event) throwError('Event not found')
 
   // Get players
-  const players = await playersCollection.find({ id: { $in: playerIds } }).toArray()
+  const players = await playersCollection.find({ _id: { $in: playerIds.map(toObjectId) } }).toArray()
 
   if (players.length !== playerIds.length) {
     throwError('One or more players not found')
@@ -217,20 +217,20 @@ export const addParticipant = async (body) => {
   const rating = calculateParticipantRating(players, event.nop)
 
   const participant = {
-    id: generateId(),
+    _id: generateId(),
     players,
     teamName,
     rating,
   }
 
-  await collection.updateOne({ id }, { $push: { participants: participant } })
+  await collection.updateOne({ _id: toObjectId(_id) }, { $push: { participants: participant } })
 
   return participant
 }
 
 const validateAddParticipantInput = (body) => {
   if (!body) throwError('Request body is required')
-  if (!body.id) throwError('Event ID is required')
+  if (!body._id) throwError('Event ID is required')
   if (!body.playerIds || !Array.isArray(body.playerIds) || body.playerIds.length === 0) {
     throwError('Player IDs are required')
   }
@@ -247,10 +247,10 @@ const validateAddParticipantRules = (event, players) => {
   // Check for duplicate players in input
   const playerIds = new Set()
   for (const player of players) {
-    if (playerIds.has(player.id)) {
-      errors.push(`Duplicate player: ${player.id}`)
+    if (playerIds.has(player._id)) {
+      errors.push(`Duplicate player: ${player._id}`)
     }
-    playerIds.add(player.id)
+    playerIds.add(player._id)
   }
 
   // Check max participants
@@ -284,7 +284,7 @@ const validateAddParticipantRules = (event, players) => {
 
   // Check if player is already in event
   for (const player of players) {
-    const existing = event.participants.find((p) => p.players.some((pl) => pl.id === player.id))
+    const existing = event.participants.find((p) => p.players.some((pl) => pl._id === player._id))
     if (existing) {
       errors.push(`Player ${player.firstName} ${player.lastName} is already in the event`)
     }
@@ -325,15 +325,15 @@ const meetsAgeRequirement = (player, ageLimitType, ageLimit, referenceDate) => {
 export const deleteParticipant = async (body) => {
   validateDeleteParticipantInput(body)
 
-  const { id, participantId } = body
+  const { _id, participantId } = body
 
   const db = getDB()
   const collection = db.collection(EVENTS_COLLECTION)
 
-  const event = await collection.findOne({ id })
+  const event = await collection.findOne({ _id: toObjectId(_id) })
   if (!event) throwError('Event not found')
 
-  const participant = event.participants.find((p) => p.id === participantId)
+  const participant = event.participants.find((p) => p._id === participantId)
   if (!participant) throwError('Participant not found')
 
   // Check if event has started
@@ -342,14 +342,14 @@ export const deleteParticipant = async (body) => {
     throwError('Cannot delete participant after event has started')
   }
 
-  await collection.updateOne({ id }, { $pull: { participants: { id: participantId } } })
+  await collection.updateOne({ _id: toObjectId(_id) }, { $pull: { participants: { _id: participantId } } })
 
   return participant
 }
 
 const validateDeleteParticipantInput = (body) => {
   if (!body) throwError('Request body is required')
-  if (!body.id) throwError('Event ID is required')
+  if (!body._id) throwError('Event ID is required')
   if (!body.participantId) throwError('Participant ID is required')
 }
 
@@ -358,14 +358,14 @@ const validateDeleteParticipantInput = (body) => {
  */
 export const generateGroups = async (body) => {
   if (!body) throwError('Request body is required')
-  if (!body.id) throwError('Event ID is required')
+  if (!body._id) throwError('Event ID is required')
 
-  const { id } = body
+  const { _id } = body
 
   const db = getDB()
   const collection = db.collection(EVENTS_COLLECTION)
 
-  const event = await collection.findOne({ id })
+  const event = await collection.findOne({ _id: toObjectId(_id) })
   if (!event) throwError('Event not found')
 
   // Validate
@@ -382,7 +382,7 @@ export const generateGroups = async (body) => {
   const groups = groupArrays.map((participants, index) => {
     const matchSchedule = generateGroupMatchSchedule(participants)
     const matches = matchSchedule.map((schedule) => ({
-      id: generateId(),
+      _id: generateId(),
       config: {
         numberOfGames,
         isSuddenDeath: true,
@@ -425,7 +425,7 @@ export const generateGroups = async (body) => {
     groups,
   }
 
-  await collection.updateOne({ id }, { $set: { eventStages: updatedStages } })
+  await collection.updateOne({ _id: toObjectId(_id) }, { $set: { eventStages: updatedStages } })
 
   return groups
 }
@@ -529,14 +529,14 @@ const generateGroupMatchSchedule = (participants) => {
  */
 export const generateKnockout = async (body) => {
   if (!body) throwError('Request body is required')
-  if (!body.id) throwError('Event ID is required')
+  if (!body._id) throwError('Event ID is required')
 
-  const { id } = body
+  const { _id } = body
 
   const db = getDB()
   const collection = db.collection(EVENTS_COLLECTION)
 
-  const event = await collection.findOne({ id })
+  const event = await collection.findOne({ _id: toObjectId(_id) })
   if (!event) throwError('Event not found')
 
   // Validate
@@ -578,7 +578,7 @@ export const generateKnockout = async (body) => {
   const updatedStages = [...event.eventStages]
   updatedStages[knockoutStageIndex] = updatedKnockoutStage
 
-  await collection.updateOne({ id }, { $set: { eventStages: updatedStages } })
+  await collection.updateOne({ _id: toObjectId(_id) }, { $set: { eventStages: updatedStages } })
 
   return updatedKnockoutStage
 }
@@ -743,7 +743,7 @@ const createKnockoutMatches = (seedingList, event, roundName) => {
 
     matches.push({
       match: {
-        id: generateId(),
+        _id: generateId(),
         config: {
           numberOfGames,
           isSuddenDeath: true,
@@ -823,8 +823,8 @@ const createKnockoutStage = (participants, nop, config, event) => {
 }
 
 const isSameParticipant = (p1, p2) => {
-  const id1 = p1.id || p1.participant?.id
-  const id2 = p2.id || p2.participant?.id
+  const id1 = p1._id || p1.participant?._id
+  const id2 = p2._id || p2.participant?._id
   return id1 === id2
 }
 
@@ -905,12 +905,12 @@ const advanceKnockoutRound = (stage, event) => {
 export const finishMatch = async (body) => {
   validateFinishMatchInput(body)
 
-  const { id, matchId, result } = body
+  const { _id, matchId, result } = body
 
   const db = getDB()
   const collection = db.collection(EVENTS_COLLECTION)
 
-  const event = await collection.findOne({ id })
+  const event = await collection.findOne({ _id: toObjectId(_id) })
   if (!event) throwError('Event not found')
 
   let matchFound = false
@@ -922,7 +922,7 @@ export const finishMatch = async (body) => {
     const groupStage = event.eventStages[groupStageIndex]
     for (let gi = 0; gi < groupStage.groups.length; gi++) {
       const group = groupStage.groups[gi]
-      const matchIndex = group.matches.findIndex((m) => m.id === matchId)
+      const matchIndex = group.matches.findIndex((m) => m._id === matchId)
       if (matchIndex !== -1) {
         matchFound = true
 
@@ -977,7 +977,7 @@ export const finishMatch = async (body) => {
       const knockoutStage = event.eventStages[knockoutStageIndex]
       for (let ri = 0; ri < knockoutStage.rounds.length; ri++) {
         const round = knockoutStage.rounds[ri]
-        const matchIndex = round.matches.findIndex((m) => m.match?.id === matchId)
+        const matchIndex = round.matches.findIndex((m) => m.match?._id === matchId)
         if (matchIndex !== -1) {
           matchFound = true
 
@@ -1022,21 +1022,21 @@ export const finishMatch = async (body) => {
 
   if (!matchFound) throwError('Match not found')
 
-  await collection.updateOne({ id }, { $set: { eventStages: updatedStages } })
+  await collection.updateOne({ _id: toObjectId(_id) }, { $set: { eventStages: updatedStages } })
 
   return { success: true }
 }
 
 const validateFinishMatchInput = (body) => {
   if (!body) throwError('Request body is required')
-  if (!body.id) throwError('Event ID is required')
+  if (!body._id) throwError('Event ID is required')
   if (!body.matchId) throwError('Match ID is required')
   if (!body.result || !Array.isArray(body.result)) throwError('Match result is required')
 }
 
 const updateMatchWithResult = (match, result) => {
   const games = result.map((gameResult, index) => ({
-    id: `${match.id}-game-${index}`,
+    _id: `${match._id}-game-${index}`,
     config: match.config.gameConfig,
     score1: gameResult.score1,
     score2: gameResult.score2,
@@ -1144,9 +1144,9 @@ const calculateGroupStats = (participant, matches) => {
 }
 
 const getParticipantSideInMatch = (match, participant) => {
-  const participantId = participant.id || participant.participant?.id
-  if (match.side1.some((p) => p.id === participantId)) return 1
-  if (match.side2.some((p) => p.id === participantId)) return 2
+  const participantId = participant._id || participant.participant?._id
+  if (match.side1.some((p) => p._id === participantId)) return 1
+  if (match.side2.some((p) => p._id === participantId)) return 2
   return undefined
 }
 
@@ -1210,8 +1210,8 @@ const getHeadToHeadWinner = (p1, p2, matches) => {
 }
 
 const isSameParticipantEntity = (p1, p2) => {
-  const id1 = p1.id || p1.participant?.id
-  const id2 = p2.id || p2.participant?.id
+  const id1 = p1._id || p1.participant?._id
+  const id2 = p2._id || p2.participant?._id
   return id1 === id2
 }
 

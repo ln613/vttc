@@ -2,7 +2,7 @@ import type { Player } from './Player'
 import type { Match } from './Match'
 
 export interface Team {
-  id: string
+  _id: string
   name: string
   players: Player[]
 }
@@ -81,7 +81,7 @@ export interface BestOfNConfig {
  * Tournament participant (player or team)
  */
 export interface Participant {
-  id: string
+  _id: string
   players: Player[]
   teamName?: string
   rating: number // Computed rating for seeding
@@ -198,7 +198,7 @@ export type Stage = GroupStage | KnockoutStage
  * Tournament - a template for events with common configuration
  */
 export interface Tournament {
-  id: string
+  _id: string
   name: string
   sex: ParticipantSex
   type: TournamentType

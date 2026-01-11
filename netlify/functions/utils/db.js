@@ -1,7 +1,54 @@
-import { MongoClient } from 'mongodb'
+import { MongoClient, ObjectId } from 'mongodb'
 
 let cachedDb = null
 let cachedClient = null
+
+/**
+ * Convert string _id to ObjectId for MongoDB queries
+ */
+export const toObjectId = (id) => {
+  if (!id) return null
+  if (id instanceof ObjectId) return id
+  try {
+    return new ObjectId(id)
+  } catch {
+    return id // Return as-is if not a valid ObjectId string
+  }
+}
+
+/**
+ * Convert ObjectId _id to string in document
+ */
+const convertIdToString = (doc) => {
+  if (!doc) return doc
+  if (doc._id instanceof ObjectId) {
+    return { ...doc, _id: doc._id.toString() }
+  }
+  return doc
+}
+
+/**
+ * Convert ObjectId _id to string in array of documents
+ */
+const convertIdsToString = (docs) => {
+  if (!docs || !Array.isArray(docs)) return docs
+  return docs.map(convertIdToString)
+}
+
+/**
+ * Convert _id field in filter to ObjectId if it's a string
+ */
+const convertFilterIds = (filter) => {
+  if (!filter) return filter
+  const converted = { ...filter }
+  if (converted._id && typeof converted._id === 'string') {
+    converted._id = toObjectId(converted._id)
+  }
+  if (converted._id && converted._id.$in) {
+    converted._id.$in = converted._id.$in.map(toObjectId)
+  }
+  return converted
+}
 
 export const connectDB = async () => {
   if (cachedDb) return cachedDb
@@ -31,8 +78,9 @@ export const get = async (collectionName, filter = {}, projection = {}, sort = {
 
   const db = getDB()
   const collection = db.collection(collectionName)
+  const convertedFilter = convertFilterIds(filter)
 
-  let cursor = collection.find(filter, { projection })
+  let cursor = collection.find(convertedFilter, { projection })
 
   if (Object.keys(sort).length > 0) {
     cursor = cursor.sort(sort)
@@ -46,20 +94,23 @@ export const get = async (collectionName, filter = {}, projection = {}, sort = {
     cursor = cursor.limit(options.limit)
   }
 
-  return cursor.toArray()
+  const results = await cursor.toArray()
+  return convertIdsToString(results)
 }
 
 export const getOne = async (collectionName, filter = {}, projection = {}) => {
   validateParams({ collectionName })
 
   const db = getDB()
-  return db.collection(collectionName).findOne(filter, { projection })
+  const convertedFilter = convertFilterIds(filter)
+  const result = await db.collection(collectionName).findOne(convertedFilter, { projection })
+  return convertIdToString(result)
 }
 
-export const getById = async (collectionName, id, projection = {}) => {
-  validateParams({ collectionName, id })
+export const getById = async (collectionName, _id, projection = {}) => {
+  validateParams({ collectionName, _id })
 
-  return getOne(collectionName, { id }, projection)
+  return getOne(collectionName, { _id }, projection)
 }
 
 export const save = async (collectionName, document) => {
@@ -68,16 +119,17 @@ export const save = async (collectionName, document) => {
   const db = getDB()
   const collection = db.collection(collectionName)
 
-  if (document.id) {
+  if (document._id) {
+    const docToSave = { ...document, _id: toObjectId(document._id) }
     const result = await collection.updateOne(
-      { id: document.id },
-      { $set: document },
+      { _id: docToSave._id },
+      { $set: docToSave },
       { upsert: true },
     )
     return result
   } else {
     const result = await collection.insertOne(document)
-    return result
+    return { ...result, insertedId: result.insertedId.toString() }
   }
 }
 
@@ -85,13 +137,14 @@ export const remove = async (collectionName, filter) => {
   validateParams({ collectionName, filter })
 
   const db = getDB()
-  return db.collection(collectionName).deleteOne(filter)
+  const convertedFilter = convertFilterIds(filter)
+  return db.collection(collectionName).deleteOne(convertedFilter)
 }
 
-export const removeById = async (collectionName, id) => {
-  validateParams({ collectionName, id })
+export const removeById = async (collectionName, _id) => {
+  validateParams({ collectionName, _id })
 
-  return remove(collectionName, { id })
+  return remove(collectionName, { _id })
 }
 
 export const unsetFields = async (collectionName, fields, filter = {}) => {
@@ -100,13 +153,14 @@ export const unsetFields = async (collectionName, fields, filter = {}) => {
 
   const db = getDB()
   const collection = db.collection(collectionName)
+  const convertedFilter = convertFilterIds(filter)
 
   const unsetObj = fields.reduce((acc, field) => {
     acc[field] = ''
     return acc
   }, {})
 
-  return collection.updateMany(filter, { $unset: unsetObj })
+  return collection.updateMany(convertedFilter, { $unset: unsetObj })
 }
 
 const validateParams = (params) => {
@@ -116,8 +170,8 @@ const validateParams = (params) => {
     errors.push('collectionName is required')
   }
 
-  if (params.id !== undefined && !params.id) {
-    errors.push('id is required')
+  if (params._id !== undefined && !params._id) {
+    errors.push('_id is required')
   }
 
   if (params.document !== undefined && !params.document) {

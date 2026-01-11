@@ -58,7 +58,7 @@ describe('Tournament API Handlers', () => {
 
       const result = await tournamentHandlers.createTournament(body)
 
-      expect(result.id).toBeDefined()
+      expect(result._id).toBeDefined()
       expect(result.name).toBe('Test Open Tournament')
       expect(result.date).toBe('2024-03-15')
       expect(result.nop).toBe(1)
@@ -191,7 +191,7 @@ describe('Tournament API Handlers', () => {
         formatType: 'openSingle',
       })
 
-      const result = await tournamentHandlers.getTournament({ id: created.id })
+      const result = await tournamentHandlers.getTournament({ _id: created._id })
       expect(result.name).toBe('Test Tournament')
     })
 
@@ -203,7 +203,7 @@ describe('Tournament API Handlers', () => {
 
     it('should fail when tournament not found', async () => {
       await expect(
-        tournamentHandlers.getTournament({ id: 'nonexistent' }),
+        tournamentHandlers.getTournament({ _id: 'nonexistent' }),
       ).rejects.toThrow('Tournament not found')
     })
   })
@@ -222,10 +222,10 @@ describe('Tournament API Handlers', () => {
 
       // Create test players
       players = [
-        { id: 'p1', firstName: 'John', lastName: 'Doe', rating: 1500 },
-        { id: 'p2', firstName: 'Jane', lastName: 'Smith', rating: 1400 },
-        { id: 'p3', firstName: 'Bob', lastName: 'Brown', rating: 1300 },
-        { id: 'p4', firstName: 'Alice', lastName: 'White', rating: 1200 },
+        { _id: 'p1', firstName: 'John', lastName: 'Doe', rating: 1500 },
+        { _id: 'p2', firstName: 'Jane', lastName: 'Smith', rating: 1400 },
+        { _id: 'p3', firstName: 'Bob', lastName: 'Brown', rating: 1300 },
+        { _id: 'p4', firstName: 'Alice', lastName: 'White', rating: 1200 },
       ]
 
       await db.collection('players').insertMany(players)
@@ -233,13 +233,13 @@ describe('Tournament API Handlers', () => {
 
     it('should add participant to tournament', async () => {
       const result = await tournamentHandlers.addParticipant({
-        tournamentId: tournament.id,
+        tournamentId: tournament._id,
         playerIds: ['p1'],
       })
 
-      expect(result.id).toBeDefined()
+      expect(result._id).toBeDefined()
       expect(result.players.length).toBe(1)
-      expect(result.players[0].id).toBe('p1')
+      expect(result.players[0]._id).toBe('p1')
       expect(result.rating).toBe(1500)
     })
 
@@ -255,7 +255,7 @@ describe('Tournament API Handlers', () => {
     it('should fail when player not found', async () => {
       await expect(
         tournamentHandlers.addParticipant({
-          tournamentId: tournament.id,
+          tournamentId: tournament._id,
           playerIds: ['nonexistent'],
         }),
       ).rejects.toThrow('not found')
@@ -263,13 +263,13 @@ describe('Tournament API Handlers', () => {
 
     it('should fail when player already in tournament', async () => {
       await tournamentHandlers.addParticipant({
-        tournamentId: tournament.id,
+        tournamentId: tournament._id,
         playerIds: ['p1'],
       })
 
       await expect(
         tournamentHandlers.addParticipant({
-          tournamentId: tournament.id,
+          tournamentId: tournament._id,
           playerIds: ['p1'],
         }),
       ).rejects.toThrow('already in the tournament')
@@ -285,17 +285,17 @@ describe('Tournament API Handlers', () => {
       })
 
       await tournamentHandlers.addParticipant({
-        tournamentId: limitedTournament.id,
+        tournamentId: limitedTournament._id,
         playerIds: ['p1'],
       })
       await tournamentHandlers.addParticipant({
-        tournamentId: limitedTournament.id,
+        tournamentId: limitedTournament._id,
         playerIds: ['p2'],
       })
 
       await expect(
         tournamentHandlers.addParticipant({
-          tournamentId: limitedTournament.id,
+          tournamentId: limitedTournament._id,
           playerIds: ['p3'],
         }),
       ).rejects.toThrow('maximum participants')
@@ -314,34 +314,34 @@ describe('Tournament API Handlers', () => {
       })
 
       await db.collection('players').insertOne({
-        id: 'p1',
+        _id: 'p1',
         firstName: 'John',
         lastName: 'Doe',
         rating: 1500,
       })
 
       participant = await tournamentHandlers.addParticipant({
-        tournamentId: tournament.id,
+        tournamentId: tournament._id,
         playerIds: ['p1'],
       })
     })
 
     it('should delete participant from tournament', async () => {
       const result = await tournamentHandlers.deleteParticipant({
-        tournamentId: tournament.id,
-        participantId: participant.id,
+        tournamentId: tournament._id,
+        participantId: participant._id,
       })
 
-      expect(result.id).toBe(participant.id)
+      expect(result._id).toBe(participant._id)
 
-      const updated = await tournamentHandlers.getTournament({ id: tournament.id })
+      const updated = await tournamentHandlers.getTournament({ _id: tournament._id })
       expect(updated.participants.length).toBe(0)
     })
 
     it('should fail when participant not found', async () => {
       await expect(
         tournamentHandlers.deleteParticipant({
-          tournamentId: tournament.id,
+          tournamentId: tournament._id,
           participantId: 'nonexistent',
         }),
       ).rejects.toThrow('Participant not found')
@@ -360,7 +360,7 @@ describe('Tournament API Handlers', () => {
 
       // Create and add 6 players
       const players = Array.from({ length: 6 }, (_, i) => ({
-        id: `p${i + 1}`,
+        _id: `p${i + 1}`,
         firstName: `Player${i + 1}`,
         lastName: 'Test',
         rating: 1500 - i * 100,
@@ -370,15 +370,15 @@ describe('Tournament API Handlers', () => {
 
       for (const player of players) {
         await tournamentHandlers.addParticipant({
-          tournamentId: tournament.id,
-          playerIds: [player.id],
+          tournamentId: tournament._id,
+          playerIds: [player._id],
         })
       }
     })
 
     it('should generate groups with snake seeding', async () => {
       const result = await tournamentHandlers.generateGroups({
-        tournamentId: tournament.id,
+        tournamentId: tournament._id,
       })
 
       // 6 participants -> 2 groups
@@ -401,27 +401,27 @@ describe('Tournament API Handlers', () => {
       })
 
       await db.collection('players').insertOne({
-        id: 'small-p1',
+        _id: 'small-p1',
         firstName: 'Solo',
         lastName: 'Player',
         rating: 1500,
       })
 
       await tournamentHandlers.addParticipant({
-        tournamentId: smallTournament.id,
+        tournamentId: smallTournament._id,
         playerIds: ['small-p1'],
       })
 
       await expect(
-        tournamentHandlers.generateGroups({ tournamentId: smallTournament.id }),
+        tournamentHandlers.generateGroups({ tournamentId: smallTournament._id }),
       ).rejects.toThrow('Minimum 4 participants')
     })
 
     it('should fail when groups already generated', async () => {
-      await tournamentHandlers.generateGroups({ tournamentId: tournament.id })
+      await tournamentHandlers.generateGroups({ tournamentId: tournament._id })
 
       await expect(
-        tournamentHandlers.generateGroups({ tournamentId: tournament.id }),
+        tournamentHandlers.generateGroups({ tournamentId: tournament._id }),
       ).rejects.toThrow('already been generated')
     })
   })
@@ -439,7 +439,7 @@ describe('Tournament API Handlers', () => {
 
       // Create and add 4 players
       const players = Array.from({ length: 4 }, (_, i) => ({
-        id: `fm-p${i + 1}`,
+        _id: `fm-p${i + 1}`,
         firstName: `Player${i + 1}`,
         lastName: 'Test',
         rating: 1500 - i * 100,
@@ -449,23 +449,23 @@ describe('Tournament API Handlers', () => {
 
       for (const player of players) {
         await tournamentHandlers.addParticipant({
-          tournamentId: tournament.id,
-          playerIds: [player.id],
+          tournamentId: tournament._id,
+          playerIds: [player._id],
         })
       }
 
       // Generate groups
       const groups = await tournamentHandlers.generateGroups({
-        tournamentId: tournament.id,
+        tournamentId: tournament._id,
       })
 
       // Get first match id
-      matchId = groups[0].matches[0].id
+      matchId = groups[0].matches[0]._id
     })
 
     it('should finish a match with result', async () => {
       const result = await tournamentHandlers.finishMatch({
-        tournamentId: tournament.id,
+        tournamentId: tournament._id,
         matchId,
         result: [
           { score1: 11, score2: 5 },
@@ -476,9 +476,9 @@ describe('Tournament API Handlers', () => {
       expect(result.success).toBe(true)
 
       // Verify match is updated
-      const updated = await tournamentHandlers.getTournament({ id: tournament.id })
+      const updated = await tournamentHandlers.getTournament({ _id: tournament._id })
       const groupStage = updated.stages.find((s) => s.type === 'group')
-      const match = groupStage.groups[0].matches.find((m) => m.id === matchId)
+      const match = groupStage.groups[0].matches.find((m) => m._id === matchId)
 
       expect(match.gamesWon1).toBe(2)
       expect(match.gamesWon2).toBe(0)
@@ -488,7 +488,7 @@ describe('Tournament API Handlers', () => {
     it('should fail when match not found', async () => {
       await expect(
         tournamentHandlers.finishMatch({
-          tournamentId: tournament.id,
+          tournamentId: tournament._id,
           matchId: 'nonexistent',
           result: [{ score1: 11, score2: 5 }],
         }),
@@ -497,7 +497,7 @@ describe('Tournament API Handlers', () => {
 
     it('should fail when match already finished', async () => {
       await tournamentHandlers.finishMatch({
-        tournamentId: tournament.id,
+        tournamentId: tournament._id,
         matchId,
         result: [
           { score1: 11, score2: 5 },
@@ -507,7 +507,7 @@ describe('Tournament API Handlers', () => {
 
       await expect(
         tournamentHandlers.finishMatch({
-          tournamentId: tournament.id,
+          tournamentId: tournament._id,
           matchId,
           result: [{ score1: 11, score2: 5 }],
         }),
@@ -527,7 +527,7 @@ describe('Tournament API Handlers', () => {
 
       // Create and add 4 players
       const players = Array.from({ length: 4 }, (_, i) => ({
-        id: `ko-p${i + 1}`,
+        _id: `ko-p${i + 1}`,
         firstName: `Player${i + 1}`,
         lastName: 'Test',
         rating: 1500 - i * 100,
@@ -537,18 +537,18 @@ describe('Tournament API Handlers', () => {
 
       for (const player of players) {
         await tournamentHandlers.addParticipant({
-          tournamentId: tournament.id,
-          playerIds: [player.id],
+          tournamentId: tournament._id,
+          playerIds: [player._id],
         })
       }
 
       // Generate groups
-      await tournamentHandlers.generateGroups({ tournamentId: tournament.id })
+      await tournamentHandlers.generateGroups({ tournamentId: tournament._id })
     })
 
     it('should fail when group stage not complete', async () => {
       await expect(
-        tournamentHandlers.generateKnockout({ tournamentId: tournament.id }),
+        tournamentHandlers.generateKnockout({ tournamentId: tournament._id }),
       ).rejects.toThrow('group stage matches must be completed')
     })
   })
@@ -559,9 +559,9 @@ describe('Tournament Rules Integration', () => {
     it('should generate correct schedule for group of 3', () => {
       // Schedule: seed 2 vs seed 3, seed 1 vs seed 3, seed 1 vs seed 2
       const participants = [
-        { id: 's1', rating: 1500 },
-        { id: 's2', rating: 1400 },
-        { id: 's3', rating: 1300 },
+        { _id: 's1', rating: 1500 },
+        { _id: 's2', rating: 1400 },
+        { _id: 's3', rating: 1300 },
       ]
 
       // Expected:

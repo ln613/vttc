@@ -31,19 +31,19 @@ import {
 } from './tournamentRules'
 
 // Helper to create test players
-const createPlayer = (id: string, rating: number): Player => ({
-  id,
-  firstName: `Player${id}`,
+const createPlayer = (_id: string, rating: number): Player => ({
+  _id,
+  firstName: `Player${_id}`,
   lastName: 'Test',
   rating,
 })
 
 // Helper to create test teams
-const createTeam = (id: string, playerRatings: number[]): Team => ({
-  id,
-  name: `Team${id}`,
+const createTeam = (_id: string, playerRatings: number[]): Team => ({
+  _id,
+  name: `Team${_id}`,
   players: playerRatings.map((rating, index) =>
-    createPlayer(`${id}-${index}`, rating),
+    createPlayer(`${_id}-${index}`, rating),
   ),
 })
 
@@ -118,7 +118,7 @@ describe('getTeamSeeding', () => {
   })
 
   it('should return 0 for empty team', () => {
-    const team: Team = { id: '1', name: 'Empty', players: [] }
+    const team: Team = { _id: '1', name: 'Empty', players: [] }
     expect(getTeamSeeding(team, 3)).toBe(0)
   })
 })
@@ -153,7 +153,7 @@ describe('sortBySeeding', () => {
       createTeam('3', [1100, 1000]), // 2100
     ]
     const sorted = sortBySeeding(teams, 2)
-    expect(sorted.map((t) => t.id)).toEqual(['2', '3', '1'])
+    expect(sorted.map((t) => t._id)).toEqual(['2', '3', '1'])
   })
 })
 
@@ -377,19 +377,19 @@ describe('formGroupsWithSnakeSeeding - comprehensive test for 4 to 40 participan
 
 // Helper to create a match result
 const createMatchResult = (
-  id: string,
+  _id: string,
   p1: Player,
   p2: Player,
   gamesWon1: number,
   gamesWon2: number,
   games: { score1: number; score2: number }[],
 ): Match => ({
-  id,
+  _id,
   config: DEFAULT_MATCH_CONFIG,
   side1: [p1],
   side2: [p2],
   games: games.map((g, i) => ({
-    id: `${id}-game-${i}`,
+    _id: `${_id}-game-${i}`,
     config: DEFAULT_GAME_CONFIG,
     score1: g.score1,
     score2: g.score2,
@@ -770,7 +770,7 @@ describe('Knockout Stage', () => {
       ]
 
       const seeded = calculateSnakeRankingSeeding(advanced)
-      const names = seeded.map((s) => (s.participant as Player).id)
+      const names = seeded.map((s) => (s.participant as Player)._id)
 
       // R1 (odd): G1, G2, G3 order -> Tom, Joe, Tony
       // R2 (even): G3, G2, G1 order -> Glen, Frank, John
@@ -968,7 +968,7 @@ describe('Knockout Stage', () => {
 
       // Verify seeding order
       const seedNames = stage.seedingList.map(
-        (s) => (s.participant.participant as Player).id,
+        (s) => (s.participant.participant as Player)._id,
       )
       expect(seedNames).toEqual(['Tom', 'Joe', 'Tony', 'Glen', 'Frank', 'John'])
 
@@ -992,8 +992,8 @@ describe('Knockout Stage', () => {
       // Tony (G3) should not play Glen (G3 - same group), so Tony vs John
       // Glen should play Frank (both from different groups than their opponents)
       const matchPairs = realMatches.map((m) => {
-        const p1Name = (m.participant1!.participant as Player).id
-        const p2Name = (m.participant2!.participant as Player).id
+        const p1Name = (m.participant1!.participant as Player)._id
+        const p2Name = (m.participant2!.participant as Player)._id
         return [p1Name, p2Name].sort()
       })
 
@@ -1061,14 +1061,14 @@ describe('Group Match Schedule', () => {
 
       expect(schedule.length).toBe(3)
       // Match 1: s2 vs s3
-      expect(schedule[0].side1.id).toBe('s2')
-      expect(schedule[0].side2.id).toBe('s3')
+      expect(schedule[0].side1._id).toBe('s2')
+      expect(schedule[0].side2._id).toBe('s3')
       // Match 2: s1 vs s3
-      expect(schedule[1].side1.id).toBe('s1')
-      expect(schedule[1].side2.id).toBe('s3')
+      expect(schedule[1].side1._id).toBe('s1')
+      expect(schedule[1].side2._id).toBe('s3')
       // Match 3: s1 vs s2
-      expect(schedule[2].side1.id).toBe('s1')
-      expect(schedule[2].side2.id).toBe('s2')
+      expect(schedule[2].side1._id).toBe('s1')
+      expect(schedule[2].side2._id).toBe('s2')
     })
 
     it('should generate correct matches for group of 4', () => {
@@ -1083,23 +1083,23 @@ describe('Group Match Schedule', () => {
 
       expect(schedule.length).toBe(6)
       // Match 1: s1 vs s4
-      expect(schedule[0].side1.id).toBe('s1')
-      expect(schedule[0].side2.id).toBe('s4')
+      expect(schedule[0].side1._id).toBe('s1')
+      expect(schedule[0].side2._id).toBe('s4')
       // Match 2: s2 vs s3
-      expect(schedule[1].side1.id).toBe('s2')
-      expect(schedule[1].side2.id).toBe('s3')
+      expect(schedule[1].side1._id).toBe('s2')
+      expect(schedule[1].side2._id).toBe('s3')
       // Match 3: s1 vs s3
-      expect(schedule[2].side1.id).toBe('s1')
-      expect(schedule[2].side2.id).toBe('s3')
+      expect(schedule[2].side1._id).toBe('s1')
+      expect(schedule[2].side2._id).toBe('s3')
       // Match 4: s2 vs s4
-      expect(schedule[3].side1.id).toBe('s2')
-      expect(schedule[3].side2.id).toBe('s4')
+      expect(schedule[3].side1._id).toBe('s2')
+      expect(schedule[3].side2._id).toBe('s4')
       // Match 5: s3 vs s4
-      expect(schedule[4].side1.id).toBe('s3')
-      expect(schedule[4].side2.id).toBe('s4')
+      expect(schedule[4].side1._id).toBe('s3')
+      expect(schedule[4].side2._id).toBe('s4')
       // Match 6: s1 vs s2
-      expect(schedule[5].side1.id).toBe('s1')
-      expect(schedule[5].side2.id).toBe('s2')
+      expect(schedule[5].side1._id).toBe('s1')
+      expect(schedule[5].side2._id).toBe('s2')
     })
 
     it('should generate round robin for group larger than 4', () => {
@@ -1114,7 +1114,7 @@ describe('Group Match Schedule', () => {
 
       // Verify all pairs are present
       const pairs = schedule.map(({ side1, side2 }) =>
-        [side1.id, side2.id].sort().join('-'),
+        [side1._id, side2._id].sort().join('-'),
       )
       const expectedPairs = [
         's1-s2', 's1-s3', 's1-s4', 's1-s5',
@@ -1184,7 +1184,7 @@ describe('Age and Rating Requirements', () => {
   describe('meetsAgeRequirement', () => {
     it('should return true for player under age limit (U)', () => {
       const player: Player = {
-        id: '1',
+        _id: '1',
         firstName: 'Young',
         lastName: 'Player',
         rating: 1500,
@@ -1196,7 +1196,7 @@ describe('Age and Rating Requirements', () => {
 
     it('should return false for player over age limit (U)', () => {
       const player: Player = {
-        id: '1',
+        _id: '1',
         firstName: 'Old',
         lastName: 'Player',
         rating: 1500,
@@ -1208,7 +1208,7 @@ describe('Age and Rating Requirements', () => {
 
     it('should return true for player over age limit (O)', () => {
       const player: Player = {
-        id: '1',
+        _id: '1',
         firstName: 'Senior',
         lastName: 'Player',
         rating: 1500,
@@ -1220,7 +1220,7 @@ describe('Age and Rating Requirements', () => {
 
     it('should return false for player under age limit (O)', () => {
       const player: Player = {
-        id: '1',
+        _id: '1',
         firstName: 'Young',
         lastName: 'Player',
         rating: 1500,
@@ -1232,7 +1232,7 @@ describe('Age and Rating Requirements', () => {
 
     it('should return false when dateOfBirth is missing', () => {
       const player: Player = {
-        id: '1',
+        _id: '1',
         firstName: 'No',
         lastName: 'Birthday',
         rating: 1500,
@@ -1265,7 +1265,7 @@ describe('Participant Creation', () => {
       const players = [createPlayer('p1', 1500)]
       const participant = createParticipant('part1', players, 1)
 
-      expect(participant.id).toBe('part1')
+      expect(participant._id).toBe('part1')
       expect(participant.players).toEqual(players)
       expect(participant.rating).toBe(1500)
     })
@@ -1300,7 +1300,7 @@ describe('Tournament Creation and Validation', () => {
     it('should return error when duplicate exists', () => {
       const existingTournaments = [
         {
-          id: 't1',
+          _id: 't1',
           name: 'Existing Tournament',
           date: '2024-03-15',
           nop: 1,
@@ -1327,7 +1327,7 @@ describe('Tournament Creation and Validation', () => {
         OPEN_SINGLE_FORMAT,
       )
 
-      expect(tournament.id).toBeDefined()
+      expect(tournament._id).toBeDefined()
       expect(tournament.name).toBe('Open Singles 2024')
       expect(tournament.date).toBe('2024-03-15')
       expect(tournament.nop).toBe(1)

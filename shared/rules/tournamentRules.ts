@@ -141,7 +141,7 @@ export const formGroupsWithSnakeSeeding = <T extends Player | Team>(
  * Get participant ID
  */
 export const getParticipantId = (participant: Player | Team): string => {
-  return participant.id
+  return participant._id
 }
 
 /**
@@ -193,8 +193,8 @@ export const getParticipantSideInMatch = (
 ): 1 | 2 | undefined => {
   const participantId = getParticipantId(participant)
   // For singles, side1 and side2 have one player each
-  if (match.side1.some((p) => p.id === participantId)) return 1
-  if (match.side2.some((p) => p.id === participantId)) return 2
+  if (match.side1.some((p) => p._id === participantId)) return 1
+  if (match.side2.some((p) => p._id === participantId)) return 2
   return undefined
 }
 
@@ -356,8 +356,8 @@ export const getMatchesBetweenParticipants = (
 
   return allMatches.filter((match) => {
     // Both sides must be in the participant set
-    const side1InSet = match.side1.some((p) => participantIds.has(p.id))
-    const side2InSet = match.side2.some((p) => participantIds.has(p.id))
+    const side1InSet = match.side1.some((p) => participantIds.has(p._id))
+    const side2InSet = match.side2.some((p) => participantIds.has(p._id))
     return side1InSet && side2InSet
   })
 }
@@ -1073,13 +1073,13 @@ export const meetsRatingRequirement = (
  * Create a new participant
  */
 export const createParticipant = (
-  id: string,
+  _id: string,
   players: Player[],
   nop: number,
   teamName?: string,
 ): Participant => {
   return {
-    id,
+    _id,
     players,
     teamName,
     rating: calculateParticipantRating(players, nop),
@@ -1125,7 +1125,7 @@ export const createTournament = (input: {
         : ['group', 'knockout']
 
   return {
-    id: generateId(),
+    _id: generateId(),
     name: input.name,
     sex: input.sex || 'All',
     type,
@@ -1236,10 +1236,10 @@ export const validateAddParticipant = (
   // Check for duplicate players in input
   const playerIds = new Set<string>()
   for (const player of players) {
-    if (playerIds.has(player.id)) {
-      errors.push(`Duplicate player: ${player.id}`)
+    if (playerIds.has(player._id)) {
+      errors.push(`Duplicate player: ${player._id}`)
     }
-    playerIds.add(player.id)
+    playerIds.add(player._id)
   }
 
   // Check max participants
@@ -1279,7 +1279,7 @@ export const validateAddParticipant = (
   // Check if player is already in event
   for (const player of players) {
     const existing = event.participants.find((p: Participant) =>
-      p.players.some((pl) => pl.id === player.id),
+      p.players.some((pl) => pl._id === player._id),
     )
     if (existing) {
       errors.push(
@@ -1301,7 +1301,7 @@ export const validateDeleteParticipant = (
   const errors: string[] = []
 
   const participant = event.participants.find(
-    (p: Participant) => p.id === participantId,
+    (p: Participant) => p._id === participantId,
   )
   if (!participant) {
     errors.push('Participant not found')
@@ -1411,7 +1411,7 @@ export const validateFinishMatch = (event: Event, matchId: string): string[] => 
     | undefined
   if (groupStage) {
     for (const group of groupStage.groups) {
-      const match = group.matches.find((m) => m.id === matchId)
+      const match = group.matches.find((m) => m._id === matchId)
       if (match) {
         matchFound = true
         if (match.winningSide !== undefined) {
@@ -1429,7 +1429,7 @@ export const validateFinishMatch = (event: Event, matchId: string): string[] => 
       | undefined
     if (knockoutStage) {
       for (const round of knockoutStage.rounds) {
-        const knockoutMatch = round.matches.find((m) => m.match?.id === matchId)
+        const knockoutMatch = round.matches.find((m) => m.match?._id === matchId)
         if (knockoutMatch) {
           matchFound = true
           if (knockoutMatch.winner !== undefined) {

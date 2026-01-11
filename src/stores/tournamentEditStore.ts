@@ -9,7 +9,7 @@ import { apiPost } from '../utils/api'
 import { createStore } from './createStore'
 
 export interface TournamentEditFormData {
-  id?: string
+  _id?: string
   name: string
   sex: ParticipantSex
   type: TournamentType
@@ -152,7 +152,7 @@ const buildSavePayload = (formData: TournamentEditFormData) => {
   const hasTopPlayersRating = isRated && isTeam && formData.topPlayersRatingEnabled
 
   return {
-    id: formData.id,
+    _id: formData._id,
     name: formData.name,
     sex: formData.sex,
     type: formData.type,

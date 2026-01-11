@@ -113,7 +113,7 @@ const EventEdit: React.FC<EventEditProps> = ({
   }, [])
 
   const tournamentOptions = (tournaments || []).map((t) => ({
-    value: t.id,
+    value: t._id,
     label: t.name,
   }))
 
@@ -186,7 +186,7 @@ const EventEdit: React.FC<EventEditProps> = ({
 }
 
 interface Tournament {
-  id: string
+  _id: string
   name: string
   type: string
   stages: ('group' | 'knockout')[]

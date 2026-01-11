@@ -198,13 +198,13 @@ export const getHandicapStartingScore = (
  * Create a new game
  */
 export const createGame = (
-  id: string,
+  _id: string,
   config: GameConfig = DEFAULT_GAME_CONFIG,
   startingScore1: number = 0,
   startingScore2: number = 0,
 ): Game => {
   return {
-    id,
+    _id,
     config,
     score1: startingScore1,
     score2: startingScore2,
@@ -323,13 +323,13 @@ export const getMatchConfigForRound = (
  * Create a new match
  */
 export const createMatch = (
-  id: string,
+  _id: string,
   side1: Player[],
   side2: Player[],
   config: MatchConfig = DEFAULT_MATCH_CONFIG,
 ): Match => {
   return {
-    id,
+    _id,
     config,
     side1,
     side2,
@@ -464,10 +464,10 @@ export const deriveTeamAssignment = (
   const assignedIds = new Set(
     Object.values(providedAssignment)
       .filter((p): p is Player => p !== undefined)
-      .map((p) => p.id),
+      .map((p) => p._id),
   )
 
-  const remaining = team.players.filter((p) => !assignedIds.has(p.id))
+  const remaining = team.players.filter((p) => !assignedIds.has(p._id))
 
   if (nop === 2) {
     // A is provided, derive B
@@ -519,7 +519,7 @@ export const determineTeamMatchWinner = (
  * Create a new team match
  */
 export const createTeamMatch = (
-  id: string,
+  _id: string,
   homeTeam: Team,
   awayTeam: Team,
   homeAssignment: TeamAssignment,
@@ -527,7 +527,7 @@ export const createTeamMatch = (
   config: TeamMatchConfig,
 ): TeamMatch => {
   return {
-    id,
+    _id,
     config,
     homeTeam,
     awayTeam,

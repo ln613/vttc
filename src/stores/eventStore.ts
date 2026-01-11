@@ -3,7 +3,7 @@ import { apiGet } from '../utils/api'
 import { createStore, createAsyncState, type AsyncState } from './createStore'
 
 export interface EventOption {
-  id: string
+  _id: string
   eventName: string
   nop: number
   maxParticipants: number
@@ -45,9 +45,9 @@ export const eventActions = {
     }
   },
 
-  getEventById: (id: string): EventOption | undefined => {
+  getEventById: (_id: string): EventOption | undefined => {
     const state = eventStore.getState()
-    return state.data?.find((e) => e.id === id)
+    return state.data?.find((e) => e._id === _id)
   },
 }
 

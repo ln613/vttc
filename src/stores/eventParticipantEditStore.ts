@@ -62,7 +62,7 @@ export const eventParticipantEditActions = {
 
     try {
       await apiPost('addParticipant', {
-        id: selectedEvent.id,
+        _id: selectedEvent._id,
         playerIds,
       })
       eventParticipantEditActions.showToast('success', 'Participant added successfully')
@@ -87,7 +87,7 @@ export const eventParticipantEditActions = {
 
     try {
       await apiPost('deleteParticipant', {
-        id: selectedEvent.id,
+        _id: selectedEvent._id,
         participantId,
       })
       eventParticipantEditActions.showToast('success', 'Participant deleted successfully')

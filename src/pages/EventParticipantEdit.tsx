@@ -75,7 +75,7 @@ const EventParticipantEdit: React.FC = () => {
   }, [])
 
   const eventOptions = (events || []).map((e) => ({
-    value: e.id,
+    value: e._id,
     label: e.eventName,
   }))
 
@@ -169,7 +169,7 @@ const SingleParticipantTable: React.FC<SingleParticipantTableProps> = ({
       <tbody>
         {sortedParticipants.map((participant) => (
           <SingleParticipantRow
-            key={participant.id}
+            key={participant._id}
             participant={participant}
             showDelete={showDelete}
           />
@@ -198,7 +198,7 @@ const SingleParticipantRow: React.FC<SingleParticipantRowProps> = ({
         <Button
           color="#e74c3c"
           onClick={() =>
-            eventParticipantEditActions.deleteParticipant(participant.id)
+            eventParticipantEditActions.deleteParticipant(participant._id)
           }
         >
           Delete
@@ -239,7 +239,7 @@ const DoubleOrTeamParticipantTable: React.FC<
       <tbody>
         {sortedParticipants.map((participant) => (
           <TeamParticipantRows
-            key={participant.id}
+            key={participant._id}
             participant={participant}
             event={event}
             showDelete={showDelete}
@@ -275,7 +275,7 @@ const TeamParticipantRows: React.FC<TeamParticipantRowsProps> = ({
   return (
     <>
       {sortedPlayers.map((player, index) => (
-        <tr key={`${participant.id}-${player.id}`}>
+        <tr key={`${participant._id}-${player._id}`}>
           <td style={tdStyle}>
             {player.firstName} {player.lastName}
           </td>
@@ -304,7 +304,7 @@ const TeamParticipantRows: React.FC<TeamParticipantRowsProps> = ({
               <Button
                 color="#e74c3c"
                 onClick={() =>
-                  eventParticipantEditActions.deleteParticipant(participant.id)
+                  eventParticipantEditActions.deleteParticipant(participant._id)
                 }
               >
                 Delete
@@ -354,7 +354,7 @@ const AddParticipantDialog: React.FC<AddParticipantDialogProps> = ({
       return nameA.localeCompare(nameB)
     })
     .map((p) => ({
-      value: p.id,
+      value: p._id,
       label: `${p.firstName} ${p.lastName} - ${p.rating || 0}`,
     }))
 

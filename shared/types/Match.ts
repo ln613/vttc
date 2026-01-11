@@ -20,7 +20,7 @@ export interface GameConfig {
  * A game between 2 sides
  */
 export interface Game {
-  id: string
+  _id: string
   config: GameConfig
   score1: number // Points for side 1
   score2: number // Points for side 2
@@ -40,7 +40,7 @@ export interface MatchConfig {
  * A single or double match between 2 sides
  */
 export interface Match {
-  id: string
+  _id: string
   config: MatchConfig
   side1: Player[] // 1 player for single, 2 for doubles
   side2: Player[]
@@ -78,7 +78,7 @@ export interface TeamMatchConfig {
  * A team match consisting of multiple matches
  */
 export interface TeamMatch {
-  id: string
+  _id: string
   config: TeamMatchConfig
   homeTeam: Team
   awayTeam: Team
