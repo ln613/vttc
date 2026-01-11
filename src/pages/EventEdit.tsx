@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect } from 'react'
 import { Header } from '../components/Header'
 import Input from '../components/Input'
 import Select from '../components/Select'
@@ -6,21 +6,18 @@ import DatePicker from '../components/DatePicker'
 import SingleSelectTags from '../components/SingleSelectTags'
 import Toggle from '../components/Toggle'
 import Button from '../components/Button'
-import { apiGet, apiPost } from '../utils/api'
-import type {
-  StagesType,
-  QualifiersCount,
-  TournamentType,
-  BestOfOption,
-} from '../../shared/types'
-
-interface Tournament {
-  id: string
-  name: string
-  type: TournamentType
-  stages: ('group' | 'knockout')[]
-  stagesType: StagesType
-}
+import {
+  useTournamentStore,
+  tournamentActions,
+} from '../stores/tournamentStore'
+import {
+  useEventEditStore,
+  eventEditActions,
+  hasGroupStage,
+  hasKnockoutStage,
+  type EventEditFormData,
+} from '../stores/eventEditStore'
+import type { BestOfOption, QualifiersCount } from '../../shared/types'
 
 const GROUP_GAMES_OPTIONS: BestOfOption[] = ['Best of 3', 'Best of 5']
 const KNOCKOUT_GAMES_OPTIONS: BestOfOption[] = [
@@ -59,22 +56,6 @@ const HANDICAP_DIFFERENCE_OPTIONS = generateHandicapDifferenceOptions()
 const MAX_POINTS_GIVEN_OPTIONS = generateMaxPointsGivenOptions()
 const MAX_PARTICIPANTS_OPTIONS = generateMaxParticipantsOptions()
 
-interface EventEditFormData {
-  eventId?: string
-  tournamentId: string
-  date: Date | null
-  maxParticipants: string
-  name: string
-  groupGames: BestOfOption
-  knockoutGames: BestOfOption
-  groupMatches: BestOfOption
-  knockoutMatches: BestOfOption
-  qualifiers: QualifiersCount
-  handicapEnabled: boolean
-  handicapDifference: string
-  handicapMaxPoints: string
-}
-
 interface EventEditProps {
   isEdit?: boolean
   initialData?: Partial<EventEditFormData>
@@ -82,12 +63,37 @@ interface EventEditProps {
   onCancel?: () => void
 }
 
-const hasGroupStage = (stages: ('group' | 'knockout')[]): boolean => {
-  return stages.includes('group')
+const containerStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  minHeight: '100vh',
 }
 
-const hasKnockoutStage = (stages: ('group' | 'knockout')[]): boolean => {
-  return stages.includes('knockout')
+const contentStyle: React.CSSProperties = {
+  padding: '24px',
+}
+
+const titleStyle: React.CSSProperties = {
+  fontSize: '2rem',
+  fontWeight: 700,
+  textAlign: 'left',
+  marginBottom: '24px',
+  color: '#333',
+}
+
+const sectionTitleStyle: React.CSSProperties = {
+  fontSize: '14px',
+  fontWeight: 700,
+  marginTop: '24px',
+  marginBottom: '8px',
+  color: '#333',
+  textAlign: 'left',
+}
+
+const buttonContainerStyle: React.CSSProperties = {
+  display: 'flex',
+  gap: '16px',
+  marginTop: '24px',
 }
 
 const EventEdit: React.FC<EventEditProps> = ({
@@ -96,262 +102,20 @@ const EventEdit: React.FC<EventEditProps> = ({
   onSave,
   onCancel,
 }) => {
-  const [tournaments, setTournaments] = useState<Tournament[]>([])
-  const [selectedTournament, setSelectedTournament] = useState<Tournament | null>(null)
-  const [tournamentId, setTournamentId] = useState(initialData?.tournamentId || '')
-  const [date, setDate] = useState<Date | null>(initialData?.date || null)
-  const [maxParticipants, setMaxParticipants] = useState(
-    initialData?.maxParticipants || 'Unlimited',
-  )
-  const [name, setName] = useState(initialData?.name || '')
-  const [groupGames, setGroupGames] = useState<BestOfOption>(
-    initialData?.groupGames || 'Best of 3',
-  )
-  const [knockoutGames, setKnockoutGames] = useState<BestOfOption>(
-    initialData?.knockoutGames || 'Best of 3 before Semifinal',
-  )
-  const [groupMatches, setGroupMatches] = useState<BestOfOption>(
-    initialData?.groupMatches || 'Best of 3',
-  )
-  const [knockoutMatches, setKnockoutMatches] = useState<BestOfOption>(
-    initialData?.knockoutMatches || 'Best of 3 before Semifinal',
-  )
-  const [qualifiers, setQualifiers] = useState<QualifiersCount>(
-    initialData?.qualifiers || 'Top 2',
-  )
-  const [handicapEnabled, setHandicapEnabled] = useState(
-    initialData?.handicapEnabled || false,
-  )
-  const [handicapDifference, setHandicapDifference] = useState(
-    initialData?.handicapDifference || '200',
-  )
-  const [handicapMaxPoints, setHandicapMaxPoints] = useState(
-    initialData?.handicapMaxPoints || '5',
-  )
+  const { data: tournaments } = useTournamentStore()
+  const { formData } = useEventEditStore()
+  const selectedTournament = eventEditActions.getSelectedTournament()
 
   useEffect(() => {
-    const fetchTournaments = async () => {
-      try {
-        const data = await apiGet<Tournament[]>('tournaments')
-        setTournaments(data)
-      } catch (error) {
-        console.error('Failed to fetch tournaments:', error)
-      }
-    }
-    fetchTournaments()
+    tournamentActions.fetchTournaments()
+    eventEditActions.initForm(initialData)
+    return () => eventEditActions.resetForm()
   }, [])
 
-  useEffect(() => {
-    if (tournamentId) {
-      const tournament = tournaments.find((t) => t.id === tournamentId)
-      setSelectedTournament(tournament || null)
-    }
-  }, [tournamentId, tournaments])
-
-  useEffect(() => {
-    if (selectedTournament && date) {
-      const dateStr = date.toISOString().split('T')[0]
-      setName(`${selectedTournament.name} - ${dateStr}`)
-    }
-  }, [selectedTournament, date])
-
-  const containerStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    minHeight: '100vh',
-  }
-
-  const contentStyle: React.CSSProperties = {
-    padding: '24px',
-  }
-
-  const titleStyle: React.CSSProperties = {
-    fontSize: '2rem',
-    fontWeight: 700,
-    textAlign: 'left',
-    marginBottom: '24px',
-    color: '#333',
-  }
-
-  const sectionTitleStyle: React.CSSProperties = {
-    fontSize: '14px',
-    fontWeight: 700,
-    marginTop: '24px',
-    marginBottom: '8px',
-    color: '#333',
-    textAlign: 'left',
-  }
-
-  const buttonContainerStyle: React.CSSProperties = {
-    display: 'flex',
-    gap: '16px',
-    marginTop: '24px',
-  }
-
-  const tournamentOptions = tournaments.map((t) => ({
+  const tournamentOptions = (tournaments || []).map((t) => ({
     value: t.id,
     label: t.name,
   }))
-
-  const validateForm = (): boolean => {
-    return !!tournamentId && !!date && !!name.trim()
-  }
-
-  const handleSave = async () => {
-    if (!validateForm()) {
-      return
-    }
-
-    const confirmed = window.confirm('Are you sure you want to save this event?')
-    if (!confirmed) {
-      return
-    }
-
-    const data: EventEditFormData = {
-      eventId: initialData?.eventId,
-      tournamentId,
-      date,
-      maxParticipants,
-      name,
-      groupGames,
-      knockoutGames,
-      groupMatches,
-      knockoutMatches,
-      qualifiers,
-      handicapEnabled,
-      handicapDifference,
-      handicapMaxPoints,
-    }
-
-    try {
-      await apiPost('saveEvent', {
-        eventId: data.eventId,
-        tournamentId: data.tournamentId,
-        date: data.date?.toISOString().split('T')[0],
-        maxParticipants:
-          data.maxParticipants === 'Unlimited' ? 0 : parseInt(data.maxParticipants, 10),
-        name: data.name,
-        groupGames: data.groupGames,
-        knockoutGames: data.knockoutGames,
-        groupMatches: data.groupMatches,
-        knockoutMatches: data.knockoutMatches,
-        qualifiers: data.qualifiers,
-        handicapEnabled: data.handicapEnabled,
-        handicapDifference: parseInt(data.handicapDifference, 10),
-        handicapMaxPoints: parseInt(data.handicapMaxPoints, 10),
-      })
-      onSave?.(data)
-    } catch (error) {
-      console.error('Failed to save event:', error)
-    }
-  }
-
-  const handleCancel = () => {
-    onCancel?.()
-  }
-
-  const renderNumberOfGamesSection = () => {
-    if (!selectedTournament) return null
-
-    return (
-      <>
-        <h3 style={sectionTitleStyle}>Number of Games</h3>
-        {hasGroupStage(selectedTournament.stages) && (
-          <SingleSelectTags
-            label="Group Stage"
-            options={GROUP_GAMES_OPTIONS}
-            selectedValue={groupGames}
-            onChange={(value) => setGroupGames(value as BestOfOption)}
-          />
-        )}
-        {hasKnockoutStage(selectedTournament.stages) && (
-          <SingleSelectTags
-            label="Knockout Stage"
-            options={KNOCKOUT_GAMES_OPTIONS}
-            selectedValue={knockoutGames}
-            onChange={(value) => setKnockoutGames(value as BestOfOption)}
-          />
-        )}
-      </>
-    )
-  }
-
-  const renderNumberOfMatchesSection = () => {
-    if (!selectedTournament || selectedTournament.type !== 'Team') return null
-
-    return (
-      <>
-        <h3 style={sectionTitleStyle}>Number of Matches</h3>
-        {hasGroupStage(selectedTournament.stages) && (
-          <SingleSelectTags
-            label="Group Stage"
-            options={GROUP_GAMES_OPTIONS}
-            selectedValue={groupMatches}
-            onChange={(value) => setGroupMatches(value as BestOfOption)}
-          />
-        )}
-        {hasKnockoutStage(selectedTournament.stages) && (
-          <SingleSelectTags
-            label="Knockout Stage"
-            options={KNOCKOUT_GAMES_OPTIONS}
-            selectedValue={knockoutMatches}
-            onChange={(value) => setKnockoutMatches(value as BestOfOption)}
-          />
-        )}
-      </>
-    )
-  }
-
-  const renderQualifiersSection = () => {
-    if (!selectedTournament || !hasGroupStage(selectedTournament.stages)) return null
-
-    return (
-      <SingleSelectTags
-        label="Number of Qualifiers"
-        options={QUALIFIERS_OPTIONS}
-        selectedValue={qualifiers}
-        onChange={(value) => setQualifiers(value as QualifiersCount)}
-      />
-    )
-  }
-
-  const renderHandicapSection = () => (
-    <>
-      <h3 style={sectionTitleStyle}>Handicap</h3>
-      <div
-        style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}
-      >
-        <Toggle
-          label=""
-          value={handicapEnabled}
-          onChange={setHandicapEnabled}
-          noMargin
-        />
-        {handicapEnabled && (
-          <>
-            <span style={{ fontWeight: 500 }}>Difference:</span>
-            <Select
-              label=""
-              name="handicapDifference"
-              value={handicapDifference}
-              onChange={setHandicapDifference}
-              options={HANDICAP_DIFFERENCE_OPTIONS}
-              noMargin
-            />
-            <span style={{ fontWeight: 500 }}>Max Points Given:</span>
-            <Select
-              label=""
-              name="handicapMaxPoints"
-              value={handicapMaxPoints}
-              onChange={setHandicapMaxPoints}
-              options={MAX_POINTS_GIVEN_OPTIONS}
-              noMargin
-            />
-          </>
-        )}
-      </div>
-    </>
-  )
 
   return (
     <div style={containerStyle}>
@@ -361,34 +125,58 @@ const EventEdit: React.FC<EventEditProps> = ({
         <Select
           label="Tournament"
           name="tournament"
-          value={tournamentId}
-          onChange={setTournamentId}
+          value={formData.tournamentId}
+          onChange={(value) => eventEditActions.setField('tournamentId', value)}
           options={tournamentOptions}
         />
-        <DatePicker label="Date" value={date} onChange={setDate} />
+        <DatePicker
+          label="Date"
+          value={formData.date}
+          onChange={(value) => eventEditActions.setField('date', value)}
+        />
         <Input
           label="Name"
           name="name"
-          value={name}
-          onChange={setName}
+          value={formData.name}
+          onChange={(value) => eventEditActions.setField('name', value)}
           required
         />
         <Select
           label="Max Participants"
           name="maxParticipants"
-          value={maxParticipants}
-          onChange={setMaxParticipants}
+          value={formData.maxParticipants}
+          onChange={(value) =>
+            eventEditActions.setField('maxParticipants', value)
+          }
           options={MAX_PARTICIPANTS_OPTIONS}
         />
-        {renderNumberOfMatchesSection()}
-        {renderNumberOfGamesSection()}
-        {renderQualifiersSection()}
-        {renderHandicapSection()}
+        <NumberOfMatchesSection
+          tournament={selectedTournament}
+          groupMatches={formData.groupMatches}
+          knockoutMatches={formData.knockoutMatches}
+        />
+        <NumberOfGamesSection
+          tournament={selectedTournament}
+          groupGames={formData.groupGames}
+          knockoutGames={formData.knockoutGames}
+        />
+        <QualifiersSection
+          tournament={selectedTournament}
+          qualifiers={formData.qualifiers}
+        />
+        <HandicapSection
+          handicapEnabled={formData.handicapEnabled}
+          handicapDifference={formData.handicapDifference}
+          handicapMaxPoints={formData.handicapMaxPoints}
+        />
         <div style={buttonContainerStyle}>
-          <Button color="#e74c3c" onClick={handleCancel}>
+          <Button color="#e74c3c" onClick={onCancel}>
             Cancel
           </Button>
-          <Button color="#27ae60" onClick={handleSave}>
+          <Button
+            color="#27ae60"
+            onClick={() => eventEditActions.saveEvent(onSave)}
+          >
             Save
           </Button>
         </div>
@@ -396,5 +184,172 @@ const EventEdit: React.FC<EventEditProps> = ({
     </div>
   )
 }
+
+interface Tournament {
+  id: string
+  name: string
+  type: string
+  stages: ('group' | 'knockout')[]
+}
+
+interface NumberOfGamesSectionProps {
+  tournament: Tournament | undefined
+  groupGames: BestOfOption
+  knockoutGames: BestOfOption
+}
+
+const NumberOfGamesSection: React.FC<NumberOfGamesSectionProps> = ({
+  tournament,
+  groupGames,
+  knockoutGames,
+}) => {
+  if (!tournament) return null
+
+  return (
+    <>
+      <h3 style={sectionTitleStyle}>Number of Games</h3>
+      {hasGroupStage(tournament.stages) && (
+        <SingleSelectTags
+          label="Group Stage"
+          options={GROUP_GAMES_OPTIONS}
+          selectedValue={groupGames}
+          onChange={(value) =>
+            eventEditActions.setField('groupGames', value as BestOfOption)
+          }
+        />
+      )}
+      {hasKnockoutStage(tournament.stages) && (
+        <SingleSelectTags
+          label="Knockout Stage"
+          options={KNOCKOUT_GAMES_OPTIONS}
+          selectedValue={knockoutGames}
+          onChange={(value) =>
+            eventEditActions.setField('knockoutGames', value as BestOfOption)
+          }
+        />
+      )}
+    </>
+  )
+}
+
+interface NumberOfMatchesSectionProps {
+  tournament: Tournament | undefined
+  groupMatches: BestOfOption
+  knockoutMatches: BestOfOption
+}
+
+const NumberOfMatchesSection: React.FC<NumberOfMatchesSectionProps> = ({
+  tournament,
+  groupMatches,
+  knockoutMatches,
+}) => {
+  if (!tournament || tournament.type !== 'Team') return null
+
+  return (
+    <>
+      <h3 style={sectionTitleStyle}>Number of Matches</h3>
+      {hasGroupStage(tournament.stages) && (
+        <SingleSelectTags
+          label="Group Stage"
+          options={GROUP_GAMES_OPTIONS}
+          selectedValue={groupMatches}
+          onChange={(value) =>
+            eventEditActions.setField('groupMatches', value as BestOfOption)
+          }
+        />
+      )}
+      {hasKnockoutStage(tournament.stages) && (
+        <SingleSelectTags
+          label="Knockout Stage"
+          options={KNOCKOUT_GAMES_OPTIONS}
+          selectedValue={knockoutMatches}
+          onChange={(value) =>
+            eventEditActions.setField('knockoutMatches', value as BestOfOption)
+          }
+        />
+      )}
+    </>
+  )
+}
+
+interface QualifiersSectionProps {
+  tournament: Tournament | undefined
+  qualifiers: QualifiersCount
+}
+
+const QualifiersSection: React.FC<QualifiersSectionProps> = ({
+  tournament,
+  qualifiers,
+}) => {
+  if (!tournament || !hasGroupStage(tournament.stages)) return null
+
+  return (
+    <SingleSelectTags
+      label="Number of Qualifiers"
+      options={QUALIFIERS_OPTIONS}
+      selectedValue={qualifiers}
+      onChange={(value) =>
+        eventEditActions.setField('qualifiers', value as QualifiersCount)
+      }
+    />
+  )
+}
+
+interface HandicapSectionProps {
+  handicapEnabled: boolean
+  handicapDifference: string
+  handicapMaxPoints: string
+}
+
+const HandicapSection: React.FC<HandicapSectionProps> = ({
+  handicapEnabled,
+  handicapDifference,
+  handicapMaxPoints,
+}) => (
+  <>
+    <h3 style={sectionTitleStyle}>Handicap</h3>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        marginBottom: '16px',
+      }}
+    >
+      <Toggle
+        label=""
+        value={handicapEnabled}
+        onChange={(value) => eventEditActions.setField('handicapEnabled', value)}
+        noMargin
+      />
+      {handicapEnabled && (
+        <>
+          <span style={{ fontWeight: 500 }}>Difference:</span>
+          <Select
+            label=""
+            name="handicapDifference"
+            value={handicapDifference}
+            onChange={(value) =>
+              eventEditActions.setField('handicapDifference', value)
+            }
+            options={HANDICAP_DIFFERENCE_OPTIONS}
+            noMargin
+          />
+          <span style={{ fontWeight: 500 }}>Max Points Given:</span>
+          <Select
+            label=""
+            name="handicapMaxPoints"
+            value={handicapMaxPoints}
+            onChange={(value) =>
+              eventEditActions.setField('handicapMaxPoints', value)
+            }
+            options={MAX_POINTS_GIVEN_OPTIONS}
+            noMargin
+          />
+        </>
+      )}
+    </div>
+  </>
+)
 
 export default EventEdit

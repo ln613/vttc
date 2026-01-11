@@ -1,31 +1,16 @@
-import { useEffect, useState } from 'react'
 import type { Player } from '../../shared/types/Player'
-import { api } from '../utils/api'
+import { usePlayerStore, playerActions } from '../stores/playerStore'
 
 export const PlayerList = () => {
-  const [players, setPlayers] = useState<Player[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { data: players, loading, error } = usePlayerStore()
 
-  useEffect(() => {
-    fetchPlayers()
-  }, [])
-
-  const fetchPlayers = async () => {
-    try {
-      setLoading(true)
-      const data = await api<Player[]>('players')
-      setPlayers(data)
-      setError(null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch players')
-    } finally {
-      setLoading(false)
-    }
+  if (!players && !loading) {
+    playerActions.fetchPlayers()
   }
 
   if (loading) return <div>Loading...</div>
   if (error) return <div>Error: {error}</div>
+  if (!players) return null
 
   return (
     <ul>
