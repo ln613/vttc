@@ -363,7 +363,7 @@ const EventEdit: React.FC<EventEditProps> = ({
           name="tournament"
           value={tournamentId}
           onChange={setTournamentId}
-          options={[{ value: '', label: 'Select a tournament' }, ...tournamentOptions]}
+          options={tournamentOptions}
         />
         <DatePicker label="Date" value={date} onChange={setDate} />
         <Input

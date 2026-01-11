@@ -17,9 +17,6 @@
 - ageLimitType = null (required if restriction = age)
 - ageLimit = null (required if restriction = age)
 - stages = group + knockout
-- handicapEnabled = false
-- handicapDifference = 200
-- handicapMaxPoints = 5
 
 ### derived input
 
@@ -40,7 +37,7 @@
 
 return the new tournament
 
-## Create event
+## Save event
 
 An event is a tournament on a specific date with specific max participants.
 
@@ -56,6 +53,9 @@ An event is a tournament on a specific date with specific max participants.
 - groupMatches = best of 3
 - knockoutMatches = best of 3 before semifinal
 - qualifiers = 2
+- handicapEnabled = false
+- handicapDifference = 200
+- handicapMaxPoints = 5
 
 ### derived input
 
@@ -70,7 +70,7 @@ An event is a tournament on a specific date with specific max participants.
 
 ### Action
 
-- event is a sub class of tournament, copy the tournament fields to the new event object
+- event is a sub class of tournament, copy the tournament fields (ecept id and name) to the new event object
 - save to db
 
 ### Output

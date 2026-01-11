@@ -85,9 +85,10 @@ export const saveEvent = async (body) => {
     }
   }
 
-  // Copy tournament fields to event and add event-specific fields
+  // Copy tournament fields (except id and name) to event and add event-specific fields
+  const { id: _tournamentId, name: _tournamentName, ...tournamentFields } = tournament
   const event = {
-    ...tournament,
+    ...tournamentFields,
     eventId: isEdit ? eventId : generateId(),
     tournamentId,
     date,
