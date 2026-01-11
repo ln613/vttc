@@ -261,13 +261,8 @@ const validateAddParticipantRules = (event, players) => {
 
   // Check rating requirement
   if (event.restriction === 'Rated' && event.ratingLimit) {
-    for (const player of players) {
-      if (player.rating > event.ratingLimit) {
-        errors.push(
-          `Player ${player.firstName} ${player.lastName} rating (${player.rating}) exceeds limit (${event.ratingLimit})`,
-        )
-      }
-    }
+    const ratingErrors = validateRatingRequirement(event, players)
+    errors.push(...ratingErrors)
   }
 
   // Check age requirement
@@ -296,12 +291,63 @@ const validateAddParticipantRules = (event, players) => {
   return errors
 }
 
+/**
+ * Validate rating requirement based on event type
+ * - Single: player rating must meet the limit
+ * - Double: combined rating of the pair must meet the limit
+ * - Team: combined rating must meet the limit, plus top N players check if enabled
+ */
+const validateRatingRequirement = (event, players) => {
+  const errors = []
+  const { type, ratingLimit, topPlayersRatingEnabled, topPlayersCount, topPlayersRatingLimit } = event
+
+  if (type === 'Single') {
+    // Single event: player rating must meet the limit
+    const player = players[0]
+    if (player.rating > ratingLimit) {
+      errors.push(
+        `Player ${player.firstName} ${player.lastName} rating (${player.rating}) exceeds limit (${ratingLimit})`,
+      )
+    }
+  } else if (type === 'Double') {
+    // Double event: combined rating of the pair must meet the limit
+    const combinedRating = players.reduce((sum, p) => sum + (p.rating || 0), 0)
+    if (combinedRating > ratingLimit) {
+      errors.push(
+        `Combined rating (${combinedRating}) exceeds limit (${ratingLimit})`,
+      )
+    }
+  } else if (type === 'Team') {
+    // Team event: combined rating must meet the limit
+    const combinedRating = players.reduce((sum, p) => sum + (p.rating || 0), 0)
+    if (combinedRating > ratingLimit) {
+      errors.push(
+        `Team combined rating (${combinedRating}) exceeds limit (${ratingLimit})`,
+      )
+    }
+
+    // Check top N players combined rating if enabled
+    if (topPlayersRatingEnabled && topPlayersCount && topPlayersRatingLimit) {
+      const sortedPlayers = [...players].sort((a, b) => (b.rating || 0) - (a.rating || 0))
+      const topPlayers = sortedPlayers.slice(0, topPlayersCount)
+      const topPlayersRating = topPlayers.reduce((sum, p) => sum + (p.rating || 0), 0)
+      if (topPlayersRating > topPlayersRatingLimit) {
+        errors.push(
+          `Top ${topPlayersCount} players combined rating (${topPlayersRating}) exceeds limit (${topPlayersRatingLimit})`,
+        )
+      }
+    }
+  }
+
+  return errors
+}
+
 const calculateParticipantRating = (players, nop) => {
   if (players.length === 0) return 0
   if (nop === 1) return players[0]?.rating || 0
-  if (nop <= 3) return players.reduce((sum, p) => sum + p.rating, 0)
-  const sorted = [...players].sort((a, b) => b.rating - a.rating)
-  return sorted.slice(0, 3).reduce((sum, p) => sum + p.rating, 0)
+  if (nop <= 3) return players.reduce((sum, p) => sum + (p.rating || 0), 0)
+  const sorted = [...players].sort((a, b) => (b.rating || 0) - (a.rating || 0))
+  return sorted.slice(0, 3).reduce((sum, p) => sum + (p.rating || 0), 0)
 }
 
 const calculateAge = (dateOfBirth, referenceDate) => {
