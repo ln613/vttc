@@ -819,7 +819,7 @@ describe('Knockout Stage', () => {
         }),
       )
 
-      const stage = createKnockoutStage(participants, 1, { isEliminationEvent: false })
+      const stage = createKnockoutStage(participants, 1, { isKnockoutOnly: false })
 
       expect(stage.type).toBe('knockout')
       expect(stage.numberOfRounds).toBe(3) // 8 -> 4 -> 2 -> 1
@@ -839,7 +839,7 @@ describe('Knockout Stage', () => {
         }),
       )
 
-      const stage = createKnockoutStage(participants, 1, { isEliminationEvent: false })
+      const stage = createKnockoutStage(participants, 1, { isKnockoutOnly: false })
 
       // 6 participants, 2 byes
       const byeCount = stage.seedingList.filter((s) => s.hasBye).length
@@ -964,7 +964,7 @@ describe('Knockout Stage', () => {
         { participant: glen, groupIndex: 2, ranking: 2 },
       ]
 
-      const stage = createKnockoutStage(advanced, 1, { isEliminationEvent: false })
+      const stage = createKnockoutStage(advanced, 1, { isKnockoutOnly: false })
 
       // Verify seeding order
       const seedNames = stage.seedingList.map(
@@ -1018,12 +1018,9 @@ import {
   validateAddParticipant,
   validateGenerateGroups,
   createTournament,
+  validateCreateEvent,
 } from './tournamentRules'
-import {
-  OPEN_SINGLE_FORMAT,
-  RATED_SINGLE_FORMAT,
-  AGE_SINGLE_FORMAT,
-} from '../types/Tournament'
+import type { Tournament, Event } from '../types/Tournament'
 
 describe('Group Match Schedule', () => {
   describe('GROUP_OF_3_SCHEDULE', () => {
@@ -1281,38 +1278,59 @@ describe('Participant Creation', () => {
 })
 
 describe('Tournament Creation and Validation', () => {
+  // Helper to create a test event
+  const createTestEvent = (overrides: Partial<Event> = {}): Event => ({
+    _id: 'e1',
+    tournamentId: 't1',
+    name: 'Test Tournament',
+    date: '2024-03-15',
+    maxParticipants: 0,
+    eventName: 'Test Tournament - 2024-03-15',
+    sex: 'All',
+    type: 'Single',
+    nop: 1,
+    restriction: 'Open',
+    topPlayersRatingEnabled: false,
+    stages: ['group', 'knockout'],
+    stagesType: 'Group + Knockout',
+    groupGames: 'Best of 3',
+    knockoutGames: 'Best of 5',
+    qualifiers: 'Top 2',
+    handicapEnabled: false,
+    handicapDifference: 200,
+    handicapMaxPoints: 5,
+    participants: [],
+    eventStages: [],
+    ...overrides,
+  })
+
   describe('validateCreateTournament', () => {
     it('should return empty array for valid input', () => {
-      const errors = validateCreateTournament('Test Tournament', '2024-03-15', [])
+      const errors = validateCreateTournament('Test Tournament', [])
       expect(errors).toEqual([])
     })
 
     it('should return error when name is missing', () => {
-      const errors = validateCreateTournament('', '2024-03-15', [])
+      const errors = validateCreateTournament('', [])
       expect(errors).toContain('Tournament name is required')
     })
 
-    it('should return error when date is missing', () => {
-      const errors = validateCreateTournament('Test', '', [])
-      expect(errors).toContain('Tournament date is required')
-    })
-
     it('should return error when duplicate exists', () => {
-      const existingTournaments = [
+      const existingTournaments: Tournament[] = [
         {
           _id: 't1',
           name: 'Existing Tournament',
-          date: '2024-03-15',
+          sex: 'All',
+          type: 'Single',
           nop: 1,
-          format: OPEN_SINGLE_FORMAT,
-          maxParticipants: 0,
-          participants: [],
-          stages: [],
+          restriction: 'Open',
+          topPlayersRatingEnabled: false,
+          stages: ['group', 'knockout'],
+          stagesType: 'Group + Knockout',
         },
       ]
       const errors = validateCreateTournament(
         'Existing Tournament',
-        '2024-03-15',
         existingTournaments,
       )
       expect(errors.some((e) => e.includes('already exists'))).toBe(true)
@@ -1321,173 +1339,152 @@ describe('Tournament Creation and Validation', () => {
 
   describe('createTournament', () => {
     it('should create tournament with open single format', () => {
-      const tournament = createTournament(
-        'Open Singles 2024',
-        '2024-03-15',
-        OPEN_SINGLE_FORMAT,
-      )
+      const tournament = createTournament({
+        name: 'Open Singles 2024',
+      })
 
       expect(tournament._id).toBeDefined()
       expect(tournament.name).toBe('Open Singles 2024')
-      expect(tournament.date).toBe('2024-03-15')
       expect(tournament.nop).toBe(1)
-      expect(tournament.format).toEqual(OPEN_SINGLE_FORMAT)
-      expect(tournament.maxParticipants).toBe(0)
-      expect(tournament.participants).toEqual([])
+      expect(tournament.type).toBe('Single')
+      expect(tournament.restriction).toBe('Open')
       expect(tournament.stages.length).toBe(2)
-      expect(tournament.stages[0].type).toBe('group')
-      expect(tournament.stages[1].type).toBe('knockout')
+      expect(tournament.stages[0]).toBe('group')
+      expect(tournament.stages[1]).toBe('knockout')
     })
 
     it('should create tournament with rated single format', () => {
-      const format = RATED_SINGLE_FORMAT(1500)
-      const tournament = createTournament('U1500 2024', '2024-03-16', format, 32)
+      const tournament = createTournament({
+        name: 'U1500 2024',
+        restriction: 'Rated',
+        ratingLimit: 1500,
+      })
 
-      expect(tournament.format.ratingLimit).toBe(1500)
-      expect(tournament.maxParticipants).toBe(32)
+      expect(tournament.ratingLimit).toBe(1500)
     })
 
     it('should create tournament with age single format', () => {
-      const format = AGE_SINGLE_FORMAT('U', 19)
-      const tournament = createTournament('U19 Juniors', '2024-03-17', format)
+      const tournament = createTournament({
+        name: 'U19 Juniors',
+        restriction: 'Age',
+        ageLimitType: 'U',
+        ageLimit: 19,
+      })
 
-      expect(tournament.format.ageLimitType).toBe('U')
-      expect(tournament.format.ageLimit).toBe(19)
+      expect(tournament.ageLimitType).toBe('U')
+      expect(tournament.ageLimit).toBe(19)
     })
   })
 
   describe('validateAddParticipant', () => {
     it('should return empty array for valid participant', () => {
-      const tournament = createTournament('Test', '2024-03-15', OPEN_SINGLE_FORMAT)
+      const event = createTestEvent()
       const players = [createPlayer('p1', 1500)]
 
-      const errors = validateAddParticipant(tournament, players)
+      const errors = validateAddParticipant(event, players)
       expect(errors).toEqual([])
     })
 
     it('should return error when wrong number of players', () => {
-      const tournament = createTournament('Test', '2024-03-15', OPEN_SINGLE_FORMAT)
+      const event = createTestEvent()
       const players = [createPlayer('p1', 1500), createPlayer('p2', 1400)]
 
-      const errors = validateAddParticipant(tournament, players)
+      const errors = validateAddParticipant(event, players)
       expect(errors.some((e) => e.includes('Expected 1 player'))).toBe(true)
     })
 
     it('should return error when duplicate players in input', () => {
-      const tournament = createTournament('Test', '2024-03-15', OPEN_SINGLE_FORMAT)
+      const event = createTestEvent()
       const player = createPlayer('p1', 1500)
       const players = [player, player]
 
-      const errors = validateAddParticipant(tournament, players)
+      const errors = validateAddParticipant(event, players)
       expect(errors.some((e) => e.includes('Duplicate player'))).toBe(true)
     })
 
     it('should return error when max participants reached', () => {
-      const tournament = createTournament('Test', '2024-03-15', OPEN_SINGLE_FORMAT, 1)
-      tournament.participants.push(createParticipant('part1', [createPlayer('p1', 1500)], 1))
+      const event = createTestEvent({
+        maxParticipants: 1,
+        participants: [createParticipant('part1', [createPlayer('p1', 1500)], 1)],
+      })
 
-      const errors = validateAddParticipant(tournament, [createPlayer('p2', 1400)])
+      const errors = validateAddParticipant(event, [createPlayer('p2', 1400)])
       expect(errors.some((e) => e.includes('maximum participants'))).toBe(true)
     })
 
     it('should return error when player rating exceeds limit', () => {
-      const format = RATED_SINGLE_FORMAT(1500)
-      const tournament = createTournament('U1500', '2024-03-15', format)
+      const event = createTestEvent({
+        restriction: 'Rated',
+        ratingLimit: 1500,
+      })
       const players = [createPlayer('p1', 1600)]
 
-      const errors = validateAddParticipant(tournament, players)
+      const errors = validateAddParticipant(event, players)
       expect(errors.some((e) => e.includes('exceeds limit'))).toBe(true)
     })
 
-    it('should return error when player already in tournament', () => {
-      const tournament = createTournament('Test', '2024-03-15', OPEN_SINGLE_FORMAT)
+    it('should return error when player already in event', () => {
       const player = createPlayer('p1', 1500)
-      tournament.participants.push(createParticipant('part1', [player], 1))
+      const event = createTestEvent({
+        participants: [createParticipant('part1', [player], 1)],
+      })
 
-      const errors = validateAddParticipant(tournament, [player])
-      expect(errors.some((e) => e.includes('already in the tournament'))).toBe(true)
+      const errors = validateAddParticipant(event, [player])
+      expect(errors.some((e) => e.includes('already in the event'))).toBe(true)
     })
   })
 
   describe('validateGenerateGroups', () => {
-    it('should return empty array for valid tournament', () => {
-      const tournament = createTournament('Test', '2024-03-15', OPEN_SINGLE_FORMAT)
-      tournament.participants = Array.from({ length: 4 }, (_, i) =>
-        createParticipant(`part${i}`, [createPlayer(`p${i}`, 1500 - i * 100)], 1),
-      )
+    it('should return empty array for valid event', () => {
+      const event = createTestEvent({
+        participants: Array.from({ length: 4 }, (_, i) =>
+          createParticipant(`part${i}`, [createPlayer(`p${i}`, 1500 - i * 100)], 1),
+        ),
+      })
 
-      const errors = validateGenerateGroups(tournament)
+      const errors = validateGenerateGroups(event)
       expect(errors).toEqual([])
     })
 
     it('should return error when first stage is not group', () => {
-      const tournament = createTournament('Test', '2024-03-15', OPEN_SINGLE_FORMAT)
-      tournament.stages = [{ type: 'knockout', config: { isEliminationEvent: true }, seedingList: [], rounds: [], numberOfRounds: 0 }]
+      const event = createTestEvent({
+        stages: ['knockout'],
+      })
 
-      const errors = validateGenerateGroups(tournament)
+      const errors = validateGenerateGroups(event)
       expect(errors.some((e) => e.includes('group stage'))).toBe(true)
     })
 
     it('should return error when less than 4 participants', () => {
-      const tournament = createTournament('Test', '2024-03-15', OPEN_SINGLE_FORMAT)
-      tournament.participants = [createParticipant('part1', [createPlayer('p1', 1500)], 1)]
+      const event = createTestEvent({
+        participants: [createParticipant('part1', [createPlayer('p1', 1500)], 1)],
+      })
 
-      const errors = validateGenerateGroups(tournament)
+      const errors = validateGenerateGroups(event)
       expect(errors.some((e) => e.includes('4 participants'))).toBe(true)
-    })
-
-    it('should return error when groups already generated', () => {
-      const tournament = createTournament('Test', '2024-03-15', OPEN_SINGLE_FORMAT)
-      tournament.participants = Array.from({ length: 4 }, (_, i) =>
-        createParticipant(`part${i}`, [createPlayer(`p${i}`, 1500 - i * 100)], 1),
-      )
-      const groupStage = tournament.stages[0] as { type: 'group'; groups: unknown[] }
-      groupStage.groups = [{ index: 0, participants: [], matches: [], isComplete: false }]
-
-      const errors = validateGenerateGroups(tournament)
-      expect(errors.some((e) => e.includes('already been generated'))).toBe(true)
     })
   })
 })
 
-describe('Pre-defined Tournament Formats', () => {
-  describe('OPEN_SINGLE_FORMAT', () => {
-    it('should have correct configuration', () => {
-      expect(OPEN_SINGLE_FORMAT.type).toBe('openSingle')
-      expect(OPEN_SINGLE_FORMAT.nop).toBe(1)
-      expect(OPEN_SINGLE_FORMAT.stages).toEqual(['group', 'knockout'])
-      expect(OPEN_SINGLE_FORMAT.sex).toBe('both')
-      expect(OPEN_SINGLE_FORMAT.bestOfN.groupStage).toBe(3)
-      expect(OPEN_SINGLE_FORMAT.bestOfN.knockoutBeforeSemifinal).toBe(3)
-      expect(OPEN_SINGLE_FORMAT.bestOfN.semifinalAndFinal).toBe(5)
-    })
-  })
-
-  describe('RATED_SINGLE_FORMAT', () => {
-    it('should create format with rating limit', () => {
-      const format = RATED_SINGLE_FORMAT(1500)
-
-      expect(format.type).toBe('ratedSingle')
-      expect(format.nop).toBe(1)
-      expect(format.ratingLimit).toBe(1500)
-    })
-  })
-
-  describe('AGE_SINGLE_FORMAT', () => {
-    it('should create under age format', () => {
-      const format = AGE_SINGLE_FORMAT('U', 19)
-
-      expect(format.type).toBe('ageSingle')
-      expect(format.ageLimitType).toBe('U')
-      expect(format.ageLimit).toBe(19)
+describe('Tournament Types', () => {
+  describe('createTournament', () => {
+    it('should create a single tournament', () => {
+      const tournament = createTournament({ name: 'Singles' })
+      expect(tournament.type).toBe('Single')
+      expect(tournament.nop).toBe(1)
     })
 
-    it('should create over age format', () => {
-      const format = AGE_SINGLE_FORMAT('O', 40)
+    it('should create a doubles tournament', () => {
+      const tournament = createTournament({ name: 'Doubles', type: 'Double' })
+      expect(tournament.type).toBe('Double')
+      expect(tournament.nop).toBe(2)
+    })
 
-      expect(format.type).toBe('ageSingle')
-      expect(format.ageLimitType).toBe('O')
-      expect(format.ageLimit).toBe(40)
+    it('should create a team tournament', () => {
+      const tournament = createTournament({ name: 'Teams', type: 'Team', teamSize: 5 })
+      expect(tournament.type).toBe('Team')
+      expect(tournament.teamSize).toBe(5)
+      expect(tournament.nop).toBe(5)
     })
   })
 })
