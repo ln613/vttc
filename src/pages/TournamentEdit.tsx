@@ -213,9 +213,6 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
         ageLimitType: data.restriction === 'Age' ? data.ageLimitType : undefined,
         ageLimit: data.restriction === 'Age' ? parseInt(data.ageLimit, 10) : undefined,
         stages: data.stages,
-        handicapEnabled: data.handicapEnabled,
-        handicapDifference: parseInt(data.handicapDifference, 10),
-        handicapMaxPoints: parseInt(data.handicapMaxPoints, 10),
       })
       onSave?.(data)
     } catch (error) {
