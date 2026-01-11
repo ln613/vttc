@@ -7,9 +7,10 @@ Vertical
 - shared header
 - title "Edit Event Participants" (h1, align left)
 - Event: dropdown (all events)
-- Add Participant button
-- section title "List of participants - {number of participants}", if max participants is not unlimited, followed by " / {max participants}"
-- Table of participants
+- (display after selecting an event):
+  - Add Participant button
+  - section title "List of participants - {number of participants}", if max participants is not unlimited, followed by " / {max participants}"
+  - Table of participants
 
 ## Single Participant
 

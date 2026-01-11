@@ -4,7 +4,7 @@ import { createStore } from './createStore'
 import { tournamentActions, type Tournament } from './tournamentStore'
 
 export interface EventEditFormData {
-  eventId?: string
+  id?: string
   tournamentId: string
   date: Date | null
   maxParticipants: string
@@ -136,7 +136,7 @@ const generateEventName = (
 }
 
 const buildSavePayload = (formData: EventEditFormData) => ({
-  eventId: formData.eventId,
+  id: formData.id,
   tournamentId: formData.tournamentId,
   date: formData.date?.toISOString().split('T')[0],
   maxParticipants:

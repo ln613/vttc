@@ -217,9 +217,9 @@ export interface Tournament {
 
 /**
  * Event - a tournament on a specific date with specific participants
+ * The event's `id` field (inherited from Tournament) is the unique event identifier.
  */
 export interface Event extends Tournament {
-  eventId: string
   tournamentId: string
   date: string
   maxParticipants: number // 0 = unlimited
