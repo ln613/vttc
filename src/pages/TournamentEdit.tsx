@@ -26,7 +26,7 @@ const STAGES_OPTIONS: StagesType[] = [
 
 const generateRatingOptions = () => {
   const options = []
-  for (let i = 100; i <= 3000; i += 50) {
+  for (let i = 100; i <= 6000; i += 50) {
     options.push({ value: String(i), label: String(i) })
   }
   return options
