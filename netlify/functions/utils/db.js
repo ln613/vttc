@@ -94,6 +94,21 @@ export const removeById = async (collectionName, id) => {
   return remove(collectionName, { id })
 }
 
+export const unsetFields = async (collectionName, fields, filter = {}) => {
+  validateParams({ collectionName })
+  validateFields(fields)
+
+  const db = getDB()
+  const collection = db.collection(collectionName)
+
+  const unsetObj = fields.reduce((acc, field) => {
+    acc[field] = ''
+    return acc
+  }, {})
+
+  return collection.updateMany(filter, { $unset: unsetObj })
+}
+
 const validateParams = (params) => {
   const errors = []
 
@@ -115,5 +130,11 @@ const validateParams = (params) => {
 
   if (errors.length > 0) {
     throw new Error(errors.join('\n'))
+  }
+}
+
+const validateFields = (fields) => {
+  if (!fields || !Array.isArray(fields) || fields.length === 0) {
+    throw new Error('fields must be a non-empty array')
   }
 }
