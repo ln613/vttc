@@ -4,6 +4,12 @@ import { apiHandlers } from './utils/handlers.js'
 export const handler = async (event) => {
   try {
     const method = event.httpMethod.toLowerCase()
+
+    // Handle preflight OPTIONS request
+    if (method === 'options') {
+      return createResponse(200, {})
+    }
+
     const params = event.queryStringParameters || {}
     const { type } = params
 
