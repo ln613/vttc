@@ -79,7 +79,7 @@ return the new event
 
 ## Add participant
 
-Add a participant (1 player or 1 team) to a event
+Add a participant (1 player or a pair of players or 1 team) to a event
 
 ### input
 
@@ -94,7 +94,7 @@ Add a participant (1 player or 1 team) to a event
 - no deplicate players in the input
 - the number of players in the input = nop of event
 - the number of existing participants < max participants
-- if event is a rated event, the player/team rating must meet the rating requirement
+- if event is a rated event, the player/team rating must meet the rating requirement, team also needs to meet the top N players combined rating limit
 - if event is a age event, all players must meet the age requirement
 
 ### Action

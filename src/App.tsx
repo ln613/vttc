@@ -3,6 +3,7 @@ import './App.css'
 import Home from './pages/Home'
 import TournamentEdit from './pages/TournamentEdit'
 import EventEdit from './pages/EventEdit'
+import EventParticipantEdit from './pages/EventParticipantEdit'
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
         <Route path="/tournament/:id/edit" element={<TournamentEdit isEdit />} />
         <Route path="/event/new" element={<EventEdit />} />
         <Route path="/event/:id/edit" element={<EventEdit isEdit />} />
+        <Route path="/event/participants" element={<EventParticipantEdit />} />
       </Routes>
     </BrowserRouter>
   )

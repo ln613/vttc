@@ -246,6 +246,20 @@ const validateAddParticipantRules = (tournament, players) => {
     }
   }
 
+  // Check top N players combined rating limit for teams/pairs
+  if (tournament.topPlayersRatingEnabled && players.length > 1) {
+    const topN = tournament.topPlayersCount || players.length
+    const sortedByRating = [...players].sort((a, b) => (b.rating || 0) - (a.rating || 0))
+    const topPlayers = sortedByRating.slice(0, topN)
+    const combinedRating = topPlayers.reduce((sum, p) => sum + (p.rating || 0), 0)
+    
+    if (combinedRating > tournament.topPlayersRatingLimit) {
+      errors.push(
+        `Team's top ${topN} players combined rating (${combinedRating}) exceeds limit (${tournament.topPlayersRatingLimit})`,
+      )
+    }
+  }
+
   // Check age requirement
   if (
     tournament.format.ageLimitType !== undefined &&
