@@ -47,8 +47,17 @@ const generateMaxPointsGivenOptions = () => {
   return options
 }
 
+const generateMaxParticipantsOptions = () => {
+  const options = [{ value: 'Unlimited', label: 'Unlimited' }]
+  for (let i = 4; i <= 128; i++) {
+    options.push({ value: String(i), label: String(i) })
+  }
+  return options
+}
+
 const HANDICAP_DIFFERENCE_OPTIONS = generateHandicapDifferenceOptions()
 const MAX_POINTS_GIVEN_OPTIONS = generateMaxPointsGivenOptions()
+const MAX_PARTICIPANTS_OPTIONS = generateMaxParticipantsOptions()
 
 interface EventEditFormData {
   eventId?: string
@@ -92,7 +101,7 @@ const EventEdit: React.FC<EventEditProps> = ({
   const [tournamentId, setTournamentId] = useState(initialData?.tournamentId || '')
   const [date, setDate] = useState<Date | null>(initialData?.date || null)
   const [maxParticipants, setMaxParticipants] = useState(
-    initialData?.maxParticipants || '',
+    initialData?.maxParticipants || 'Unlimited',
   )
   const [name, setName] = useState(initialData?.name || '')
   const [groupGames, setGroupGames] = useState<BestOfOption>(
@@ -214,7 +223,8 @@ const EventEdit: React.FC<EventEditProps> = ({
         eventId: data.eventId,
         tournamentId: data.tournamentId,
         date: data.date?.toISOString().split('T')[0],
-        maxParticipants: data.maxParticipants ? parseInt(data.maxParticipants, 10) : 0,
+        maxParticipants:
+          data.maxParticipants === 'Unlimited' ? 0 : parseInt(data.maxParticipants, 10),
         name: data.name,
         groupGames: data.groupGames,
         knockoutGames: data.knockoutGames,
@@ -355,12 +365,12 @@ const EventEdit: React.FC<EventEditProps> = ({
           onChange={setName}
           required
         />
-        <Input
+        <Select
           label="Max Participants"
           name="maxParticipants"
           value={maxParticipants}
           onChange={setMaxParticipants}
-          placeholder="Leave empty for unlimited"
+          options={MAX_PARTICIPANTS_OPTIONS}
         />
         {renderNumberOfMatchesSection()}
         {renderNumberOfGamesSection()}

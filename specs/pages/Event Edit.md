@@ -9,6 +9,7 @@ Vertical
 - Tournament: dropdown (all tournaments)
 - date picker
 - Name: input (initial value after tournament and date are selected "{tournament name} - {date}") *
+- Max Participants: dropdown (Unlimited, 4 to 128, default Unlimited)
 - Number of Matches section
 - Number of Games section
 - Number of Qualifiers section
