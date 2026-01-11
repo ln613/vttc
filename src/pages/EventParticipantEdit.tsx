@@ -61,6 +61,11 @@ const tdStyle: React.CSSProperties = {
   borderBottom: '1px solid #eee',
 }
 
+const tdPlayerStyle: React.CSSProperties = {
+  ...tdStyle,
+  textAlign: 'left',
+}
+
 const EventParticipantEdit: React.FC = () => {
   const { data: events } = useEventStore()
   const { data: players } = usePlayerStore()
@@ -167,11 +172,12 @@ const SingleParticipantTable: React.FC<SingleParticipantTableProps> = ({
         </tr>
       </thead>
       <tbody>
-        {sortedParticipants.map((participant) => (
+        {sortedParticipants.map((participant, index) => (
           <SingleParticipantRow
             key={participant._id}
             participant={participant}
             showDelete={showDelete}
+            rowIndex={index}
           />
         ))}
       </tbody>
@@ -182,14 +188,19 @@ const SingleParticipantTable: React.FC<SingleParticipantTableProps> = ({
 interface SingleParticipantRowProps {
   participant: Participant
   showDelete: boolean
+  rowIndex: number
 }
+
+const getRowBackgroundColor = (index: number): string =>
+  index % 2 === 0 ? 'white' : '#e6e6fa'
 
 const SingleParticipantRow: React.FC<SingleParticipantRowProps> = ({
   participant,
   showDelete,
+  rowIndex,
 }) => (
-  <tr>
-    <td style={tdStyle}>
+  <tr style={{ backgroundColor: getRowBackgroundColor(rowIndex) }}>
+    <td style={tdPlayerStyle}>
       {participant.players[0]?.firstName} {participant.players[0]?.lastName}
     </td>
     <td style={tdStyle}>{participant.players[0]?.rating || 0}</td>
@@ -237,13 +248,14 @@ const DoubleOrTeamParticipantTable: React.FC<
         </tr>
       </thead>
       <tbody>
-        {sortedParticipants.map((participant) => (
+        {sortedParticipants.map((participant, index) => (
           <TeamParticipantRows
             key={participant._id}
             participant={participant}
             event={event}
             showDelete={showDelete}
             showTopNCombined={!!showTopNCombined}
+            participantIndex={index}
           />
         ))}
       </tbody>
@@ -256,6 +268,7 @@ interface TeamParticipantRowsProps {
   event: EventOption
   showDelete: boolean
   showTopNCombined: boolean
+  participantIndex: number
 }
 
 const TeamParticipantRows: React.FC<TeamParticipantRowsProps> = ({
@@ -263,6 +276,7 @@ const TeamParticipantRows: React.FC<TeamParticipantRowsProps> = ({
   event,
   showDelete,
   showTopNCombined,
+  participantIndex,
 }) => {
   const sortedPlayers = [...participant.players].sort(
     (a, b) => (b.rating || 0) - (a.rating || 0),
@@ -272,11 +286,16 @@ const TeamParticipantRows: React.FC<TeamParticipantRowsProps> = ({
     ? calculateTopNCombinedRating(participant, event.topPlayersCount!)
     : null
 
+  const rowBgColor = getRowBackgroundColor(participantIndex)
+
   return (
     <>
       {sortedPlayers.map((player, index) => (
-        <tr key={`${participant._id}-${player._id}`}>
-          <td style={tdStyle}>
+        <tr
+          key={`${participant._id}-${player._id}`}
+          style={{ backgroundColor: rowBgColor }}
+        >
+          <td style={tdPlayerStyle}>
             {player.firstName} {player.lastName}
           </td>
           <td style={tdStyle}>{player.rating || 0}</td>

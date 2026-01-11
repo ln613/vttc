@@ -10,16 +10,16 @@ Vertical
 - (display after selecting an event):
   - Add Participant button
   - section title "List of participants - {number of participants}", if max participants is not unlimited, followed by " / {max participants}"
-  - Table of participants
+  - Table of participants (alternate bg color - white, lavender)
 
 ## Single Participant
 
-- table columns - Player, Rating, "Delete" button
+- table columns - Player (align left), Rating, "Delete" button
 - order by Rating desc
 
 ## Double/Team Participant
 
-- table columns - Players, Rating, Combined Rating, "Delete" button
+- table columns - Players (align left), Rating, Combined Rating, "Delete" button
 - each participant consists of multiple rows, 1 player per row (order by Rating desc), no divider between rows. The cells in Combined Rating and "Delete" button columns are merged, and center aligned vertically
 - For team participant, if topPlayersRatingEnabled, add a column "Top {topPlayersCount} Combined"
 - order by Combined Rating desc
