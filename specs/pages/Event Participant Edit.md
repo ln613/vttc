@@ -42,5 +42,6 @@ Vertical
 
 ### interaction
 
-- on save: confirm and call add participant API
+- on save: call add participant API
   - show result in toast notification, close on success, stay on fail
+  - update and re-order the list

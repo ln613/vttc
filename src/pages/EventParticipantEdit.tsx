@@ -337,14 +337,9 @@ const AddParticipantDialog: React.FC<AddParticipantDialogProps> = ({
   }
 
   const handleSave = () => {
-    const confirmed = window.confirm(
-      'Are you sure you want to add this participant?',
+    eventParticipantEditActions.addParticipant(
+      selectedPlayerIds.filter((id) => id !== ''),
     )
-    if (confirmed) {
-      eventParticipantEditActions.addParticipant(
-        selectedPlayerIds.filter((id) => id !== ''),
-      )
-    }
   }
 
   const playerOptions = players
