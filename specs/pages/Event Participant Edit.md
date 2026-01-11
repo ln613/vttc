@@ -14,13 +14,13 @@ Vertical
 
 ## Single Participant
 
-- table columns - Player (align left), Rating, "Delete" button
+- table columns - Player (align left), Rating, "Delete" icon
 - order by Rating desc
 
 ## Double/Team Participant
 
-- table columns - Players (align left), Rating, Combined Rating, "Delete" button
-- each participant consists of multiple rows, 1 player per row (order by Rating desc), no divider between rows. The cells in Combined Rating and "Delete" button columns are merged, and center aligned vertically
+- table columns - Players (align left), Rating, Combined Rating, "Delete" icon
+- each participant consists of multiple rows, 1 player per row (order by Rating desc), no divider between rows. The cells in Combined Rating and "Delete" icon columns are merged, and center aligned vertically
 - For team participant, if topPlayersRatingEnabled, add a column "Top {topPlayersCount} Combined"
 - order by Combined Rating desc
 
@@ -30,7 +30,7 @@ Vertical
 - Add Participant button should be disabled if number of participants reach max participants
 - on Add Participant button click: show the Add Participant Dialog
 - delete column should be hidden if event has schedule or pass the start date
-- on delete button click: confirm and call delete participant API
+- on delete icon click: confirm and call delete participant API
 
 ## Add Participant Dialog
 
