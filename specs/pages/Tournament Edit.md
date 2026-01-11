@@ -36,4 +36,4 @@ Visible if the selected Restriction is Age
 
 ## interaction
 
-- on save, call save tournament API
+- on save: confirm and call save tournament API

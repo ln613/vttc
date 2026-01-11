@@ -66,9 +66,6 @@ interface TournamentEditFormData {
   ageLimitType: AgeLimitType
   ageLimit: string
   stages: StagesType
-  handicapEnabled: boolean
-  handicapDifference: string
-  handicapMaxPoints: string
 }
 
 interface TournamentEditProps {
@@ -111,15 +108,6 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
   const [ageLimit, setAgeLimit] = useState(initialData?.ageLimit || '20')
   const [stages, setStages] = useState<StagesType>(
     initialData?.stages || 'Group + Knockout',
-  )
-  const [handicapEnabled, setHandicapEnabled] = useState(
-    initialData?.handicapEnabled || false,
-  )
-  const [handicapDifference, setHandicapDifference] = useState(
-    initialData?.handicapDifference || '200',
-  )
-  const [handicapMaxPoints, setHandicapMaxPoints] = useState(
-    initialData?.handicapMaxPoints || '5',
   )
 
   const containerStyle: React.CSSProperties = {
@@ -176,6 +164,12 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
     if (!validateForm()) {
       return
     }
+
+    const confirmed = window.confirm('Are you sure you want to save this tournament?')
+    if (!confirmed) {
+      return
+    }
+
     const data: TournamentEditFormData = {
       id: initialData?.id,
       name,
@@ -193,9 +187,6 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
       ageLimitType: restriction === 'Age' ? ageLimitType : 'U',
       ageLimit: restriction === 'Age' ? ageLimit : '20',
       stages,
-      handicapEnabled,
-      handicapDifference: handicapEnabled ? handicapDifference : '200',
-      handicapMaxPoints: handicapEnabled ? handicapMaxPoints : '5',
     }
 
     try {

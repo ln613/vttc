@@ -16,7 +16,6 @@ import type {
 import {
   DEFAULT_GROUP_STAGE_CONFIG,
   type Participant,
-  type TournamentFormat,
   type Tournament,
   type BestOfNConfig,
 } from '../types/Tournament'
@@ -1112,9 +1111,6 @@ export const createTournament = (input: {
   ageLimitType?: 'U' | 'O'
   ageLimit?: number
   stages?: 'Group + Knockout' | 'Group Only (Big Round Robin)' | 'Knockout Only'
-  handicapEnabled?: boolean
-  handicapDifference?: number
-  handicapMaxPoints?: number
 }): Tournament => {
   const type = input.type || 'Single'
   const teamSize = type === 'Team' ? (input.teamSize || 3) : undefined
@@ -1144,9 +1140,6 @@ export const createTournament = (input: {
     ageLimit: input.restriction === 'Age' ? input.ageLimit : undefined,
     stages: stagesArray,
     stagesType,
-    handicapEnabled: input.handicapEnabled || false,
-    handicapDifference: input.handicapDifference || 200,
-    handicapMaxPoints: input.handicapMaxPoints || 5,
   }
 }
 

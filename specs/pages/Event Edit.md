@@ -42,4 +42,4 @@ Select the number of participants who will advance from the group stage, only vi
 ## interaction
 
 - on load: call get tournaments API to populate the tournaments dropdown
-- on save, call save event API
+- on save: confirm and call save event API

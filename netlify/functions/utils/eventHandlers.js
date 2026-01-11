@@ -43,6 +43,9 @@ export const saveEvent = async (body) => {
     groupMatches = 'Best of 3',
     knockoutMatches = 'Best of 3 before Semifinal',
     qualifiers = 'Top 2',
+    handicapEnabled = false,
+    handicapDifference = 200,
+    handicapMaxPoints = 5,
   } = body
 
   const db = getDB()
@@ -95,6 +98,9 @@ export const saveEvent = async (body) => {
     groupMatches: tournament.type === 'Team' ? groupMatches : undefined,
     knockoutMatches: tournament.type === 'Team' ? knockoutMatches : undefined,
     qualifiers,
+    handicapEnabled,
+    handicapDifference,
+    handicapMaxPoints,
     participants: isEdit ? undefined : [], // Don't overwrite participants on edit
     eventStages: isEdit
       ? undefined

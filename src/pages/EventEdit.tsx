@@ -202,6 +202,11 @@ const EventEdit: React.FC<EventEditProps> = ({
       return
     }
 
+    const confirmed = window.confirm('Are you sure you want to save this event?')
+    if (!confirmed) {
+      return
+    }
+
     const data: EventEditFormData = {
       eventId: initialData?.eventId,
       tournamentId,
@@ -231,6 +236,9 @@ const EventEdit: React.FC<EventEditProps> = ({
         groupMatches: data.groupMatches,
         knockoutMatches: data.knockoutMatches,
         qualifiers: data.qualifiers,
+        handicapEnabled: data.handicapEnabled,
+        handicapDifference: parseInt(data.handicapDifference, 10),
+        handicapMaxPoints: parseInt(data.handicapMaxPoints, 10),
       })
       onSave?.(data)
     } catch (error) {

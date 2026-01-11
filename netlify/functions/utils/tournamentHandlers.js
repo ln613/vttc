@@ -63,9 +63,6 @@ export const saveTournament = async (body) => {
     ageLimitType,
     ageLimit,
     stages = 'Group + Knockout',
-    handicapEnabled = false,
-    handicapDifference = 200,
-    handicapMaxPoints = 5,
   } = body
 
   const db = getDB()
@@ -119,9 +116,6 @@ export const saveTournament = async (body) => {
     ageLimit: restriction === 'Age' ? ageLimit : undefined,
     stages: stagesArray,
     stagesType: stages,
-    handicapEnabled,
-    handicapDifference,
-    handicapMaxPoints,
     updatedAt: new Date().toISOString(),
   }
 

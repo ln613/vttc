@@ -78,60 +78,6 @@ export interface BestOfNConfig {
 }
 
 /**
- * Handicap configuration
- */
-export interface HandicapConfig {
-  enabled: boolean
-  difference: number // D = rating difference divisor, default 200
-  maxPointsGiven: number // MP = max points given, default 5
-}
-
-/**
- * Default handicap configuration
- */
-export const DEFAULT_HANDICAP_CONFIG: HandicapConfig = {
-  enabled: false,
-  difference: 200,
-  maxPointsGiven: 5,
-}
-
-/**
- * Rated restriction configuration
- */
-export interface RatedRestrictionConfig {
-  ratingLimit: number // Rating limit (RL)
-  topPlayersCount?: number // For team events, N = number of top players to consider
-  topPlayersRatingLimit?: number // For team events, TPRL = top players rating limit
-}
-
-/**
- * Age restriction configuration
- */
-export interface AgeRestrictionConfig {
-  ageLimitType: AgeLimitType // U for under, O for over
-  ageLimit: number // Age limit value
-}
-
-/**
- * Tournament format configuration
- */
-export interface TournamentFormat {
-  type: TournamentType
-  nop: number
-  teamSize?: number // For team events: 2, 3, or 4
-  stages: ('group' | 'knockout')[]
-  stagesType: StagesType
-  sex: ParticipantSex
-  restriction: TournamentRestriction
-  ratedConfig?: RatedRestrictionConfig // For Rated restriction
-  ageConfig?: AgeRestrictionConfig // For Age restriction
-  bestOfNGames: BestOfNConfig // Number of games per match
-  bestOfNMatches?: BestOfNConfig // Number of matches per team match (for Team type)
-  qualifiersCount: QualifiersCount // Number advancing from group stage
-  handicap: HandicapConfig
-}
-
-/**
  * Tournament participant (player or team)
  */
 export interface Participant {
@@ -267,9 +213,6 @@ export interface Tournament {
   ageLimit?: number // Required if restriction = Age
   stages: ('group' | 'knockout')[]
   stagesType: StagesType
-  handicapEnabled: boolean
-  handicapDifference: number // Default 200
-  handicapMaxPoints: number // Default 5
 }
 
 /**
@@ -286,6 +229,9 @@ export interface Event extends Tournament {
   groupMatches?: BestOfOption // Number of matches per team match in group (Team only)
   knockoutMatches?: BestOfOption // Number of matches per team match in knockout (Team only)
   qualifiers: QualifiersCount
+  handicapEnabled: boolean
+  handicapDifference: number // D = rating difference divisor, default 200
+  handicapMaxPoints: number // MP = max points given, default 5
   participants: Participant[]
   eventStages: Stage[]
 }
@@ -328,49 +274,3 @@ export const DEFAULT_BEST_OF_N: BestOfNConfig = {
   knockoutBeforeSemifinal: 3,
   semifinalAndFinal: 5,
 }
-
-/**
- * Create a default tournament format
- */
-export const createDefaultFormat = (
-  type: TournamentType = 'Single',
-  restriction: TournamentRestriction = 'Open',
-): TournamentFormat => ({
-  type,
-  nop: type === 'Single' ? 1 : type === 'Double' ? 2 : 3,
-  teamSize: type === 'Team' ? 3 : undefined,
-  stages: ['group', 'knockout'],
-  stagesType: 'Group + Knockout',
-  sex: 'All',
-  restriction,
-  bestOfNGames: DEFAULT_BEST_OF_N,
-  bestOfNMatches: type === 'Team' ? DEFAULT_BEST_OF_N : undefined,
-  qualifiersCount: 'Top 2',
-  handicap: DEFAULT_HANDICAP_CONFIG,
-})
-
-/**
- * Pre-defined Tournament Formats
- */
-export const OPEN_SINGLE_FORMAT: TournamentFormat = createDefaultFormat(
-  'Single',
-  'Open',
-)
-
-export const RATED_SINGLE_FORMAT = (ratingLimit: number): TournamentFormat => ({
-  ...createDefaultFormat('Single', 'Rated'),
-  ratedConfig: {
-    ratingLimit,
-  },
-})
-
-export const AGE_SINGLE_FORMAT = (
-  ageLimitType: AgeLimitType,
-  ageLimit: number,
-): TournamentFormat => ({
-  ...createDefaultFormat('Single', 'Age'),
-  ageConfig: {
-    ageLimitType,
-    ageLimit,
-  },
-})
