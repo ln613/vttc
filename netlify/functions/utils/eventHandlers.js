@@ -1,6 +1,7 @@
 import { getDB } from './db.js'
 
-const COLLECTION = 'tournaments'
+const EVENTS_COLLECTION = 'events'
+const TOURNAMENTS_COLLECTION = 'tournaments'
 
 /**
  * Throw error helper
@@ -26,172 +27,187 @@ const generateId = () => {
 }
 
 /**
- * Get nop from tournament type and team size
+ * Save event (create or update)
  */
-const getNop = (type, teamSize) => {
-  if (type === 'Single') return 1
-  if (type === 'Double') return 2
-  return teamSize || 3
-}
-
-/**
- * Get stages array from stages type
- */
-const getStagesArray = (stagesType) => {
-  if (stagesType === 'Group Only (Big Round Robin)') return ['group']
-  if (stagesType === 'Knockout Only') return ['knockout']
-  return ['group', 'knockout']
-}
-
-/**
- * Save tournament (create or update)
- */
-export const saveTournament = async (body) => {
-  validateSaveTournamentInput(body)
+export const saveEvent = async (body) => {
+  validateSaveEventInput(body)
 
   const {
-    id,
+    eventId,
+    tournamentId,
+    date,
+    maxParticipants = 0,
     name,
-    sex = 'All',
-    type = 'Single',
-    teamSize,
-    restriction = 'Open',
-    ratingLimit,
-    topPlayersRatingEnabled = false,
-    topPlayersCount,
-    topPlayersRatingLimit,
-    ageLimitType,
-    ageLimit,
-    stages = 'Group + Knockout',
-    handicapEnabled = false,
-    handicapDifference = 200,
-    handicapMaxPoints = 5,
+    groupGames = 'Best of 3',
+    knockoutGames = 'Best of 3 before Semifinal',
+    groupMatches = 'Best of 3',
+    knockoutMatches = 'Best of 3 before Semifinal',
+    qualifiers = 'Top 2',
   } = body
 
   const db = getDB()
-  const collection = db.collection(COLLECTION)
+  const eventsCollection = db.collection(EVENTS_COLLECTION)
+  const tournamentsCollection = db.collection(TOURNAMENTS_COLLECTION)
 
-  const isEdit = id != null
+  const isEdit = eventId != null
+
+  // Get tournament
+  const tournament = await tournamentsCollection.findOne({ id: tournamentId })
+  if (!tournament) {
+    throwError('Tournament not found')
+  }
+
+  // Generate default event name
+  const eventName = name || `${tournament.name} - ${date}`
 
   // Validation
   if (!isEdit) {
-    const existing = await collection.findOne({ name })
+    const existing = await eventsCollection.findOne({ eventName, date })
     if (existing) {
-      throwError('A tournament with the same name already exists')
+      throwError('An event with the same name and date already exists')
     }
   } else {
-    const existing = await collection.findOne({ id })
+    const existing = await eventsCollection.findOne({ eventId })
     if (!existing) {
-      throwError('Tournament not found')
+      throwError('Event not found')
+    }
+    // Check no schedules have been created
+    const hasSchedules = existing.eventStages?.some(
+      (s) =>
+        (s.type === 'group' && s.groups?.length > 0) ||
+        (s.type === 'knockout' && s.rounds?.length > 0),
+    )
+    if (hasSchedules) {
+      throwError('Cannot edit event after schedules have been created')
     }
   }
 
-  // Validate required fields based on type/restriction
-  if (type === 'Team' && !teamSize) {
-    throwError('Team size is required for team tournaments')
-  }
-  if (restriction === 'Rated' && !ratingLimit) {
-    throwError('Rating limit is required for rated tournaments')
-  }
-  if (topPlayersRatingEnabled && (!topPlayersCount || !topPlayersRatingLimit)) {
-    throwError('Top players count and rating limit are required when enabled')
-  }
-  if (restriction === 'Age' && (!ageLimitType || !ageLimit)) {
-    throwError('Age limit type and age limit are required for age tournaments')
-  }
-
-  const nop = getNop(type, teamSize)
-  const stagesArray = getStagesArray(stages)
-
-  const tournament = {
-    id: isEdit ? id : generateId(),
-    name,
-    sex,
-    type,
-    teamSize: type === 'Team' ? teamSize : undefined,
-    nop,
-    restriction,
-    ratingLimit: restriction === 'Rated' ? ratingLimit : undefined,
-    topPlayersRatingEnabled,
-    topPlayersCount: topPlayersRatingEnabled ? topPlayersCount : undefined,
-    topPlayersRatingLimit: topPlayersRatingEnabled ? topPlayersRatingLimit : undefined,
-    ageLimitType: restriction === 'Age' ? ageLimitType : undefined,
-    ageLimit: restriction === 'Age' ? ageLimit : undefined,
-    stages: stagesArray,
-    stagesType: stages,
-    handicapEnabled,
-    handicapDifference,
-    handicapMaxPoints,
+  // Copy tournament fields to event and add event-specific fields
+  const event = {
+    ...tournament,
+    eventId: isEdit ? eventId : generateId(),
+    tournamentId,
+    date,
+    maxParticipants,
+    eventName,
+    groupGames,
+    knockoutGames,
+    groupMatches: tournament.type === 'Team' ? groupMatches : undefined,
+    knockoutMatches: tournament.type === 'Team' ? knockoutMatches : undefined,
+    qualifiers,
+    participants: isEdit ? undefined : [], // Don't overwrite participants on edit
+    eventStages: isEdit
+      ? undefined
+      : tournament.stages.map((stageType) => {
+          if (stageType === 'group') {
+            return {
+              type: 'group',
+              config: { advancingCount: getQualifiersCount(qualifiers) },
+              groups: [],
+              advancedParticipants: [],
+            }
+          }
+          return {
+            type: 'knockout',
+            config: { isKnockoutOnly: tournament.stages[0] !== 'group' },
+            seedingList: [],
+            rounds: [],
+            numberOfRounds: 0,
+          }
+        }),
     updatedAt: new Date().toISOString(),
   }
 
+  // Remove undefined fields
+  Object.keys(event).forEach((key) => {
+    if (event[key] === undefined) delete event[key]
+  })
+
   if (isEdit) {
-    await collection.updateOne({ id }, { $set: tournament })
+    await eventsCollection.updateOne({ eventId }, { $set: event })
   } else {
-    tournament.createdAt = new Date().toISOString()
-    await collection.insertOne(tournament)
+    event.createdAt = new Date().toISOString()
+    await eventsCollection.insertOne(event)
   }
 
-  return tournament
+  return event
 }
 
-const validateSaveTournamentInput = (body) => {
+const validateSaveEventInput = (body) => {
   if (!body) throwError('Request body is required')
-  if (!body.name) throwError('Tournament name is required')
+  if (!body.tournamentId) throwError('Tournament ID is required')
+  if (!body.date) throwError('Event date is required')
+}
+
+const getQualifiersCount = (qualifiers) => {
+  switch (qualifiers) {
+    case 'Top 1':
+      return 1
+    case 'Top 2':
+      return 2
+    case 'Top 3':
+      return 3
+    case 'All':
+      return 999 // Large number to mean all
+    default:
+      return 2
+  }
 }
 
 /**
- * Get all tournaments
+ * Get all events
  */
-export const getTournaments = async () => {
+export const getEvents = async (params = {}) => {
   const db = getDB()
-  const tournaments = await db.collection(COLLECTION).find({}).toArray()
-  return tournaments
+  const query = {}
+  if (params.tournamentId) {
+    query.tournamentId = params.tournamentId
+  }
+  const events = await db.collection(EVENTS_COLLECTION).find(query).toArray()
+  return events
 }
 
 /**
- * Get tournament by ID
+ * Get event by ID
  */
-export const getTournament = async (params) => {
-  if (!params.id) throwError('Tournament ID is required')
+export const getEvent = async (params) => {
+  if (!params.eventId) throwError('Event ID is required')
 
   const db = getDB()
-  const tournament = await db.collection(COLLECTION).findOne({ id: params.id })
-  if (!tournament) throwError('Tournament not found')
-  return tournament
+  const event = await db.collection(EVENTS_COLLECTION).findOne({ eventId: params.eventId })
+  if (!event) throwError('Event not found')
+  return event
 }
 
 /**
- * Add participant to tournament
+ * Add participant to event
  */
 export const addParticipant = async (body) => {
   validateAddParticipantInput(body)
 
-  const { tournamentId, playerIds, teamName } = body
+  const { eventId, playerIds, teamName } = body
 
   const db = getDB()
-  const collection = db.collection(COLLECTION)
+  const collection = db.collection(EVENTS_COLLECTION)
   const playersCollection = db.collection('players')
 
-  // Get tournament
-  const tournament = await collection.findOne({ id: tournamentId })
-  if (!tournament) throwError('Tournament not found')
+  // Get event
+  const event = await collection.findOne({ eventId })
+  if (!event) throwError('Event not found')
 
   // Get players
-  const players = await playersCollection
-    .find({ id: { $in: playerIds } })
-    .toArray()
+  const players = await playersCollection.find({ id: { $in: playerIds } }).toArray()
 
   if (players.length !== playerIds.length) {
     throwError('One or more players not found')
   }
 
   // Validate
-  const errors = validateAddParticipantRules(tournament, players)
+  const errors = validateAddParticipantRules(event, players)
   throwErrors(errors)
 
   // Calculate rating
-  const rating = calculateParticipantRating(players, tournament.nop)
+  const rating = calculateParticipantRating(players, event.nop)
 
   const participant = {
     id: generateId(),
@@ -200,28 +216,25 @@ export const addParticipant = async (body) => {
     rating,
   }
 
-  await collection.updateOne(
-    { id: tournamentId },
-    { $push: { participants: participant } },
-  )
+  await collection.updateOne({ eventId }, { $push: { participants: participant } })
 
   return participant
 }
 
 const validateAddParticipantInput = (body) => {
   if (!body) throwError('Request body is required')
-  if (!body.tournamentId) throwError('Tournament ID is required')
+  if (!body.eventId) throwError('Event ID is required')
   if (!body.playerIds || !Array.isArray(body.playerIds) || body.playerIds.length === 0) {
     throwError('Player IDs are required')
   }
 }
 
-const validateAddParticipantRules = (tournament, players) => {
+const validateAddParticipantRules = (event, players) => {
   const errors = []
 
   // Check number of players matches nop
-  if (players.length !== tournament.nop) {
-    errors.push(`Expected ${tournament.nop} player(s), got ${players.length}`)
+  if (players.length !== event.nop) {
+    errors.push(`Expected ${event.nop} player(s), got ${players.length}`)
   }
 
   // Check for duplicate players in input
@@ -234,35 +247,27 @@ const validateAddParticipantRules = (tournament, players) => {
   }
 
   // Check max participants
-  if (
-    tournament.maxParticipants > 0 &&
-    tournament.participants.length >= tournament.maxParticipants
-  ) {
-    errors.push('Tournament has reached maximum participants')
+  if (event.maxParticipants > 0 && event.participants.length >= event.maxParticipants) {
+    errors.push('Event has reached maximum participants')
   }
 
   // Check rating requirement
-  if (tournament.format.ratingLimit !== undefined) {
+  if (event.restriction === 'Rated' && event.ratingLimit) {
     for (const player of players) {
-      if (player.rating > tournament.format.ratingLimit) {
+      if (player.rating > event.ratingLimit) {
         errors.push(
-          `Player ${player.firstName} ${player.lastName} rating (${player.rating}) exceeds limit (${tournament.format.ratingLimit})`,
+          `Player ${player.firstName} ${player.lastName} rating (${player.rating}) exceeds limit (${event.ratingLimit})`,
         )
       }
     }
   }
 
   // Check age requirement
-  if (
-    tournament.format.ageLimitType !== undefined &&
-    tournament.format.ageLimit !== undefined
-  ) {
+  if (event.restriction === 'Age' && event.ageLimitType && event.ageLimit) {
     for (const player of players) {
-      if (!meetsAgeRequirement(player, tournament.format.ageLimitType, tournament.format.ageLimit, tournament.date)) {
+      if (!meetsAgeRequirement(player, event.ageLimitType, event.ageLimit, event.date)) {
         const requirement =
-          tournament.format.ageLimitType === 'U'
-            ? `under ${tournament.format.ageLimit}`
-            : `over ${tournament.format.ageLimit}`
+          event.ageLimitType === 'U' ? `under ${event.ageLimit}` : `over ${event.ageLimit}`
         errors.push(
           `Player ${player.firstName} ${player.lastName} does not meet age requirement (${requirement})`,
         )
@@ -270,15 +275,11 @@ const validateAddParticipantRules = (tournament, players) => {
     }
   }
 
-  // Check if player is already in tournament
+  // Check if player is already in event
   for (const player of players) {
-    const existing = tournament.participants.find((p) =>
-      p.players.some((pl) => pl.id === player.id),
-    )
+    const existing = event.participants.find((p) => p.players.some((pl) => pl.id === player.id))
     if (existing) {
-      errors.push(
-        `Player ${player.firstName} ${player.lastName} is already in the tournament`,
-      )
+      errors.push(`Player ${player.firstName} ${player.lastName} is already in the event`)
     }
   }
 
@@ -312,74 +313,71 @@ const meetsAgeRequirement = (player, ageLimitType, ageLimit, referenceDate) => {
 }
 
 /**
- * Delete participant from tournament
+ * Delete participant from event
  */
 export const deleteParticipant = async (body) => {
   validateDeleteParticipantInput(body)
 
-  const { tournamentId, participantId } = body
+  const { eventId, participantId } = body
 
   const db = getDB()
-  const collection = db.collection(COLLECTION)
+  const collection = db.collection(EVENTS_COLLECTION)
 
-  const tournament = await collection.findOne({ id: tournamentId })
-  if (!tournament) throwError('Tournament not found')
+  const event = await collection.findOne({ eventId })
+  if (!event) throwError('Event not found')
 
-  const participant = tournament.participants.find((p) => p.id === participantId)
+  const participant = event.participants.find((p) => p.id === participantId)
   if (!participant) throwError('Participant not found')
 
-  // Check if tournament has started
-  const groupStage = tournament.stages.find((s) => s.type === 'group')
+  // Check if event has started
+  const groupStage = event.eventStages.find((s) => s.type === 'group')
   if (groupStage && groupStage.groups.length > 0) {
-    throwError('Cannot delete participant after tournament has started')
+    throwError('Cannot delete participant after event has started')
   }
 
-  await collection.updateOne(
-    { id: tournamentId },
-    { $pull: { participants: { id: participantId } } },
-  )
+  await collection.updateOne({ eventId }, { $pull: { participants: { id: participantId } } })
 
   return participant
 }
 
 const validateDeleteParticipantInput = (body) => {
   if (!body) throwError('Request body is required')
-  if (!body.tournamentId) throwError('Tournament ID is required')
+  if (!body.eventId) throwError('Event ID is required')
   if (!body.participantId) throwError('Participant ID is required')
 }
 
 /**
- * Generate groups for a tournament
+ * Generate groups for an event
  */
 export const generateGroups = async (body) => {
   if (!body) throwError('Request body is required')
-  if (!body.tournamentId) throwError('Tournament ID is required')
+  if (!body.eventId) throwError('Event ID is required')
 
-  const { tournamentId } = body
+  const { eventId } = body
 
   const db = getDB()
-  const collection = db.collection(COLLECTION)
+  const collection = db.collection(EVENTS_COLLECTION)
 
-  const tournament = await collection.findOne({ id: tournamentId })
-  if (!tournament) throwError('Tournament not found')
+  const event = await collection.findOne({ eventId })
+  if (!event) throwError('Event not found')
 
   // Validate
-  const errors = validateGenerateGroupsRules(tournament)
+  const errors = validateGenerateGroupsRules(event)
   throwErrors(errors)
 
   // Form groups with snake seeding
-  const groupArrays = formGroupsWithSnakeSeeding(
-    tournament.participants,
-    tournament.nop,
-  )
+  const groupArrays = formGroupsWithSnakeSeeding(event.participants, event.nop)
+
+  // Get number of games for group stage
+  const numberOfGames = getBestOfNumber(event.groupGames)
 
   // Create groups with match schedules
   const groups = groupArrays.map((participants, index) => {
     const matchSchedule = generateGroupMatchSchedule(participants)
-    const matches = matchSchedule.map((schedule, matchIndex) => ({
+    const matches = matchSchedule.map((schedule) => ({
       id: generateId(),
       config: {
-        numberOfGames: tournament.format.bestOfN.groupStage,
+        numberOfGames,
         isSuddenDeath: true,
         gameConfig: { type: 'standard', targetPoints: 11, isGolden: false },
       },
@@ -413,30 +411,37 @@ export const generateGroups = async (body) => {
   })
 
   // Update group stage
-  const groupStageIndex = tournament.stages.findIndex((s) => s.type === 'group')
-  const updatedStages = [...tournament.stages]
+  const groupStageIndex = event.eventStages.findIndex((s) => s.type === 'group')
+  const updatedStages = [...event.eventStages]
   updatedStages[groupStageIndex] = {
     ...updatedStages[groupStageIndex],
     groups,
   }
 
-  await collection.updateOne({ id: tournamentId }, { $set: { stages: updatedStages } })
+  await collection.updateOne({ eventId }, { $set: { eventStages: updatedStages } })
 
   return groups
 }
 
-const validateGenerateGroupsRules = (tournament) => {
+const getBestOfNumber = (bestOfOption) => {
+  if (bestOfOption === 'Best of 3') return 3
+  if (bestOfOption === 'Best of 5') return 5
+  if (bestOfOption.includes('Best of 3')) return 3
+  return 3
+}
+
+const validateGenerateGroupsRules = (event) => {
   const errors = []
 
-  if (tournament.stages.length === 0 || tournament.stages[0].type !== 'group') {
-    errors.push('Tournament does not have a group stage as first stage')
+  if (event.stages.length === 0 || event.stages[0] !== 'group') {
+    errors.push('Event does not have a group stage as first stage')
   }
 
-  if (tournament.participants.length < 4) {
+  if (event.participants.length < 4) {
     errors.push('Minimum 4 participants required')
   }
 
-  const groupStage = tournament.stages.find((s) => s.type === 'group')
+  const groupStage = event.eventStages.find((s) => s.type === 'group')
   if (groupStage && groupStage.groups.length > 0) {
     errors.push('Groups have already been generated')
   }
@@ -517,23 +522,23 @@ const generateGroupMatchSchedule = (participants) => {
  */
 export const generateKnockout = async (body) => {
   if (!body) throwError('Request body is required')
-  if (!body.tournamentId) throwError('Tournament ID is required')
+  if (!body.eventId) throwError('Event ID is required')
 
-  const { tournamentId } = body
+  const { eventId } = body
 
   const db = getDB()
-  const collection = db.collection(COLLECTION)
+  const collection = db.collection(EVENTS_COLLECTION)
 
-  const tournament = await collection.findOne({ id: tournamentId })
-  if (!tournament) throwError('Tournament not found')
+  const event = await collection.findOne({ eventId })
+  if (!event) throwError('Event not found')
 
   // Validate
-  const errors = validateGenerateKnockoutRules(tournament)
+  const errors = validateGenerateKnockoutRules(event)
   throwErrors(errors)
 
-  const knockoutStageIndex = tournament.stages.findIndex((s) => s.type === 'knockout')
-  const knockoutStage = tournament.stages[knockoutStageIndex]
-  const groupStage = tournament.stages.find((s) => s.type === 'group')
+  const knockoutStageIndex = event.eventStages.findIndex((s) => s.type === 'knockout')
+  const knockoutStage = event.eventStages[knockoutStageIndex]
+  const groupStage = event.eventStages.find((s) => s.type === 'group')
 
   let updatedKnockoutStage
 
@@ -549,42 +554,42 @@ export const generateKnockout = async (body) => {
         ranking: ap.ranking,
       }))
     } else {
-      // Elimination event - use all participants
-      participants = tournament.participants.map((p, i) => ({
+      // Knockout-only event - use all participants
+      participants = event.participants.map((p, i) => ({
         participant: p,
         groupIndex: 0,
         ranking: i + 1,
       }))
     }
 
-    updatedKnockoutStage = createKnockoutStage(participants, tournament.nop, knockoutStage.config, tournament.format.bestOfN)
+    updatedKnockoutStage = createKnockoutStage(participants, event.nop, knockoutStage.config, event)
   } else {
     // Advance to next round
-    updatedKnockoutStage = advanceKnockoutRound(knockoutStage, tournament.format.bestOfN)
+    updatedKnockoutStage = advanceKnockoutRound(knockoutStage, event)
   }
 
-  const updatedStages = [...tournament.stages]
+  const updatedStages = [...event.eventStages]
   updatedStages[knockoutStageIndex] = updatedKnockoutStage
 
-  await collection.updateOne({ id: tournamentId }, { $set: { stages: updatedStages } })
+  await collection.updateOne({ eventId }, { $set: { eventStages: updatedStages } })
 
   return updatedKnockoutStage
 }
 
-const validateGenerateKnockoutRules = (tournament) => {
+const validateGenerateKnockoutRules = (event) => {
   const errors = []
 
-  const knockoutIndex = tournament.stages.findIndex((s) => s.type === 'knockout')
-  if (knockoutIndex === -1) {
-    errors.push('Tournament does not have a knockout stage')
+  const hasKnockout = event.stages.includes('knockout')
+  if (!hasKnockout) {
+    errors.push('Event does not have a knockout stage')
     return errors
   }
 
-  const knockoutStage = tournament.stages[knockoutIndex]
-  const groupStage = tournament.stages.find((s) => s.type === 'group')
+  const knockoutStage = event.eventStages.find((s) => s.type === 'knockout')
+  const groupStage = event.eventStages.find((s) => s.type === 'group')
 
-  if (knockoutIndex === 0) {
-    if (tournament.participants.length < 4) {
+  if (event.stages[0] === 'knockout') {
+    if (event.participants.length < 4) {
       errors.push('Minimum 4 participants required')
     }
   }
@@ -599,7 +604,7 @@ const validateGenerateKnockoutRules = (tournament) => {
   if (knockoutStage.rounds.length > 0) {
     const lastRound = knockoutStage.rounds[knockoutStage.rounds.length - 1]
     if (lastRound.isComplete && lastRound.participantCount === 2) {
-      errors.push('Tournament is already complete')
+      errors.push('Event is already complete')
     }
 
     const currentRound = knockoutStage.rounds.find((r) => !r.isComplete)
@@ -661,10 +666,10 @@ const calculateSnakeRankingSeeding = (advancedParticipants) => {
   return seeded
 }
 
-const createInitialSeedingList = (participants, isEliminationEvent, nop) => {
+const createInitialSeedingList = (participants, isKnockoutOnly, nop) => {
   let seeded
 
-  if (isEliminationEvent) {
+  if (isKnockoutOnly) {
     seeded = [...participants].sort((a, b) => {
       const ratingA = a.participant.rating || 0
       const ratingB = b.participant.rating || 0
@@ -685,8 +690,24 @@ const createInitialSeedingList = (participants, isEliminationEvent, nop) => {
 
 const wereInSameGroup = (p1, p2) => p1.groupIndex === p2.groupIndex
 
-const createKnockoutMatches = (seedingList, bestOfN, roundName) => {
+const getKnockoutGamesCount = (event, roundName) => {
+  const knockoutGames = event.knockoutGames
+  if (knockoutGames === 'Best of 5') return 5
+  if (knockoutGames === 'Best of 3') return 3
+  if (knockoutGames === 'Best of 3 before Quarterfinal') {
+    if (roundName === 'Quarterfinal' || roundName === 'Semifinal' || roundName === 'Final') return 5
+    return 3
+  }
+  if (knockoutGames === 'Best of 3 before Semifinal') {
+    if (roundName === 'Semifinal' || roundName === 'Final') return 5
+    return 3
+  }
+  return 3
+}
+
+const createKnockoutMatches = (seedingList, event, roundName) => {
   const matches = []
+  const numberOfGames = getKnockoutGamesCount(event, roundName)
 
   const byeEntries = seedingList.filter((e) => e.hasBye)
   for (const entry of byeEntries) {
@@ -712,11 +733,6 @@ const createKnockoutMatches = (seedingList, bestOfN, roundName) => {
     }
 
     remaining.splice(bottomIndex, 1)
-
-    const numberOfGames =
-      roundName === 'Semifinal' || roundName === 'Final'
-        ? bestOfN.semifinalAndFinal
-        : bestOfN.knockoutBeforeSemifinal
 
     matches.push({
       match: {
@@ -759,15 +775,15 @@ const calculateRemainingParticipants = (totalParticipants) => {
   return remaining
 }
 
-const createKnockoutStage = (participants, nop, config, bestOfN) => {
-  const seedingList = createInitialSeedingList(participants, config.isEliminationEvent, nop)
+const createKnockoutStage = (participants, nop, config, event) => {
+  const seedingList = createInitialSeedingList(participants, config.isKnockoutOnly, nop)
   const numberOfRounds = calculateNumberOfRounds(participants.length)
   const remainingParticipants = calculateRemainingParticipants(participants.length)
 
   const rounds = []
 
   const firstRoundNames = getKnockoutRoundName(remainingParticipants[0], participants.length)
-  const firstRoundMatches = createKnockoutMatches(seedingList, bestOfN, firstRoundNames.name)
+  const firstRoundMatches = createKnockoutMatches(seedingList, event, firstRoundNames.name)
 
   rounds.push({
     index: 0,
@@ -822,10 +838,12 @@ const createSubsequentRoundSeedingList = (previousSeedingList, previousMatches) 
       }
     } else {
       const entry1 = previousSeedingList.find(
-        (e) => e.participant && match.participant1 && isSameParticipant(e.participant, match.participant1),
+        (e) =>
+          e.participant && match.participant1 && isSameParticipant(e.participant, match.participant1),
       )
       const entry2 = previousSeedingList.find(
-        (e) => e.participant && match.participant2 && isSameParticipant(e.participant, match.participant2),
+        (e) =>
+          e.participant && match.participant2 && isSameParticipant(e.participant, match.participant2),
       )
 
       const higherSeed = Math.min(entry1?.seed || 999, entry2?.seed || 999)
@@ -839,7 +857,7 @@ const createSubsequentRoundSeedingList = (previousSeedingList, previousMatches) 
   return newList.sort((a, b) => a.seed - b.seed)
 }
 
-const advanceKnockoutRound = (stage, bestOfN) => {
+const advanceKnockoutRound = (stage, event) => {
   const currentRoundIndex = stage.rounds.findIndex((r) => !r.isComplete)
   if (currentRoundIndex === -1 || currentRoundIndex >= stage.rounds.length - 1) {
     return stage
@@ -856,7 +874,7 @@ const advanceKnockoutRound = (stage, bestOfN) => {
     stage.rounds[currentRoundIndex + 1].participantCount,
     stage.rounds[0].participantCount,
   )
-  const nextRoundMatches = createKnockoutMatches(nextSeedingList, bestOfN, nextRoundNames.name)
+  const nextRoundMatches = createKnockoutMatches(nextSeedingList, event, nextRoundNames.name)
 
   const nextRound = {
     ...stage.rounds[currentRoundIndex + 1],
@@ -875,26 +893,26 @@ const advanceKnockoutRound = (stage, bestOfN) => {
 }
 
 /**
- * Finish a match
+ * Finish a match in an event
  */
 export const finishMatch = async (body) => {
   validateFinishMatchInput(body)
 
-  const { tournamentId, matchId, result } = body
+  const { eventId, matchId, result } = body
 
   const db = getDB()
-  const collection = db.collection(COLLECTION)
+  const collection = db.collection(EVENTS_COLLECTION)
 
-  const tournament = await collection.findOne({ id: tournamentId })
-  if (!tournament) throwError('Tournament not found')
+  const event = await collection.findOne({ eventId })
+  if (!event) throwError('Event not found')
 
   let matchFound = false
-  let updatedStages = [...tournament.stages]
+  let updatedStages = [...event.eventStages]
 
   // Find and update match in group stage
-  const groupStageIndex = tournament.stages.findIndex((s) => s.type === 'group')
+  const groupStageIndex = event.eventStages.findIndex((s) => s.type === 'group')
   if (groupStageIndex !== -1) {
-    const groupStage = tournament.stages[groupStageIndex]
+    const groupStage = event.eventStages[groupStageIndex]
     for (let gi = 0; gi < groupStage.groups.length; gi++) {
       const group = groupStage.groups[gi]
       const matchIndex = group.matches.findIndex((m) => m.id === matchId)
@@ -908,7 +926,7 @@ export const finishMatch = async (body) => {
 
         // Update match with result
         const updatedMatch = updateMatchWithResult(match, result)
-        
+
         // Update group stats
         const updatedGroup = updateGroupAfterMatch(group, updatedMatch, matchIndex)
 
@@ -947,9 +965,9 @@ export const finishMatch = async (body) => {
 
   // Find and update match in knockout stage
   if (!matchFound) {
-    const knockoutStageIndex = tournament.stages.findIndex((s) => s.type === 'knockout')
+    const knockoutStageIndex = event.eventStages.findIndex((s) => s.type === 'knockout')
     if (knockoutStageIndex !== -1) {
-      const knockoutStage = tournament.stages[knockoutStageIndex]
+      const knockoutStage = event.eventStages[knockoutStageIndex]
       for (let ri = 0; ri < knockoutStage.rounds.length; ri++) {
         const round = knockoutStage.rounds[ri]
         const matchIndex = round.matches.findIndex((m) => m.match?.id === matchId)
@@ -962,7 +980,8 @@ export const finishMatch = async (body) => {
           }
 
           const updatedMatch = updateMatchWithResult(knockoutMatch.match, result)
-          const winner = updatedMatch.winningSide === 1 ? knockoutMatch.participant1 : knockoutMatch.participant2
+          const winner =
+            updatedMatch.winningSide === 1 ? knockoutMatch.participant1 : knockoutMatch.participant2
 
           const updatedKnockoutMatch = {
             ...knockoutMatch,
@@ -996,14 +1015,14 @@ export const finishMatch = async (body) => {
 
   if (!matchFound) throwError('Match not found')
 
-  await collection.updateOne({ id: tournamentId }, { $set: { stages: updatedStages } })
+  await collection.updateOne({ eventId }, { $set: { eventStages: updatedStages } })
 
   return { success: true }
 }
 
 const validateFinishMatchInput = (body) => {
   if (!body) throwError('Request body is required')
-  if (!body.tournamentId) throwError('Tournament ID is required')
+  if (!body.eventId) throwError('Event ID is required')
   if (!body.matchId) throwError('Match ID is required')
   if (!body.result || !Array.isArray(body.result)) throwError('Match result is required')
 }

@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import './App.css'
 import Home from './pages/Home'
 import TournamentEdit from './pages/TournamentEdit'
+import EventEdit from './pages/EventEdit'
 
 function App() {
   return (
@@ -10,6 +11,8 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/tournament/new" element={<TournamentEdit />} />
         <Route path="/tournament/:id/edit" element={<TournamentEdit isEdit />} />
+        <Route path="/event/new" element={<EventEdit />} />
+        <Route path="/event/:id/edit" element={<EventEdit isEdit />} />
       </Routes>
     </BrowserRouter>
   )

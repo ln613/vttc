@@ -11,6 +11,7 @@ import type {
   KnockoutRound,
   KnockoutMatch,
   KnockoutSeedingEntry,
+  Event,
 } from '../types/Tournament'
 import {
   DEFAULT_GROUP_STAGE_CONFIG,
@@ -672,13 +673,13 @@ export const calculateByeCount = (participantCount: number): number => {
  */
 export const createInitialSeedingList = (
   participants: ParticipantWithGroupInfo[],
-  isEliminationEvent: boolean,
+  isKnockoutOnly: boolean,
   nop: number,
 ): KnockoutSeedingEntry[] => {
   let seeded: ParticipantWithGroupInfo[]
 
-  if (isEliminationEvent) {
-    // For elimination events, use rating-based seeding
+  if (isKnockoutOnly) {
+    // For knockout-only tournaments (KT), use rating-based seeding
     const sorted = [...participants].sort((a, b) => {
       return (
         getParticipantSeeding(b.participant, nop) -
@@ -687,7 +688,7 @@ export const createInitialSeedingList = (
     })
     seeded = sorted
   } else {
-    // For group events, use snake ranking seeding
+    // For group + knockout tournaments (GT), use snake ranking seeding
     seeded = calculateSnakeRankingSeeding(participants)
   }
 
@@ -839,7 +840,7 @@ export const createKnockoutStage = (
 ): KnockoutStage => {
   const seedingList = createInitialSeedingList(
     participants,
-    config.isEliminationEvent,
+    config.isKnockoutOnly,
     nop,
   )
 
@@ -1096,41 +1097,56 @@ export const generateId = (): string => {
 }
 
 /**
- * Create a new tournament
+ * Create a new tournament (template)
  */
-export const createTournament = (
-  name: string,
-  date: string,
-  format: TournamentFormat,
-  maxParticipants: number = 0,
-): Tournament => {
-  const stages = format.stages.map((stageType) => {
-    if (stageType === 'group') {
-      return {
-        type: 'group' as const,
-        config: DEFAULT_GROUP_STAGE_CONFIG,
-        groups: [],
-        advancedParticipants: [],
-      }
-    }
-    return {
-      type: 'knockout' as const,
-      config: { isEliminationEvent: format.stages[0] !== 'group' },
-      seedingList: [],
-      rounds: [],
-      numberOfRounds: 0,
-    }
-  })
+export const createTournament = (input: {
+  name: string
+  sex?: 'All' | 'Man' | 'Woman' | 'Mixed'
+  type?: 'Single' | 'Double' | 'Team'
+  teamSize?: number
+  restriction?: 'Open' | 'Rated' | 'Age'
+  ratingLimit?: number
+  topPlayersRatingEnabled?: boolean
+  topPlayersCount?: number
+  topPlayersRatingLimit?: number
+  ageLimitType?: 'U' | 'O'
+  ageLimit?: number
+  stages?: 'Group + Knockout' | 'Group Only (Big Round Robin)' | 'Knockout Only'
+  handicapEnabled?: boolean
+  handicapDifference?: number
+  handicapMaxPoints?: number
+}): Tournament => {
+  const type = input.type || 'Single'
+  const teamSize = type === 'Team' ? (input.teamSize || 3) : undefined
+  const nop = type === 'Single' ? 1 : type === 'Double' ? 2 : (teamSize || 3)
+  const stagesType = input.stages || 'Group + Knockout'
+  
+  const stagesArray: ('group' | 'knockout')[] =
+    stagesType === 'Group Only (Big Round Robin)'
+      ? ['group']
+      : stagesType === 'Knockout Only'
+        ? ['knockout']
+        : ['group', 'knockout']
 
   return {
     id: generateId(),
-    name,
-    date,
-    nop: format.nop,
-    format,
-    maxParticipants,
-    participants: [],
-    stages,
+    name: input.name,
+    sex: input.sex || 'All',
+    type,
+    teamSize,
+    nop,
+    restriction: input.restriction || 'Open',
+    ratingLimit: input.restriction === 'Rated' ? input.ratingLimit : undefined,
+    topPlayersRatingEnabled: input.topPlayersRatingEnabled || false,
+    topPlayersCount: input.topPlayersRatingEnabled ? input.topPlayersCount : undefined,
+    topPlayersRatingLimit: input.topPlayersRatingEnabled ? input.topPlayersRatingLimit : undefined,
+    ageLimitType: input.restriction === 'Age' ? input.ageLimitType : undefined,
+    ageLimit: input.restriction === 'Age' ? input.ageLimit : undefined,
+    stages: stagesArray,
+    stagesType,
+    handicapEnabled: input.handicapEnabled || false,
+    handicapDifference: input.handicapDifference || 200,
+    handicapMaxPoints: input.handicapMaxPoints || 5,
   }
 }
 
@@ -1161,11 +1177,10 @@ export const getMatchConfig = (
 // ==================== VALIDATION ====================
 
 /**
- * Validate tournament can be created
+ * Validate tournament can be created (now just checks name uniqueness)
  */
 export const validateCreateTournament = (
   name: string,
-  date: string,
   existingTournaments: Tournament[],
 ): string[] => {
   const errors: string[] = []
@@ -1173,33 +1188,56 @@ export const validateCreateTournament = (
   if (!name) {
     errors.push('Tournament name is required')
   }
-  if (!date) {
-    errors.push('Tournament date is required')
-  }
 
-  // Check for duplicate name + date
-  const duplicate = existingTournaments.find(
-    (t) => t.name === name && t.date === date,
-  )
+  // Check for duplicate name
+  const duplicate = existingTournaments.find((t) => t.name === name)
   if (duplicate) {
-    errors.push('A tournament with the same name and date already exists')
+    errors.push('A tournament with the same name already exists')
   }
 
   return errors
 }
 
 /**
- * Validate participant can be added
+ * Validate event can be created
+ */
+export const validateCreateEvent = (
+  name: string,
+  date: string,
+  existingEvents: Event[],
+): string[] => {
+  const errors: string[] = []
+
+  if (!name) {
+    errors.push('Event name is required')
+  }
+  if (!date) {
+    errors.push('Event date is required')
+  }
+
+  // Check for duplicate name + date
+  const duplicate = existingEvents.find(
+    (e) => e.eventName === name && e.date === date,
+  )
+  if (duplicate) {
+    errors.push('An event with the same name and date already exists')
+  }
+
+  return errors
+}
+
+/**
+ * Validate participant can be added to an event
  */
 export const validateAddParticipant = (
-  tournament: Tournament,
+  event: Event,
   players: Player[],
 ): string[] => {
   const errors: string[] = []
 
   // Check number of players matches nop
-  if (players.length !== tournament.nop) {
-    errors.push(`Expected ${tournament.nop} player(s), got ${players.length}`)
+  if (players.length !== event.nop) {
+    errors.push(`Expected ${event.nop} player(s), got ${players.length}`)
   }
 
   // Check for duplicate players in input
@@ -1213,18 +1251,15 @@ export const validateAddParticipant = (
 
   // Check max participants
   if (
-    tournament.maxParticipants > 0 &&
-    tournament.participants.length >= tournament.maxParticipants
+    event.maxParticipants > 0 &&
+    event.participants.length >= event.maxParticipants
   ) {
-    errors.push('Tournament has reached maximum participants')
+    errors.push('Event has reached maximum participants')
   }
 
-  // Check rating requirement for Rated tournaments
-  if (
-    tournament.format.restriction === 'Rated' &&
-    tournament.format.ratedConfig
-  ) {
-    const { ratingLimit } = tournament.format.ratedConfig
+  // Check rating requirement for Rated events
+  if (event.restriction === 'Rated' && event.ratingLimit) {
+    const ratingLimit = event.ratingLimit
     for (const player of players) {
       if (!meetsRatingRequirement(player, ratingLimit)) {
         errors.push(
@@ -1234,25 +1269,13 @@ export const validateAddParticipant = (
     }
   }
 
-  // Check age requirement for Age tournaments
-  if (
-    tournament.format.restriction === 'Age' &&
-    tournament.format.ageConfig
-  ) {
-    const { ageLimitType, ageLimit } = tournament.format.ageConfig
+  // Check age requirement for Age events
+  if (event.restriction === 'Age' && event.ageLimitType && event.ageLimit) {
+    const { ageLimitType, ageLimit } = event
     for (const player of players) {
-      if (
-        !meetsAgeRequirement(
-          player,
-          ageLimitType,
-          ageLimit,
-          tournament.date,
-        )
-      ) {
+      if (!meetsAgeRequirement(player, ageLimitType, ageLimit, event.date)) {
         const requirement =
-          ageLimitType === 'U'
-            ? `under ${ageLimit}`
-            : `over ${ageLimit}`
+          ageLimitType === 'U' ? `under ${ageLimit}` : `over ${ageLimit}`
         errors.push(
           `Player ${player.firstName} ${player.lastName} does not meet age requirement (${requirement})`,
         )
@@ -1260,14 +1283,14 @@ export const validateAddParticipant = (
     }
   }
 
-  // Check if player is already in tournament
+  // Check if player is already in event
   for (const player of players) {
-    const existing = tournament.participants.find((p) =>
+    const existing = event.participants.find((p: Participant) =>
       p.players.some((pl) => pl.id === player.id),
     )
     if (existing) {
       errors.push(
-        `Player ${player.firstName} ${player.lastName} is already in the tournament`,
+        `Player ${player.firstName} ${player.lastName} is already in the event`,
       )
     }
   }
@@ -1276,48 +1299,50 @@ export const validateAddParticipant = (
 }
 
 /**
- * Validate participant can be deleted
+ * Validate participant can be deleted from an event
  */
 export const validateDeleteParticipant = (
-  tournament: Tournament,
+  event: Event,
   participantId: string,
 ): string[] => {
   const errors: string[] = []
 
-  const participant = tournament.participants.find((p) => p.id === participantId)
+  const participant = event.participants.find(
+    (p: Participant) => p.id === participantId,
+  )
   if (!participant) {
     errors.push('Participant not found')
   }
 
-  // Check if tournament has started
-  const groupStage = tournament.stages.find((s) => s.type === 'group') as
+  // Check if event has started
+  const groupStage = event.eventStages.find((s) => s.type === 'group') as
     | GroupStage
     | undefined
   if (groupStage && groupStage.groups.length > 0) {
-    errors.push('Cannot delete participant after tournament has started')
+    errors.push('Cannot delete participant after event has started')
   }
 
   return errors
 }
 
 /**
- * Validate groups can be generated
+ * Validate groups can be generated for an event
  */
-export const validateGenerateGroups = (tournament: Tournament): string[] => {
+export const validateGenerateGroups = (event: Event): string[] => {
   const errors: string[] = []
 
   // Check first stage is group stage
-  if (tournament.stages.length === 0 || tournament.stages[0].type !== 'group') {
-    errors.push('Tournament does not have a group stage as first stage')
+  if (event.stages.length === 0 || event.stages[0] !== 'group') {
+    errors.push('Event does not have a group stage as first stage')
   }
 
   // Check minimum participants
-  if (tournament.participants.length < 4) {
+  if (event.participants.length < 4) {
     errors.push('Minimum 4 participants required')
   }
 
   // Check if already started
-  const groupStage = tournament.stages.find((s) => s.type === 'group') as
+  const groupStage = event.eventStages.find((s) => s.type === 'group') as
     | GroupStage
     | undefined
   if (groupStage && groupStage.groups.length > 0) {
@@ -1328,28 +1353,30 @@ export const validateGenerateGroups = (tournament: Tournament): string[] => {
 }
 
 /**
- * Validate knockout can be generated
+ * Validate knockout can be generated for an event
  */
-export const validateGenerateKnockout = (tournament: Tournament): string[] => {
+export const validateGenerateKnockout = (event: Event): string[] => {
   const errors: string[] = []
 
   // Check last stage is knockout stage
-  const knockoutIndex = tournament.stages.findIndex((s) => s.type === 'knockout')
-  if (knockoutIndex === -1) {
-    errors.push('Tournament does not have a knockout stage')
+  const hasKnockout = event.stages.includes('knockout')
+  if (!hasKnockout) {
+    errors.push('Event does not have a knockout stage')
   }
 
-  const knockoutStage = tournament.stages[knockoutIndex] as KnockoutStage | undefined
+  const knockoutStage = event.eventStages.find((s) => s.type === 'knockout') as
+    | KnockoutStage
+    | undefined
 
-  // Check minimum participants for elimination event
-  if (knockoutIndex === 0) {
-    if (tournament.participants.length < 4) {
+  // Check minimum participants for knockout-only event
+  if (event.stages[0] === 'knockout') {
+    if (event.participants.length < 4) {
       errors.push('Minimum 4 participants required')
     }
   }
 
   // Check group stage is complete if exists
-  const groupStage = tournament.stages.find((s) => s.type === 'group') as
+  const groupStage = event.eventStages.find((s) => s.type === 'group') as
     | GroupStage
     | undefined
   if (groupStage) {
@@ -1363,7 +1390,7 @@ export const validateGenerateKnockout = (tournament: Tournament): string[] => {
   if (knockoutStage && knockoutStage.rounds.length > 0) {
     const lastRound = knockoutStage.rounds[knockoutStage.rounds.length - 1]
     if (lastRound.isComplete && lastRound.participantCount === 2) {
-      errors.push('Tournament is already complete')
+      errors.push('Event is already complete')
     }
 
     // Check current round is complete
@@ -1377,19 +1404,16 @@ export const validateGenerateKnockout = (tournament: Tournament): string[] => {
 }
 
 /**
- * Validate match can be finished
+ * Validate match can be finished in an event
  */
-export const validateFinishMatch = (
-  tournament: Tournament,
-  matchId: string,
-): string[] => {
+export const validateFinishMatch = (event: Event, matchId: string): string[] => {
   const errors: string[] = []
 
-  // Find match in tournament
+  // Find match in event
   let matchFound = false
 
   // Check group stage
-  const groupStage = tournament.stages.find((s) => s.type === 'group') as
+  const groupStage = event.eventStages.find((s) => s.type === 'group') as
     | GroupStage
     | undefined
   if (groupStage) {
@@ -1407,7 +1431,7 @@ export const validateFinishMatch = (
 
   // Check knockout stage
   if (!matchFound) {
-    const knockoutStage = tournament.stages.find((s) => s.type === 'knockout') as
+    const knockoutStage = event.eventStages.find((s) => s.type === 'knockout') as
       | KnockoutStage
       | undefined
     if (knockoutStage) {

@@ -1,13 +1,5 @@
 # Tournament rules
 
-A tournament has the following fields:
-
-- name
-- date: a tournament is a single day event
-- nop: number of players per team
-- type: single (nop = 1), double (nop = 2), team (nop > 1)
-- stages: 
-
 ## Stage
 
 There are different types of stages.
@@ -80,12 +72,12 @@ The ranking of the teams/players in a group is determined based on the following
 ### Knockout Stage
 
 - Elimination stage. Winner of each match goes to the next round. Loser will be eliminated.
-- Knockout Stage is always the last stage in a tournament event.
-- Knockout Stage can be the first stage in an event (Elimination, EE), or preceded by a group stage (Group event, GE).
+- Knockout Stage is always the last stage in a tournament.
+- Knockout Stage can be the first stage in a tournament (KT), or preceded by a group stage (GT).
 
 #### The number of participants (N)
 
-For GE, the participants will be the players/teams advanced from the previous group stage.
+For GT, the participants will be the players/teams advanced from the previous group stage.
 
 #### Rounds
 
@@ -114,8 +106,8 @@ R = Math.ceil(Math.log2(N))
 
 #### 1st round Seeding
 
-- For EE, seeding is rating based (RBS), just like the group stage seeding
-- For GE, seeding is determined by the "snake ranking"
+- For KT, seeding is rating based (RBS), just like the group stage seeding
+- For GT, seeding is determined by the "snake ranking"
 
 For example, John - 1500, Peter - 1400, Tony - 1300, Sam - 1200, Joe - 1100, Tom - 1000, Phil - 900, Frank - 800, Glen - 700, and the group result/ranking is:
 
@@ -165,9 +157,9 @@ In the previous example, if John beat Tony and Glen beat Frank in the first roun
 - Open: no rating limit, no age limit
 - Rated:
   1. the rating of:
-    - any participant in single event
-    - the combined rating of any pair in double event
-    - the combined rating of all players in any team in team event
+    - any participant in single tournament
+    - the combined rating of any pair in double tournament
+    - the combined rating of all players in any team in team tournament
     must be under (<=) the rating limit (RL)
-  2. for team event with nop > 2, the combined rating of the top N (default 2) players in any team must be under (<=) the top players rating limit (TPRL)
+  2. for team tournament with nop > 2, the combined rating of the top N (default 2) players in any team must be under (<=) the top players rating limit (TPRL)
 - Age: the age of any participant must be under (<=) or over (>=) the age limit, e.g., U19, under 19-year old, O40, over 40-year old

@@ -235,7 +235,7 @@ export interface KnockoutSeedingEntry {
  * Knockout stage configuration
  */
 export interface KnockoutStageConfig {
-  isEliminationEvent: boolean // EE (true) or GE (false)
+  isKnockoutOnly: boolean // KT (true) or GT (false)
 }
 
 export interface KnockoutStage {
@@ -248,16 +248,56 @@ export interface KnockoutStage {
 
 export type Stage = GroupStage | KnockoutStage
 
+/**
+ * Tournament - a template for events with common configuration
+ */
 export interface Tournament {
   id: string
   name: string
-  date: string
-  nop: number
-  format: TournamentFormat
-  maxParticipants: number // 0 = unlimited
-  participants: Participant[]
-  stages: Stage[]
+  sex: ParticipantSex
+  type: TournamentType
+  teamSize?: number // Required if type = Team
+  nop: number // Derived: 1 for Single, 2 for Double, teamSize for Team
+  restriction: TournamentRestriction
+  ratingLimit?: number // Required if restriction = Rated
+  topPlayersRatingEnabled: boolean
+  topPlayersCount?: number // Required if topPlayersRatingEnabled = true
+  topPlayersRatingLimit?: number // Required if topPlayersRatingEnabled = true
+  ageLimitType?: AgeLimitType // Required if restriction = Age
+  ageLimit?: number // Required if restriction = Age
+  stages: ('group' | 'knockout')[]
+  stagesType: StagesType
+  handicapEnabled: boolean
+  handicapDifference: number // Default 200
+  handicapMaxPoints: number // Default 5
 }
+
+/**
+ * Event - a tournament on a specific date with specific participants
+ */
+export interface Event extends Tournament {
+  eventId: string
+  tournamentId: string
+  date: string
+  maxParticipants: number // 0 = unlimited
+  eventName: string // Default: {tournament name} - {date}
+  groupGames: BestOfOption // Number of games per match in group stage
+  knockoutGames: BestOfOption // Number of games per match in knockout stage
+  groupMatches?: BestOfOption // Number of matches per team match in group (Team only)
+  knockoutMatches?: BestOfOption // Number of matches per team match in knockout (Team only)
+  qualifiers: QualifiersCount
+  participants: Participant[]
+  eventStages: Stage[]
+}
+
+/**
+ * Best of option for games/matches
+ */
+export type BestOfOption =
+  | 'Best of 3'
+  | 'Best of 3 before Quarterfinal'
+  | 'Best of 3 before Semifinal'
+  | 'Best of 5'
 
 /**
  * Default group stage configuration
@@ -267,17 +307,17 @@ export const DEFAULT_GROUP_STAGE_CONFIG: GroupStageConfig = {
 }
 
 /**
- * Default knockout stage configuration (Group Event)
+ * Default knockout stage configuration (Group + Knockout Tournament - GT)
  */
 export const DEFAULT_KNOCKOUT_STAGE_CONFIG: KnockoutStageConfig = {
-  isEliminationEvent: false,
+  isKnockoutOnly: false,
 }
 
 /**
- * Elimination event knockout stage configuration
+ * Knockout Only tournament configuration (KT)
  */
-export const ELIMINATION_EVENT_CONFIG: KnockoutStageConfig = {
-  isEliminationEvent: true,
+export const KNOCKOUT_ONLY_CONFIG: KnockoutStageConfig = {
+  isKnockoutOnly: true,
 }
 
 /**

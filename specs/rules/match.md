@@ -83,9 +83,9 @@ A team match is a series of matches (MS) between 2 teams with 2 or more players 
   - who is X,Y,Z
 - the system can derive the rest 
 
-#### Team Match Types
+#### Team Match Schedules
 
-##### Type 1
+##### Team of 2, Best of 3 Matches
 
 - team of 2
 - 3 matches:
@@ -93,7 +93,7 @@ A team match is a series of matches (MS) between 2 teams with 2 or more players 
   - 2nd: single match B vs Y
   - 3rd: double match AB vs XY
 
-#### Type 2
+#### Team of 2, Best of 5 Matches
 
 - team of 2
 - 5 matches:
@@ -103,7 +103,7 @@ A team match is a series of matches (MS) between 2 teams with 2 or more players 
   - 4th: single match A vs Y
   - 5th: single match B vs X
 
-#### Type 3
+#### Team of 3, Best of 5 Matches
 
 - team of 3
 - 5 matches:

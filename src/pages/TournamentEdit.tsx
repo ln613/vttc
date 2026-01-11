@@ -3,16 +3,14 @@ import { Header } from '../components/Header'
 import Input from '../components/Input'
 import SingleSelectTags from '../components/SingleSelectTags'
 import Select from '../components/Select'
-import DatePicker from '../components/DatePicker'
-import MediaUpload from '../components/MediaUpload'
 import Button from '../components/Button'
 import Toggle from '../components/Toggle'
+import { apiPost } from '../utils/api'
 import type {
   ParticipantSex,
   TournamentType,
   TournamentRestriction,
   StagesType,
-  QualifiersCount,
   AgeLimitType,
 } from '../../shared/types'
 
@@ -25,15 +23,6 @@ const STAGES_OPTIONS: StagesType[] = [
   'Group Only (Big Round Robin)',
   'Knockout Only',
 ]
-const GROUP_GAMES_OPTIONS = ['Best of 3', 'Best of 5']
-const KNOCKOUT_GAMES_OPTIONS = [
-  'Best of 3',
-  'Best of 3 before Quarterfinal',
-  'Best of 3 before Semifinal',
-  'Best of 5',
-]
-const QUALIFIERS_OPTIONS: QualifiersCount[] = ['Top 1', 'Top 2', 'Top 3', 'All']
-const AGE_LIMIT_TYPE_OPTIONS: AgeLimitType[] = ['U', 'O']
 
 const generateRatingOptions = () => {
   const options = []
@@ -60,28 +49,11 @@ const generateTopPlayersCountOptions = (teamSize: string | null) => {
   return options
 }
 
-const generateHandicapDifferenceOptions = () => {
-  const options = []
-  for (let i = 100; i <= 400; i += 50) {
-    options.push({ value: String(i), label: String(i) })
-  }
-  return options
-}
-
-const generateMaxPointsGivenOptions = () => {
-  const options = []
-  for (let i = 1; i <= 10; i++) {
-    options.push({ value: String(i), label: String(i) })
-  }
-  return options
-}
-
 const RATING_OPTIONS = generateRatingOptions()
 const AGE_OPTIONS = generateAgeOptions()
-const HANDICAP_DIFFERENCE_OPTIONS = generateHandicapDifferenceOptions()
-const MAX_POINTS_GIVEN_OPTIONS = generateMaxPointsGivenOptions()
 
 interface TournamentEditFormData {
+  id?: string
   name: string
   sex: ParticipantSex
   type: TournamentType
@@ -94,16 +66,9 @@ interface TournamentEditFormData {
   ageLimitType: AgeLimitType
   ageLimit: string
   stages: StagesType
-  groupGames: string
-  knockoutGames: string
-  groupMatches: string
-  knockoutMatches: string
-  qualifiers: QualifiersCount
   handicapEnabled: boolean
   handicapDifference: string
   handicapMaxPoints: string
-  date: Date | null
-  cover: File | string | null
 }
 
 interface TournamentEditProps {
@@ -111,14 +76,6 @@ interface TournamentEditProps {
   initialData?: Partial<TournamentEditFormData>
   onSave?: (data: TournamentEditFormData) => void
   onCancel?: () => void
-}
-
-const hasGroupStage = (stages: StagesType): boolean => {
-  return stages === 'Group + Knockout' || stages === 'Group Only (Big Round Robin)'
-}
-
-const hasKnockoutStage = (stages: StagesType): boolean => {
-  return stages === 'Group + Knockout' || stages === 'Knockout Only'
 }
 
 const TournamentEdit: React.FC<TournamentEditProps> = ({
@@ -155,21 +112,6 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
   const [stages, setStages] = useState<StagesType>(
     initialData?.stages || 'Group + Knockout',
   )
-  const [groupGames, setGroupGames] = useState(
-    initialData?.groupGames || 'Best of 3',
-  )
-  const [knockoutGames, setKnockoutGames] = useState(
-    initialData?.knockoutGames || 'Best of 3 before Semifinal',
-  )
-  const [groupMatches, setGroupMatches] = useState(
-    initialData?.groupMatches || 'Best of 3',
-  )
-  const [knockoutMatches, setKnockoutMatches] = useState(
-    initialData?.knockoutMatches || 'Best of 3 before Semifinal',
-  )
-  const [qualifiers, setQualifiers] = useState<QualifiersCount>(
-    initialData?.qualifiers || 'Top 2',
-  )
   const [handicapEnabled, setHandicapEnabled] = useState(
     initialData?.handicapEnabled || false,
   )
@@ -178,10 +120,6 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
   )
   const [handicapMaxPoints, setHandicapMaxPoints] = useState(
     initialData?.handicapMaxPoints || '5',
-  )
-  const [date, setDate] = useState<Date | null>(initialData?.date || null)
-  const [cover, setCover] = useState<File | string | null>(
-    initialData?.cover || null,
   )
 
   const containerStyle: React.CSSProperties = {
@@ -234,11 +172,12 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
     return !!name.trim()
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!validateForm()) {
       return
     }
-    onSave?.({
+    const data: TournamentEditFormData = {
+      id: initialData?.id,
       name,
       sex,
       type,
@@ -254,20 +193,34 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
       ageLimitType: restriction === 'Age' ? ageLimitType : 'U',
       ageLimit: restriction === 'Age' ? ageLimit : '20',
       stages,
-      groupGames: hasGroupStage(stages) ? groupGames : 'Best of 3',
-      knockoutGames: hasKnockoutStage(stages) ? knockoutGames : 'Best of 3 before Semifinal',
-      groupMatches: type === 'Team' && hasGroupStage(stages) ? groupMatches : 'Best of 3',
-      knockoutMatches:
-        type === 'Team' && hasKnockoutStage(stages)
-          ? knockoutMatches
-          : 'Best of 3 before Semifinal',
-      qualifiers: hasGroupStage(stages) ? qualifiers : 'Top 2',
       handicapEnabled,
       handicapDifference: handicapEnabled ? handicapDifference : '200',
       handicapMaxPoints: handicapEnabled ? handicapMaxPoints : '5',
-      date,
-      cover,
-    })
+    }
+
+    try {
+      await apiPost('saveTournament', {
+        id: data.id,
+        name: data.name,
+        sex: data.sex,
+        type: data.type,
+        teamSize: data.teamSize ? parseInt(data.teamSize, 10) : undefined,
+        restriction: data.restriction,
+        ratingLimit: data.restriction === 'Rated' ? parseInt(data.ratingLimit, 10) : undefined,
+        topPlayersRatingEnabled: data.topPlayersRatingEnabled,
+        topPlayersCount: data.topPlayersRatingEnabled ? parseInt(data.topPlayersCount, 10) : undefined,
+        topPlayersRatingLimit: data.topPlayersRatingEnabled ? parseInt(data.topPlayersRatingLimit, 10) : undefined,
+        ageLimitType: data.restriction === 'Age' ? data.ageLimitType : undefined,
+        ageLimit: data.restriction === 'Age' ? parseInt(data.ageLimit, 10) : undefined,
+        stages: data.stages,
+        handicapEnabled: data.handicapEnabled,
+        handicapDifference: parseInt(data.handicapDifference, 10),
+        handicapMaxPoints: parseInt(data.handicapMaxPoints, 10),
+      })
+      onSave?.(data)
+    } catch (error) {
+      console.error('Failed to save tournament:', error)
+    }
   }
 
   const handleCancel = () => {
@@ -372,103 +325,6 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
     </div>
   )
 
-  const renderNumberOfGamesSection = () => (
-    <>
-      <h3 style={sectionTitleStyle}>Number of Games</h3>
-      {hasGroupStage(stages) && (
-        <SingleSelectTags
-          label="Group Stage"
-          options={GROUP_GAMES_OPTIONS}
-          selectedValue={groupGames}
-          onChange={setGroupGames}
-        />
-      )}
-      {hasKnockoutStage(stages) && (
-        <SingleSelectTags
-          label="Knockout Stage"
-          options={KNOCKOUT_GAMES_OPTIONS}
-          selectedValue={knockoutGames}
-          onChange={setKnockoutGames}
-        />
-      )}
-    </>
-  )
-
-  const renderNumberOfMatchesSection = () => {
-    if (type !== 'Team') return null
-
-    return (
-      <>
-        <h3 style={sectionTitleStyle}>Number of Matches</h3>
-        {hasGroupStage(stages) && (
-          <SingleSelectTags
-            label="Group Stage"
-            options={GROUP_GAMES_OPTIONS}
-            selectedValue={groupMatches}
-            onChange={setGroupMatches}
-          />
-        )}
-        {hasKnockoutStage(stages) && (
-          <SingleSelectTags
-            label="Knockout Stage"
-            options={KNOCKOUT_GAMES_OPTIONS}
-            selectedValue={knockoutMatches}
-            onChange={setKnockoutMatches}
-          />
-        )}
-      </>
-    )
-  }
-
-  const renderQualifiersSection = () => {
-    if (!hasGroupStage(stages)) return null
-
-    return (
-      <SingleSelectTags
-        label="Number of Qualifiers"
-        options={QUALIFIERS_OPTIONS}
-        selectedValue={qualifiers}
-        onChange={(value) => setQualifiers(value as QualifiersCount)}
-      />
-    )
-  }
-
-  const renderHandicapSection = () => (
-    <>
-      <h3 style={sectionTitleStyle}>Handicap</h3>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-        <Toggle
-          label=""
-          value={handicapEnabled}
-          onChange={setHandicapEnabled}
-          noMargin
-        />
-        {handicapEnabled && (
-          <>
-            <span style={{ fontWeight: 500 }}>Difference:</span>
-            <Select
-              label=""
-              name="handicapDifference"
-              value={handicapDifference}
-              onChange={setHandicapDifference}
-              options={HANDICAP_DIFFERENCE_OPTIONS}
-              noMargin
-            />
-            <span style={{ fontWeight: 500 }}>Max Points Given:</span>
-            <Select
-              label=""
-              name="handicapMaxPoints"
-              value={handicapMaxPoints}
-              onChange={setHandicapMaxPoints}
-              options={MAX_POINTS_GIVEN_OPTIONS}
-              noMargin
-            />
-          </>
-        )}
-      </div>
-    </>
-  )
-
   return (
     <div style={containerStyle}>
       <Header />
@@ -528,17 +384,11 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
         {renderRatingSection()}
         {renderAgeSection()}
         {renderStagesSection()}
-        {renderNumberOfMatchesSection()}
-        {renderNumberOfGamesSection()}
-        {renderQualifiersSection()}
-        {renderHandicapSection()}
-        <DatePicker label="Date" value={date} onChange={setDate} />
-        <MediaUpload label="Cover" value={cover} onChange={setCover} />
         <div style={buttonContainerStyle}>
           <Button color="#e74c3c" onClick={handleCancel}>
             Cancel
           </Button>
-          <Button color="#3498db" onClick={handleSave}>
+          <Button color="#27ae60" onClick={handleSave}>
             Save
           </Button>
         </div>

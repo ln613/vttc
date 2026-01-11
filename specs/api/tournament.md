@@ -1,51 +1,101 @@
 # Tournament APIs
 
-## Create tournament
+## Save tournament
 
 ### input
 
+- tournament id = null
 - name *
-- date *
-- max participants = unlimited
-- a pre-defined format (merge the input from that format) *
+- sex = all
+- type = single
+- teamSize = null (required if type = team)
+- restriction = open
+- ratingLimit = null (required if restriction = rated)
+- topPlayersRatingEnabled = false
+- topPlayersCount = null (required if topPlayersRatingEnabled = true)
+- topPlayersRatingLimit = null (required if topPlayersRatingEnabled = true)
+- ageLimitType = null (required if restriction = age)
+- ageLimit = null (required if restriction = age)
+- stages = group + knockout
+- handicapEnabled = false
+- handicapDifference = 200
+- handicapMaxPoints = 5
 
 ### derived input
 
-- nop (from the format)
+- isEdit (tournament id != null)
+- nop (1 if type = single, 2 if type = double, team size if type = team)
 
 ### Prerequisite
 
-- no tournament with the same name and date exists
+- if !isEdit, no tournament with the same name exists
+- if IsEdit, tournament with id exists
 
 ### Action
 
-- create a tournament (stages come from the format)
+- create the tournament
 - save to db
 
 ### Output
 
 return the new tournament
 
+## Create event
 
-## Add participant
-
-Add a participant (1 player or 1 team) to a tournament
+An event is a tournament on a specific date with specific max participants.
 
 ### input
 
+- event id = null
 - tournament id *
+- date *
+- max participants = unlimited
+- name = {tournament name} - {date}
+- groupGames = best of 3
+- knockoutGames = best of 3 before semifinal
+- groupMatches = best of 3
+- knockoutMatches = best of 3 before semifinal
+- qualifiers = 2
+
+### derived input
+
+- isEdit (event id != null)
+
+### Prerequisite
+
+- if !isEdit, no event with the same name and date exists
+- if IsEdit
+  - event with id exists
+  - no schedules have been created
+
+### Action
+
+- event is a sub class of tournament, copy the tournament fields to the new event object
+- save to db
+
+### Output
+
+return the new event
+
+## Add participant
+
+Add a participant (1 player or 1 team) to a event
+
+### input
+
+- event id *
 - a list of player ids *
 - team name
 
 ### Prerequisite
 
-- tournament exists
+- event exists
 - player(s) exist
 - no deplicate players in the input
-- the number of players in the input = nop of tournament
+- the number of players in the input = nop of event
 - the number of existing participants < max participants
-- if tournament is a rated event, the player/team rating must meet the rating requirement
-- if tournament is a age event, all players must meet the age requirement
+- if event is a rated event, the player/team rating must meet the rating requirement
+- if event is a age event, all players must meet the age requirement
 
 ### Action
 
@@ -58,22 +108,22 @@ return the new participant
 
 ## Delete participant
 
-Delete a participant from a tournament
+Delete a participant from a event
 
 ### input
 
-- tournament id *
+- event id *
 - participant id *
 
 ### Prerequisite
 
-- tournament exists
-- participant exist in the tournament
-- tournament not started (no groups and no schedules)
+- event exists
+- participant exist in the event
+- event not started (no groups and no schedules)
 
 ### Action
 
-- delete the participant from the tournament
+- delete the participant from the event
 - save to db
 
 ### Output
@@ -84,14 +134,14 @@ return the deleted participant
 
 ### input
 
-- tournament id *
+- event id *
 
 ### Prerequisite
 
-- tournament exists
-- the first stage of the tournament must be group stage
+- event exists
+- the first stage of the event must be group stage
 - number of participants >= 4
-- tournament not started (no groups and no schedules)
+- event not started (no groups and no schedules)
 
 ### Action
 
@@ -106,12 +156,12 @@ return the generated groups
 
 ### input
 
-- tournament id *
+- event id *
 
 ### Prerequisite
 
-- tournament exists
-- the last stage of the tournament must be knockout stage
+- event exists
+- the last stage of the event must be knockout stage
 - number of participants >= 4
 - all matches before the knockout stage are all finished
 - if the current round of the knockout stage > 1, all matches before the current round in the knockout stage must be finished
@@ -130,13 +180,13 @@ return the generated knockout round
 
 ### input
 
-- tournament id *
+- event id *
 - match id *
 - match result (result of each game in the match) *
 
 ### Prerequisite
 
-- tournament exists
+- event exists
 - match exists
 - match is not finished (doesn't have a result)
 

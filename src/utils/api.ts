@@ -11,6 +11,8 @@ export const api = async <T>(type: string, params: Record<string, string> = {}):
   return handleResponse<T>(response)
 }
 
+export const apiGet = api
+
 export const apiPost = async <T>(type: string, body: unknown): Promise<T> => {
   validateType(type)
 

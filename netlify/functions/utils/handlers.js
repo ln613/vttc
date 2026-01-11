@@ -1,23 +1,31 @@
 import { getPlayers } from './playerHandlers.js'
 import {
-  createTournament,
+  saveTournament,
   getTournaments,
   getTournament,
+} from './tournamentHandlers.js'
+import {
+  saveEvent,
+  getEvents,
+  getEvent,
   addParticipant,
   deleteParticipant,
   generateGroups,
   generateKnockout,
   finishMatch,
-} from './tournamentHandlers.js'
+} from './eventHandlers.js'
 
 export const apiHandlers = {
   get: {
     players: () => getPlayers(),
     tournaments: () => getTournaments(),
     tournament: (params) => getTournament(params),
+    events: (params) => getEvents(params),
+    event: (params) => getEvent(params),
   },
   post: {
-    createTournament: (body) => createTournament(body),
+    saveTournament: (body) => saveTournament(body),
+    saveEvent: (body) => saveEvent(body),
     addParticipant: (body) => addParticipant(body),
     deleteParticipant: (body) => deleteParticipant(body),
     generateGroups: (body) => generateGroups(body),
