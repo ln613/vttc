@@ -15,13 +15,14 @@ Vertical
 ## Score Box
 
 - participant names
+- "+" button (above the box, full width, dark red for the serving side, dark blue for the other)
 - current point
   - huge white number
   - red bg for the serving side, blue for the other
-- "+" and "-" button
+- "-" button (under the point box, full width, dark red for the serving side, dark blue for the other)
 
 ### interaction
 
 - switch serving every 2 points
-- on + button or anywhere in the score box click: add 1 point
-- on "-" button click: deduct 1 point (min 0)
+- click on "+" button or anywhere in the point box: add 1 point
+- click on "-" button: deduct 1 point (min 0)

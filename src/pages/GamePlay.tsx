@@ -82,28 +82,26 @@ const ScoreBox = ({ side }: ScoreBoxProps) => {
   const players = usePlayersForSide(side)
   const isServing = servingSide === side
 
-  const handleBoxClick = () => {
+  const handleAddPoint = () => {
     gamePlayActions.addPointToSide(side)
   }
 
-  const handleMinusClick = (e: React.MouseEvent) => {
-    e.stopPropagation()
+  const handleDeductPoint = () => {
     gamePlayActions.deductPointFromSide(side)
   }
 
   return (
-    <div
-      style={getScoreBoxStyle(isServing)}
-      onClick={handleBoxClick}
-    >
+    <div style={scoreBoxWrapperStyle}>
       <ParticipantNames players={players} />
-      <div style={scoreDisplayStyle}>{score}</div>
-      <div style={buttonContainerStyle}>
-        <button style={plusButtonStyle}>+</button>
-        <button style={minusButtonStyle} onClick={handleMinusClick}>
-          −
-        </button>
+      <button style={getPlusButtonStyle(isServing)} onClick={handleAddPoint}>
+        +
+      </button>
+      <div style={getPointBoxStyle(isServing)} onClick={handleAddPoint}>
+        <div style={scoreDisplayStyle}>{score}</div>
       </div>
+      <button style={getMinusButtonStyle(isServing)} onClick={handleDeductPoint}>
+        −
+      </button>
     </div>
   )
 }
@@ -180,19 +178,12 @@ const scoreBoxesContainerStyle: React.CSSProperties = {
   flex: 1,
 }
 
-const getScoreBoxStyle = (isServing: boolean): React.CSSProperties => ({
+const scoreBoxWrapperStyle: React.CSSProperties = {
   flex: 1,
-  backgroundColor: isServing ? '#c0392b' : '#2980b9',
-  borderRadius: '12px',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  justifyContent: 'space-between',
-  padding: '24px 16px',
-  cursor: 'pointer',
-  transition: 'background-color 0.3s ease',
-  minHeight: '400px',
-})
+}
 
 const participantNamesStyle: React.CSSProperties = {
   fontSize: '16px',
@@ -200,7 +191,33 @@ const participantNamesStyle: React.CSSProperties = {
   color: '#fff',
   textAlign: 'center',
   wordBreak: 'break-word',
+  marginBottom: '8px',
 }
+
+const getPlusButtonStyle = (isServing: boolean): React.CSSProperties => ({
+  width: '100%',
+  height: '60px',
+  borderRadius: '12px 12px 0 0',
+  border: 'none',
+  backgroundColor: isServing ? '#922b21' : '#1a5276',
+  color: '#fff',
+  fontSize: '32px',
+  fontWeight: 700,
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+})
+
+const getPointBoxStyle = (isServing: boolean): React.CSSProperties => ({
+  width: '100%',
+  flex: 1,
+  backgroundColor: isServing ? '#c0392b' : '#2980b9',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: 'pointer',
+})
 
 const scoreDisplayStyle: React.CSSProperties = {
   fontSize: '120px',
@@ -209,17 +226,12 @@ const scoreDisplayStyle: React.CSSProperties = {
   lineHeight: 1,
 }
 
-const buttonContainerStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: '16px',
-}
-
-const plusButtonStyle: React.CSSProperties = {
-  width: '60px',
+const getMinusButtonStyle = (isServing: boolean): React.CSSProperties => ({
+  width: '100%',
   height: '60px',
-  borderRadius: '50%',
+  borderRadius: '0 0 12px 12px',
   border: 'none',
-  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  backgroundColor: isServing ? '#922b21' : '#1a5276',
   color: '#fff',
   fontSize: '32px',
   fontWeight: 700,
@@ -227,21 +239,6 @@ const plusButtonStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-}
-
-const minusButtonStyle: React.CSSProperties = {
-  width: '60px',
-  height: '60px',
-  borderRadius: '50%',
-  border: 'none',
-  backgroundColor: 'rgba(0, 0, 0, 0.3)',
-  color: '#fff',
-  fontSize: '32px',
-  fontWeight: 700,
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-}
+})
 
 export default GamePlay
