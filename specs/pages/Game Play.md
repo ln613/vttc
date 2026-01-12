@@ -2,15 +2,28 @@
 
 ## Layout
 
-Vertical
-
-- shared header (desktop mode only)
-- event name
-- stage name:
-  - for group stage: "Group {n}"
-  - for knockout stage: "Round of 16", "Quarterfinal", "Semifinal"...
-- "Game {n} / {number of games}", align center
+- header
+  - if screen width > 640px:
+    - stage name, event name, game info
+  - otherwise:
+    - event name (align left)
+    - stage name, game info
 - score box for participant 1, score box for participant 2, each is half width of the screen
+
+## Stage Name
+
+- for group stage: "Group {n}"
+- for knockout stage: "Round of 16", "Quarterfinal", "Semifinal"...
+- align left
+
+## event name
+
+- text-overflow: ellipsis
+
+## Game Info 
+
+- "Game {n} / {number of games}"
+- align right
 
 ## Score Box
 

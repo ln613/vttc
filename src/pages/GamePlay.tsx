@@ -1,6 +1,5 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Header } from '../components/Header'
 import {
   useGamePlaySelector,
   gamePlayActions,
@@ -9,14 +8,11 @@ import type { Player } from '../../shared/types/Player'
 
 const GamePlay = () => {
   useInitializeFromUrl()
-  const isDesktop = useIsDesktop()
 
   return (
     <div style={containerStyle}>
-      {isDesktop && <Header />}
       <div style={contentStyle}>
-        <EventInfo />
-        <GameInfo />
+        <Header />
         <ScoreBoxes />
       </div>
     </div>
@@ -34,31 +30,62 @@ const useInitializeFromUrl = () => {
   }, [searchParams])
 }
 
-const useIsDesktop = (): boolean => {
-  return window.innerWidth >= 768
+const useIsWideScreen = () => {
+  const [isWide, setIsWide] = useState(window.innerWidth > 640)
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsWide(window.innerWidth > 640)
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  return isWide
 }
 
-const EventInfo = () => {
+const Header = () => {
+  const isWideScreen = useIsWideScreen()
+  return isWideScreen ? <WideHeader /> : <NarrowHeader />
+}
+
+const WideHeader = () => {
   const event = useGamePlaySelector((s) => s.data)
   const stageName = gamePlayActions.getStageName()
+  const currentGameIndex = useGamePlaySelector((s) => s.currentGameIndex)
+  const numberOfGames = gamePlayActions.getNumberOfGames()
 
   if (!event) return null
 
   return (
-    <div style={eventInfoStyle}>
-      <div style={eventNameStyle}>{event.eventName}</div>
+    <div style={wideHeaderStyle}>
       <div style={stageNameStyle}>{stageName}</div>
+      <div style={eventNameWideStyle}>{event.eventName}</div>
+      <div style={gameInfoStyle}>
+        Game {currentGameIndex + 1} / {numberOfGames}
+      </div>
     </div>
   )
 }
 
-const GameInfo = () => {
+const NarrowHeader = () => {
+  const event = useGamePlaySelector((s) => s.data)
+  const stageName = gamePlayActions.getStageName()
   const currentGameIndex = useGamePlaySelector((s) => s.currentGameIndex)
   const numberOfGames = gamePlayActions.getNumberOfGames()
 
+  if (!event) return null
+
   return (
-    <div style={gameInfoStyle}>
-      Game {currentGameIndex + 1} / {numberOfGames}
+    <div style={narrowHeaderContainerStyle}>
+      <div style={eventNameNarrowStyle}>{event.eventName}</div>
+      <div style={stageGameRowStyle}>
+        <div style={stageNameStyle}>{stageName}</div>
+        <div style={gameInfoStyle}>
+          Game {currentGameIndex + 1} / {numberOfGames}
+        </div>
+      </div>
     </div>
   )
 }
@@ -81,6 +108,30 @@ const ScoreBox = ({ side }: ScoreBoxProps) => {
   const score = useScore(side)
   const players = usePlayersForSide(side)
   const isServing = servingSide === side
+  const pointBoxRef = useRef<HTMLDivElement>(null)
+  const [fontSize, setFontSize] = useState(120)
+
+  useEffect(() => {
+    const calculateFontSize = () => {
+      if (!pointBoxRef.current) return
+
+      const boxWidth = pointBoxRef.current.offsetWidth
+      const boxHeight = pointBoxRef.current.offsetHeight
+      const padding = 32
+
+      const availableWidth = boxWidth - padding * 2
+      const availableHeight = boxHeight - padding * 2
+
+      const minDimension = Math.min(availableWidth, availableHeight)
+      const newFontSize = Math.max(minDimension, 40)
+
+      setFontSize(newFontSize)
+    }
+
+    calculateFontSize()
+    window.addEventListener('resize', calculateFontSize)
+    return () => window.removeEventListener('resize', calculateFontSize)
+  }, [score])
 
   const handleAddPoint = () => {
     gamePlayActions.addPointToSide(side)
@@ -96,8 +147,12 @@ const ScoreBox = ({ side }: ScoreBoxProps) => {
       <button style={getPlusButtonStyle(isServing)} onClick={handleAddPoint}>
         +
       </button>
-      <div style={getPointBoxStyle(isServing)} onClick={handleAddPoint}>
-        <div style={scoreDisplayStyle}>{score}</div>
+      <div
+        ref={pointBoxRef}
+        style={getPointBoxStyle(isServing)}
+        onClick={handleAddPoint}
+      >
+        <div style={getScoreDisplayStyle(fontSize)}>{score}</div>
       </div>
       <button style={getMinusButtonStyle(isServing)} onClick={handleDeductPoint}>
         −
@@ -147,29 +202,60 @@ const contentStyle: React.CSSProperties = {
   padding: '16px',
 }
 
-const eventInfoStyle: React.CSSProperties = {
-  textAlign: 'center',
+const wideHeaderStyle: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
   marginBottom: '16px',
 }
 
-const eventNameStyle: React.CSSProperties = {
+const eventNameWideStyle: React.CSSProperties = {
   fontSize: '20px',
   fontWeight: 700,
   color: '#fff',
-  marginBottom: '4px',
+  textAlign: 'center',
+  flex: 1,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  margin: '0 16px',
+}
+
+const narrowHeaderContainerStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  marginBottom: '16px',
+}
+
+const eventNameNarrowStyle: React.CSSProperties = {
+  fontSize: '20px',
+  fontWeight: 700,
+  color: '#fff',
+  textAlign: 'left',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  marginBottom: '8px',
+}
+
+const stageGameRowStyle: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
 }
 
 const stageNameStyle: React.CSSProperties = {
   fontSize: '16px',
-  color: '#ccc',
+  fontWeight: 600,
+  color: '#fff',
+  textAlign: 'left',
 }
 
 const gameInfoStyle: React.CSSProperties = {
-  textAlign: 'center',
-  fontSize: '18px',
+  fontSize: '16px',
   fontWeight: 600,
   color: '#fff',
-  marginBottom: '24px',
+  textAlign: 'right',
 }
 
 const scoreBoxesContainerStyle: React.CSSProperties = {
@@ -182,7 +268,8 @@ const scoreBoxWrapperStyle: React.CSSProperties = {
   flex: 1,
   display: 'flex',
   flexDirection: 'column',
-  alignItems: 'center',
+  alignItems: 'stretch',
+  minWidth: 0,
 }
 
 const participantNamesStyle: React.CSSProperties = {
@@ -192,6 +279,7 @@ const participantNamesStyle: React.CSSProperties = {
   textAlign: 'center',
   wordBreak: 'break-word',
   marginBottom: '8px',
+  width: '100%',
 }
 
 const getPlusButtonStyle = (isServing: boolean): React.CSSProperties => ({
@@ -217,14 +305,16 @@ const getPointBoxStyle = (isServing: boolean): React.CSSProperties => ({
   alignItems: 'center',
   justifyContent: 'center',
   cursor: 'pointer',
+  overflow: 'hidden',
+  minHeight: 0,
 })
 
-const scoreDisplayStyle: React.CSSProperties = {
-  fontSize: '120px',
+const getScoreDisplayStyle = (fontSize: number): React.CSSProperties => ({
+  fontSize: `${fontSize}px`,
   fontWeight: 700,
   color: '#fff',
   lineHeight: 1,
-}
+})
 
 const getMinusButtonStyle = (isServing: boolean): React.CSSProperties => ({
   width: '100%',
