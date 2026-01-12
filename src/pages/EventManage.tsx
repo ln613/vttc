@@ -284,17 +284,23 @@ const MatchResultDisplay = ({
 
   return (
     <div style={matchResultStyle}>
-      <span>{side1Name}</span>
-      <span style={scoreContainerStyle}>
+      <div style={matchLeftSideStyle}>
+        <span style={side1IsBold ? boldTextStyle : normalTextStyle}>
+          {side1Name}
+        </span>
         <span style={side1IsBold ? boldScoreStyle : normalScoreStyle}>
           {gamesWon1}
         </span>
-        <span style={scoreSeparatorStyle}>:</span>
+      </div>
+      <span style={scoreSeparatorStyle}>:</span>
+      <div style={matchRightSideStyle}>
         <span style={side2IsBold ? boldScoreStyle : normalScoreStyle}>
           {gamesWon2}
         </span>
-      </span>
-      <span>{side2Name}</span>
+        <span style={side2IsBold ? boldTextStyle : normalTextStyle}>
+          {side2Name}
+        </span>
+      </div>
     </div>
   )
 }
@@ -560,6 +566,7 @@ const matchScheduleContentStyle: React.CSSProperties = {
 const matchRowStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
+  alignItems: 'center',
   gap: '4px',
   padding: '8px 12px',
   backgroundColor: '#f9f9f9',
@@ -569,18 +576,30 @@ const matchRowStyle: React.CSSProperties = {
 const matchResultStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: '12px',
+  justifyContent: 'center',
+  width: '100%',
   fontSize: '14px',
 }
 
-const scoreContainerStyle: React.CSSProperties = {
+const matchLeftSideStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: '4px',
+  justifyContent: 'flex-end',
+  gap: '8px',
+  flex: 1,
+}
+
+const matchRightSideStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'flex-start',
+  gap: '8px',
+  flex: 1,
 }
 
 const scoreSeparatorStyle: React.CSSProperties = {
   color: '#666',
+  padding: '0 8px',
 }
 
 const boldScoreStyle: React.CSSProperties = {
@@ -588,6 +607,14 @@ const boldScoreStyle: React.CSSProperties = {
 }
 
 const normalScoreStyle: React.CSSProperties = {
+  fontWeight: 400,
+}
+
+const boldTextStyle: React.CSSProperties = {
+  fontWeight: 700,
+}
+
+const normalTextStyle: React.CSSProperties = {
   fontWeight: 400,
 }
 
