@@ -32,6 +32,7 @@ The player column title is "Players" for double event and "Team" for team event,
 - match schedule table (collapsible), where each match row:
   - names and result, like "Eric Huang 2 : 1 Nan Li", the winning participant and number (Eric Huang and 2 in this case) are bold. when no result, show 0 : 0, no bold. The row should be center aligned with ":" right in the middle.
   - results of each game: "11 : 6, 10 : 12, ...", left side represents the left participant (Eric in this case), the winning numbers are bold.
+  - Start button (if not started yet, align right, green, small)
 
 ### Knockout
 
@@ -40,3 +41,4 @@ empty
 ### interaction
 
 - on Generate Groups click: call generate groups API
+- on Start button click: go to Game Play page with the selected event, stage and match, start with Game 1

@@ -5,6 +5,7 @@ import TournamentEdit from './pages/TournamentEdit'
 import EventEdit from './pages/EventEdit'
 import EventParticipantEdit from './pages/EventParticipantEdit'
 import EventManage from './pages/EventManage'
+import GamePlay from './pages/GamePlay'
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
         <Route path="/event/:id/edit" element={<EventEdit isEdit />} />
         <Route path="/event/participants" element={<EventParticipantEdit />} />
         <Route path="/event/manage" element={<EventManage />} />
+        <Route path="/game-play" element={<GamePlay />} />
       </Routes>
     </BrowserRouter>
   )

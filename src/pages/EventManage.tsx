@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Header } from '../components/Header'
 import Select from '../components/Select'
 import Button from '../components/Button'
@@ -187,16 +188,17 @@ const GroupDisplay = ({ group }: GroupDisplayProps) => {
         participants={rankedParticipants}
         playerColumnTitle={playerColumnTitle}
       />
-      <MatchSchedule matches={group.matches} />
+      <MatchSchedule matches={group.matches} groupIndex={group.index} />
     </div>
   )
 }
 
 interface MatchScheduleProps {
   matches: Match[]
+  groupIndex: number
 }
 
-const MatchSchedule = ({ matches }: MatchScheduleProps) => {
+const MatchSchedule = ({ matches, groupIndex }: MatchScheduleProps) => {
   const [isExpanded, setIsExpanded] = useState(false)
 
   if (!matches || matches.length === 0) return null
@@ -211,7 +213,7 @@ const MatchSchedule = ({ matches }: MatchScheduleProps) => {
       {isExpanded && (
         <div style={matchScheduleContentStyle}>
           {matches.map((match) => (
-            <MatchRow key={match._id} match={match} />
+            <MatchRow key={match._id} match={match} groupIndex={groupIndex} />
           ))}
         </div>
       )}
@@ -238,23 +240,42 @@ const CollapsibleHeader = ({
 
 interface MatchRowProps {
   match: Match
+  groupIndex: number
 }
 
-const MatchRow = ({ match }: MatchRowProps) => {
+const MatchRow = ({ match, groupIndex }: MatchRowProps) => {
+  const navigate = useNavigate()
+  const selectedEventId = useEventManageSelector((s) => s.selectedEventId)
   const side1Name = getMatchSideName(match.side1)
   const side2Name = getMatchSideName(match.side2)
-  const hasResult = match.winningSide !== undefined
+  const hasResult = match.winningSide !== undefined && match.winningSide !== null
+  const hasStarted = hasResult || (match.games && match.games.length > 0)
+
+  const handleStartClick = () => {
+    if (selectedEventId) {
+      navigate(
+        `/game-play?eventId=${selectedEventId}&stage=group&groupIndex=${groupIndex}&matchId=${match._id}`,
+      )
+    }
+  }
 
   return (
     <div style={matchRowStyle}>
-      <MatchResultDisplay
-        side1Name={side1Name}
-        side2Name={side2Name}
-        gamesWon1={match.gamesWon1}
-        gamesWon2={match.gamesWon2}
-        hasResult={hasResult}
-      />
-      <GameScoresDisplay games={match.games} />
+      <div style={matchContentContainerStyle}>
+        <MatchResultDisplay
+          side1Name={side1Name}
+          side2Name={side2Name}
+          gamesWon1={match.gamesWon1}
+          gamesWon2={match.gamesWon2}
+          hasResult={hasResult}
+        />
+        <GameScoresDisplay games={match.games} />
+      </div>
+      {!hasStarted && (
+        <Button onClick={handleStartClick} color="#27ae60" size="small">
+          Start
+        </Button>
+      )}
     </div>
   )
 }
@@ -565,12 +586,21 @@ const matchScheduleContentStyle: React.CSSProperties = {
 
 const matchRowStyle: React.CSSProperties = {
   display: 'flex',
-  flexDirection: 'column',
+  flexDirection: 'row',
   alignItems: 'center',
-  gap: '4px',
+  justifyContent: 'space-between',
+  gap: '12px',
   padding: '8px 12px',
   backgroundColor: '#f9f9f9',
   borderRadius: '4px',
+}
+
+const matchContentContainerStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '4px',
+  flex: 1,
 }
 
 const matchResultStyle: React.CSSProperties = {

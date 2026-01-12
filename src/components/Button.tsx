@@ -7,6 +7,7 @@ interface ButtonProps {
   type?: 'button' | 'submit' | 'reset'
   disabled?: boolean
   className?: string
+  size?: 'small' | 'medium'
 }
 
 const hexToHsl = (hex: string): { h: number; s: number; l: number } => {
@@ -49,6 +50,23 @@ const getDarkerColor = (hex: string): string => {
   return `hsl(${darkerH}, ${s}%, ${darkerL}%)`
 }
 
+const getSizeStyles = (size: 'small' | 'medium'): React.CSSProperties => {
+  if (size === 'small') {
+    return {
+      fontSize: '12px',
+      padding: '6px 16px',
+      borderRadius: '4px',
+      letterSpacing: '0.5px',
+    }
+  }
+  return {
+    fontSize: '16px',
+    padding: '12px 40px',
+    borderRadius: '8px',
+    letterSpacing: '1px',
+  }
+}
+
 const Button: React.FC<ButtonProps> = ({
   children,
   color = '#e67e22',
@@ -56,22 +74,21 @@ const Button: React.FC<ButtonProps> = ({
   type = 'button',
   disabled = false,
   className = '',
+  size = 'medium',
 }) => {
   const darkerColor = getDarkerColor(color)
+  const sizeStyles = getSizeStyles(size)
 
   const buttonStyle: React.CSSProperties = {
     background: `linear-gradient(to right, ${color}, ${darkerColor})`,
     color: '#ffffff',
     fontWeight: 700,
-    fontSize: '16px',
-    padding: '12px 40px',
     border: 'none',
-    borderRadius: '8px',
     cursor: disabled ? 'not-allowed' : 'pointer',
     boxShadow: '0 4px 6px rgba(0, 0, 0, 0.15)',
     transition: 'all 0.2s ease',
     opacity: disabled ? 0.6 : 1,
-    letterSpacing: '1px',
+    ...sizeStyles,
   }
 
   return (
