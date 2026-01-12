@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Header } from '../components/Header'
 import Select from '../components/Select'
 import Button from '../components/Button'
@@ -9,6 +9,7 @@ import {
 import { eventActions, useEventSelector } from '../stores/eventStore'
 import type { Group, GroupParticipant } from '../../shared/types/Tournament'
 import type { Player } from '../../shared/types/Player'
+import type { Match, Game } from '../../shared/types/Match'
 
 const EventManage = () => {
   useInitializeData()
@@ -186,7 +187,154 @@ const GroupDisplay = ({ group }: GroupDisplayProps) => {
         participants={rankedParticipants}
         playerColumnTitle={playerColumnTitle}
       />
+      <MatchSchedule matches={group.matches} />
     </div>
+  )
+}
+
+interface MatchScheduleProps {
+  matches: Match[]
+}
+
+const MatchSchedule = ({ matches }: MatchScheduleProps) => {
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  if (!matches || matches.length === 0) return null
+
+  return (
+    <div style={matchScheduleContainerStyle}>
+      <CollapsibleHeader
+        title="Match Schedule"
+        isExpanded={isExpanded}
+        onToggle={() => setIsExpanded(!isExpanded)}
+      />
+      {isExpanded && (
+        <div style={matchScheduleContentStyle}>
+          {matches.map((match) => (
+            <MatchRow key={match._id} match={match} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface CollapsibleHeaderProps {
+  title: string
+  isExpanded: boolean
+  onToggle: () => void
+}
+
+const CollapsibleHeader = ({
+  title,
+  isExpanded,
+  onToggle,
+}: CollapsibleHeaderProps) => (
+  <button style={collapsibleHeaderStyle} onClick={onToggle}>
+    <span>{isExpanded ? '▼' : '▶'}</span>
+    <span style={collapsibleTitleStyle}>{title}</span>
+  </button>
+)
+
+interface MatchRowProps {
+  match: Match
+}
+
+const MatchRow = ({ match }: MatchRowProps) => {
+  const side1Name = getMatchSideName(match.side1)
+  const side2Name = getMatchSideName(match.side2)
+  const hasResult = match.winningSide !== undefined
+
+  return (
+    <div style={matchRowStyle}>
+      <MatchResultDisplay
+        side1Name={side1Name}
+        side2Name={side2Name}
+        gamesWon1={match.gamesWon1}
+        gamesWon2={match.gamesWon2}
+        hasResult={hasResult}
+      />
+      <GameScoresDisplay games={match.games} />
+    </div>
+  )
+}
+
+const getMatchSideName = (side: Player[]): string => {
+  if (!side || side.length === 0) return 'Unknown'
+  return side.map((p) => `${p.firstName} ${p.lastName}`).join(' / ')
+}
+
+interface MatchResultDisplayProps {
+  side1Name: string
+  side2Name: string
+  gamesWon1: number
+  gamesWon2: number
+  hasResult: boolean
+}
+
+const MatchResultDisplay = ({
+  side1Name,
+  side2Name,
+  gamesWon1,
+  gamesWon2,
+  hasResult,
+}: MatchResultDisplayProps) => {
+  const side1IsBold = hasResult && gamesWon1 > gamesWon2
+  const side2IsBold = hasResult && gamesWon2 > gamesWon1
+
+  return (
+    <div style={matchResultStyle}>
+      <span>{side1Name}</span>
+      <span style={scoreContainerStyle}>
+        <span style={side1IsBold ? boldScoreStyle : normalScoreStyle}>
+          {gamesWon1}
+        </span>
+        <span style={scoreSeparatorStyle}>:</span>
+        <span style={side2IsBold ? boldScoreStyle : normalScoreStyle}>
+          {gamesWon2}
+        </span>
+      </span>
+      <span>{side2Name}</span>
+    </div>
+  )
+}
+
+interface GameScoresDisplayProps {
+  games: Game[]
+}
+
+const GameScoresDisplay = ({ games }: GameScoresDisplayProps) => {
+  if (!games || games.length === 0) return null
+
+  return (
+    <div style={gameScoresStyle}>
+      {games.map((game, index) => (
+        <GameScoreDisplay key={game._id} game={game} isLast={index === games.length - 1} />
+      ))}
+    </div>
+  )
+}
+
+interface GameScoreDisplayProps {
+  game: Game
+  isLast: boolean
+}
+
+const GameScoreDisplay = ({ game, isLast }: GameScoreDisplayProps) => {
+  const side1IsBold = game.winningSide === 1
+  const side2IsBold = game.winningSide === 2
+
+  return (
+    <span>
+      <span style={side1IsBold ? boldScoreStyle : normalScoreStyle}>
+        {game.score1}
+      </span>
+      <span style={gameScoreSeparatorStyle}>:</span>
+      <span style={side2IsBold ? boldScoreStyle : normalScoreStyle}>
+        {game.score2}
+      </span>
+      {!isLast && <span style={gameDelimiterStyle}>,</span>}
+    </span>
   )
 }
 
@@ -378,6 +526,83 @@ const emptyContentStyle: React.CSSProperties = {
   padding: '40px',
   textAlign: 'center',
   color: '#666',
+}
+
+const matchScheduleContainerStyle: React.CSSProperties = {
+  marginTop: '16px',
+  borderTop: '1px solid #eee',
+  paddingTop: '12px',
+}
+
+const collapsibleHeaderStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  background: 'none',
+  border: 'none',
+  cursor: 'pointer',
+  padding: '8px 0',
+  fontSize: '14px',
+  color: '#666',
+}
+
+const collapsibleTitleStyle: React.CSSProperties = {
+  fontWeight: 600,
+}
+
+const matchScheduleContentStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '12px',
+  marginTop: '12px',
+}
+
+const matchRowStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '4px',
+  padding: '8px 12px',
+  backgroundColor: '#f9f9f9',
+  borderRadius: '4px',
+}
+
+const matchResultStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '12px',
+  fontSize: '14px',
+}
+
+const scoreContainerStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '4px',
+}
+
+const scoreSeparatorStyle: React.CSSProperties = {
+  color: '#666',
+}
+
+const boldScoreStyle: React.CSSProperties = {
+  fontWeight: 700,
+}
+
+const normalScoreStyle: React.CSSProperties = {
+  fontWeight: 400,
+}
+
+const gameScoresStyle: React.CSSProperties = {
+  fontSize: '12px',
+  color: '#666',
+  paddingLeft: '4px',
+}
+
+const gameScoreSeparatorStyle: React.CSSProperties = {
+  margin: '0 2px',
+}
+
+const gameDelimiterStyle: React.CSSProperties = {
+  marginRight: '8px',
 }
 
 export default EventManage
