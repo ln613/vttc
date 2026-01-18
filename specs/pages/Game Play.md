@@ -33,6 +33,7 @@
   - huge white number
   - red bg for the serving side, blue for the other
 - "-" button (under the point box, full width, dark red for the serving side, dark blue for the other)
+- show the number of games won at the top-right corner for the left score box, or the top-left corner for the right score box (it will cover part of the "+" button and part of the big point box)
 
 ### interaction
 

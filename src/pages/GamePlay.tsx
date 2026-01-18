@@ -102,19 +102,21 @@ const ScoreBoxes = () => {
 
   return (
     <div style={scoreBoxesContainerStyle}>
-      <ScoreBox side={leftSide} />
-      <ScoreBox side={rightSide} />
+      <ScoreBox side={leftSide} isLeft={true} />
+      <ScoreBox side={rightSide} isLeft={false} />
     </div>
   )
 }
 
 interface ScoreBoxProps {
   side: 1 | 2
+  isLeft: boolean
 }
 
-const ScoreBox = ({ side }: ScoreBoxProps) => {
+const ScoreBox = ({ side, isLeft }: ScoreBoxProps) => {
   const servingSide = useGamePlaySelector((s) => s.servingSide)
   const score = useScore(side)
+  const gamesWon = useGamesWon(side)
   const players = usePlayersForSide(side)
   const isServing = servingSide === side
   const pointBoxRef = useRef<HTMLDivElement>(null)
@@ -153,15 +155,18 @@ const ScoreBox = ({ side }: ScoreBoxProps) => {
   return (
     <div style={scoreBoxWrapperStyle}>
       <ParticipantNames players={players} />
-      <button style={getPlusButtonStyle(isServing)} onClick={handleAddPoint}>
-        +
-      </button>
-      <div
-        ref={pointBoxRef}
-        style={getPointBoxStyle(isServing)}
-        onClick={handleAddPoint}
-      >
-        <div style={getScoreDisplayStyle(fontSize)}>{score}</div>
+      <div style={scoreAreaContainerStyle}>
+        <button style={getPlusButtonStyle(isServing)} onClick={handleAddPoint}>
+          +
+        </button>
+        <div
+          ref={pointBoxRef}
+          style={getPointBoxStyle(isServing)}
+          onClick={handleAddPoint}
+        >
+          <div style={getScoreDisplayStyle(fontSize)}>{score}</div>
+        </div>
+        <GamesWonBadge gamesWon={gamesWon} isLeft={isLeft} />
       </div>
       <button style={getMinusButtonStyle(isServing)} onClick={handleDeductPoint}>
         −
@@ -170,10 +175,29 @@ const ScoreBox = ({ side }: ScoreBoxProps) => {
   )
 }
 
+interface GamesWonBadgeProps {
+  gamesWon: number
+  isLeft: boolean
+}
+
+const GamesWonBadge = ({ gamesWon, isLeft }: GamesWonBadgeProps) => {
+  return (
+    <div style={getGamesWonBadgeStyle(isLeft)}>
+      {gamesWon}
+    </div>
+  )
+}
+
 const useScore = (side: 1 | 2): number => {
   const score1 = useGamePlaySelector((s) => s.score1)
   const score2 = useGamePlaySelector((s) => s.score2)
   return side === 1 ? score1 : score2
+}
+
+const useGamesWon = (side: 1 | 2): number => {
+  const match = gamePlayActions.getCurrentMatch()
+  if (!match) return 0
+  return side === 1 ? match.gamesWon1 : match.gamesWon2
 }
 
 const usePlayersForSide = (side: 1 | 2): Player[] => {
@@ -335,6 +359,30 @@ const scoreBoxWrapperStyle: React.CSSProperties = {
   alignItems: 'stretch',
   minWidth: 0,
 }
+
+const scoreAreaContainerStyle: React.CSSProperties = {
+  position: 'relative',
+  flex: 1,
+  display: 'flex',
+  flexDirection: 'column',
+  minHeight: 0,
+}
+
+const getGamesWonBadgeStyle = (isLeft: boolean): React.CSSProperties => ({
+  position: 'absolute',
+  top: 0,
+  [isLeft ? 'right' : 'left']: 0,
+  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  color: '#333',
+  fontSize: '48px',
+  fontWeight: 700,
+  minWidth: '64px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: isLeft ? '0 0 0 8px' : '0 0 8px 0',
+  zIndex: 10,
+})
 
 const participantNamesStyle: React.CSSProperties = {
   fontSize: '16px',
