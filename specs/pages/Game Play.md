@@ -39,3 +39,14 @@
 - switch serving every 2 points
 - click on "+" button or anywhere in the point box: add 1 point
 - click on "-" button: deduct 1 point (min 0)
+- when score change, call the update game API (debounce for 3 secs)
+
+## Init Dialog (show on load)
+
+- Who serves first: single select tags (participant 1, participant 2, vertical)
+- Who is on left: single select tags (participant 1, participant 2, vertical)
+- OK button
+
+### interaction
+
+- on who is on left changed: change the participant on the left score box accordingly

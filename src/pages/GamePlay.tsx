@@ -5,9 +5,14 @@ import {
   gamePlayActions,
 } from '../stores/gamePlayStore'
 import type { Player } from '../../shared/types/Player'
+import SingleSelectTags from '../components/SingleSelectTags'
+import Button from '../components/Button'
 
 const GamePlay = () => {
   useInitializeFromUrl()
+
+  const showInitDialog = useGamePlaySelector((s) => s.showInitDialog)
+  const loading = useGamePlaySelector((s) => s.loading)
 
   return (
     <div style={containerStyle}>
@@ -15,6 +20,7 @@ const GamePlay = () => {
         <Header />
         <ScoreBoxes />
       </div>
+      {showInitDialog && !loading && <InitDialog />}
     </div>
   )
 }
@@ -91,10 +97,13 @@ const NarrowHeader = () => {
 }
 
 const ScoreBoxes = () => {
+  const leftSide = useGamePlaySelector((s) => s.leftSide)
+  const rightSide = leftSide === 1 ? 2 : 1
+
   return (
     <div style={scoreBoxesContainerStyle}>
-      <ScoreBox side={1} />
-      <ScoreBox side={2} />
+      <ScoreBox side={leftSide} />
+      <ScoreBox side={rightSide} />
     </div>
   )
 }
@@ -185,6 +194,61 @@ const ParticipantNames = ({ players }: ParticipantNamesProps) => {
 const formatPlayerNames = (players: Player[]): string => {
   if (!players || players.length === 0) return 'Player'
   return players.map((p) => `${p.firstName} ${p.lastName}`).join(' / ')
+}
+
+// Init Dialog Component
+const InitDialog = () => {
+  const initialServingSide = useGamePlaySelector((s) => s.initialServingSide)
+  const leftSide = useGamePlaySelector((s) => s.leftSide)
+  const participant1Name = gamePlayActions.getParticipantName(1)
+  const participant2Name = gamePlayActions.getParticipantName(2)
+
+  const options = [participant1Name, participant2Name]
+
+  const handleServingChange = (selected: string) => {
+    const side = selected === participant1Name ? 1 : 2
+    gamePlayActions.setInitialServingSide(side as 1 | 2)
+  }
+
+  const handleLeftSideChange = (selected: string) => {
+    const side = selected === participant1Name ? 1 : 2
+    gamePlayActions.setLeftSide(side as 1 | 2)
+  }
+
+  const handleOk = () => {
+    gamePlayActions.confirmInitDialog()
+  }
+
+  const selectedServing = initialServingSide === 1 ? participant1Name : participant2Name
+  const selectedLeft = leftSide === 1 ? participant1Name : participant2Name
+
+  return (
+    <div style={dialogOverlayStyle}>
+      <div style={dialogContentStyle}>
+        <div style={dialogFieldStyle}>
+          <SingleSelectTags
+            label="Who serves first"
+            options={options}
+            selectedValue={selectedServing}
+            onChange={handleServingChange}
+            vertical
+          />
+        </div>
+        <div style={dialogFieldStyle}>
+          <SingleSelectTags
+            label="Who is on left"
+            options={options}
+            selectedValue={selectedLeft}
+            onChange={handleLeftSideChange}
+            vertical
+          />
+        </div>
+        <div style={dialogButtonContainerStyle}>
+          <Button onClick={handleOk}>OK</Button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // Styles
@@ -330,5 +394,36 @@ const getMinusButtonStyle = (isServing: boolean): React.CSSProperties => ({
   alignItems: 'center',
   justifyContent: 'center',
 })
+
+const dialogOverlayStyle: React.CSSProperties = {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  zIndex: 1000,
+}
+
+const dialogContentStyle: React.CSSProperties = {
+  backgroundColor: '#fff',
+  borderRadius: '12px',
+  padding: '24px',
+  minWidth: '300px',
+  maxWidth: '90vw',
+}
+
+const dialogFieldStyle: React.CSSProperties = {
+  marginBottom: '16px',
+}
+
+const dialogButtonContainerStyle: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'center',
+  marginTop: '24px',
+}
 
 export default GamePlay

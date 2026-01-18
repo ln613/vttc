@@ -1276,3 +1276,265 @@ const compareByStatsOnly = (p1, p2) => {
   }
   return p2.stats.pointsWon - p1.stats.pointsWon
 }
+
+/**
+ * Update a game in a match
+ */
+export const updateGame = async (body) => {
+  validateUpdateGameInput(body)
+
+  const { _id, matchId, gameNumber, score } = body
+
+  const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
+
+  const event = await collection.findOne({ _id: toObjectId(_id) })
+  if (!event) throwError('Event not found')
+
+  let matchFound = false
+  let updatedStages = [...event.eventStages]
+  let match = null
+  let numberOfGames = 0
+
+  // Find match in group stage
+  const groupStageIndex = event.eventStages.findIndex((s) => s.type === 'group')
+  if (groupStageIndex !== -1) {
+    const groupStage = event.eventStages[groupStageIndex]
+    for (let gi = 0; gi < groupStage.groups.length; gi++) {
+      const group = groupStage.groups[gi]
+      const matchIndex = group.matches.findIndex((m) => m._id === matchId)
+      if (matchIndex !== -1) {
+        matchFound = true
+        match = group.matches[matchIndex]
+        numberOfGames = match.config.numberOfGames
+
+        // Validate game number and score
+        const errors = validateUpdateGameRules(match, gameNumber, score)
+        throwErrors(errors)
+
+        // Update match with new game score
+        const updatedMatch = updateMatchWithGameScore(match, gameNumber, score)
+
+        // Update group stats
+        const updatedGroup = updateGroupAfterMatch(group, updatedMatch, matchIndex)
+
+        // Check if group is complete
+        const groupComplete = updatedGroup.matches.every((m) => m.winningSide !== undefined)
+
+        const updatedGroupStage = {
+          ...groupStage,
+          groups: groupStage.groups.map((g, i) =>
+            i === gi ? { ...updatedGroup, isComplete: groupComplete } : g,
+          ),
+        }
+
+        // If all groups complete, calculate advanced participants
+        if (updatedGroupStage.groups.every((g) => g.isComplete)) {
+          const advancedParticipants = []
+          for (const g of updatedGroupStage.groups) {
+            const ranked = rankGroupParticipants(g.participants, g.matches)
+            const advancing = ranked.slice(0, groupStage.config.advancingCount)
+            for (const gp of advancing) {
+              advancedParticipants.push({
+                participant: gp.participant,
+                groupIndex: g.index,
+                ranking: gp.ranking,
+              })
+            }
+          }
+          updatedGroupStage.advancedParticipants = advancedParticipants
+        }
+
+        updatedStages[groupStageIndex] = updatedGroupStage
+        break
+      }
+    }
+  }
+
+  // Find match in knockout stage
+  if (!matchFound) {
+    const knockoutStageIndex = event.eventStages.findIndex((s) => s.type === 'knockout')
+    if (knockoutStageIndex !== -1) {
+      const knockoutStage = event.eventStages[knockoutStageIndex]
+      for (let ri = 0; ri < knockoutStage.rounds.length; ri++) {
+        const round = knockoutStage.rounds[ri]
+        const matchIndex = round.matches.findIndex((m) => m.match?._id === matchId)
+        if (matchIndex !== -1) {
+          matchFound = true
+          match = round.matches[matchIndex].match
+          numberOfGames = match.config.numberOfGames
+
+          // Validate game number and score
+          const errors = validateUpdateGameRules(match, gameNumber, score)
+          throwErrors(errors)
+
+          // Update match with new game score
+          const updatedMatch = updateMatchWithGameScore(match, gameNumber, score)
+          const knockoutMatch = round.matches[matchIndex]
+          const winner =
+            updatedMatch.winningSide === 1
+              ? knockoutMatch.participant1
+              : updatedMatch.winningSide === 2
+                ? knockoutMatch.participant2
+                : undefined
+
+          const updatedKnockoutMatch = {
+            ...knockoutMatch,
+            match: updatedMatch,
+            winner,
+          }
+
+          const roundComplete = round.matches.every((m, i) =>
+            i === matchIndex ? updatedKnockoutMatch.winner : m.winner,
+          )
+
+          const updatedRounds = knockoutStage.rounds.map((r, i) =>
+            i === ri
+              ? {
+                  ...r,
+                  matches: r.matches.map((m, mi) => (mi === matchIndex ? updatedKnockoutMatch : m)),
+                  isComplete: roundComplete,
+                }
+              : r,
+          )
+
+          updatedStages[knockoutStageIndex] = {
+            ...knockoutStage,
+            rounds: updatedRounds,
+          }
+          break
+        }
+      }
+    }
+  }
+
+  if (!matchFound) throwError('Match not found')
+
+  await collection.updateOne({ _id: toObjectId(_id) }, { $set: { eventStages: updatedStages } })
+
+  return { success: true }
+}
+
+const validateUpdateGameInput = (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body._id) throwError('Event ID is required')
+  if (!body.matchId) throwError('Match ID is required')
+  if (body.gameNumber === undefined || body.gameNumber === null) throwError('Game number is required')
+  if (!body.score) throwError('Score is required')
+}
+
+const validateUpdateGameRules = (match, gameNumber, score) => {
+  const errors = []
+  const { numberOfGames, gameConfig } = match.config
+  const { targetPoints, isGolden } = gameConfig
+
+  // Validate game number doesn't exceed total games
+  if (gameNumber < 1 || gameNumber > numberOfGames) {
+    errors.push(`Game number must be between 1 and ${numberOfGames}`)
+    return errors
+  }
+
+  // Check if one side already won the match (no more games allowed)
+  const needed = Math.ceil(numberOfGames / 2)
+  const gamesWon1 = match.games.filter((g, i) => i + 1 < gameNumber && g.winningSide === 1).length
+  const gamesWon2 = match.games.filter((g, i) => i + 1 < gameNumber && g.winningSide === 2).length
+
+  if (gamesWon1 >= needed || gamesWon2 >= needed) {
+    errors.push('Match is already finished, no more games allowed')
+    return errors
+  }
+
+  // Validate score
+  const { score1, score2 } = score
+
+  if (score1 < 0 || score2 < 0) {
+    errors.push('Score cannot be negative')
+  }
+
+  // Validate score doesn't exceed winning point
+  const scoreErrors = validateScoreLimit(score1, score2, targetPoints, isGolden)
+  errors.push(...scoreErrors)
+
+  return errors
+}
+
+const validateScoreLimit = (score1, score2, targetPoints, isGolden) => {
+  const errors = []
+  const maxScore = Math.max(score1, score2)
+  const minScore = Math.min(score1, score2)
+  const deucePoint = targetPoints - 1
+
+  // For golden games, winner is whoever reaches target first
+  if (isGolden) {
+    if (maxScore > targetPoints) {
+      errors.push(`Score cannot exceed ${targetPoints} for golden games`)
+    }
+    return errors
+  }
+
+  // For regular games, check if score exceeds what's possible
+  // Before deuce: first to target wins
+  // At deuce: must lead by 2
+
+  // If below deuce point, score cannot exceed target
+  if (minScore < deucePoint) {
+    if (maxScore > targetPoints) {
+      errors.push(`Score cannot exceed ${targetPoints} when below deuce point`)
+    }
+    return errors
+  }
+
+  // At deuce (both at deucePoint or higher), check if the difference is valid
+  // Score should stop when someone leads by 2
+  if (maxScore - minScore > 2) {
+    errors.push('At deuce, game ends when one side leads by 2')
+  }
+
+  // Check that both scores don't exceed what's reasonable for deuce
+  // The winning score should be minScore + 2 at most
+  if (maxScore > minScore + 2 && minScore >= deucePoint) {
+    errors.push('Invalid score: game should have ended')
+  }
+
+  return errors
+}
+
+const updateMatchWithGameScore = (match, gameNumber, score) => {
+  const gameIndex = gameNumber - 1
+  const { score1, score2 } = score
+
+  // Create or update the game
+  const newGame = {
+    _id: `${match._id}-game-${gameIndex}`,
+    config: match.config.gameConfig,
+    score1,
+    score2,
+    winningSide: determineGameWinner(score1, score2, match.config.gameConfig),
+  }
+
+  // Update games array
+  const games = [...match.games]
+  while (games.length < gameNumber) {
+    games.push({
+      _id: `${match._id}-game-${games.length}`,
+      config: match.config.gameConfig,
+      score1: 0,
+      score2: 0,
+      winningSide: undefined,
+    })
+  }
+  games[gameIndex] = newGame
+
+  // Recalculate games won
+  const gamesWon1 = games.filter((g) => g.winningSide === 1).length
+  const gamesWon2 = games.filter((g) => g.winningSide === 2).length
+  const needed = Math.ceil(match.config.numberOfGames / 2)
+
+  return {
+    ...match,
+    games,
+    gamesWon1,
+    gamesWon2,
+    winningSide: gamesWon1 >= needed ? 1 : gamesWon2 >= needed ? 2 : undefined,
+  }
+}

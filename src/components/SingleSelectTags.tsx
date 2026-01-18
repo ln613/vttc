@@ -6,6 +6,7 @@ interface SingleSelectTagsProps {
   options: string[]
   selectedValue: string | null
   onChange: (selectedValue: string) => void
+  vertical?: boolean
   className?: string
 }
 
@@ -14,6 +15,7 @@ const SingleSelectTags: React.FC<SingleSelectTagsProps> = ({
   options,
   selectedValue,
   onChange,
+  vertical = false,
   className = '',
 }) => {
   const handleChange = (selectedValues: string[]) => {
@@ -29,6 +31,7 @@ const SingleSelectTags: React.FC<SingleSelectTagsProps> = ({
       selectedValues={selectedValue ? [selectedValue] : []}
       onChange={handleChange}
       singleSelect
+      vertical={vertical}
       className={className}
     />
   )

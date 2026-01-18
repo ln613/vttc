@@ -1,7 +1,7 @@
 import type { Event, BestOfOption } from '../../shared/types/Tournament'
 import type { Match } from '../../shared/types/Match'
 import type { Player } from '../../shared/types/Player'
-import { apiGet } from '../utils/api'
+import { apiGet, apiPost } from '../utils/api'
 import { createStore, createAsyncState, type AsyncState } from './createStore'
 
 interface GamePlayState extends AsyncState<Event> {
@@ -14,6 +14,10 @@ interface GamePlayState extends AsyncState<Event> {
   score2: number
   servingSide: 1 | 2
   initialServingSide: 1 | 2
+  leftSide: 1 | 2
+  showInitDialog: boolean
+  isSaving: boolean
+  saveError: string | null
 }
 
 const createInitialState = (): GamePlayState => ({
@@ -27,9 +31,17 @@ const createInitialState = (): GamePlayState => ({
   score2: 0,
   servingSide: 1,
   initialServingSide: 1,
+  leftSide: 1,
+  showInitDialog: true,
+  isSaving: false,
+  saveError: null,
 })
 
 const gamePlayStore = createStore<GamePlayState>(createInitialState())
+
+// Debounce timer reference
+let saveDebounceTimer: ReturnType<typeof setTimeout> | null = null
+const SAVE_DEBOUNCE_MS = 3000
 
 export const {
   useStore: useGamePlayStore,
@@ -56,9 +68,28 @@ export const gamePlayActions = {
       score2: 0,
       servingSide: 1,
       initialServingSide: 1,
+      leftSide: 1,
+      showInitDialog: true,
+      isSaving: false,
+      saveError: null,
     })
 
     await fetchEvent(eventId!)
+  },
+
+  setInitialServingSide: (side: 1 | 2) => {
+    gamePlayStore.setState({
+      initialServingSide: side,
+      servingSide: side,
+    })
+  },
+
+  setLeftSide: (side: 1 | 2) => {
+    gamePlayStore.setState({ leftSide: side })
+  },
+
+  confirmInitDialog: () => {
+    gamePlayStore.setState({ showInitDialog: false })
   },
 
   addPointToSide: (side: 1 | 2) => {
@@ -76,6 +107,8 @@ export const gamePlayActions = {
       score2: newScore2,
       servingSide: newServingSide,
     })
+
+    debouncedSaveGame()
   },
 
   deductPointFromSide: (side: 1 | 2) => {
@@ -93,6 +126,8 @@ export const gamePlayActions = {
       score2: newScore2,
       servingSide: newServingSide,
     })
+
+    debouncedSaveGame()
   },
 
   getCurrentMatch: (): Match | undefined => {
@@ -100,13 +135,27 @@ export const gamePlayActions = {
     if (!state.data || !state.matchId) return undefined
 
     const stages = state.data.eventStages || []
+    
+    // Check group stage
     const groupStage = stages.find((s) => s.type === 'group')
-    if (!groupStage || groupStage.type !== 'group') return undefined
+    if (groupStage && groupStage.type === 'group') {
+      const group = groupStage.groups.find((g) => g.index === state.groupIndex)
+      if (group) {
+        const match = group.matches.find((m) => m._id === state.matchId)
+        if (match) return match
+      }
+    }
 
-    const group = groupStage.groups.find((g) => g.index === state.groupIndex)
-    if (!group) return undefined
+    // Check knockout stage
+    const knockoutStage = stages.find((s) => s.type === 'knockout')
+    if (knockoutStage && knockoutStage.type === 'knockout') {
+      for (const round of knockoutStage.rounds) {
+        const knockoutMatch = round.matches.find((m) => m.match?._id === state.matchId)
+        if (knockoutMatch?.match) return knockoutMatch.match
+      }
+    }
 
-    return group.matches.find((m) => m._id === state.matchId)
+    return undefined
   },
 
   getSide1Players: (): Player[] => {
@@ -117,6 +166,20 @@ export const gamePlayActions = {
   getSide2Players: (): Player[] => {
     const match = gamePlayActions.getCurrentMatch()
     return match?.side2 || []
+  },
+
+  getLeftSidePlayers: (): Player[] => {
+    const state = gamePlayStore.getState()
+    return state.leftSide === 1
+      ? gamePlayActions.getSide1Players()
+      : gamePlayActions.getSide2Players()
+  },
+
+  getRightSidePlayers: (): Player[] => {
+    const state = gamePlayStore.getState()
+    return state.leftSide === 1
+      ? gamePlayActions.getSide2Players()
+      : gamePlayActions.getSide1Players()
   },
 
   getStageName: (): string => {
@@ -140,7 +203,43 @@ export const gamePlayActions = {
     return parseBestOfOption(bestOf)
   },
 
+  getParticipantName: (side: 1 | 2): string => {
+    const players = side === 1
+      ? gamePlayActions.getSide1Players()
+      : gamePlayActions.getSide2Players()
+    return formatPlayerNames(players)
+  },
+
+  saveGame: async () => {
+    const state = gamePlayStore.getState()
+    if (!state.eventId || !state.matchId) return
+
+    gamePlayStore.setState({ isSaving: true, saveError: null })
+
+    try {
+      await apiPost('updateGame', {
+        _id: state.eventId,
+        matchId: state.matchId,
+        gameNumber: state.currentGameIndex + 1,
+        score: {
+          score1: state.score1,
+          score2: state.score2,
+        },
+      })
+      gamePlayStore.setState({ isSaving: false })
+    } catch (err) {
+      gamePlayStore.setState({
+        isSaving: false,
+        saveError: err instanceof Error ? err.message : 'Failed to save game',
+      })
+    }
+  },
+
   reset: () => {
+    if (saveDebounceTimer) {
+      clearTimeout(saveDebounceTimer)
+      saveDebounceTimer = null
+    }
     gamePlayStore.setState(createInitialState())
   },
 }
@@ -192,4 +291,19 @@ const parseBestOfOption = (bestOf: BestOfOption | undefined): number => {
   if (bestOf.includes('3')) return 3
   if (bestOf.includes('5')) return 5
   return 5
+}
+
+const formatPlayerNames = (players: Player[]): string => {
+  if (!players || players.length === 0) return 'Player'
+  return players.map((p) => `${p.firstName} ${p.lastName}`).join(' / ')
+}
+
+const debouncedSaveGame = () => {
+  if (saveDebounceTimer) {
+    clearTimeout(saveDebounceTimer)
+  }
+  saveDebounceTimer = setTimeout(() => {
+    gamePlayActions.saveGame()
+    saveDebounceTimer = null
+  }, SAVE_DEBOUNCE_MS)
 }

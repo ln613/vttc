@@ -181,23 +181,31 @@ return the generated groups
 
 return the generated knockout round
 
-## Finish a match
+## Update a Game
 
 ### input
 
 - event id *
 - match id *
-- match result (result of each game in the match) *
+- game number *
+- score *
 
 ### Prerequisite
 
 - event exists
 - match exists
-- match is not finished (doesn't have a result)
+- game number is valid:
+  - doesn't exceed the number of games for the current match/event
+  - if one side already won, no more games, e.g., best of 3, already 2 games both won by player 1, then 3rd game is invalid
+- score is valid
+  - no negative score
+  - doesn't exceed winning point. E.g.:
+    - for short games (to 7 points), 10:7 is invalid (after 6:6, lead by 2 wins)
+    - for regular golden games, 12:10 is invalid (whoever reach 11 wins)
 
 ### Action
 
-- attach the result to the match
+- attach the game result to the match
 - save to db
 
 ### Output

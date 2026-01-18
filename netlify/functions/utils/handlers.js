@@ -13,6 +13,7 @@ import {
   generateGroups,
   generateKnockout,
   finishMatch,
+  updateGame,
 } from './eventHandlers.js'
 
 export const apiHandlers = {
@@ -31,5 +32,6 @@ export const apiHandlers = {
     generateGroups: (body) => generateGroups(body),
     generateKnockout: (body) => generateKnockout(body),
     finishMatch: (body) => finishMatch(body),
+    updateGame: (body) => updateGame(body),
   },
 }

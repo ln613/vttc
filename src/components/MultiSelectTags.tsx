@@ -6,6 +6,7 @@ interface MultiSelectTagsProps {
   selectedValues: string[]
   onChange: (selectedValues: string[]) => void
   singleSelect?: boolean
+  vertical?: boolean
   className?: string
 }
 
@@ -15,6 +16,7 @@ const MultiSelectTags: React.FC<MultiSelectTagsProps> = ({
   selectedValues,
   onChange,
   singleSelect = false,
+  vertical = false,
   className = '',
 }) => {
   const containerStyle: React.CSSProperties = {
@@ -30,13 +32,19 @@ const MultiSelectTags: React.FC<MultiSelectTagsProps> = ({
     textAlign: 'left',
   }
 
-  const tagsContainerStyle: React.CSSProperties = {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '8px',
-    maxHeight: '140px',
-    overflowY: 'auto',
-  }
+  const tagsContainerStyle: React.CSSProperties = vertical
+    ? {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+      }
+    : {
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '8px',
+        maxHeight: '140px',
+        overflowY: 'auto',
+      }
 
   const handleTagClick = (option: string) => {
     const isSelected = selectedValues.includes(option)
@@ -65,6 +73,7 @@ const MultiSelectTags: React.FC<MultiSelectTagsProps> = ({
       fontSize: '14px',
       transition: 'all 0.2s ease',
       userSelect: 'none',
+      textAlign: 'center',
     }
   }
 

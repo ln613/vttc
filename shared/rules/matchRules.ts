@@ -594,3 +594,159 @@ export const getNextTeamMatchToPlay = (
     matchIndex: playedCount,
   }
 }
+
+// ==================== GAME UPDATE VALIDATION ====================
+
+/**
+ * Validate game number for a match
+ * Returns error messages if invalid
+ */
+export const validateGameNumber = (
+  gameNumber: number,
+  numberOfGames: number,
+  gamesWon1: number,
+  gamesWon2: number,
+): string[] => {
+  const errors: string[] = []
+
+  if (!isValidGameNumber(gameNumber, numberOfGames)) {
+    errors.push(`Game number must be between 1 and ${numberOfGames}`)
+    return errors
+  }
+
+  if (isMatchAlreadyWon(gamesWon1, gamesWon2, numberOfGames, gameNumber)) {
+    errors.push('Match is already finished, no more games allowed')
+  }
+
+  return errors
+}
+
+const isValidGameNumber = (
+  gameNumber: number,
+  numberOfGames: number,
+): boolean => {
+  return gameNumber >= 1 && gameNumber <= numberOfGames
+}
+
+const isMatchAlreadyWon = (
+  gamesWon1: number,
+  gamesWon2: number,
+  numberOfGames: number,
+  currentGameNumber: number,
+): boolean => {
+  const needed = gamesNeededToWin(numberOfGames)
+  // Count games won before the current game
+  const winsBeforeCurrent1 = gamesWon1
+  const winsBeforeCurrent2 = gamesWon2
+
+  return winsBeforeCurrent1 >= needed || winsBeforeCurrent2 >= needed
+}
+
+/**
+ * Validate score for a game
+ * Returns error messages if invalid
+ */
+export const validateGameScore = (
+  score1: number,
+  score2: number,
+  config: GameConfig,
+): string[] => {
+  const errors: string[] = []
+
+  if (!isNonNegativeScore(score1, score2)) {
+    errors.push('Score cannot be negative')
+    return errors
+  }
+
+  const scoreErrors = validateScoreLimit(score1, score2, config.targetPoints, config.isGolden)
+  errors.push(...scoreErrors)
+
+  return errors
+}
+
+const isNonNegativeScore = (score1: number, score2: number): boolean => {
+  return score1 >= 0 && score2 >= 0
+}
+
+/**
+ * Validate score doesn't exceed what's possible for the game type
+ */
+export const validateScoreLimit = (
+  score1: number,
+  score2: number,
+  targetPoints: number,
+  isGolden: boolean = false,
+): string[] => {
+  const errors: string[] = []
+  const maxScore = Math.max(score1, score2)
+  const minScore = Math.min(score1, score2)
+  const deucePoint = getDeucePoint(targetPoints)
+
+  if (isGolden) {
+    return validateGoldenGameScore(maxScore, targetPoints)
+  }
+
+  return validateRegularGameScore(maxScore, minScore, targetPoints, deucePoint)
+}
+
+const validateGoldenGameScore = (
+  maxScore: number,
+  targetPoints: number,
+): string[] => {
+  const errors: string[] = []
+
+  // For golden games, winner is whoever reaches target first
+  if (maxScore > targetPoints) {
+    errors.push(`Score cannot exceed ${targetPoints} for golden games`)
+  }
+
+  return errors
+}
+
+const validateRegularGameScore = (
+  maxScore: number,
+  minScore: number,
+  targetPoints: number,
+  deucePoint: number,
+): string[] => {
+  const errors: string[] = []
+
+  // Before deuce: score cannot exceed target
+  if (minScore < deucePoint) {
+    if (maxScore > targetPoints) {
+      errors.push(`Score cannot exceed ${targetPoints} when below deuce point`)
+    }
+    return errors
+  }
+
+  // At deuce (both at deucePoint or higher)
+  // Game ends when someone leads by 2
+  if (maxScore - minScore > 2) {
+    errors.push('At deuce, game ends when one side leads by 2')
+  }
+
+  return errors
+}
+
+/**
+ * Check if a score represents a complete game (has a winner)
+ */
+export const isGameComplete = (
+  score1: number,
+  score2: number,
+  config: GameConfig,
+): boolean => {
+  return determineGameWinner(score1, score2, config) !== undefined
+}
+
+/**
+ * Check if adding more games is allowed for a match
+ */
+export const canAddMoreGames = (
+  gamesWon1: number,
+  gamesWon2: number,
+  numberOfGames: number,
+): boolean => {
+  const needed = gamesNeededToWin(numberOfGames)
+  return gamesWon1 < needed && gamesWon2 < needed
+}
