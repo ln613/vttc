@@ -117,6 +117,7 @@ const ScoreBox = ({ side, isLeft }: ScoreBoxProps) => {
   const servingSide = useGamePlaySelector((s) => s.servingSide)
   const score = useScore(side)
   const gamesWon = useGamesWon(side)
+  const timeout = useTimeout(side)
   const players = usePlayersForSide(side)
   const isServing = servingSide === side
   const pointBoxRef = useRef<HTMLDivElement>(null)
@@ -152,6 +153,10 @@ const ScoreBox = ({ side, isLeft }: ScoreBoxProps) => {
     gamePlayActions.deductPointFromSide(side)
   }
 
+  const handleToggleTimeout = () => {
+    gamePlayActions.toggleTimeout(side)
+  }
+
   return (
     <div style={scoreBoxWrapperStyle}>
       <ParticipantNames players={players} />
@@ -167,6 +172,7 @@ const ScoreBox = ({ side, isLeft }: ScoreBoxProps) => {
           <div style={getScoreDisplayStyle(fontSize)}>{score}</div>
         </div>
         <GamesWonBadge gamesWon={gamesWon} isLeft={isLeft} />
+        <TimeoutBadge timeout={timeout} isLeft={isLeft} onToggle={handleToggleTimeout} />
       </div>
       <button style={getMinusButtonStyle(isServing)} onClick={handleDeductPoint}>
         −
@@ -188,6 +194,26 @@ const GamesWonBadge = ({ gamesWon, isLeft }: GamesWonBadgeProps) => {
   )
 }
 
+interface TimeoutBadgeProps {
+  timeout: boolean
+  isLeft: boolean
+  onToggle: () => void
+}
+
+const TimeoutBadge = ({ timeout, isLeft, onToggle }: TimeoutBadgeProps) => {
+  return (
+    <div
+      style={getTimeoutBadgeStyle(isLeft, timeout)}
+      onClick={(e) => {
+        e.stopPropagation()
+        onToggle()
+      }}
+    >
+      T
+    </div>
+  )
+}
+
 const useScore = (side: 1 | 2): number => {
   const score1 = useGamePlaySelector((s) => s.score1)
   const score2 = useGamePlaySelector((s) => s.score2)
@@ -198,6 +224,12 @@ const useGamesWon = (side: 1 | 2): number => {
   const match = gamePlayActions.getCurrentMatch()
   if (!match) return 0
   return side === 1 ? match.gamesWon1 : match.gamesWon2
+}
+
+const useTimeout = (side: 1 | 2): boolean => {
+  const timeout1 = useGamePlaySelector((s) => s.timeout1)
+  const timeout2 = useGamePlaySelector((s) => s.timeout2)
+  return side === 1 ? timeout1 : timeout2
 }
 
 const usePlayersForSide = (side: 1 | 2): Player[] => {
@@ -382,6 +414,23 @@ const getGamesWonBadgeStyle = (isLeft: boolean): React.CSSProperties => ({
   justifyContent: 'center',
   borderRadius: isLeft ? '0 0 0 8px' : '0 0 8px 0',
   zIndex: 10,
+})
+
+const getTimeoutBadgeStyle = (isLeft: boolean, timeout: boolean): React.CSSProperties => ({
+  position: 'absolute',
+  top: 0,
+  [isLeft ? 'left' : 'right']: 0,
+  backgroundColor: timeout ? '#333' : 'rgba(255, 255, 255, 0.9)',
+  color: timeout ? '#fff' : '#000',
+  fontSize: '48px',
+  fontWeight: 700,
+  minWidth: '64px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: isLeft ? '0 0 8px 0' : '0 0 0 8px',
+  zIndex: 10,
+  cursor: 'pointer',
 })
 
 const participantNamesStyle: React.CSSProperties = {

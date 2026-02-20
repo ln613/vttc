@@ -34,6 +34,7 @@
   - red bg for the serving side, blue for the other
 - "-" button (under the point box, full width, dark red for the serving side, dark blue for the other)
 - show the number of games won at the top-right corner for the left score box, or the top-left corner for the right score box (it will cover part of the "+" button and part of the big point box)
+- show "T" at the top-left corner for the right score box, or the top-right corner for the left score box
 
 ### interaction
 
@@ -41,6 +42,7 @@
 - click on "+" button or anywhere in the point box: add 1 point
 - click on "-" button: deduct 1 point (min 0)
 - when score change, call the update game API (debounce for 3 secs)
+- click on "T" toggles the style of "T" (dark bg white text or white bg black text), the dark bg means the timeout has been called by the player(s) on that side 
 
 ## Init Dialog (show on load)
 

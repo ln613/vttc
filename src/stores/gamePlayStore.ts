@@ -18,6 +18,8 @@ interface GamePlayState extends AsyncState<Event> {
   showInitDialog: boolean
   isSaving: boolean
   saveError: string | null
+  timeout1: boolean
+  timeout2: boolean
 }
 
 const createInitialState = (): GamePlayState => ({
@@ -35,6 +37,8 @@ const createInitialState = (): GamePlayState => ({
   showInitDialog: true,
   isSaving: false,
   saveError: null,
+  timeout1: false,
+  timeout2: false,
 })
 
 const gamePlayStore = createStore<GamePlayState>(createInitialState())
@@ -86,6 +90,15 @@ export const gamePlayActions = {
 
   setLeftSide: (side: 1 | 2) => {
     gamePlayStore.setState({ leftSide: side })
+  },
+
+  toggleTimeout: (side: 1 | 2) => {
+    const state = gamePlayStore.getState()
+    if (side === 1) {
+      gamePlayStore.setState({ timeout1: !state.timeout1 })
+    } else {
+      gamePlayStore.setState({ timeout2: !state.timeout2 })
+    }
   },
 
   confirmInitDialog: () => {
