@@ -1,28 +1,31 @@
+import { Show, For, onMount } from 'solid-js'
 import type { Player } from '../../shared/types/Player'
-import { usePlayerStore, playerActions } from '../stores/playerStore'
+import { playerState, playerActions } from '../stores/playerStore'
 
 export const PlayerList = () => {
-  const { data: players, loading, error } = usePlayerStore()
-
-  if (!players && !loading) {
-    playerActions.fetchPlayers()
-  }
-
-  if (loading) return <div>Loading...</div>
-  if (error) return <div>Error: {error}</div>
-  if (!players) return null
+  onMount(() => {
+    if (!playerState.data && !playerState.loading) {
+      playerActions.fetchPlayers()
+    }
+  })
 
   return (
-    <ul>
-      {players.map((player) => (
-        <PlayerItem key={player._id} player={player} />
-      ))}
-    </ul>
+    <Show when={!playerState.loading} fallback={<div>Loading...</div>}>
+      <Show when={!playerState.error} fallback={<div>Error: {playerState.error}</div>}>
+        <Show when={playerState.data}>
+          <ul>
+            <For each={playerState.data}>
+              {(player) => <PlayerItem player={player} />}
+            </For>
+          </ul>
+        </Show>
+      </Show>
+    </Show>
   )
 }
 
-const PlayerItem = ({ player }: { player: Player }) => (
+const PlayerItem = (props: { player: Player }) => (
   <li>
-    {player.firstName} {player.lastName} - {player.rating}
+    {props.player.firstName} {props.player.lastName} - {props.player.rating}
   </li>
 )

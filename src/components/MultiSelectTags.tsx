@@ -1,4 +1,4 @@
-import React from 'react'
+import { Show, For, type JSX } from 'solid-js'
 
 interface MultiSelectTagsProps {
   label?: string
@@ -7,89 +7,82 @@ interface MultiSelectTagsProps {
   onChange: (selectedValues: string[]) => void
   singleSelect?: boolean
   vertical?: boolean
-  className?: string
+  class?: string
 }
 
-const MultiSelectTags: React.FC<MultiSelectTagsProps> = ({
-  label,
-  options,
-  selectedValues,
-  onChange,
-  singleSelect = false,
-  vertical = false,
-  className = '',
-}) => {
-  const containerStyle: React.CSSProperties = {
-    marginBottom: '16px',
-  }
+const containerStyle: JSX.CSSProperties = {
+  'margin-bottom': '16px',
+}
 
-  const labelStyle: React.CSSProperties = {
-    display: 'block',
-    fontWeight: 700,
-    fontSize: '14px',
-    marginBottom: '8px',
-    color: '#333',
-    textAlign: 'left',
-  }
+const labelStyle: JSX.CSSProperties = {
+  display: 'block',
+  'font-weight': 700,
+  'font-size': '14px',
+  'margin-bottom': '8px',
+  color: '#333',
+  'text-align': 'left',
+}
 
-  const tagsContainerStyle: React.CSSProperties = vertical
-    ? {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '8px',
-      }
-    : {
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '8px',
-        maxHeight: '140px',
-        overflowY: 'auto',
-      }
+const MultiSelectTags = (props: MultiSelectTagsProps) => {
+  const tagsContainerStyle = (): JSX.CSSProperties =>
+    props.vertical
+      ? {
+          display: 'flex',
+          'flex-direction': 'column',
+          gap: '8px',
+        }
+      : {
+          display: 'flex',
+          'flex-wrap': 'wrap',
+          gap: '8px',
+          'max-height': '140px',
+          'overflow-y': 'auto',
+        }
 
   const handleTagClick = (option: string) => {
-    const isSelected = selectedValues.includes(option)
-    if (singleSelect) {
+    const isSelected = props.selectedValues.includes(option)
+    if (props.singleSelect) {
       if (!isSelected) {
-        onChange([option])
+        props.onChange([option])
       }
     } else {
       if (isSelected) {
-        onChange(selectedValues.filter((v) => v !== option))
+        props.onChange(props.selectedValues.filter((v) => v !== option))
       } else {
-        onChange([...selectedValues, option])
+        props.onChange([...props.selectedValues, option])
       }
     }
   }
 
-  const getTagStyle = (option: string): React.CSSProperties => {
-    const isSelected = selectedValues.includes(option)
+  const getTagStyle = (option: string): JSX.CSSProperties => {
+    const isSelected = props.selectedValues.includes(option)
     return {
       padding: '8px 16px',
-      borderRadius: '4px',
-      cursor: singleSelect && isSelected ? 'default' : 'pointer',
-      backgroundColor: isSelected ? '#3498db' : 'transparent',
+      'border-radius': '4px',
+      cursor: props.singleSelect && isSelected ? 'default' : 'pointer',
+      'background-color': isSelected ? '#3498db' : 'transparent',
       color: isSelected ? '#fff' : '#333',
       border: isSelected ? 'none' : '1px solid #ddd',
-      fontSize: '14px',
+      'font-size': '14px',
       transition: 'all 0.2s ease',
-      userSelect: 'none',
-      textAlign: 'center',
+      'user-select': 'none',
+      'text-align': 'center',
     }
   }
 
   return (
-    <div style={containerStyle} className={className}>
-      {label && <label style={labelStyle}>{label}</label>}
-      <div style={tagsContainerStyle}>
-        {options.map((option) => (
-          <span
-            key={option}
-            style={getTagStyle(option)}
-            onClick={() => handleTagClick(option)}
-          >
-            {option}
-          </span>
-        ))}
+    <div style={containerStyle} class={props.class ?? ''}>
+      <Show when={props.label}>
+        <label style={labelStyle}>{props.label}</label>
+      </Show>
+      <div style={tagsContainerStyle()}>
+        <For each={props.options}>
+          {(option) => (
+            <span style={getTagStyle(option)} onClick={() => handleTagClick(option)}>
+              {option}
+            </span>
+          )}
+        </For>
       </div>
     </div>
   )

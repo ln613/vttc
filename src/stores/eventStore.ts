@@ -1,6 +1,6 @@
+import { createStore } from 'solid-js/store'
 import type { TournamentType, Participant } from '../../shared/types/Tournament'
 import { apiGet } from '../utils/api'
-import { createStore, createAsyncState, type AsyncState } from './createStore'
 
 export interface EventOption {
   _id: string
@@ -15,50 +15,50 @@ export interface EventOption {
   date: string
 }
 
-interface EventState extends AsyncState<EventOption[]> {}
+interface EventState {
+  data: EventOption[] | null
+  loading: boolean
+  error: string | null
+}
 
-const eventStore = createStore<EventState>(createAsyncState<EventOption[]>())
+const getInitialState = (): EventState => ({
+  data: null,
+  loading: false,
+  error: null,
+})
 
-export const {
-  useStore: useEventStore,
-  useSelector: useEventSelector,
-  getState: getEventState,
-} = eventStore
+const [eventState, setEventState] = createStore<EventState>(getInitialState())
+
+export { eventState }
 
 export const eventActions = {
   fetchEvents: async () => {
-    setLoadingState()
+    setEventState({ loading: true, error: null })
     try {
       const data = await apiGet<EventOption[]>('events')
-      setSuccessState(data)
+      setEventState({ data, loading: false, error: null })
     } catch (err) {
-      setErrorState(err)
+      setEventState({
+        loading: false,
+        error: err instanceof Error ? err.message : 'Failed to fetch events',
+      })
     }
   },
 
   refreshEvents: async () => {
     try {
       const data = await apiGet<EventOption[]>('events')
-      setSuccessState(data)
+      setEventState({ data, loading: false, error: null })
     } catch (err) {
-      setErrorState(err)
+      setEventState({
+        loading: false,
+        error: err instanceof Error ? err.message : 'Failed to fetch events',
+      })
     }
   },
 
-  getEventById: (_id: string): EventOption | undefined => {
-    const state = eventStore.getState()
-    return state.data?.find((e) => e._id === _id)
-  },
+  getEventById: (_id: string): EventOption | undefined =>
+    eventState.data?.find((e) => e._id === _id),
+
+  reset: () => setEventState(getInitialState()),
 }
-
-const setLoadingState = () =>
-  eventStore.setState({ loading: true, error: null })
-
-const setSuccessState = (data: EventOption[]) =>
-  eventStore.setState({ data, loading: false, error: null })
-
-const setErrorState = (err: unknown) =>
-  eventStore.setState({
-    loading: false,
-    error: err instanceof Error ? err.message : 'Failed to fetch events',
-  })

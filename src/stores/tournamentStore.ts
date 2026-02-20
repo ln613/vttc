@@ -1,6 +1,6 @@
+import { createStore } from 'solid-js/store'
 import type { StagesType, TournamentType } from '../../shared/types'
 import { apiGet } from '../utils/api'
-import { createStore, createAsyncState, type AsyncState } from './createStore'
 
 export interface Tournament {
   _id: string
@@ -10,44 +10,41 @@ export interface Tournament {
   stagesType: StagesType
 }
 
-interface TournamentState extends AsyncState<Tournament[]> {}
+interface TournamentState {
+  data: Tournament[] | null
+  loading: boolean
+  error: string | null
+}
 
-const tournamentStore = createStore<TournamentState>(createAsyncState<Tournament[]>())
+const getInitialState = (): TournamentState => ({
+  data: null,
+  loading: false,
+  error: null,
+})
 
-export const {
-  useStore: useTournamentStore,
-  useSelector: useTournamentSelector,
-  getState: getTournamentState,
-} = tournamentStore
+const [tournamentState, setTournamentState] =
+  createStore<TournamentState>(getInitialState())
+
+export { tournamentState }
 
 export const tournamentActions = {
   fetchTournaments: async () => {
-    const state = tournamentStore.getState()
-    if (state.data || state.loading) return
+    if (tournamentState.data || tournamentState.loading) return
 
-    setLoadingState()
+    setTournamentState({ loading: true, error: null })
     try {
       const data = await apiGet<Tournament[]>('tournaments')
-      setSuccessState(data)
+      setTournamentState({ data, loading: false, error: null })
     } catch (err) {
-      setErrorState(err)
+      setTournamentState({
+        loading: false,
+        error: err instanceof Error ? err.message : 'Failed to fetch tournaments',
+      })
     }
   },
 
-  getTournamentById: (_id: string): Tournament | undefined => {
-    const state = tournamentStore.getState()
-    return state.data?.find((t) => t._id === _id)
-  },
+  getTournamentById: (_id: string): Tournament | undefined =>
+    tournamentState.data?.find((t) => t._id === _id),
+
+  reset: () => setTournamentState(getInitialState()),
 }
-
-const setLoadingState = () =>
-  tournamentStore.setState({ loading: true, error: null })
-
-const setSuccessState = (data: Tournament[]) =>
-  tournamentStore.setState({ data, loading: false, error: null })
-
-const setErrorState = (err: unknown) =>
-  tournamentStore.setState({
-    loading: false,
-    error: err instanceof Error ? err.message : 'Failed to fetch tournaments',
-  })

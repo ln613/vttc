@@ -1,10 +1,13 @@
+import { createStore } from 'solid-js/store'
 import type { Event, BestOfOption } from '../../shared/types/Tournament'
 import type { Match } from '../../shared/types/Match'
 import type { Player } from '../../shared/types/Player'
 import { apiGet, apiPost } from '../utils/api'
-import { createStore, createAsyncState, type AsyncState } from './createStore'
 
-interface GamePlayState extends AsyncState<Event> {
+interface GamePlayState {
+  data: Event | null
+  loading: boolean
+  error: string | null
   eventId: string | null
   stage: 'group' | 'knockout'
   groupIndex: number
@@ -22,8 +25,10 @@ interface GamePlayState extends AsyncState<Event> {
   timeout2: boolean
 }
 
-const createInitialState = (): GamePlayState => ({
-  ...createAsyncState<Event>(),
+const getInitialState = (): GamePlayState => ({
+  data: null,
+  loading: false,
+  error: null,
   eventId: null,
   stage: 'group',
   groupIndex: 0,
@@ -41,221 +46,14 @@ const createInitialState = (): GamePlayState => ({
   timeout2: false,
 })
 
-const gamePlayStore = createStore<GamePlayState>(createInitialState())
+const [gamePlayState, setGamePlayState] =
+  createStore<GamePlayState>(getInitialState())
 
 // Debounce timer reference
 let saveDebounceTimer: ReturnType<typeof setTimeout> | null = null
 const SAVE_DEBOUNCE_MS = 3000
 
-export const {
-  useStore: useGamePlayStore,
-  useSelector: useGamePlaySelector,
-  getState: getGamePlayState,
-} = gamePlayStore
-
-export const gamePlayActions = {
-  initializeFromUrl: async (params: URLSearchParams) => {
-    const eventId = params.get('eventId')
-    const stage = params.get('stage') as 'group' | 'knockout'
-    const groupIndex = parseInt(params.get('groupIndex') || '0', 10)
-    const matchId = params.get('matchId')
-
-    validateParams(eventId, matchId)
-
-    gamePlayStore.setState({
-      eventId,
-      stage,
-      groupIndex,
-      matchId,
-      currentGameIndex: 0,
-      score1: 0,
-      score2: 0,
-      servingSide: 1,
-      initialServingSide: 1,
-      leftSide: 1,
-      showInitDialog: true,
-      isSaving: false,
-      saveError: null,
-    })
-
-    await fetchEvent(eventId!)
-  },
-
-  setInitialServingSide: (side: 1 | 2) => {
-    gamePlayStore.setState({
-      initialServingSide: side,
-      servingSide: side,
-    })
-  },
-
-  setLeftSide: (side: 1 | 2) => {
-    gamePlayStore.setState({ leftSide: side })
-  },
-
-  toggleTimeout: (side: 1 | 2) => {
-    const state = gamePlayStore.getState()
-    if (side === 1) {
-      gamePlayStore.setState({ timeout1: !state.timeout1 })
-    } else {
-      gamePlayStore.setState({ timeout2: !state.timeout2 })
-    }
-  },
-
-  confirmInitDialog: () => {
-    gamePlayStore.setState({ showInitDialog: false })
-  },
-
-  addPointToSide: (side: 1 | 2) => {
-    const state = gamePlayStore.getState()
-    const newScore1 = side === 1 ? state.score1 + 1 : state.score1
-    const newScore2 = side === 2 ? state.score2 + 1 : state.score2
-    const newServingSide = calculateServingSide(
-      newScore1,
-      newScore2,
-      state.initialServingSide,
-    )
-
-    gamePlayStore.setState({
-      score1: newScore1,
-      score2: newScore2,
-      servingSide: newServingSide,
-    })
-
-    debouncedSaveGame()
-  },
-
-  deductPointFromSide: (side: 1 | 2) => {
-    const state = gamePlayStore.getState()
-    const newScore1 = side === 1 ? Math.max(0, state.score1 - 1) : state.score1
-    const newScore2 = side === 2 ? Math.max(0, state.score2 - 1) : state.score2
-    const newServingSide = calculateServingSide(
-      newScore1,
-      newScore2,
-      state.initialServingSide,
-    )
-
-    gamePlayStore.setState({
-      score1: newScore1,
-      score2: newScore2,
-      servingSide: newServingSide,
-    })
-
-    debouncedSaveGame()
-  },
-
-  getCurrentMatch: (): Match | undefined => {
-    const state = gamePlayStore.getState()
-    if (!state.data || !state.matchId) return undefined
-
-    const stages = state.data.eventStages || []
-    
-    // Check group stage
-    const groupStage = stages.find((s) => s.type === 'group')
-    if (groupStage && groupStage.type === 'group') {
-      const group = groupStage.groups.find((g) => g.index === state.groupIndex)
-      if (group) {
-        const match = group.matches.find((m) => m._id === state.matchId)
-        if (match) return match
-      }
-    }
-
-    // Check knockout stage
-    const knockoutStage = stages.find((s) => s.type === 'knockout')
-    if (knockoutStage && knockoutStage.type === 'knockout') {
-      for (const round of knockoutStage.rounds) {
-        const knockoutMatch = round.matches.find((m) => m.match?._id === state.matchId)
-        if (knockoutMatch?.match) return knockoutMatch.match
-      }
-    }
-
-    return undefined
-  },
-
-  getSide1Players: (): Player[] => {
-    const match = gamePlayActions.getCurrentMatch()
-    return match?.side1 || []
-  },
-
-  getSide2Players: (): Player[] => {
-    const match = gamePlayActions.getCurrentMatch()
-    return match?.side2 || []
-  },
-
-  getLeftSidePlayers: (): Player[] => {
-    const state = gamePlayStore.getState()
-    return state.leftSide === 1
-      ? gamePlayActions.getSide1Players()
-      : gamePlayActions.getSide2Players()
-  },
-
-  getRightSidePlayers: (): Player[] => {
-    const state = gamePlayStore.getState()
-    return state.leftSide === 1
-      ? gamePlayActions.getSide2Players()
-      : gamePlayActions.getSide1Players()
-  },
-
-  getStageName: (): string => {
-    const state = gamePlayStore.getState()
-    if (state.stage === 'group') {
-      return `Group ${state.groupIndex + 1}`
-    }
-    // For knockout, we would need more info to determine round name
-    return 'Knockout'
-  },
-
-  getNumberOfGames: (): number => {
-    const state = gamePlayStore.getState()
-    if (!state.data) return 5
-
-    const bestOf =
-      state.stage === 'group'
-        ? state.data.groupGames
-        : state.data.knockoutGames
-
-    return parseBestOfOption(bestOf)
-  },
-
-  getParticipantName: (side: 1 | 2): string => {
-    const players = side === 1
-      ? gamePlayActions.getSide1Players()
-      : gamePlayActions.getSide2Players()
-    return formatPlayerNames(players)
-  },
-
-  saveGame: async () => {
-    const state = gamePlayStore.getState()
-    if (!state.eventId || !state.matchId) return
-
-    gamePlayStore.setState({ isSaving: true, saveError: null })
-
-    try {
-      await apiPost('updateGame', {
-        _id: state.eventId,
-        matchId: state.matchId,
-        gameNumber: state.currentGameIndex + 1,
-        score: {
-          score1: state.score1,
-          score2: state.score2,
-        },
-      })
-      gamePlayStore.setState({ isSaving: false })
-    } catch (err) {
-      gamePlayStore.setState({
-        isSaving: false,
-        saveError: err instanceof Error ? err.message : 'Failed to save game',
-      })
-    }
-  },
-
-  reset: () => {
-    if (saveDebounceTimer) {
-      clearTimeout(saveDebounceTimer)
-      saveDebounceTimer = null
-    }
-    gamePlayStore.setState(createInitialState())
-  },
-}
+export { gamePlayState }
 
 const validateParams = (eventId: string | null, matchId: string | null) => {
   if (!eventId) throw new Error('Event ID is required')
@@ -263,26 +61,17 @@ const validateParams = (eventId: string | null, matchId: string | null) => {
 }
 
 const fetchEvent = async (eventId: string) => {
-  setLoadingState()
+  setGamePlayState({ loading: true, error: null })
   try {
     const data = await apiGet<Event>('event', { _id: eventId })
-    setSuccessState(data)
+    setGamePlayState({ data, loading: false, error: null })
   } catch (err) {
-    setErrorState(err)
+    setGamePlayState({
+      loading: false,
+      error: err instanceof Error ? err.message : 'Failed to fetch event',
+    })
   }
 }
-
-const setLoadingState = () =>
-  gamePlayStore.setState({ loading: true, error: null })
-
-const setSuccessState = (data: Event) =>
-  gamePlayStore.setState({ data, loading: false, error: null })
-
-const setErrorState = (err: unknown) =>
-  gamePlayStore.setState({
-    loading: false,
-    error: err instanceof Error ? err.message : 'Failed to fetch event',
-  })
 
 const calculateServingSide = (
   score1: number,
@@ -319,4 +108,198 @@ const debouncedSaveGame = () => {
     gamePlayActions.saveGame()
     saveDebounceTimer = null
   }, SAVE_DEBOUNCE_MS)
+}
+
+export const gamePlayActions = {
+  initializeFromUrl: async (params: URLSearchParams) => {
+    const eventId = params.get('eventId')
+    const stage = params.get('stage') as 'group' | 'knockout'
+    const groupIndex = parseInt(params.get('groupIndex') || '0', 10)
+    const matchId = params.get('matchId')
+
+    validateParams(eventId, matchId)
+
+    setGamePlayState({
+      eventId,
+      stage,
+      groupIndex,
+      matchId,
+      currentGameIndex: 0,
+      score1: 0,
+      score2: 0,
+      servingSide: 1,
+      initialServingSide: 1,
+      leftSide: 1,
+      showInitDialog: true,
+      isSaving: false,
+      saveError: null,
+    })
+
+    await fetchEvent(eventId!)
+  },
+
+  setInitialServingSide: (side: 1 | 2) => {
+    setGamePlayState({
+      initialServingSide: side,
+      servingSide: side,
+    })
+  },
+
+  setLeftSide: (side: 1 | 2) => {
+    setGamePlayState({ leftSide: side })
+  },
+
+  toggleTimeout: (side: 1 | 2) => {
+    if (side === 1) {
+      setGamePlayState({ timeout1: !gamePlayState.timeout1 })
+    } else {
+      setGamePlayState({ timeout2: !gamePlayState.timeout2 })
+    }
+  },
+
+  confirmInitDialog: () => {
+    setGamePlayState({ showInitDialog: false })
+  },
+
+  addPointToSide: (side: 1 | 2) => {
+    const newScore1 = side === 1 ? gamePlayState.score1 + 1 : gamePlayState.score1
+    const newScore2 = side === 2 ? gamePlayState.score2 + 1 : gamePlayState.score2
+    const newServingSide = calculateServingSide(
+      newScore1,
+      newScore2,
+      gamePlayState.initialServingSide,
+    )
+
+    setGamePlayState({
+      score1: newScore1,
+      score2: newScore2,
+      servingSide: newServingSide,
+    })
+
+    debouncedSaveGame()
+  },
+
+  deductPointFromSide: (side: 1 | 2) => {
+    const newScore1 = side === 1 ? Math.max(0, gamePlayState.score1 - 1) : gamePlayState.score1
+    const newScore2 = side === 2 ? Math.max(0, gamePlayState.score2 - 1) : gamePlayState.score2
+    const newServingSide = calculateServingSide(
+      newScore1,
+      newScore2,
+      gamePlayState.initialServingSide,
+    )
+
+    setGamePlayState({
+      score1: newScore1,
+      score2: newScore2,
+      servingSide: newServingSide,
+    })
+
+    debouncedSaveGame()
+  },
+
+  getCurrentMatch: (): Match | undefined => {
+    if (!gamePlayState.data || !gamePlayState.matchId) return undefined
+
+    const stages = gamePlayState.data.eventStages || []
+
+    // Check group stage
+    const groupStage = stages.find((s) => s.type === 'group')
+    if (groupStage && groupStage.type === 'group') {
+      const group = groupStage.groups.find((g) => g.index === gamePlayState.groupIndex)
+      if (group) {
+        const match = group.matches.find((m) => m._id === gamePlayState.matchId)
+        if (match) return match
+      }
+    }
+
+    // Check knockout stage
+    const knockoutStage = stages.find((s) => s.type === 'knockout')
+    if (knockoutStage && knockoutStage.type === 'knockout') {
+      for (const round of knockoutStage.rounds) {
+        const knockoutMatch = round.matches.find((m) => m.match?._id === gamePlayState.matchId)
+        if (knockoutMatch?.match) return knockoutMatch.match
+      }
+    }
+
+    return undefined
+  },
+
+  getSide1Players: (): Player[] => {
+    const match = gamePlayActions.getCurrentMatch()
+    return match?.side1 || []
+  },
+
+  getSide2Players: (): Player[] => {
+    const match = gamePlayActions.getCurrentMatch()
+    return match?.side2 || []
+  },
+
+  getLeftSidePlayers: (): Player[] =>
+    gamePlayState.leftSide === 1
+      ? gamePlayActions.getSide1Players()
+      : gamePlayActions.getSide2Players(),
+
+  getRightSidePlayers: (): Player[] =>
+    gamePlayState.leftSide === 1
+      ? gamePlayActions.getSide2Players()
+      : gamePlayActions.getSide1Players(),
+
+  getStageName: (): string => {
+    if (gamePlayState.stage === 'group') {
+      return `Group ${gamePlayState.groupIndex + 1}`
+    }
+    // For knockout, we would need more info to determine round name
+    return 'Knockout'
+  },
+
+  getNumberOfGames: (): number => {
+    if (!gamePlayState.data) return 5
+
+    const bestOf =
+      gamePlayState.stage === 'group'
+        ? gamePlayState.data.groupGames
+        : gamePlayState.data.knockoutGames
+
+    return parseBestOfOption(bestOf)
+  },
+
+  getParticipantName: (side: 1 | 2): string => {
+    const players =
+      side === 1
+        ? gamePlayActions.getSide1Players()
+        : gamePlayActions.getSide2Players()
+    return formatPlayerNames(players)
+  },
+
+  saveGame: async () => {
+    if (!gamePlayState.eventId || !gamePlayState.matchId) return
+
+    setGamePlayState({ isSaving: true, saveError: null })
+
+    try {
+      await apiPost('updateGame', {
+        _id: gamePlayState.eventId,
+        matchId: gamePlayState.matchId,
+        gameNumber: gamePlayState.currentGameIndex + 1,
+        score: {
+          score1: gamePlayState.score1,
+          score2: gamePlayState.score2,
+        },
+      })
+      setGamePlayState({ isSaving: false })
+    } catch (err) {
+      setGamePlayState({
+        isSaving: false,
+        saveError: err instanceof Error ? err.message : 'Failed to save game',
+      })
+    }
+  },
+
+  reset: () => {
+    if (saveDebounceTimer) {
+      clearTimeout(saveDebounceTimer)
+      saveDebounceTimer = null
+    }
+    setGamePlayState(getInitialState())
+  },
 }

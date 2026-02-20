@@ -1,4 +1,3 @@
-import React from 'react'
 import MultiSelectTags from './MultiSelectTags'
 
 interface SingleSelectTagsProps {
@@ -7,32 +6,25 @@ interface SingleSelectTagsProps {
   selectedValue: string | null
   onChange: (selectedValue: string) => void
   vertical?: boolean
-  className?: string
+  class?: string
 }
 
-const SingleSelectTags: React.FC<SingleSelectTagsProps> = ({
-  label,
-  options,
-  selectedValue,
-  onChange,
-  vertical = false,
-  className = '',
-}) => {
+const SingleSelectTags = (props: SingleSelectTagsProps) => {
   const handleChange = (selectedValues: string[]) => {
     if (selectedValues.length > 0) {
-      onChange(selectedValues[0])
+      props.onChange(selectedValues[0])
     }
   }
 
   return (
     <MultiSelectTags
-      label={label}
-      options={options}
-      selectedValues={selectedValue ? [selectedValue] : []}
+      label={props.label}
+      options={props.options}
+      selectedValues={props.selectedValue ? [props.selectedValue] : []}
       onChange={handleChange}
       singleSelect
-      vertical={vertical}
-      className={className}
+      vertical={props.vertical}
+      class={props.class}
     />
   )
 }

@@ -1,6 +1,6 @@
+import { createStore } from 'solid-js/store'
 import type { Participant } from '../../shared/types/Tournament'
 import { apiPost } from '../utils/api'
-import { createStore } from './createStore'
 import { eventActions, type EventOption } from './eventStore'
 import { playerActions } from './playerStore'
 
@@ -16,17 +16,17 @@ interface EventParticipantEditState {
   saving: boolean
 }
 
-const eventParticipantEditStore = createStore<EventParticipantEditState>({
+const getInitialState = (): EventParticipantEditState => ({
   selectedEventId: '',
   showAddDialog: false,
   toastMessage: null,
   saving: false,
 })
 
-export const {
-  useStore: useEventParticipantEditStore,
-  useSelector: useEventParticipantEditSelector,
-} = eventParticipantEditStore
+const [eventParticipantEditState, setEventParticipantEditState] =
+  createStore<EventParticipantEditState>(getInitialState())
+
+export { eventParticipantEditState }
 
 export const eventParticipantEditActions = {
   init: () => {
@@ -35,30 +35,30 @@ export const eventParticipantEditActions = {
   },
 
   setSelectedEventId: (id: string) => {
-    eventParticipantEditStore.setState({ selectedEventId: id })
+    setEventParticipantEditState({ selectedEventId: id })
   },
 
   openAddDialog: () => {
-    eventParticipantEditStore.setState({ showAddDialog: true })
+    setEventParticipantEditState({ showAddDialog: true })
   },
 
   closeAddDialog: () => {
-    eventParticipantEditStore.setState({ showAddDialog: false })
+    setEventParticipantEditState({ showAddDialog: false })
   },
 
   showToast: (type: 'success' | 'error', text: string) => {
-    eventParticipantEditStore.setState({ toastMessage: { type, text } })
+    setEventParticipantEditState({ toastMessage: { type, text } })
     setTimeout(() => {
-      eventParticipantEditStore.setState({ toastMessage: null })
+      setEventParticipantEditState({ toastMessage: null })
     }, 3000)
   },
 
   addParticipant: async (playerIds: string[]) => {
-    const { selectedEventId } = eventParticipantEditStore.getState()
+    const { selectedEventId } = eventParticipantEditState
     const selectedEvent = eventActions.getEventById(selectedEventId)
     if (!selectedEvent) return
 
-    eventParticipantEditStore.setState({ saving: true })
+    setEventParticipantEditState({ saving: true })
 
     try {
       await apiPost('addParticipant', {
@@ -66,19 +66,19 @@ export const eventParticipantEditActions = {
         playerIds,
       })
       eventParticipantEditActions.showToast('success', 'Participant added successfully')
-      eventParticipantEditStore.setState({ showAddDialog: false, saving: false })
+      setEventParticipantEditState({ showAddDialog: false, saving: false })
       await eventActions.refreshEvents()
     } catch (error) {
       eventParticipantEditActions.showToast(
         'error',
         error instanceof Error ? error.message : 'Failed to add participant',
       )
-      eventParticipantEditStore.setState({ saving: false })
+      setEventParticipantEditState({ saving: false })
     }
   },
 
   deleteParticipant: async (participantId: string) => {
-    const { selectedEventId } = eventParticipantEditStore.getState()
+    const { selectedEventId } = eventParticipantEditState
     const selectedEvent = eventActions.getEventById(selectedEventId)
     if (!selectedEvent) return
 
@@ -100,19 +100,10 @@ export const eventParticipantEditActions = {
     }
   },
 
-  getSelectedEvent: (): EventOption | undefined => {
-    const { selectedEventId } = eventParticipantEditStore.getState()
-    return eventActions.getEventById(selectedEventId)
-  },
+  getSelectedEvent: (): EventOption | undefined =>
+    eventActions.getEventById(eventParticipantEditState.selectedEventId),
 
-  reset: () => {
-    eventParticipantEditStore.setState({
-      selectedEventId: '',
-      showAddDialog: false,
-      toastMessage: null,
-      saving: false,
-    })
-  },
+  reset: () => setEventParticipantEditState(getInitialState()),
 }
 
 export const canShowDeleteColumn = (event: EventOption): boolean => {
@@ -137,9 +128,8 @@ export const getParticipantsCountText = (event: EventOption): string => {
   return `List of participants - ${count} / ${event.maxParticipants}`
 }
 
-export const calculateCombinedRating = (participant: Participant): number => {
-  return participant.players.reduce((sum, p) => sum + (p.rating || 0), 0)
-}
+export const calculateCombinedRating = (participant: Participant): number =>
+  participant.players.reduce((sum, p) => sum + (p.rating || 0), 0)
 
 export const calculateTopNCombinedRating = (
   participant: Participant,

@@ -1,6 +1,6 @@
+import { createStore } from 'solid-js/store'
 import type { BestOfOption, QualifiersCount } from '../../shared/types'
 import { apiPost } from '../utils/api'
-import { createStore } from './createStore'
 import { tournamentActions, type Tournament } from './tournamentStore'
 
 export interface EventEditFormData {
@@ -40,21 +40,20 @@ const defaultFormData: EventEditFormData = {
   handicapMaxPoints: '5',
 }
 
-const eventEditStore = createStore<EventEditState>({
+const getInitialState = (): EventEditState => ({
   formData: { ...defaultFormData },
   saving: false,
   error: null,
 })
 
-export const {
-  useStore: useEventEditStore,
-  useSelector: useEventEditSelector,
-  getState: getEventEditState,
-} = eventEditStore
+const [eventEditState, setEventEditState] =
+  createStore<EventEditState>(getInitialState())
+
+export { eventEditState }
 
 export const eventEditActions = {
   initForm: (initialData?: Partial<EventEditFormData>) => {
-    eventEditStore.setState({
+    setEventEditState({
       formData: { ...defaultFormData, ...initialData },
       saving: false,
       error: null,
@@ -65,8 +64,7 @@ export const eventEditActions = {
     field: K,
     value: EventEditFormData[K],
   ) => {
-    const { formData } = eventEditStore.getState()
-    const newFormData = { ...formData, [field]: value }
+    const newFormData = { ...eventEditState.formData, [field]: value }
 
     if (field === 'tournamentId' || field === 'date') {
       const updatedName = generateEventName(
@@ -78,51 +76,42 @@ export const eventEditActions = {
       }
     }
 
-    eventEditStore.setState({ formData: newFormData })
+    setEventEditState({ formData: newFormData })
   },
 
   saveEvent: async (onSuccess?: (data: EventEditFormData) => void) => {
-    const { formData } = eventEditStore.getState()
+    const { formData } = eventEditState
 
     if (!validateForm(formData)) {
-      eventEditStore.setState({ error: 'Please fill all required fields' })
+      setEventEditState({ error: 'Please fill all required fields' })
       return
     }
 
     const confirmed = window.confirm('Are you sure you want to save this event?')
     if (!confirmed) return
 
-    eventEditStore.setState({ saving: true, error: null })
+    setEventEditState({ saving: true, error: null })
 
     try {
       await apiPost('saveEvent', buildSavePayload(formData))
-      eventEditStore.setState({ saving: false })
+      setEventEditState({ saving: false })
       onSuccess?.(formData)
     } catch (err) {
-      eventEditStore.setState({
+      setEventEditState({
         saving: false,
         error: err instanceof Error ? err.message : 'Failed to save event',
       })
     }
   },
 
-  resetForm: () => {
-    eventEditStore.setState({
-      formData: { ...defaultFormData },
-      saving: false,
-      error: null,
-    })
-  },
+  resetForm: () => setEventEditState(getInitialState()),
 
-  getSelectedTournament: (): Tournament | undefined => {
-    const { formData } = eventEditStore.getState()
-    return tournamentActions.getTournamentById(formData.tournamentId)
-  },
+  getSelectedTournament: (): Tournament | undefined =>
+    tournamentActions.getTournamentById(eventEditState.formData.tournamentId),
 }
 
-const validateForm = (formData: EventEditFormData): boolean => {
-  return !!formData.tournamentId && !!formData.date && !!formData.name.trim()
-}
+const validateForm = (formData: EventEditFormData): boolean =>
+  !!formData.tournamentId && !!formData.date && !!formData.name.trim()
 
 const generateEventName = (
   tournamentId: string,

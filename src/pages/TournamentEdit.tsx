@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import { Show, onMount, onCleanup, type JSX } from 'solid-js'
 import { Header } from '../components/Header'
 import Input from '../components/Input'
 import SingleSelectTags from '../components/SingleSelectTags'
@@ -6,7 +6,7 @@ import Select from '../components/Select'
 import Button from '../components/Button'
 import Toggle from '../components/Toggle'
 import {
-  useTournamentEditStore,
+  tournamentEditState,
   tournamentEditActions,
   generateTopPlayersCountOptions,
   type TournamentEditFormData,
@@ -47,49 +47,49 @@ const generateAgeOptions = () => {
 const RATING_OPTIONS = generateRatingOptions()
 const AGE_OPTIONS = generateAgeOptions()
 
-const containerStyle: React.CSSProperties = {
+const containerStyle: JSX.CSSProperties = {
   display: 'flex',
-  flexDirection: 'column',
-  minHeight: '100vh',
+  'flex-direction': 'column',
+  'min-height': '100vh',
 }
 
-const contentStyle: React.CSSProperties = {
+const contentStyle: JSX.CSSProperties = {
   padding: '24px',
 }
 
-const titleStyle: React.CSSProperties = {
-  fontSize: '2rem',
-  fontWeight: 700,
-  textAlign: 'left',
-  marginBottom: '24px',
+const titleStyle: JSX.CSSProperties = {
+  'font-size': '2rem',
+  'font-weight': 700,
+  'text-align': 'left',
+  'margin-bottom': '24px',
   color: '#333',
 }
 
-const sectionTitleStyle: React.CSSProperties = {
-  fontSize: '14px',
-  fontWeight: 700,
-  marginTop: '24px',
-  marginBottom: '8px',
+const sectionTitleStyle: JSX.CSSProperties = {
+  'font-size': '14px',
+  'font-weight': 700,
+  'margin-top': '24px',
+  'margin-bottom': '8px',
   color: '#333',
-  textAlign: 'left',
+  'text-align': 'left',
 }
 
-const buttonContainerStyle: React.CSSProperties = {
+const buttonContainerStyle: JSX.CSSProperties = {
   display: 'flex',
   gap: '16px',
-  marginTop: '24px',
+  'margin-top': '24px',
 }
 
-const inlineRowStyle: React.CSSProperties = {
+const inlineRowStyle: JSX.CSSProperties = {
   display: 'flex',
-  alignItems: 'flex-end',
+  'align-items': 'flex-end',
   gap: '12px',
-  marginBottom: '16px',
+  'margin-bottom': '16px',
 }
 
-const inlineRowMiddleNoMarginStyle: React.CSSProperties = {
+const inlineRowMiddleNoMarginStyle: JSX.CSSProperties = {
   display: 'flex',
-  alignItems: 'center',
+  'align-items': 'center',
   gap: '12px',
 }
 
@@ -100,37 +100,33 @@ interface TournamentEditProps {
   onCancel?: () => void
 }
 
-const TournamentEdit: React.FC<TournamentEditProps> = ({
-  isEdit = false,
-  initialData,
-  onSave,
-  onCancel,
-}) => {
-  const { formData } = useTournamentEditStore()
+const TournamentEdit = (props: TournamentEditProps) => {
+  onMount(() => {
+    tournamentEditActions.initForm(props.initialData)
+  })
 
-  useEffect(() => {
-    tournamentEditActions.initForm(initialData)
-    return () => tournamentEditActions.resetForm()
-  }, [])
+  onCleanup(() => {
+    tournamentEditActions.resetForm()
+  })
 
   return (
     <div style={containerStyle}>
       <Header />
       <div style={contentStyle}>
         <h1 style={titleStyle}>
-          {isEdit ? 'Edit Tournament' : 'Add Tournament'}
+          {props.isEdit ? 'Edit Tournament' : 'Add Tournament'}
         </h1>
         <Input
           label="Name"
           name="name"
-          value={formData.name}
+          value={tournamentEditState.formData.name}
           onChange={(value) => tournamentEditActions.setField('name', value)}
           required
         />
         <SingleSelectTags
           label="Sex"
           options={SEX_OPTIONS}
-          selectedValue={formData.sex}
+          selectedValue={tournamentEditState.formData.sex}
           onChange={(value) =>
             tournamentEditActions.setField('sex', value as ParticipantSex)
           }
@@ -138,25 +134,25 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
         <SingleSelectTags
           label="Type"
           options={TYPE_OPTIONS}
-          selectedValue={formData.type}
+          selectedValue={tournamentEditState.formData.type}
           onChange={(value) =>
             tournamentEditActions.setField('type', value as TournamentType)
           }
         />
-        {formData.type === 'Team' && (
+        <Show when={tournamentEditState.formData.type === 'Team'}>
           <SingleSelectTags
             label="Team Size"
             options={TEAM_SIZE_OPTIONS}
-            selectedValue={formData.teamSize || '3'}
+            selectedValue={tournamentEditState.formData.teamSize || '3'}
             onChange={(value) =>
               tournamentEditActions.setField('teamSize', value)
             }
           />
-        )}
+        </Show>
         <SingleSelectTags
           label="Restriction"
           options={RESTRICTION_OPTIONS}
-          selectedValue={formData.restriction}
+          selectedValue={tournamentEditState.formData.restriction}
           onChange={(value) =>
             tournamentEditActions.setField(
               'restriction',
@@ -164,16 +160,16 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
             )
           }
         />
-        <RatingSection formData={formData} />
-        <AgeSection formData={formData} />
-        <StagesSection formData={formData} />
+        <RatingSection />
+        <AgeSection />
+        <StagesSection />
         <div style={buttonContainerStyle}>
-          <Button color="#e74c3c" onClick={onCancel}>
+          <Button color="#e74c3c" onClick={props.onCancel}>
             Cancel
           </Button>
           <Button
             color="#27ae60"
-            onClick={() => tournamentEditActions.saveTournament(onSave)}
+            onClick={() => tournamentEditActions.saveTournament(props.onSave)}
           >
             Save
           </Button>
@@ -183,99 +179,81 @@ const TournamentEdit: React.FC<TournamentEditProps> = ({
   )
 }
 
-interface RatingSectionProps {
-  formData: TournamentEditFormData
-}
+const RatingSection = () => (
+  <Show when={tournamentEditState.formData.restriction === 'Rated'}>
+    <h3 style={sectionTitleStyle}>Rating</h3>
+    <div style={inlineRowMiddleNoMarginStyle}>
+      <span style={{ 'font-weight': 500 }}>Under</span>
+      <Select
+        label=""
+        name="ratingLimit"
+        value={tournamentEditState.formData.ratingLimit}
+        onChange={(value) =>
+          tournamentEditActions.setField('ratingLimit', value)
+        }
+        options={RATING_OPTIONS}
+        noMargin
+      />
+    </div>
+    <Show when={tournamentEditState.formData.type === 'Team'}>
+      <TopPlayersRatingSection />
+    </Show>
+  </Show>
+)
 
-const RatingSection: React.FC<RatingSectionProps> = ({ formData }) => {
-  if (formData.restriction !== 'Rated') return null
-
-  return (
-    <>
-      <h3 style={sectionTitleStyle}>Rating</h3>
-      <div style={inlineRowMiddleNoMarginStyle}>
-        <span style={{ fontWeight: 500 }}>Under</span>
-        <Select
-          label=""
-          name="ratingLimit"
-          value={formData.ratingLimit}
-          onChange={(value) =>
-            tournamentEditActions.setField('ratingLimit', value)
-          }
-          options={RATING_OPTIONS}
-          noMargin
-        />
-      </div>
-      {formData.type === 'Team' && (
-        <TopPlayersRatingSection formData={formData} />
-      )}
-    </>
-  )
-}
-
-interface TopPlayersRatingSectionProps {
-  formData: TournamentEditFormData
-}
-
-const TopPlayersRatingSection: React.FC<TopPlayersRatingSectionProps> = ({
-  formData,
-}) => (
+const TopPlayersRatingSection = () => (
   <>
     <h3 style={sectionTitleStyle}>Top Players Rating</h3>
     <div style={inlineRowMiddleNoMarginStyle}>
       <Toggle
         label=""
-        value={formData.topPlayersRatingEnabled}
+        value={tournamentEditState.formData.topPlayersRatingEnabled}
         onChange={(value) =>
           tournamentEditActions.setField('topPlayersRatingEnabled', value)
         }
         noMargin
       />
-      {formData.topPlayersRatingEnabled && (
-        <>
-          <span style={{ fontWeight: 500 }}>
-            The combined rating of the top
-          </span>
-          <Select
-            label=""
-            name="topPlayersCount"
-            value={formData.topPlayersCount}
-            onChange={(value) =>
-              tournamentEditActions.setField('topPlayersCount', value)
-            }
-            options={generateTopPlayersCountOptions(formData.teamSize)}
-            noMargin
-          />
-          <span style={{ fontWeight: 500 }}>players must be under</span>
-          <Select
-            label=""
-            name="topPlayersRatingLimit"
-            value={formData.topPlayersRatingLimit}
-            onChange={(value) =>
-              tournamentEditActions.setField('topPlayersRatingLimit', value)
-            }
-            options={RATING_OPTIONS}
-            noMargin
-          />
-        </>
-      )}
+      <Show when={tournamentEditState.formData.topPlayersRatingEnabled}>
+        <span style={{ 'font-weight': 500 }}>
+          The combined rating of the top
+        </span>
+        <Select
+          label=""
+          name="topPlayersCount"
+          value={tournamentEditState.formData.topPlayersCount}
+          onChange={(value) =>
+            tournamentEditActions.setField('topPlayersCount', value)
+          }
+          options={generateTopPlayersCountOptions(
+            tournamentEditState.formData.teamSize,
+          )}
+          noMargin
+        />
+        <span style={{ 'font-weight': 500 }}>players must be under</span>
+        <Select
+          label=""
+          name="topPlayersRatingLimit"
+          value={tournamentEditState.formData.topPlayersRatingLimit}
+          onChange={(value) =>
+            tournamentEditActions.setField('topPlayersRatingLimit', value)
+          }
+          options={RATING_OPTIONS}
+          noMargin
+        />
+      </Show>
     </div>
   </>
 )
 
-interface AgeSectionProps {
-  formData: TournamentEditFormData
-}
-
-const AgeSection: React.FC<AgeSectionProps> = ({ formData }) => {
-  if (formData.restriction !== 'Age') return null
-
-  return (
+const AgeSection = () => (
+  <Show when={tournamentEditState.formData.restriction === 'Age'}>
     <div style={inlineRowStyle}>
       <SingleSelectTags
         label="Age"
         options={['Under', 'Over']}
-        selectedValue={formData.ageLimitType === 'U' ? 'Under' : 'Over'}
+        selectedValue={
+          tournamentEditState.formData.ageLimitType === 'U' ? 'Under' : 'Over'
+        }
         onChange={(value) =>
           tournamentEditActions.setField(
             'ageLimitType',
@@ -286,24 +264,26 @@ const AgeSection: React.FC<AgeSectionProps> = ({ formData }) => {
       <Select
         label=""
         name="ageLimit"
-        value={formData.ageLimit}
+        value={tournamentEditState.formData.ageLimit}
         onChange={(value) => tournamentEditActions.setField('ageLimit', value)}
         options={AGE_OPTIONS}
       />
     </div>
-  )
-}
+  </Show>
+)
 
-interface StagesSectionProps {
-  formData: TournamentEditFormData
-}
-
-const StagesSection: React.FC<StagesSectionProps> = ({ formData }) => (
-  <div style={formData.restriction === 'Rated' ? { marginTop: '24px' } : undefined}>
+const StagesSection = () => (
+  <div
+    style={
+      tournamentEditState.formData.restriction === 'Rated'
+        ? { 'margin-top': '24px' }
+        : undefined
+    }
+  >
     <SingleSelectTags
       label="Stages"
       options={STAGES_OPTIONS}
-      selectedValue={formData.stages}
+      selectedValue={tournamentEditState.formData.stages}
       onChange={(value) =>
         tournamentEditActions.setField('stages', value as StagesType)
       }

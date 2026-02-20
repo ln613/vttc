@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { createSignal } from 'solid-js'
 import Button from '../components/Button'
 import { Header } from '../components/Header'
 import Input from '../components/Input'
@@ -43,8 +43,8 @@ const americanCountries = [
 ]
 
 const Home = () => {
-  const [email, setEmail] = useState('')
-  const [country, setCountry] = useState('')
+  const [email, setEmail] = createSignal('')
+  const [country, setCountry] = createSignal('')
 
   return (
     <div>
@@ -57,7 +57,7 @@ const Home = () => {
       <Input
         label="Email Address"
         name="email"
-        value={email}
+        value={email()}
         onChange={setEmail}
         type="email"
         required
@@ -65,7 +65,7 @@ const Home = () => {
       <Select
         label="Country"
         name="country"
-        value={country}
+        value={country()}
         onChange={setCountry}
         options={americanCountries}
       />

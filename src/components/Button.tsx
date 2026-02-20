@@ -1,12 +1,12 @@
-import React from 'react'
+import type { JSX } from 'solid-js'
 
 interface ButtonProps {
-  children: React.ReactNode
+  children: JSX.Element
   color?: string
   onClick?: () => void
   type?: 'button' | 'submit' | 'reset'
   disabled?: boolean
-  className?: string
+  class?: string
   size?: 'small' | 'medium'
 }
 
@@ -50,66 +50,68 @@ const getDarkerColor = (hex: string): string => {
   return `hsl(${darkerH}, ${s}%, ${darkerL}%)`
 }
 
-const getSizeStyles = (size: 'small' | 'medium'): React.CSSProperties => {
+const getSizeStyles = (size: 'small' | 'medium'): JSX.CSSProperties => {
   if (size === 'small') {
     return {
-      fontSize: '12px',
+      'font-size': '12px',
       padding: '6px 16px',
-      borderRadius: '4px',
-      letterSpacing: '0.5px',
+      'border-radius': '4px',
+      'letter-spacing': '0.5px',
     }
   }
   return {
-    fontSize: '16px',
+    'font-size': '16px',
     padding: '12px 40px',
-    borderRadius: '8px',
-    letterSpacing: '1px',
+    'border-radius': '8px',
+    'letter-spacing': '1px',
   }
 }
 
-const Button: React.FC<ButtonProps> = ({
-  children,
-  color = '#e67e22',
-  onClick,
-  type = 'button',
-  disabled = false,
-  className = '',
-  size = 'medium',
-}) => {
-  const darkerColor = getDarkerColor(color)
-  const sizeStyles = getSizeStyles(size)
+const Button = (props: ButtonProps) => {
+  const color = () => props.color ?? '#e67e22'
+  const disabled = () => props.disabled ?? false
+  const size = () => props.size ?? 'medium'
 
-  const buttonStyle: React.CSSProperties = {
-    background: `linear-gradient(to right, ${color}, ${darkerColor})`,
+  const darkerColor = () => getDarkerColor(color())
+  const sizeStyles = () => getSizeStyles(size())
+
+  const buttonStyle = (): JSX.CSSProperties => ({
+    background: `linear-gradient(to right, ${color()}, ${darkerColor()})`,
     color: '#ffffff',
-    fontWeight: 700,
+    'font-weight': 700,
     border: 'none',
-    cursor: disabled ? 'not-allowed' : 'pointer',
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.15)',
+    cursor: disabled() ? 'not-allowed' : 'pointer',
+    'box-shadow': '0 4px 6px rgba(0, 0, 0, 0.15)',
     transition: 'all 0.2s ease',
-    opacity: disabled ? 0.6 : 1,
-    ...sizeStyles,
+    opacity: disabled() ? 0.6 : 1,
+    ...sizeStyles(),
+  })
+
+  const handleMouseEnter = (e: MouseEvent) => {
+    if (!disabled()) {
+      const target = e.currentTarget as HTMLButtonElement
+      target.style.transform = 'translateY(-2px)'
+      target.style.boxShadow = '0 6px 8px rgba(0, 0, 0, 0.2)'
+    }
+  }
+
+  const handleMouseLeave = (e: MouseEvent) => {
+    const target = e.currentTarget as HTMLButtonElement
+    target.style.transform = 'translateY(0)'
+    target.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.15)'
   }
 
   return (
     <button
-      type={type}
-      style={buttonStyle}
-      onClick={onClick}
-      disabled={disabled}
-      className={className}
-      onMouseEnter={(e) => {
-        if (!disabled) {
-          e.currentTarget.style.transform = 'translateY(-2px)'
-          e.currentTarget.style.boxShadow = '0 6px 8px rgba(0, 0, 0, 0.2)'
-        }
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'translateY(0)'
-        e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.15)'
-      }}
+      type={props.type ?? 'button'}
+      style={buttonStyle()}
+      onClick={props.onClick}
+      disabled={disabled()}
+      class={props.class ?? ''}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
-      {children}
+      {props.children}
     </button>
   )
 }

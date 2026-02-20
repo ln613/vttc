@@ -1,34 +1,36 @@
+import { createStore } from 'solid-js/store'
 import type { Player } from '../../shared/types/Player'
 import { api } from '../utils/api'
-import { createStore, createAsyncState, type AsyncState } from './createStore'
 
-interface PlayerState extends AsyncState<Player[]> {}
+interface PlayerState {
+  data: Player[] | null
+  loading: boolean
+  error: string | null
+}
 
-const playerStore = createStore<PlayerState>(createAsyncState<Player[]>())
+const getInitialState = (): PlayerState => ({
+  data: null,
+  loading: false,
+  error: null,
+})
 
-export const { useStore: usePlayerStore, useSelector: usePlayerSelector } =
-  playerStore
+const [playerState, setPlayerState] = createStore<PlayerState>(getInitialState())
+
+export { playerState }
 
 export const playerActions = {
   fetchPlayers: async () => {
-    setLoadingState()
+    setPlayerState({ loading: true, error: null })
     try {
       const data = await api<Player[]>('players')
-      setSuccessState(data)
+      setPlayerState({ data, loading: false, error: null })
     } catch (err) {
-      setErrorState(err)
+      setPlayerState({
+        loading: false,
+        error: err instanceof Error ? err.message : 'Failed to fetch players',
+      })
     }
   },
+
+  reset: () => setPlayerState(getInitialState()),
 }
-
-const setLoadingState = () =>
-  playerStore.setState({ loading: true, error: null })
-
-const setSuccessState = (data: Player[]) =>
-  playerStore.setState({ data, loading: false, error: null })
-
-const setErrorState = (err: unknown) =>
-  playerStore.setState({
-    loading: false,
-    error: err instanceof Error ? err.message : 'Failed to fetch players',
-  })

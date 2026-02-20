@@ -1,3 +1,4 @@
+import { createStore } from 'solid-js/store'
 import type {
   ParticipantSex,
   TournamentType,
@@ -6,7 +7,6 @@ import type {
   AgeLimitType,
 } from '../../shared/types'
 import { apiPost } from '../utils/api'
-import { createStore } from './createStore'
 
 export interface TournamentEditFormData {
   _id?: string
@@ -45,20 +45,20 @@ const defaultFormData: TournamentEditFormData = {
   stages: 'Group + Knockout',
 }
 
-const tournamentEditStore = createStore<TournamentEditState>({
+const getInitialState = (): TournamentEditState => ({
   formData: { ...defaultFormData },
   saving: false,
   error: null,
 })
 
-export const {
-  useStore: useTournamentEditStore,
-  useSelector: useTournamentEditSelector,
-} = tournamentEditStore
+const [tournamentEditState, setTournamentEditState] =
+  createStore<TournamentEditState>(getInitialState())
+
+export { tournamentEditState }
 
 export const tournamentEditActions = {
   initForm: (initialData?: Partial<TournamentEditFormData>) => {
-    tournamentEditStore.setState({
+    setTournamentEditState({
       formData: { ...defaultFormData, ...initialData },
       saving: false,
       error: null,
@@ -69,8 +69,7 @@ export const tournamentEditActions = {
     field: K,
     value: TournamentEditFormData[K],
   ) => {
-    const { formData } = tournamentEditStore.getState()
-    const newFormData = { ...formData, [field]: value }
+    const newFormData = { ...tournamentEditState.formData, [field]: value }
 
     if (field === 'type') {
       handleTypeChange(newFormData, value as TournamentType)
@@ -80,42 +79,36 @@ export const tournamentEditActions = {
       handleTeamSizeChange(newFormData, value as string)
     }
 
-    tournamentEditStore.setState({ formData: newFormData })
+    setTournamentEditState({ formData: newFormData })
   },
 
   saveTournament: async (onSuccess?: (data: TournamentEditFormData) => void) => {
-    const { formData } = tournamentEditStore.getState()
+    const { formData } = tournamentEditState
 
     if (!validateForm(formData)) {
-      tournamentEditStore.setState({ error: 'Please fill all required fields' })
+      setTournamentEditState({ error: 'Please fill all required fields' })
       return
     }
 
     const confirmed = window.confirm('Are you sure you want to save this tournament?')
     if (!confirmed) return
 
-    tournamentEditStore.setState({ saving: true, error: null })
+    setTournamentEditState({ saving: true, error: null })
 
     try {
       const payload = buildSavePayload(formData)
       await apiPost('saveTournament', payload)
-      tournamentEditStore.setState({ saving: false })
+      setTournamentEditState({ saving: false })
       onSuccess?.(formData)
     } catch (err) {
-      tournamentEditStore.setState({
+      setTournamentEditState({
         saving: false,
         error: err instanceof Error ? err.message : 'Failed to save tournament',
       })
     }
   },
 
-  resetForm: () => {
-    tournamentEditStore.setState({
-      formData: { ...defaultFormData },
-      saving: false,
-      error: null,
-    })
-  },
+  resetForm: () => setTournamentEditState(getInitialState()),
 }
 
 const handleTypeChange = (
@@ -141,9 +134,8 @@ const handleTeamSizeChange = (
   }
 }
 
-const validateForm = (formData: TournamentEditFormData): boolean => {
-  return !!formData.name.trim()
-}
+const validateForm = (formData: TournamentEditFormData): boolean =>
+  !!formData.name.trim()
 
 const buildSavePayload = (formData: TournamentEditFormData) => {
   const isRated = formData.restriction === 'Rated'

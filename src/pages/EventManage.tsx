@@ -1,19 +1,24 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Show, For, onMount, onCleanup, createSignal, type JSX } from 'solid-js'
+import { useNavigate } from '@solidjs/router'
 import { Header } from '../components/Header'
 import Select from '../components/Select'
 import Button from '../components/Button'
-import {
-  useEventManageSelector,
-  eventManageActions,
-} from '../stores/eventManageStore'
-import { eventActions, useEventSelector } from '../stores/eventStore'
+import { eventManageState, eventManageActions } from '../stores/eventManageStore'
+import { eventState, eventActions } from '../stores/eventStore'
 import type { Group, GroupParticipant } from '../../shared/types/Tournament'
 import type { Player } from '../../shared/types/Player'
 import type { Match, Game } from '../../shared/types/Match'
 
 const EventManage = () => {
-  useInitializeData()
+  onMount(() => {
+    if (!eventState.data) {
+      eventActions.fetchEvents()
+    }
+  })
+
+  onCleanup(() => {
+    eventManageActions.reset()
+  })
 
   return (
     <div style={containerStyle}>
@@ -27,85 +32,69 @@ const EventManage = () => {
   )
 }
 
-const useInitializeData = () => {
-  const events = useEventSelector((s) => s.data)
-
-  useEffect(() => {
-    if (!events) {
-      eventActions.fetchEvents()
-    }
-    return () => {
-      eventManageActions.reset()
-    }
-  }, [events])
-}
-
 const EventSelector = () => {
-  const events = useEventSelector((s) => s.data)
-  const selectedEventId = useEventManageSelector((s) => s.selectedEventId)
-
-  const options =
-    events?.map((e) => ({
+  const options = () =>
+    eventState.data?.map((e) => ({
       value: e._id,
       label: e.eventName,
     })) || []
+
+  const handleEventChange = (eventId: string) => {
+    eventManageActions.selectEvent(eventId || null)
+  }
 
   return (
     <Select
       label="Event"
       name="event"
-      value={selectedEventId || ''}
+      value={eventManageState.selectedEventId || ''}
       onChange={handleEventChange}
-      options={options}
+      options={options()}
       placeholder="-- Select an event --"
     />
   )
 }
 
-const handleEventChange = (eventId: string) => {
-  eventManageActions.selectEvent(eventId || null)
-}
-
-const EventContent = () => {
-  const selectedEventId = useEventManageSelector((s) => s.selectedEventId)
-  const event = useEventManageSelector((s) => s.data)
-  const loading = useEventManageSelector((s) => s.loading)
-
-  if (!selectedEventId) return null
-  if (loading) return <div>Loading...</div>
-  if (!event) return null
-
-  return (
-    <div style={eventContentStyle}>
-      <StageTabs />
-      <StageContent />
-    </div>
-  )
-}
+const EventContent = () => (
+  <Show when={eventManageState.selectedEventId}>
+    <Show when={!eventManageState.loading} fallback={<div>Loading...</div>}>
+      <Show when={eventManageState.data}>
+        <div style={eventContentStyle}>
+          <StageTabs />
+          <StageContent />
+        </div>
+      </Show>
+    </Show>
+  </Show>
+)
 
 const StageTabs = () => {
-  const event = useEventManageSelector((s) => s.data)
-  const activeTab = useEventManageSelector((s) => s.activeStageTab)
-
-  if (!event) return null
-
-  const stages = event.stages || []
-  const tabs = stages.map((stage) => ({
-    key: stage,
-    label: stage === 'group' ? 'Group' : 'Knockout',
-  }))
+  const event = () => eventManageState.data
 
   return (
-    <div style={tabsContainerStyle}>
-      {tabs.map((tab) => (
-        <TabButton
-          key={tab.key}
-          label={tab.label}
-          isActive={activeTab === tab.key}
-          onClick={() => eventManageActions.setActiveStageTab(tab.key)}
-        />
-      ))}
-    </div>
+    <Show when={event()}>
+      {(e) => {
+        const stages = e().stages || []
+        const tabs = stages.map((stage) => ({
+          key: stage as 'group' | 'knockout',
+          label: stage === 'group' ? 'Group' : 'Knockout',
+        }))
+
+        return (
+          <div style={tabsContainerStyle}>
+            <For each={tabs}>
+              {(tab) => (
+                <TabButton
+                  label={tab.label}
+                  isActive={eventManageState.activeStageTab === tab.key}
+                  onClick={() => eventManageActions.setActiveStageTab(tab.key)}
+                />
+              )}
+            </For>
+          </div>
+        )
+      }}
+    </Show>
   )
 }
 
@@ -115,80 +104,85 @@ interface TabButtonProps {
   onClick: () => void
 }
 
-const TabButton = ({ label, isActive, onClick }: TabButtonProps) => (
-  <button style={getTabStyle(isActive)} onClick={onClick}>
-    {label}
-  </button>
-)
-
-const getTabStyle = (isActive: boolean): React.CSSProperties => ({
-  padding: '12px 24px',
-  border: 'none',
-  borderBottom: isActive ? '3px solid #e67e22' : '3px solid transparent',
-  backgroundColor: 'transparent',
-  cursor: 'pointer',
-  fontWeight: isActive ? 700 : 400,
-  fontSize: '16px',
-  color: isActive ? '#e67e22' : '#666',
-  transition: 'all 0.2s ease',
-})
-
-const StageContent = () => {
-  const activeTab = useEventManageSelector((s) => s.activeStageTab)
-
-  if (activeTab === 'group') return <GroupStageContent />
-  if (activeTab === 'knockout') return <KnockoutStageContent />
-
-  return null
-}
-
-const GroupStageContent = () => {
-  const hasGroups = eventManageActions.hasGroups()
-  const groupStage = eventManageActions.getGroupStage()
-
-  if (!hasGroups) return <GenerateGroupsSection />
+const TabButton = (props: TabButtonProps) => {
+  const tabStyle = (): JSX.CSSProperties => ({
+    padding: '12px 24px',
+    border: 'none',
+    'border-bottom': props.isActive
+      ? '3px solid #e67e22'
+      : '3px solid transparent',
+    'background-color': 'transparent',
+    cursor: 'pointer',
+    'font-weight': props.isActive ? 700 : 400,
+    'font-size': '16px',
+    color: props.isActive ? '#e67e22' : '#666',
+    transition: 'all 0.2s ease',
+  })
 
   return (
-    <div style={groupsListStyle}>
-      {groupStage?.groups.map((group) => (
-        <GroupDisplay key={group.index} group={group} />
-      ))}
-    </div>
+    <button style={tabStyle()} onClick={props.onClick}>
+      {props.label}
+    </button>
+  )
+}
+
+const StageContent = () => (
+  <Show
+    when={eventManageState.activeStageTab === 'group'}
+    fallback={<KnockoutStageContent />}
+  >
+    <GroupStageContent />
+  </Show>
+)
+
+const GroupStageContent = () => {
+  const hasGroups = () => eventManageActions.hasGroups()
+  const groupStage = () => eventManageActions.getGroupStage()
+
+  return (
+    <Show when={hasGroups()} fallback={<GenerateGroupsSection />}>
+      <div style={groupsListStyle}>
+        <For each={groupStage()?.groups}>
+          {(group) => <GroupDisplay group={group} />}
+        </For>
+      </div>
+    </Show>
   )
 }
 
 const GenerateGroupsSection = () => {
-  const generatingGroups = useEventManageSelector((s) => s.generatingGroups)
+  const handleGenerateGroups = () => {
+    eventManageActions.generateGroups()
+  }
 
   return (
     <div style={generateGroupsStyle}>
-      <Button onClick={handleGenerateGroups} disabled={generatingGroups}>
-        {generatingGroups ? 'Generating...' : 'Generate Groups'}
+      <Button
+        onClick={handleGenerateGroups}
+        disabled={eventManageState.generatingGroups}
+      >
+        {eventManageState.generatingGroups ? 'Generating...' : 'Generate Groups'}
       </Button>
     </div>
   )
-}
-
-const handleGenerateGroups = () => {
-  eventManageActions.generateGroups()
 }
 
 interface GroupDisplayProps {
   group: Group
 }
 
-const GroupDisplay = ({ group }: GroupDisplayProps) => {
-  const playerColumnTitle = eventManageActions.getPlayerColumnTitle()
-  const rankedParticipants = getRankedParticipants(group.participants)
+const GroupDisplay = (props: GroupDisplayProps) => {
+  const playerColumnTitle = () => eventManageActions.getPlayerColumnTitle()
+  const rankedParticipants = () => getRankedParticipants(props.group.participants)
 
   return (
     <div style={groupContainerStyle}>
-      <h3 style={groupTitleStyle}>Group {group.index + 1}</h3>
+      <h3 style={groupTitleStyle}>Group {props.group.index + 1}</h3>
       <GroupTable
-        participants={rankedParticipants}
-        playerColumnTitle={playerColumnTitle}
+        participants={rankedParticipants()}
+        playerColumnTitle={playerColumnTitle()}
       />
-      <MatchSchedule matches={group.matches} groupIndex={group.index} />
+      <MatchSchedule matches={props.group.matches} groupIndex={props.group.index} />
     </div>
   )
 }
@@ -198,26 +192,28 @@ interface MatchScheduleProps {
   groupIndex: number
 }
 
-const MatchSchedule = ({ matches, groupIndex }: MatchScheduleProps) => {
-  const [isExpanded, setIsExpanded] = useState(false)
-
-  if (!matches || matches.length === 0) return null
+const MatchSchedule = (props: MatchScheduleProps) => {
+  const [isExpanded, setIsExpanded] = createSignal(false)
 
   return (
-    <div style={matchScheduleContainerStyle}>
-      <CollapsibleHeader
-        title="Match Schedule"
-        isExpanded={isExpanded}
-        onToggle={() => setIsExpanded(!isExpanded)}
-      />
-      {isExpanded && (
-        <div style={matchScheduleContentStyle}>
-          {matches.map((match) => (
-            <MatchRow key={match._id} match={match} groupIndex={groupIndex} />
-          ))}
-        </div>
-      )}
-    </div>
+    <Show when={props.matches && props.matches.length > 0}>
+      <div style={matchScheduleContainerStyle}>
+        <CollapsibleHeader
+          title="Match Schedule"
+          isExpanded={isExpanded()}
+          onToggle={() => setIsExpanded(!isExpanded())}
+        />
+        <Show when={isExpanded()}>
+          <div style={matchScheduleContentStyle}>
+            <For each={props.matches}>
+              {(match) => (
+                <MatchRow match={match} groupIndex={props.groupIndex} />
+              )}
+            </For>
+          </div>
+        </Show>
+      </div>
+    </Show>
   )
 }
 
@@ -227,14 +223,10 @@ interface CollapsibleHeaderProps {
   onToggle: () => void
 }
 
-const CollapsibleHeader = ({
-  title,
-  isExpanded,
-  onToggle,
-}: CollapsibleHeaderProps) => (
-  <button style={collapsibleHeaderStyle} onClick={onToggle}>
-    <span>{isExpanded ? '▼' : '▶'}</span>
-    <span style={collapsibleTitleStyle}>{title}</span>
+const CollapsibleHeader = (props: CollapsibleHeaderProps) => (
+  <button style={collapsibleHeaderStyle} onClick={props.onToggle}>
+    <span>{props.isExpanded ? '▼' : '▶'}</span>
+    <span style={collapsibleTitleStyle}>{props.title}</span>
   </button>
 )
 
@@ -243,18 +235,20 @@ interface MatchRowProps {
   groupIndex: number
 }
 
-const MatchRow = ({ match, groupIndex }: MatchRowProps) => {
+const MatchRow = (props: MatchRowProps) => {
   const navigate = useNavigate()
-  const selectedEventId = useEventManageSelector((s) => s.selectedEventId)
-  const side1Name = getMatchSideName(match.side1)
-  const side2Name = getMatchSideName(match.side2)
-  const hasResult = match.winningSide !== undefined && match.winningSide !== null
-  const hasStarted = hasResult || (match.games && match.games.length > 0)
+  const side1Name = () => getMatchSideName(props.match.side1)
+  const side2Name = () => getMatchSideName(props.match.side2)
+  const hasResult = () =>
+    props.match.winningSide !== undefined && props.match.winningSide !== null
+  const hasStarted = () =>
+    hasResult() || (props.match.games && props.match.games.length > 0)
 
   const handleStartClick = () => {
-    if (selectedEventId) {
+    const eventId = eventManageState.selectedEventId
+    if (eventId) {
       navigate(
-        `/game-play?eventId=${selectedEventId}&stage=group&groupIndex=${groupIndex}&matchId=${match._id}`,
+        `/game-play?eventId=${eventId}&stage=group&groupIndex=${props.groupIndex}&matchId=${props.match._id}`,
       )
     }
   }
@@ -263,19 +257,19 @@ const MatchRow = ({ match, groupIndex }: MatchRowProps) => {
     <div style={matchRowStyle}>
       <div style={matchContentContainerStyle}>
         <MatchResultDisplay
-          side1Name={side1Name}
-          side2Name={side2Name}
-          gamesWon1={match.gamesWon1}
-          gamesWon2={match.gamesWon2}
-          hasResult={hasResult}
+          side1Name={side1Name()}
+          side2Name={side2Name()}
+          gamesWon1={props.match.gamesWon1}
+          gamesWon2={props.match.gamesWon2}
+          hasResult={hasResult()}
         />
-        <GameScoresDisplay games={match.games} />
+        <GameScoresDisplay games={props.match.games} />
       </div>
-      {!hasStarted && (
+      <Show when={!hasStarted()}>
         <Button onClick={handleStartClick} color="#27ae60" size="small">
           Start
         </Button>
-      )}
+      </Show>
     </div>
   )
 }
@@ -293,33 +287,27 @@ interface MatchResultDisplayProps {
   hasResult: boolean
 }
 
-const MatchResultDisplay = ({
-  side1Name,
-  side2Name,
-  gamesWon1,
-  gamesWon2,
-  hasResult,
-}: MatchResultDisplayProps) => {
-  const side1IsBold = hasResult && gamesWon1 > gamesWon2
-  const side2IsBold = hasResult && gamesWon2 > gamesWon1
+const MatchResultDisplay = (props: MatchResultDisplayProps) => {
+  const side1IsBold = () => props.hasResult && props.gamesWon1 > props.gamesWon2
+  const side2IsBold = () => props.hasResult && props.gamesWon2 > props.gamesWon1
 
   return (
     <div style={matchResultStyle}>
       <div style={matchLeftSideStyle}>
-        <span style={side1IsBold ? boldTextStyle : normalTextStyle}>
-          {side1Name}
+        <span style={side1IsBold() ? boldTextStyle : normalTextStyle}>
+          {props.side1Name}
         </span>
-        <span style={side1IsBold ? boldScoreStyle : normalScoreStyle}>
-          {gamesWon1}
+        <span style={side1IsBold() ? boldScoreStyle : normalScoreStyle}>
+          {props.gamesWon1}
         </span>
       </div>
       <span style={scoreSeparatorStyle}>:</span>
       <div style={matchRightSideStyle}>
-        <span style={side2IsBold ? boldScoreStyle : normalScoreStyle}>
-          {gamesWon2}
+        <span style={side2IsBold() ? boldScoreStyle : normalScoreStyle}>
+          {props.gamesWon2}
         </span>
-        <span style={side2IsBold ? boldTextStyle : normalTextStyle}>
-          {side2Name}
+        <span style={side2IsBold() ? boldTextStyle : normalTextStyle}>
+          {props.side2Name}
         </span>
       </div>
     </div>
@@ -330,45 +318,50 @@ interface GameScoresDisplayProps {
   games: Game[]
 }
 
-const GameScoresDisplay = ({ games }: GameScoresDisplayProps) => {
-  if (!games || games.length === 0) return null
-
-  return (
+const GameScoresDisplay = (props: GameScoresDisplayProps) => (
+  <Show when={props.games && props.games.length > 0}>
     <div style={gameScoresStyle}>
-      {games.map((game, index) => (
-        <GameScoreDisplay key={game._id} game={game} isLast={index === games.length - 1} />
-      ))}
+      <For each={props.games}>
+        {(game, index) => (
+          <GameScoreDisplay
+            game={game}
+            isLast={index() === props.games.length - 1}
+          />
+        )}
+      </For>
     </div>
-  )
-}
+  </Show>
+)
 
 interface GameScoreDisplayProps {
   game: Game
   isLast: boolean
 }
 
-const GameScoreDisplay = ({ game, isLast }: GameScoreDisplayProps) => {
-  const side1IsBold = game.winningSide === 1
-  const side2IsBold = game.winningSide === 2
+const GameScoreDisplay = (props: GameScoreDisplayProps) => {
+  const side1IsBold = () => props.game.winningSide === 1
+  const side2IsBold = () => props.game.winningSide === 2
 
   return (
     <span>
-      <span style={side1IsBold ? boldScoreStyle : normalScoreStyle}>
-        {game.score1}
+      <span style={side1IsBold() ? boldScoreStyle : normalScoreStyle}>
+        {props.game.score1}
       </span>
       <span style={gameScoreSeparatorStyle}>:</span>
-      <span style={side2IsBold ? boldScoreStyle : normalScoreStyle}>
-        {game.score2}
+      <span style={side2IsBold() ? boldScoreStyle : normalScoreStyle}>
+        {props.game.score2}
       </span>
-      {!isLast && <span style={gameDelimiterStyle}>,</span>}
+      <Show when={!props.isLast}>
+        <span style={gameDelimiterStyle}>,</span>
+      </Show>
     </span>
   )
 }
 
 const getRankedParticipants = (
   participants: GroupParticipant[],
-): GroupParticipant[] => {
-  return [...participants].sort((a, b) => {
+): GroupParticipant[] =>
+  [...participants].sort((a, b) => {
     if (b.stats.matchesWon !== a.stats.matchesWon) {
       return b.stats.matchesWon - a.stats.matchesWon
     }
@@ -377,76 +370,69 @@ const getRankedParticipants = (
     }
     return b.stats.gamesWon - a.stats.gamesWon
   })
-}
 
 interface GroupTableProps {
   participants: GroupParticipant[]
   playerColumnTitle: string
 }
 
-const GroupTable = ({ participants, playerColumnTitle }: GroupTableProps) => {
-  return (
-    <table style={tableStyle}>
-      <thead>
-        <tr>
-          <th style={thStyle}>Rank</th>
-          <th style={{ ...thStyle, textAlign: 'left' }}>{playerColumnTitle}</th>
-          <th style={thStyle}>Total</th>
-          <th style={thStyle}>W</th>
-          <th style={thStyle}>L</th>
-          <th style={thStyle}>+/-</th>
-          <th style={thStyle}>Win %</th>
-          <th style={thStyle}>MW</th>
-          <th style={thStyle}>ML</th>
-          <th style={thStyle}>GW</th>
-          <th style={thStyle}>GL</th>
-        </tr>
-      </thead>
-      <tbody>
-        {participants.map((gp, index) => (
-          <GroupTableRow
-            key={getParticipantId(gp)}
-            participant={gp}
-            rank={index + 1}
-          />
-        ))}
-      </tbody>
-    </table>
-  )
-}
-
-const getParticipantId = (gp: GroupParticipant): string => {
-  const participant = gp.participant
-  if ('_id' in participant) return String(participant._id)
-  return String((participant as Player)._id)
-}
+const GroupTable = (props: GroupTableProps) => (
+  <table style={tableStyle}>
+    <thead>
+      <tr>
+        <th style={thStyle}>Rank</th>
+        <th style={{ ...thStyle, 'text-align': 'left' }}>
+          {props.playerColumnTitle}
+        </th>
+        <th style={thStyle}>Total</th>
+        <th style={thStyle}>W</th>
+        <th style={thStyle}>L</th>
+        <th style={thStyle}>+/-</th>
+        <th style={thStyle}>Win %</th>
+        <th style={thStyle}>MW</th>
+        <th style={thStyle}>ML</th>
+        <th style={thStyle}>GW</th>
+        <th style={thStyle}>GL</th>
+      </tr>
+    </thead>
+    <tbody>
+      <For each={props.participants}>
+        {(gp, index) => (
+          <GroupTableRow participant={gp} rank={index() + 1} />
+        )}
+      </For>
+    </tbody>
+  </table>
+)
 
 interface GroupTableRowProps {
   participant: GroupParticipant
   rank: number
 }
 
-const GroupTableRow = ({ participant, rank }: GroupTableRowProps) => {
-  const { stats } = participant
-  const total = stats.matchesPlayed
-  const winPercentage = total > 0 ? ((stats.matchesWon / total) * 100).toFixed(1) : '0.0'
-  const playerDisplay = getPlayerDisplay(participant)
-  const difference = stats.matchesWon - stats.matchesLost
-  const differenceDisplay = difference >= 0 ? `+${difference}` : String(difference)
+const GroupTableRow = (props: GroupTableRowProps) => {
+  const stats = () => props.participant.stats
+  const total = () => stats().matchesPlayed
+  const winPercentage = () =>
+    total() > 0 ? ((stats().matchesWon / total()) * 100).toFixed(1) : '0.0'
+  const playerDisplay = () => getPlayerDisplay(props.participant)
+  const difference = () => stats().matchesWon - stats().matchesLost
+  const differenceDisplay = () =>
+    difference() >= 0 ? `+${difference()}` : String(difference())
 
   return (
     <tr>
-      <td style={tdStyle}>{rank}</td>
-      <td style={{ ...tdStyle, textAlign: 'left' }}>{playerDisplay}</td>
-      <td style={tdStyle}>{total}</td>
-      <td style={tdStyle}>{stats.matchesWon}</td>
-      <td style={tdStyle}>{stats.matchesLost}</td>
-      <td style={tdStyle}>{differenceDisplay}</td>
-      <td style={tdStyle}>{winPercentage}%</td>
-      <td style={tdStyle}>{stats.matchesWon}</td>
-      <td style={tdStyle}>{stats.matchesLost}</td>
-      <td style={tdStyle}>{stats.gamesWon}</td>
-      <td style={tdStyle}>{stats.gamesLost}</td>
+      <td style={tdStyle}>{props.rank}</td>
+      <td style={{ ...tdStyle, 'text-align': 'left' }}>{playerDisplay()}</td>
+      <td style={tdStyle}>{total()}</td>
+      <td style={tdStyle}>{stats().matchesWon}</td>
+      <td style={tdStyle}>{stats().matchesLost}</td>
+      <td style={tdStyle}>{differenceDisplay()}</td>
+      <td style={tdStyle}>{winPercentage()}%</td>
+      <td style={tdStyle}>{stats().matchesWon}</td>
+      <td style={tdStyle}>{stats().matchesLost}</td>
+      <td style={tdStyle}>{stats().gamesWon}</td>
+      <td style={tdStyle}>{stats().gamesLost}</td>
     </tr>
   )
 }
@@ -468,198 +454,198 @@ const getPlayerDisplay = (gp: GroupParticipant): string => {
   return 'Unknown'
 }
 
-const KnockoutStageContent = () => {
-  return <div style={emptyContentStyle}>Knockout stage display coming soon</div>
-}
+const KnockoutStageContent = () => (
+  <div style={emptyContentStyle}>Knockout stage display coming soon</div>
+)
 
 // Styles
-const containerStyle: React.CSSProperties = {
-  minHeight: '100vh',
-  backgroundColor: '#f5f5f5',
+const containerStyle: JSX.CSSProperties = {
+  'min-height': '100vh',
+  'background-color': '#f5f5f5',
 }
 
-const contentStyle: React.CSSProperties = {
-  maxWidth: '1200px',
+const contentStyle: JSX.CSSProperties = {
+  'max-width': '1200px',
   margin: '0 auto',
   padding: '20px',
 }
 
-const titleStyle: React.CSSProperties = {
-  textAlign: 'left',
-  fontSize: '28px',
-  fontWeight: 700,
+const titleStyle: JSX.CSSProperties = {
+  'text-align': 'left',
+  'font-size': '28px',
+  'font-weight': 700,
   color: '#333',
-  marginBottom: '20px',
+  'margin-bottom': '20px',
 }
 
-const eventContentStyle: React.CSSProperties = {
-  marginTop: '20px',
+const eventContentStyle: JSX.CSSProperties = {
+  'margin-top': '20px',
 }
 
-const tabsContainerStyle: React.CSSProperties = {
+const tabsContainerStyle: JSX.CSSProperties = {
   display: 'flex',
   gap: '4px',
-  borderBottom: '1px solid #ddd',
-  marginBottom: '20px',
+  'border-bottom': '1px solid #ddd',
+  'margin-bottom': '20px',
 }
 
-const groupsListStyle: React.CSSProperties = {
+const groupsListStyle: JSX.CSSProperties = {
   display: 'flex',
-  flexDirection: 'column',
+  'flex-direction': 'column',
   gap: '24px',
 }
 
-const generateGroupsStyle: React.CSSProperties = {
+const generateGroupsStyle: JSX.CSSProperties = {
   padding: '40px',
-  textAlign: 'center',
+  'text-align': 'center',
 }
 
-const groupContainerStyle: React.CSSProperties = {
-  backgroundColor: '#fff',
-  borderRadius: '8px',
+const groupContainerStyle: JSX.CSSProperties = {
+  'background-color': '#fff',
+  'border-radius': '8px',
   padding: '20px',
-  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+  'box-shadow': '0 2px 4px rgba(0, 0, 0, 0.1)',
 }
 
-const groupTitleStyle: React.CSSProperties = {
-  fontSize: '18px',
-  fontWeight: 700,
+const groupTitleStyle: JSX.CSSProperties = {
+  'font-size': '18px',
+  'font-weight': 700,
   color: '#333',
-  marginBottom: '16px',
+  'margin-bottom': '16px',
 }
 
-const tableStyle: React.CSSProperties = {
+const tableStyle: JSX.CSSProperties = {
   width: '100%',
-  borderCollapse: 'collapse',
-  fontSize: '14px',
+  'border-collapse': 'collapse',
+  'font-size': '14px',
 }
 
-const thStyle: React.CSSProperties = {
+const thStyle: JSX.CSSProperties = {
   padding: '12px 8px',
-  textAlign: 'center',
-  borderBottom: '2px solid #ddd',
-  backgroundColor: '#f9f9f9',
-  fontWeight: 700,
+  'text-align': 'center',
+  'border-bottom': '2px solid #ddd',
+  'background-color': '#f9f9f9',
+  'font-weight': 700,
   color: '#333',
 }
 
-const tdStyle: React.CSSProperties = {
+const tdStyle: JSX.CSSProperties = {
   padding: '12px 8px',
-  textAlign: 'center',
-  borderBottom: '1px solid #eee',
+  'text-align': 'center',
+  'border-bottom': '1px solid #eee',
 }
 
-const emptyContentStyle: React.CSSProperties = {
+const emptyContentStyle: JSX.CSSProperties = {
   padding: '40px',
-  textAlign: 'center',
+  'text-align': 'center',
   color: '#666',
 }
 
-const matchScheduleContainerStyle: React.CSSProperties = {
-  marginTop: '16px',
-  borderTop: '1px solid #eee',
-  paddingTop: '12px',
+const matchScheduleContainerStyle: JSX.CSSProperties = {
+  'margin-top': '16px',
+  'border-top': '1px solid #eee',
+  'padding-top': '12px',
 }
 
-const collapsibleHeaderStyle: React.CSSProperties = {
+const collapsibleHeaderStyle: JSX.CSSProperties = {
   display: 'flex',
-  alignItems: 'center',
+  'align-items': 'center',
   gap: '8px',
   background: 'none',
   border: 'none',
   cursor: 'pointer',
   padding: '8px 0',
-  fontSize: '14px',
+  'font-size': '14px',
   color: '#666',
 }
 
-const collapsibleTitleStyle: React.CSSProperties = {
-  fontWeight: 600,
+const collapsibleTitleStyle: JSX.CSSProperties = {
+  'font-weight': 600,
 }
 
-const matchScheduleContentStyle: React.CSSProperties = {
+const matchScheduleContentStyle: JSX.CSSProperties = {
   display: 'flex',
-  flexDirection: 'column',
+  'flex-direction': 'column',
   gap: '12px',
-  marginTop: '12px',
+  'margin-top': '12px',
 }
 
-const matchRowStyle: React.CSSProperties = {
+const matchRowStyle: JSX.CSSProperties = {
   display: 'flex',
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'space-between',
+  'flex-direction': 'row',
+  'align-items': 'center',
+  'justify-content': 'space-between',
   gap: '12px',
   padding: '8px 12px',
-  backgroundColor: '#f9f9f9',
-  borderRadius: '4px',
+  'background-color': '#f9f9f9',
+  'border-radius': '4px',
 }
 
-const matchContentContainerStyle: React.CSSProperties = {
+const matchContentContainerStyle: JSX.CSSProperties = {
   display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
+  'flex-direction': 'column',
+  'align-items': 'center',
   gap: '4px',
-  flex: 1,
+  flex: '1',
 }
 
-const matchResultStyle: React.CSSProperties = {
+const matchResultStyle: JSX.CSSProperties = {
   display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
+  'align-items': 'center',
+  'justify-content': 'center',
   width: '100%',
-  fontSize: '14px',
+  'font-size': '14px',
 }
 
-const matchLeftSideStyle: React.CSSProperties = {
+const matchLeftSideStyle: JSX.CSSProperties = {
   display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'flex-end',
+  'align-items': 'center',
+  'justify-content': 'flex-end',
   gap: '8px',
-  flex: 1,
+  flex: '1',
 }
 
-const matchRightSideStyle: React.CSSProperties = {
+const matchRightSideStyle: JSX.CSSProperties = {
   display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'flex-start',
+  'align-items': 'center',
+  'justify-content': 'flex-start',
   gap: '8px',
-  flex: 1,
+  flex: '1',
 }
 
-const scoreSeparatorStyle: React.CSSProperties = {
+const scoreSeparatorStyle: JSX.CSSProperties = {
   color: '#666',
   padding: '0 8px',
 }
 
-const boldScoreStyle: React.CSSProperties = {
-  fontWeight: 700,
+const boldScoreStyle: JSX.CSSProperties = {
+  'font-weight': 700,
 }
 
-const normalScoreStyle: React.CSSProperties = {
-  fontWeight: 400,
+const normalScoreStyle: JSX.CSSProperties = {
+  'font-weight': 400,
 }
 
-const boldTextStyle: React.CSSProperties = {
-  fontWeight: 700,
+const boldTextStyle: JSX.CSSProperties = {
+  'font-weight': 700,
 }
 
-const normalTextStyle: React.CSSProperties = {
-  fontWeight: 400,
+const normalTextStyle: JSX.CSSProperties = {
+  'font-weight': 400,
 }
 
-const gameScoresStyle: React.CSSProperties = {
-  fontSize: '12px',
+const gameScoresStyle: JSX.CSSProperties = {
+  'font-size': '12px',
   color: '#666',
-  paddingLeft: '4px',
+  'padding-left': '4px',
 }
 
-const gameScoreSeparatorStyle: React.CSSProperties = {
+const gameScoreSeparatorStyle: JSX.CSSProperties = {
   margin: '0 2px',
 }
 
-const gameDelimiterStyle: React.CSSProperties = {
-  marginRight: '8px',
+const gameDelimiterStyle: JSX.CSSProperties = {
+  'margin-right': '8px',
 }
 
 export default EventManage

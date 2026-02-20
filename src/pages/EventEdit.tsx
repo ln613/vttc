@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import { Show, onMount, onCleanup, type JSX } from 'solid-js'
 import { Header } from '../components/Header'
 import Input from '../components/Input'
 import Select from '../components/Select'
@@ -6,12 +6,9 @@ import DatePicker from '../components/DatePicker'
 import SingleSelectTags from '../components/SingleSelectTags'
 import Toggle from '../components/Toggle'
 import Button from '../components/Button'
+import { tournamentState, tournamentActions } from '../stores/tournamentStore'
 import {
-  useTournamentStore,
-  tournamentActions,
-} from '../stores/tournamentStore'
-import {
-  useEventEditStore,
+  eventEditState,
   eventEditActions,
   hasGroupStage,
   hasKnockoutStage,
@@ -63,119 +60,99 @@ interface EventEditProps {
   onCancel?: () => void
 }
 
-const containerStyle: React.CSSProperties = {
+const containerStyle: JSX.CSSProperties = {
   display: 'flex',
-  flexDirection: 'column',
-  minHeight: '100vh',
+  'flex-direction': 'column',
+  'min-height': '100vh',
 }
 
-const contentStyle: React.CSSProperties = {
+const contentStyle: JSX.CSSProperties = {
   padding: '24px',
 }
 
-const titleStyle: React.CSSProperties = {
-  fontSize: '2rem',
-  fontWeight: 700,
-  textAlign: 'left',
-  marginBottom: '24px',
+const titleStyle: JSX.CSSProperties = {
+  'font-size': '2rem',
+  'font-weight': 700,
+  'text-align': 'left',
+  'margin-bottom': '24px',
   color: '#333',
 }
 
-const sectionTitleStyle: React.CSSProperties = {
-  fontSize: '14px',
-  fontWeight: 700,
-  marginTop: '24px',
-  marginBottom: '8px',
+const sectionTitleStyle: JSX.CSSProperties = {
+  'font-size': '14px',
+  'font-weight': 700,
+  'margin-top': '24px',
+  'margin-bottom': '8px',
   color: '#333',
-  textAlign: 'left',
+  'text-align': 'left',
 }
 
-const buttonContainerStyle: React.CSSProperties = {
+const buttonContainerStyle: JSX.CSSProperties = {
   display: 'flex',
   gap: '16px',
-  marginTop: '24px',
+  'margin-top': '24px',
 }
 
-const EventEdit: React.FC<EventEditProps> = ({
-  isEdit = false,
-  initialData,
-  onSave,
-  onCancel,
-}) => {
-  const { data: tournaments } = useTournamentStore()
-  const { formData } = useEventEditStore()
-  const selectedTournament = eventEditActions.getSelectedTournament()
-
-  useEffect(() => {
+const EventEdit = (props: EventEditProps) => {
+  onMount(() => {
     tournamentActions.fetchTournaments()
-    eventEditActions.initForm(initialData)
-    return () => eventEditActions.resetForm()
-  }, [])
+    eventEditActions.initForm(props.initialData)
+  })
 
-  const tournamentOptions = (tournaments || []).map((t) => ({
-    value: t._id,
-    label: t.name,
-  }))
+  onCleanup(() => {
+    eventEditActions.resetForm()
+  })
+
+  const tournamentOptions = () =>
+    (tournamentState.data || []).map((t) => ({
+      value: t._id,
+      label: t.name,
+    }))
 
   return (
     <div style={containerStyle}>
       <Header />
       <div style={contentStyle}>
-        <h1 style={titleStyle}>{isEdit ? 'Edit Event' : 'Add Event'}</h1>
+        <h1 style={titleStyle}>{props.isEdit ? 'Edit Event' : 'Add Event'}</h1>
         <Select
           label="Tournament"
           name="tournament"
-          value={formData.tournamentId}
+          value={eventEditState.formData.tournamentId}
           onChange={(value) => eventEditActions.setField('tournamentId', value)}
-          options={tournamentOptions}
+          options={tournamentOptions()}
         />
         <DatePicker
           label="Date"
-          value={formData.date}
+          value={eventEditState.formData.date}
           onChange={(value) => eventEditActions.setField('date', value)}
         />
         <Input
           label="Name"
           name="name"
-          value={formData.name}
+          value={eventEditState.formData.name}
           onChange={(value) => eventEditActions.setField('name', value)}
           required
         />
         <Select
           label="Max Participants"
           name="maxParticipants"
-          value={formData.maxParticipants}
+          value={eventEditState.formData.maxParticipants}
           onChange={(value) =>
             eventEditActions.setField('maxParticipants', value)
           }
           options={MAX_PARTICIPANTS_OPTIONS}
         />
-        <NumberOfMatchesSection
-          tournament={selectedTournament}
-          groupMatches={formData.groupMatches}
-          knockoutMatches={formData.knockoutMatches}
-        />
-        <NumberOfGamesSection
-          tournament={selectedTournament}
-          groupGames={formData.groupGames}
-          knockoutGames={formData.knockoutGames}
-        />
-        <QualifiersSection
-          tournament={selectedTournament}
-          qualifiers={formData.qualifiers}
-        />
-        <HandicapSection
-          handicapEnabled={formData.handicapEnabled}
-          handicapDifference={formData.handicapDifference}
-          handicapMaxPoints={formData.handicapMaxPoints}
-        />
+        <NumberOfMatchesSection />
+        <NumberOfGamesSection />
+        <QualifiersSection />
+        <HandicapSection />
         <div style={buttonContainerStyle}>
-          <Button color="#e74c3c" onClick={onCancel}>
+          <Button color="#e74c3c" onClick={props.onCancel}>
             Cancel
           </Button>
           <Button
             color="#27ae60"
-            onClick={() => eventEditActions.saveEvent(onSave)}
+            onClick={() => eventEditActions.saveEvent(props.onSave)}
           >
             Save
           </Button>
@@ -185,169 +162,137 @@ const EventEdit: React.FC<EventEditProps> = ({
   )
 }
 
-interface Tournament {
-  _id: string
-  name: string
-  type: string
-  stages: ('group' | 'knockout')[]
-}
-
-interface NumberOfGamesSectionProps {
-  tournament: Tournament | undefined
-  groupGames: BestOfOption
-  knockoutGames: BestOfOption
-}
-
-const NumberOfGamesSection: React.FC<NumberOfGamesSectionProps> = ({
-  tournament,
-  groupGames,
-  knockoutGames,
-}) => {
-  if (!tournament) return null
+const NumberOfGamesSection = () => {
+  const tournament = () => eventEditActions.getSelectedTournament()
 
   return (
-    <>
-      <h3 style={sectionTitleStyle}>Number of Games</h3>
-      {hasGroupStage(tournament.stages) && (
-        <SingleSelectTags
-          label="Group Stage"
-          options={GROUP_GAMES_OPTIONS}
-          selectedValue={groupGames}
-          onChange={(value) =>
-            eventEditActions.setField('groupGames', value as BestOfOption)
-          }
-        />
-      )}
-      {hasKnockoutStage(tournament.stages) && (
-        <SingleSelectTags
-          label="Knockout Stage"
-          options={KNOCKOUT_GAMES_OPTIONS}
-          selectedValue={knockoutGames}
-          onChange={(value) =>
-            eventEditActions.setField('knockoutGames', value as BestOfOption)
-          }
-        />
-      )}
-    </>
-  )
-}
-
-interface NumberOfMatchesSectionProps {
-  tournament: Tournament | undefined
-  groupMatches: BestOfOption
-  knockoutMatches: BestOfOption
-}
-
-const NumberOfMatchesSection: React.FC<NumberOfMatchesSectionProps> = ({
-  tournament,
-  groupMatches,
-  knockoutMatches,
-}) => {
-  if (!tournament || tournament.type !== 'Team') return null
-
-  return (
-    <>
-      <h3 style={sectionTitleStyle}>Number of Matches</h3>
-      {hasGroupStage(tournament.stages) && (
-        <SingleSelectTags
-          label="Group Stage"
-          options={GROUP_GAMES_OPTIONS}
-          selectedValue={groupMatches}
-          onChange={(value) =>
-            eventEditActions.setField('groupMatches', value as BestOfOption)
-          }
-        />
-      )}
-      {hasKnockoutStage(tournament.stages) && (
-        <SingleSelectTags
-          label="Knockout Stage"
-          options={KNOCKOUT_GAMES_OPTIONS}
-          selectedValue={knockoutMatches}
-          onChange={(value) =>
-            eventEditActions.setField('knockoutMatches', value as BestOfOption)
-          }
-        />
-      )}
-    </>
-  )
-}
-
-interface QualifiersSectionProps {
-  tournament: Tournament | undefined
-  qualifiers: QualifiersCount
-}
-
-const QualifiersSection: React.FC<QualifiersSectionProps> = ({
-  tournament,
-  qualifiers,
-}) => {
-  if (!tournament || !hasGroupStage(tournament.stages)) return null
-
-  return (
-    <SingleSelectTags
-      label="Number of Qualifiers"
-      options={QUALIFIERS_OPTIONS}
-      selectedValue={qualifiers}
-      onChange={(value) =>
-        eventEditActions.setField('qualifiers', value as QualifiersCount)
-      }
-    />
-  )
-}
-
-interface HandicapSectionProps {
-  handicapEnabled: boolean
-  handicapDifference: string
-  handicapMaxPoints: string
-}
-
-const HandicapSection: React.FC<HandicapSectionProps> = ({
-  handicapEnabled,
-  handicapDifference,
-  handicapMaxPoints,
-}) => (
-  <>
-    <h3 style={sectionTitleStyle}>Handicap</h3>
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        marginBottom: '16px',
-      }}
-    >
-      <Toggle
-        label=""
-        value={handicapEnabled}
-        onChange={(value) => eventEditActions.setField('handicapEnabled', value)}
-        noMargin
-      />
-      {handicapEnabled && (
+    <Show when={tournament()}>
+      {(t) => (
         <>
-          <span style={{ fontWeight: 500 }}>Difference:</span>
-          <Select
-            label=""
-            name="handicapDifference"
-            value={handicapDifference}
-            onChange={(value) =>
-              eventEditActions.setField('handicapDifference', value)
-            }
-            options={HANDICAP_DIFFERENCE_OPTIONS}
-            noMargin
-          />
-          <span style={{ fontWeight: 500 }}>Max Points Given:</span>
-          <Select
-            label=""
-            name="handicapMaxPoints"
-            value={handicapMaxPoints}
-            onChange={(value) =>
-              eventEditActions.setField('handicapMaxPoints', value)
-            }
-            options={MAX_POINTS_GIVEN_OPTIONS}
-            noMargin
-          />
+          <h3 style={sectionTitleStyle}>Number of Games</h3>
+          <Show when={hasGroupStage(t().stages)}>
+            <SingleSelectTags
+              label="Group Stage"
+              options={GROUP_GAMES_OPTIONS}
+              selectedValue={eventEditState.formData.groupGames}
+              onChange={(value) =>
+                eventEditActions.setField('groupGames', value as BestOfOption)
+              }
+            />
+          </Show>
+          <Show when={hasKnockoutStage(t().stages)}>
+            <SingleSelectTags
+              label="Knockout Stage"
+              options={KNOCKOUT_GAMES_OPTIONS}
+              selectedValue={eventEditState.formData.knockoutGames}
+              onChange={(value) =>
+                eventEditActions.setField('knockoutGames', value as BestOfOption)
+              }
+            />
+          </Show>
         </>
       )}
+    </Show>
+  )
+}
+
+const NumberOfMatchesSection = () => {
+  const tournament = () => eventEditActions.getSelectedTournament()
+
+  return (
+    <Show when={tournament()?.type === 'Team' && tournament()}>
+      {(t) => (
+        <>
+          <h3 style={sectionTitleStyle}>Number of Matches</h3>
+          <Show when={hasGroupStage(t().stages)}>
+            <SingleSelectTags
+              label="Group Stage"
+              options={GROUP_GAMES_OPTIONS}
+              selectedValue={eventEditState.formData.groupMatches}
+              onChange={(value) =>
+                eventEditActions.setField('groupMatches', value as BestOfOption)
+              }
+            />
+          </Show>
+          <Show when={hasKnockoutStage(t().stages)}>
+            <SingleSelectTags
+              label="Knockout Stage"
+              options={KNOCKOUT_GAMES_OPTIONS}
+              selectedValue={eventEditState.formData.knockoutMatches}
+              onChange={(value) =>
+                eventEditActions.setField(
+                  'knockoutMatches',
+                  value as BestOfOption,
+                )
+              }
+            />
+          </Show>
+        </>
+      )}
+    </Show>
+  )
+}
+
+const QualifiersSection = () => {
+  const tournament = () => eventEditActions.getSelectedTournament()
+
+  return (
+    <Show when={tournament() && hasGroupStage(tournament()!.stages)}>
+      <SingleSelectTags
+        label="Number of Qualifiers"
+        options={QUALIFIERS_OPTIONS}
+        selectedValue={eventEditState.formData.qualifiers}
+        onChange={(value) =>
+          eventEditActions.setField('qualifiers', value as QualifiersCount)
+        }
+      />
+    </Show>
+  )
+}
+
+const inlineRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  gap: '12px',
+  'margin-bottom': '16px',
+}
+
+const HandicapSection = () => (
+  <>
+    <h3 style={sectionTitleStyle}>Handicap</h3>
+    <div style={inlineRowStyle}>
+      <Toggle
+        label=""
+        value={eventEditState.formData.handicapEnabled}
+        onChange={(value) =>
+          eventEditActions.setField('handicapEnabled', value)
+        }
+        noMargin
+      />
+      <Show when={eventEditState.formData.handicapEnabled}>
+        <span style={{ 'font-weight': '500' }}>Difference:</span>
+        <Select
+          label=""
+          name="handicapDifference"
+          value={eventEditState.formData.handicapDifference}
+          onChange={(value) =>
+            eventEditActions.setField('handicapDifference', value)
+          }
+          options={HANDICAP_DIFFERENCE_OPTIONS}
+          noMargin
+        />
+        <span style={{ 'font-weight': '500' }}>Max Points Given:</span>
+        <Select
+          label=""
+          name="handicapMaxPoints"
+          value={eventEditState.formData.handicapMaxPoints}
+          onChange={(value) =>
+            eventEditActions.setField('handicapMaxPoints', value)
+          }
+          options={MAX_POINTS_GIVEN_OPTIONS}
+          noMargin
+        />
+      </Show>
     </div>
   </>
 )

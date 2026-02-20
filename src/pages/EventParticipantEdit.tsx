@@ -1,13 +1,13 @@
-import React, { useEffect, useState } from 'react'
+import { Show, For, onMount, onCleanup, createSignal, type JSX } from 'solid-js'
 import { Header } from '../components/Header'
 import Select from '../components/Select'
 import Button from '../components/Button'
 import type { Player } from '../../shared/types/Player'
 import type { Participant } from '../../shared/types/Tournament'
-import { useEventStore, type EventOption } from '../stores/eventStore'
-import { usePlayerStore } from '../stores/playerStore'
+import { eventState, type EventOption } from '../stores/eventStore'
+import { playerState } from '../stores/playerStore'
 import {
-  useEventParticipantEditStore,
+  eventParticipantEditState,
   eventParticipantEditActions,
   canShowDeleteColumn,
   isAddDisabled,
@@ -16,85 +16,94 @@ import {
   calculateTopNCombinedRating,
 } from '../stores/eventParticipantEditStore'
 
-const containerStyle: React.CSSProperties = {
+const containerStyle: JSX.CSSProperties = {
   display: 'flex',
-  flexDirection: 'column',
-  minHeight: '100vh',
+  'flex-direction': 'column',
+  'min-height': '100vh',
 }
 
-const contentStyle: React.CSSProperties = {
+const contentStyle: JSX.CSSProperties = {
   padding: '24px',
 }
 
-const titleStyle: React.CSSProperties = {
-  fontSize: '2rem',
-  fontWeight: 700,
-  textAlign: 'left',
-  marginBottom: '24px',
+const titleStyle: JSX.CSSProperties = {
+  'font-size': '2rem',
+  'font-weight': 700,
+  'text-align': 'left',
+  'margin-bottom': '24px',
   color: '#333',
 }
 
-const sectionTitleStyle: React.CSSProperties = {
-  fontSize: '14px',
-  fontWeight: 700,
-  marginTop: '24px',
-  marginBottom: '8px',
+const sectionTitleStyle: JSX.CSSProperties = {
+  'font-size': '14px',
+  'font-weight': 700,
+  'margin-top': '24px',
+  'margin-bottom': '8px',
   color: '#333',
-  textAlign: 'left',
+  'text-align': 'left',
 }
 
-const tableStyle: React.CSSProperties = {
+const tableStyle: JSX.CSSProperties = {
   width: '100%',
-  borderCollapse: 'collapse',
-  marginTop: '16px',
+  'border-collapse': 'collapse',
+  'margin-top': '16px',
 }
 
-const thStyle: React.CSSProperties = {
+const thStyle: JSX.CSSProperties = {
   padding: '12px',
-  textAlign: 'left',
-  borderBottom: '2px solid #ddd',
-  backgroundColor: '#f8f9fa',
+  'text-align': 'left',
+  'border-bottom': '2px solid #ddd',
+  'background-color': '#f8f9fa',
 }
 
-const tdStyle: React.CSSProperties = {
+const tdStyle: JSX.CSSProperties = {
   padding: '12px',
-  borderBottom: '1px solid #eee',
+  'border-bottom': '1px solid #eee',
 }
 
-const tdPlayerStyle: React.CSSProperties = {
+const tdPlayerStyle: JSX.CSSProperties = {
   ...tdStyle,
-  textAlign: 'left',
+  'text-align': 'left',
 }
 
-const EventParticipantEdit: React.FC = () => {
-  const { data: events } = useEventStore()
-  const { data: players } = usePlayerStore()
-  const { selectedEventId, showAddDialog, toastMessage } =
-    useEventParticipantEditStore()
+const deleteIconStyle: JSX.CSSProperties = {
+  cursor: 'pointer',
+  color: '#e74c3c',
+  width: '20px',
+  height: '20px',
+}
 
-  const selectedEvent = eventParticipantEditActions.getSelectedEvent()
-
-  useEffect(() => {
+const EventParticipantEdit = () => {
+  onMount(() => {
     eventParticipantEditActions.init()
-    return () => eventParticipantEditActions.reset()
-  }, [])
+  })
 
-  const eventOptions = (events || []).map((e) => ({
-    value: e._id,
-    label: e.eventName,
-  }))
+  onCleanup(() => {
+    eventParticipantEditActions.reset()
+  })
 
-  const toastStyle: React.CSSProperties = {
+  const eventOptions = () =>
+    (eventState.data || []).map((e) => ({
+      value: e._id,
+      label: e.eventName,
+    }))
+
+  const selectedEvent = () => eventParticipantEditActions.getSelectedEvent()
+
+  const toastStyle = (): JSX.CSSProperties => ({
     position: 'fixed',
     top: '20px',
     right: '20px',
     padding: '16px 24px',
-    borderRadius: '8px',
+    'border-radius': '8px',
     color: 'white',
-    fontWeight: 500,
-    zIndex: 1001,
-    backgroundColor: toastMessage?.type === 'success' ? '#27ae60' : '#e74c3c',
-  }
+    'font-weight': '500',
+    'z-index': 1001,
+    'background-color':
+      eventParticipantEditState.toastMessage?.type === 'success'
+        ? '#27ae60'
+        : '#e74c3c',
+  })
 
   return (
     <div style={containerStyle}>
@@ -104,37 +113,45 @@ const EventParticipantEdit: React.FC = () => {
         <Select
           label="Event"
           name="event"
-          value={selectedEventId}
+          value={eventParticipantEditState.selectedEventId}
           onChange={eventParticipantEditActions.setSelectedEventId}
-          options={eventOptions}
+          options={eventOptions()}
         />
-        {selectedEvent && (
-          <>
-            <div style={{ marginTop: '16px' }}>
-              <Button
-                color="#3498db"
-                onClick={eventParticipantEditActions.openAddDialog}
-                disabled={isAddDisabled(selectedEvent)}
-              >
-                Add Participant
-              </Button>
-            </div>
-            <h3 style={sectionTitleStyle}>
-              {getParticipantsCountText(selectedEvent)}
-            </h3>
-            <ParticipantsTable event={selectedEvent} />
-          </>
-        )}
+        <Show when={selectedEvent()}>
+          {(event) => (
+            <>
+              <div style={{ 'margin-top': '16px' }}>
+                <Button
+                  color="#3498db"
+                  onClick={eventParticipantEditActions.openAddDialog}
+                  disabled={isAddDisabled(event())}
+                >
+                  Add Participant
+                </Button>
+              </div>
+              <h3 style={sectionTitleStyle}>
+                {getParticipantsCountText(event())}
+              </h3>
+              <ParticipantsTable event={event()} />
+            </>
+          )}
+        </Show>
       </div>
 
-      {showAddDialog && selectedEvent && (
-        <AddParticipantDialog
-          nop={selectedEvent.nop}
-          players={players || []}
-        />
-      )}
+      <Show when={eventParticipantEditState.showAddDialog && selectedEvent()}>
+        {(event) => (
+          <AddParticipantDialog
+            nop={event().nop}
+            players={playerState.data || []}
+          />
+        )}
+      </Show>
 
-      {toastMessage && <div style={toastStyle}>{toastMessage.text}</div>}
+      <Show when={eventParticipantEditState.toastMessage}>
+        <div style={toastStyle()}>
+          {eventParticipantEditState.toastMessage!.text}
+        </div>
+      </Show>
     </div>
   )
 }
@@ -143,24 +160,25 @@ interface ParticipantsTableProps {
   event: EventOption
 }
 
-const ParticipantsTable: React.FC<ParticipantsTableProps> = ({ event }) => {
-  if (event.nop === 1) {
-    return <SingleParticipantTable event={event} />
-  }
-  return <DoubleOrTeamParticipantTable event={event} />
-}
+const ParticipantsTable = (props: ParticipantsTableProps) => (
+  <Show
+    when={props.event.nop === 1}
+    fallback={<DoubleOrTeamParticipantTable event={props.event} />}
+  >
+    <SingleParticipantTable event={props.event} />
+  </Show>
+)
 
 interface SingleParticipantTableProps {
   event: EventOption
 }
 
-const SingleParticipantTable: React.FC<SingleParticipantTableProps> = ({
-  event,
-}) => {
-  const sortedParticipants = [...event.participants].sort(
-    (a, b) => (b.rating || 0) - (a.rating || 0),
-  )
-  const showDelete = canShowDeleteColumn(event)
+const SingleParticipantTable = (props: SingleParticipantTableProps) => {
+  const sortedParticipants = () =>
+    [...props.event.participants].sort(
+      (a, b) => (b.rating || 0) - (a.rating || 0),
+    )
+  const showDelete = () => canShowDeleteColumn(props.event)
 
   return (
     <table style={tableStyle}>
@@ -168,18 +186,21 @@ const SingleParticipantTable: React.FC<SingleParticipantTableProps> = ({
         <tr>
           <th style={thStyle}>Player</th>
           <th style={thStyle}>Rating</th>
-          {showDelete && <th style={thStyle}>Action</th>}
+          <Show when={showDelete()}>
+            <th style={thStyle}>Action</th>
+          </Show>
         </tr>
       </thead>
       <tbody>
-        {sortedParticipants.map((participant, index) => (
-          <SingleParticipantRow
-            key={participant._id}
-            participant={participant}
-            showDelete={showDelete}
-            rowIndex={index}
-          />
-        ))}
+        <For each={sortedParticipants()}>
+          {(participant, index) => (
+            <SingleParticipantRow
+              participant={participant}
+              showDelete={showDelete()}
+              rowIndex={index()}
+            />
+          )}
+        </For>
       </tbody>
     </table>
   )
@@ -194,23 +215,20 @@ interface SingleParticipantRowProps {
 const getRowBackgroundColor = (index: number): string =>
   index % 2 === 0 ? 'white' : '#e6e6fa'
 
-const deleteIconStyle: React.CSSProperties = {
-  cursor: 'pointer',
-  color: '#e74c3c',
-  width: '20px',
-  height: '20px',
+interface DeleteIconProps {
+  onClick: () => void
 }
 
-const DeleteIcon: React.FC<{ onClick: () => void }> = ({ onClick }) => (
+const DeleteIcon = (props: DeleteIconProps) => (
   <svg
     style={deleteIconStyle}
-    onClick={onClick}
+    onClick={props.onClick}
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
   >
     <polyline points="3 6 5 6 21 6" />
     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
@@ -219,25 +237,22 @@ const DeleteIcon: React.FC<{ onClick: () => void }> = ({ onClick }) => (
   </svg>
 )
 
-const SingleParticipantRow: React.FC<SingleParticipantRowProps> = ({
-  participant,
-  showDelete,
-  rowIndex,
-}) => (
-  <tr style={{ backgroundColor: getRowBackgroundColor(rowIndex) }}>
+const SingleParticipantRow = (props: SingleParticipantRowProps) => (
+  <tr style={{ 'background-color': getRowBackgroundColor(props.rowIndex) }}>
     <td style={tdPlayerStyle}>
-      {participant.players[0]?.firstName} {participant.players[0]?.lastName}
+      {props.participant.players[0]?.firstName}{' '}
+      {props.participant.players[0]?.lastName}
     </td>
-    <td style={tdStyle}>{participant.players[0]?.rating || 0}</td>
-    {showDelete && (
+    <td style={tdStyle}>{props.participant.players[0]?.rating || 0}</td>
+    <Show when={props.showDelete}>
       <td style={tdStyle}>
         <DeleteIcon
           onClick={() =>
-            eventParticipantEditActions.deleteParticipant(participant._id)
+            eventParticipantEditActions.deleteParticipant(props.participant._id)
           }
         />
       </td>
-    )}
+    </Show>
   </tr>
 )
 
@@ -245,16 +260,19 @@ interface DoubleOrTeamParticipantTableProps {
   event: EventOption
 }
 
-const DoubleOrTeamParticipantTable: React.FC<
-  DoubleOrTeamParticipantTableProps
-> = ({ event }) => {
-  const sortedParticipants = [...event.participants].sort(
-    (a, b) => calculateCombinedRating(b) - calculateCombinedRating(a),
-  )
-  const showDelete = canShowDeleteColumn(event)
-  const isTeam = event.type === 'Team'
-  const showTopNCombined =
-    isTeam && event.topPlayersRatingEnabled && event.topPlayersCount
+const DoubleOrTeamParticipantTable = (
+  props: DoubleOrTeamParticipantTableProps,
+) => {
+  const sortedParticipants = () =>
+    [...props.event.participants].sort(
+      (a, b) => calculateCombinedRating(b) - calculateCombinedRating(a),
+    )
+  const showDelete = () => canShowDeleteColumn(props.event)
+  const isTeam = () => props.event.type === 'Team'
+  const showTopNCombined = () =>
+    isTeam() &&
+    props.event.topPlayersRatingEnabled &&
+    props.event.topPlayersCount
 
   return (
     <table style={tableStyle}>
@@ -263,23 +281,26 @@ const DoubleOrTeamParticipantTable: React.FC<
           <th style={thStyle}>Players</th>
           <th style={thStyle}>Rating</th>
           <th style={thStyle}>Combined Rating</th>
-          {showTopNCombined && (
-            <th style={thStyle}>Top {event.topPlayersCount} Combined</th>
-          )}
-          {showDelete && <th style={thStyle}>Action</th>}
+          <Show when={showTopNCombined()}>
+            <th style={thStyle}>Top {props.event.topPlayersCount} Combined</th>
+          </Show>
+          <Show when={showDelete()}>
+            <th style={thStyle}>Action</th>
+          </Show>
         </tr>
       </thead>
       <tbody>
-        {sortedParticipants.map((participant, index) => (
-          <TeamParticipantRows
-            key={participant._id}
-            participant={participant}
-            event={event}
-            showDelete={showDelete}
-            showTopNCombined={!!showTopNCombined}
-            participantIndex={index}
-          />
-        ))}
+        <For each={sortedParticipants()}>
+          {(participant, index) => (
+            <TeamParticipantRows
+              participant={participant}
+              event={props.event}
+              showDelete={showDelete()}
+              showTopNCombined={!!showTopNCombined()}
+              participantIndex={index()}
+            />
+          )}
+        </For>
       </tbody>
     </table>
   )
@@ -293,65 +314,63 @@ interface TeamParticipantRowsProps {
   participantIndex: number
 }
 
-const TeamParticipantRows: React.FC<TeamParticipantRowsProps> = ({
-  participant,
-  event,
-  showDelete,
-  showTopNCombined,
-  participantIndex,
-}) => {
-  const sortedPlayers = [...participant.players].sort(
-    (a, b) => (b.rating || 0) - (a.rating || 0),
-  )
-  const combinedRating = calculateCombinedRating(participant)
-  const topNCombined = showTopNCombined
-    ? calculateTopNCombinedRating(participant, event.topPlayersCount!)
-    : null
+const TeamParticipantRows = (props: TeamParticipantRowsProps) => {
+  const sortedPlayers = () =>
+    [...props.participant.players].sort(
+      (a, b) => (b.rating || 0) - (a.rating || 0),
+    )
+  const combinedRating = () => calculateCombinedRating(props.participant)
+  const topNCombined = () =>
+    props.showTopNCombined
+      ? calculateTopNCombinedRating(
+          props.participant,
+          props.event.topPlayersCount!,
+        )
+      : null
 
-  const rowBgColor = getRowBackgroundColor(participantIndex)
+  const rowBgColor = getRowBackgroundColor(props.participantIndex)
 
   return (
-    <>
-      {sortedPlayers.map((player, index) => (
-        <tr
-          key={`${participant._id}-${player._id}`}
-          style={{ backgroundColor: rowBgColor }}
-        >
+    <For each={sortedPlayers()}>
+      {(player, index) => (
+        <tr style={{ 'background-color': rowBgColor }}>
           <td style={tdPlayerStyle}>
             {player.firstName} {player.lastName}
           </td>
           <td style={tdStyle}>{player.rating || 0}</td>
-          {index === 0 && (
+          <Show when={index() === 0}>
             <td
-              style={{ ...tdStyle, verticalAlign: 'middle' }}
-              rowSpan={sortedPlayers.length}
+              style={{ ...tdStyle, 'vertical-align': 'middle' }}
+              rowSpan={sortedPlayers().length}
             >
-              {combinedRating}
+              {combinedRating()}
             </td>
-          )}
-          {showTopNCombined && index === 0 && (
+          </Show>
+          <Show when={props.showTopNCombined && index() === 0}>
             <td
-              style={{ ...tdStyle, verticalAlign: 'middle' }}
-              rowSpan={sortedPlayers.length}
+              style={{ ...tdStyle, 'vertical-align': 'middle' }}
+              rowSpan={sortedPlayers().length}
             >
-              {topNCombined}
+              {topNCombined()}
             </td>
-          )}
-          {showDelete && index === 0 && (
+          </Show>
+          <Show when={props.showDelete && index() === 0}>
             <td
-              style={{ ...tdStyle, verticalAlign: 'middle' }}
-              rowSpan={sortedPlayers.length}
+              style={{ ...tdStyle, 'vertical-align': 'middle' }}
+              rowSpan={sortedPlayers().length}
             >
               <DeleteIcon
                 onClick={() =>
-                  eventParticipantEditActions.deleteParticipant(participant._id)
+                  eventParticipantEditActions.deleteParticipant(
+                    props.participant._id,
+                  )
                 }
               />
             </td>
-          )}
+          </Show>
         </tr>
-      ))}
-    </>
+      )}
+    </For>
   )
 }
 
@@ -360,86 +379,85 @@ interface AddParticipantDialogProps {
   players: Player[]
 }
 
-const AddParticipantDialog: React.FC<AddParticipantDialogProps> = ({
-  nop,
-  players,
-}) => {
-  const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>(
-    Array(nop).fill(''),
+const dialogOverlayStyle: JSX.CSSProperties = {
+  position: 'fixed',
+  top: '0',
+  left: '0',
+  right: '0',
+  bottom: '0',
+  'background-color': 'rgba(0, 0, 0, 0.5)',
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'center',
+  'z-index': 1000,
+}
+
+const dialogStyle: JSX.CSSProperties = {
+  'background-color': 'white',
+  'border-radius': '8px',
+  padding: '24px',
+  'min-width': '400px',
+  'max-width': '500px',
+}
+
+const dialogTitleStyle: JSX.CSSProperties = {
+  'font-size': '1.5rem',
+  'font-weight': 700,
+  'margin-bottom': '24px',
+  color: '#333',
+}
+
+const buttonContainerStyle: JSX.CSSProperties = {
+  display: 'flex',
+  gap: '16px',
+  'margin-top': '24px',
+  'justify-content': 'flex-end',
+}
+
+const AddParticipantDialog = (props: AddParticipantDialogProps) => {
+  const [selectedPlayerIds, setSelectedPlayerIds] = createSignal<string[]>(
+    Array(props.nop).fill(''),
   )
 
   const handlePlayerChange = (index: number, playerId: string) => {
-    const newIds = [...selectedPlayerIds]
+    const newIds = [...selectedPlayerIds()]
     newIds[index] = playerId
     setSelectedPlayerIds(newIds)
   }
 
   const handleSave = () => {
     eventParticipantEditActions.addParticipant(
-      selectedPlayerIds.filter((id) => id !== ''),
+      selectedPlayerIds().filter((id) => id !== ''),
     )
   }
 
-  const playerOptions = players
-    .sort((a, b) => {
-      const nameA = `${a.firstName} ${a.lastName}`.toLowerCase()
-      const nameB = `${b.firstName} ${b.lastName}`.toLowerCase()
-      return nameA.localeCompare(nameB)
-    })
-    .map((p) => ({
-      value: p._id,
-      label: `${p.firstName} ${p.lastName} - ${p.rating || 0}`,
-    }))
-
-  const dialogOverlayStyle: React.CSSProperties = {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-  }
-
-  const dialogStyle: React.CSSProperties = {
-    backgroundColor: 'white',
-    borderRadius: '8px',
-    padding: '24px',
-    minWidth: '400px',
-    maxWidth: '500px',
-  }
-
-  const dialogTitleStyle: React.CSSProperties = {
-    fontSize: '1.5rem',
-    fontWeight: 700,
-    marginBottom: '24px',
-    color: '#333',
-  }
-
-  const buttonContainerStyle: React.CSSProperties = {
-    display: 'flex',
-    gap: '16px',
-    marginTop: '24px',
-    justifyContent: 'flex-end',
-  }
+  const playerOptions = () =>
+    [...props.players]
+      .sort((a, b) => {
+        const nameA = `${a.firstName} ${a.lastName}`.toLowerCase()
+        const nameB = `${b.firstName} ${b.lastName}`.toLowerCase()
+        return nameA.localeCompare(nameB)
+      })
+      .map((p) => ({
+        value: p._id,
+        label: `${p.firstName} ${p.lastName} - ${p.rating || 0}`,
+      }))
 
   return (
     <div style={dialogOverlayStyle}>
       <div style={dialogStyle}>
         <h2 style={dialogTitleStyle}>Add Participant</h2>
-        {Array.from({ length: nop }, (_, index) => (
-          <Select
-            key={index}
-            label={`Player ${index + 1}`}
-            name={`player-${index}`}
-            value={selectedPlayerIds[index]}
-            onChange={(value) => handlePlayerChange(index, value)}
-            options={playerOptions}
-          />
-        ))}
+        <For each={Array.from({ length: props.nop }, (_, i) => i)}>
+          {(index) => (
+            <Select
+              label={`Player ${index + 1}`}
+              name={`player-${index}`}
+              value={selectedPlayerIds()[index]}
+              onChange={(value) => handlePlayerChange(index, value)}
+              options={playerOptions()}
+            />
+          )}
+        </For>
         <div style={buttonContainerStyle}>
           <Button
             color="#e74c3c"

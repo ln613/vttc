@@ -1,4 +1,4 @@
-import React from 'react'
+import { Show, type JSX } from 'solid-js'
 
 interface InputProps {
   label: string
@@ -11,107 +11,97 @@ interface InputProps {
   rows?: number
   type?: 'text' | 'email' | 'tel' | 'password' | 'number'
   disabled?: boolean
-  className?: string
+  class?: string
 }
 
-const Input: React.FC<InputProps> = ({
-  label,
-  name,
-  value,
-  onChange,
-  placeholder = '',
-  required = false,
-  multiline = false,
-  rows = 6,
-  type = 'text',
-  disabled = false,
-  className = '',
-}) => {
-  const labelStyle: React.CSSProperties = {
-    display: 'block',
-    fontWeight: 700,
-    fontSize: '14px',
-    marginBottom: '8px',
-    color: '#333',
-    textAlign: 'left',
-  }
+const labelStyle: JSX.CSSProperties = {
+  display: 'block',
+  'font-weight': 700,
+  'font-size': '14px',
+  'margin-bottom': '8px',
+  color: '#333',
+  'text-align': 'left',
+}
 
-  const requiredStyle: React.CSSProperties = {
-    color: '#e74c3c',
-    marginLeft: '4px',
-  }
+const requiredStyle: JSX.CSSProperties = {
+  color: '#e74c3c',
+  'margin-left': '4px',
+}
 
-  const inputStyle: React.CSSProperties = {
+const containerStyle: JSX.CSSProperties = {
+  'margin-bottom': '16px',
+}
+
+const Input = (props: InputProps) => {
+  const inputStyle = (): JSX.CSSProperties => ({
     width: '100%',
     padding: '12px 16px',
-    fontSize: '14px',
+    'font-size': '14px',
     border: '1px solid #ddd',
-    borderRadius: '8px',
+    'border-radius': '8px',
     outline: 'none',
     transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
-    boxSizing: 'border-box',
-    backgroundColor: disabled ? '#f5f5f5' : '#fff',
+    'box-sizing': 'border-box',
+    'background-color': props.disabled ? '#f5f5f5' : '#fff',
     color: '#333',
-    cursor: disabled ? 'not-allowed' : 'text',
+    cursor: props.disabled ? 'not-allowed' : 'text',
+  })
+
+  const handleFocus = (e: FocusEvent) => {
+    const target = e.currentTarget as HTMLElement
+    target.style.borderColor = '#3498db'
+    target.style.boxShadow = '0 0 0 3px rgba(52, 152, 219, 0.1)'
   }
 
-  const containerStyle: React.CSSProperties = {
-    marginBottom: '16px',
+  const handleBlur = (e: FocusEvent) => {
+    const target = e.currentTarget as HTMLElement
+    target.style.borderColor = '#ddd'
+    target.style.boxShadow = 'none'
   }
 
-  const handleFocus = (
-    e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>,
-  ) => {
-    e.currentTarget.style.borderColor = '#3498db'
-    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(52, 152, 219, 0.1)'
-  }
-
-  const handleBlur = (
-    e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>,
-  ) => {
-    e.currentTarget.style.borderColor = '#ddd'
-    e.currentTarget.style.boxShadow = 'none'
-  }
-
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-  ) => {
-    onChange(e.target.value)
+  const handleChange = (e: Event) => {
+    const target = e.target as HTMLInputElement | HTMLTextAreaElement
+    props.onChange(target.value)
   }
 
   return (
-    <div style={containerStyle} className={className}>
-      <label htmlFor={name} style={labelStyle}>
-        {label}
-        {required && <span style={requiredStyle}>*</span>}
+    <div style={containerStyle} class={props.class ?? ''}>
+      <label for={props.name} style={labelStyle}>
+        {props.label}
+        <Show when={props.required}>
+          <span style={requiredStyle}>*</span>
+        </Show>
       </label>
-      {multiline ? (
+      <Show
+        when={props.multiline}
+        fallback={
+          <input
+            id={props.name}
+            name={props.name}
+            type={props.type ?? 'text'}
+            value={props.value}
+            onInput={handleChange}
+            placeholder={props.placeholder ?? ''}
+            disabled={props.disabled}
+            style={inputStyle()}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
+          />
+        }
+      >
         <textarea
-          id={name}
-          name={name}
-          value={value}
-          onChange={handleChange}
-          placeholder={placeholder}
-          disabled={disabled}
-          rows={rows}
-          style={{ ...inputStyle, resize: 'vertical', minHeight: '120px' }}
+          id={props.name}
+          name={props.name}
+          value={props.value}
+          onInput={handleChange}
+          placeholder={props.placeholder ?? ''}
+          disabled={props.disabled}
+          rows={props.rows ?? 6}
+          style={{ ...inputStyle(), resize: 'vertical', 'min-height': '120px' }}
           onFocus={handleFocus}
           onBlur={handleBlur}
         />
-      ) : (
-        <input
-          id={name}
-          name={name}
-          type={type}
-          value={value}
-          onChange={handleChange}
-          placeholder={placeholder}
-          disabled={disabled}
-          style={inputStyle}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-        />
-      )}
+      </Show>
     </div>
   )
 }

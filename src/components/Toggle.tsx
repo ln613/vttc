@@ -1,4 +1,4 @@
-import React from 'react'
+import { Show, type JSX } from 'solid-js'
 
 interface ToggleProps {
   label: string
@@ -7,60 +7,62 @@ interface ToggleProps {
   noMargin?: boolean
 }
 
-const Toggle: React.FC<ToggleProps> = ({ label, value, onChange, noMargin = false }) => {
-  const containerStyle: React.CSSProperties = {
+const labelStyle: JSX.CSSProperties = {
+  'font-size': '14px',
+  'font-weight': 600,
+  color: '#333',
+}
+
+const toggleContainerStyle: JSX.CSSProperties = {
+  position: 'relative',
+  width: '48px',
+  height: '24px',
+  cursor: 'pointer',
+}
+
+const Toggle = (props: ToggleProps) => {
+  const containerStyle = (): JSX.CSSProperties => ({
     display: 'flex',
-    alignItems: 'center',
+    'align-items': 'center',
     gap: '12px',
-    marginBottom: noMargin ? 0 : '16px',
-  }
+    'margin-bottom': props.noMargin ? '0' : '16px',
+  })
 
-  const labelStyle: React.CSSProperties = {
-    fontSize: '14px',
-    fontWeight: 600,
-    color: '#333',
-  }
-
-  const toggleContainerStyle: React.CSSProperties = {
-    position: 'relative',
-    width: '48px',
-    height: '24px',
-    cursor: 'pointer',
-  }
-
-  const toggleTrackStyle: React.CSSProperties = {
+  const toggleTrackStyle = (): JSX.CSSProperties => ({
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: value ? '#3498db' : '#ccc',
-    borderRadius: '12px',
+    top: '0',
+    left: '0',
+    right: '0',
+    bottom: '0',
+    'background-color': props.value ? '#3498db' : '#ccc',
+    'border-radius': '12px',
     transition: 'background-color 0.2s ease',
-  }
+  })
 
-  const toggleThumbStyle: React.CSSProperties = {
+  const toggleThumbStyle = (): JSX.CSSProperties => ({
     position: 'absolute',
     top: '2px',
-    left: value ? '26px' : '2px',
+    left: props.value ? '26px' : '2px',
     width: '20px',
     height: '20px',
-    backgroundColor: '#fff',
-    borderRadius: '50%',
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+    'background-color': '#fff',
+    'border-radius': '50%',
+    'box-shadow': '0 2px 4px rgba(0, 0, 0, 0.2)',
     transition: 'left 0.2s ease',
-  }
+  })
 
   const handleToggle = () => {
-    onChange(!value)
+    props.onChange(!props.value)
   }
 
   return (
-    <div style={containerStyle}>
-      {label && <span style={labelStyle}>{label}</span>}
+    <div style={containerStyle()}>
+      <Show when={props.label}>
+        <span style={labelStyle}>{props.label}</span>
+      </Show>
       <div style={toggleContainerStyle} onClick={handleToggle}>
-        <div style={toggleTrackStyle} />
-        <div style={toggleThumbStyle} />
+        <div style={toggleTrackStyle()} />
+        <div style={toggleThumbStyle()} />
       </div>
     </div>
   )

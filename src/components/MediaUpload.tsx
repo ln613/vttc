@@ -1,162 +1,162 @@
-import React, { useRef, useState } from 'react'
+import { createSignal, Show, type JSX } from 'solid-js'
 
 interface MediaUploadProps {
   label?: string
   value: File | string | null
   onChange: (file: File | null) => void
-  className?: string
+  class?: string
 }
 
-const MediaUpload: React.FC<MediaUploadProps> = ({
-  label,
-  value,
-  onChange,
-  className = '',
-}) => {
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [isHovered, setIsHovered] = useState(false)
-  const [showPreviewOverlay, setShowPreviewOverlay] = useState(false)
+const containerStyle: JSX.CSSProperties = {
+  'margin-bottom': '16px',
+}
 
-  const containerStyle: React.CSSProperties = {
-    marginBottom: '16px',
-  }
+const labelStyle: JSX.CSSProperties = {
+  display: 'block',
+  'font-weight': 700,
+  'font-size': '14px',
+  'margin-bottom': '8px',
+  color: '#333',
+  'text-align': 'left',
+}
 
-  const labelStyle: React.CSSProperties = {
-    display: 'block',
-    fontWeight: 700,
-    fontSize: '14px',
-    marginBottom: '8px',
-    color: '#333',
-    textAlign: 'left',
-  }
+const previewBoxStyle: JSX.CSSProperties = {
+  width: '300px',
+  height: '300px',
+  border: '2px dashed #ddd',
+  'border-radius': '4px',
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'center',
+  cursor: 'pointer',
+  position: 'relative',
+  overflow: 'hidden',
+  'background-color': '#fafafa',
+}
 
-  const previewBoxStyle: React.CSSProperties = {
-    width: '300px',
-    height: '300px',
-    border: '2px dashed #ddd',
-    borderRadius: '4px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    position: 'relative',
-    overflow: 'hidden',
-    backgroundColor: '#fafafa',
-  }
+const plusSignStyle: JSX.CSSProperties = {
+  'font-size': '64px',
+  color: '#ccc',
+  'font-weight': 300,
+  'user-select': 'none',
+}
 
-  const plusSignStyle: React.CSSProperties = {
-    fontSize: '64px',
-    color: '#ccc',
-    fontWeight: 300,
-    userSelect: 'none',
-  }
+const imageStyle: JSX.CSSProperties = {
+  width: '100%',
+  height: '100%',
+  'object-fit': 'contain',
+}
 
-  const imageStyle: React.CSSProperties = {
-    width: '100%',
-    height: '100%',
-    objectFit: 'contain',
-  }
+const overlayStyle: JSX.CSSProperties = {
+  position: 'fixed',
+  top: '0',
+  left: '0',
+  width: '100vw',
+  height: '100vh',
+  'background-color': 'rgba(0, 0, 0, 0.8)',
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'center',
+  'z-index': 1000,
+}
 
-  const removeButtonStyle: React.CSSProperties = {
+const overlayImageStyle: JSX.CSSProperties = {
+  'max-width': '90vw',
+  'max-height': '90vh',
+  'object-fit': 'contain',
+}
+
+const MediaUpload = (props: MediaUploadProps) => {
+  const [isHovered, setIsHovered] = createSignal(false)
+  const [showPreviewOverlay, setShowPreviewOverlay] = createSignal(false)
+
+  let fileInputRef: HTMLInputElement | undefined
+
+  const removeButtonStyle = (): JSX.CSSProperties => ({
     position: 'absolute',
     top: '8px',
     right: '8px',
     width: '28px',
     height: '28px',
-    padding: 0,
-    borderRadius: '50%',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    padding: '0',
+    'border-radius': '50%',
+    'background-color': 'rgba(0, 0, 0, 0.6)',
     color: '#fff',
     border: 'none',
     cursor: 'pointer',
-    display: isHovered ? 'flex' : 'none',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '16px',
-    fontWeight: 'bold',
-    lineHeight: 1,
+    display: isHovered() ? 'flex' : 'none',
+    'align-items': 'center',
+    'justify-content': 'center',
+    'font-size': '16px',
+    'font-weight': 'bold',
+    'line-height': '1',
     transition: 'opacity 0.2s ease',
-  }
-
-  const overlayStyle: React.CSSProperties = {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    width: '100vw',
-    height: '100vh',
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-  }
-
-  const overlayImageStyle: React.CSSProperties = {
-    maxWidth: '90vw',
-    maxHeight: '90vh',
-    objectFit: 'contain',
-  }
+  })
 
   const getMediaUrl = (): string | null => {
-    if (!value) return null
-    if (typeof value === 'string') return value
-    return URL.createObjectURL(value)
+    if (!props.value) return null
+    if (typeof props.value === 'string') return props.value
+    return URL.createObjectURL(props.value)
   }
 
   const handlePreviewBoxClick = () => {
-    if (!value) {
-      fileInputRef.current?.click()
+    if (!props.value) {
+      fileInputRef?.click()
     } else {
       setShowPreviewOverlay(true)
     }
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null
-    onChange(file)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
+  const handleFileChange = (e: Event) => {
+    const target = e.target as HTMLInputElement
+    const file = target.files?.[0] || null
+    props.onChange(file)
+    if (fileInputRef) {
+      fileInputRef.value = ''
     }
   }
 
-  const handleRemoveClick = (e: React.MouseEvent) => {
+  const handleRemoveClick = (e: MouseEvent) => {
     e.stopPropagation()
-    onChange(null)
+    props.onChange(null)
   }
 
   const handleOverlayClick = () => {
     setShowPreviewOverlay(false)
   }
 
-  const handleOverlayKeyDown = (e: React.KeyboardEvent) => {
+  const handleOverlayKeyDown = () => {
     setShowPreviewOverlay(false)
   }
 
-  const mediaUrl = getMediaUrl()
-
   return (
-    <div style={containerStyle} className={className}>
-      {label && <label style={labelStyle}>{label}</label>}
+    <div style={containerStyle} class={props.class ?? ''}>
+      <Show when={props.label}>
+        <label style={labelStyle}>{props.label}</label>
+      </Show>
       <div
         style={previewBoxStyle}
         onClick={handlePreviewBoxClick}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        {mediaUrl ? (
-          <>
-            <img src={mediaUrl} alt="Preview" style={imageStyle} />
-            <button
-              style={removeButtonStyle}
-              onClick={handleRemoveClick}
-              type="button"
-            >
-              ×
-            </button>
-          </>
-        ) : (
-          <span style={plusSignStyle}>+</span>
-        )}
+        <Show
+          when={getMediaUrl()}
+          fallback={<span style={plusSignStyle}>+</span>}
+        >
+          {(url) => (
+            <>
+              <img src={url()} alt="Preview" style={imageStyle} />
+              <button
+                style={removeButtonStyle()}
+                onClick={handleRemoveClick}
+                type="button"
+              >
+                ×
+              </button>
+            </>
+          )}
+        </Show>
       </div>
       <input
         ref={fileInputRef}
@@ -165,16 +165,18 @@ const MediaUpload: React.FC<MediaUploadProps> = ({
         style={{ display: 'none' }}
         onChange={handleFileChange}
       />
-      {showPreviewOverlay && mediaUrl && (
-        <div
-          style={overlayStyle}
-          onClick={handleOverlayClick}
-          onKeyDown={handleOverlayKeyDown}
-          tabIndex={0}
-        >
-          <img src={mediaUrl} alt="Full Preview" style={overlayImageStyle} />
-        </div>
-      )}
+      <Show when={showPreviewOverlay() && getMediaUrl()}>
+        {(url) => (
+          <div
+            style={overlayStyle}
+            onClick={handleOverlayClick}
+            onKeyDown={handleOverlayKeyDown}
+            tabIndex={0}
+          >
+            <img src={url()} alt="Full Preview" style={overlayImageStyle} />
+          </div>
+        )}
+      </Show>
     </div>
   )
 }

@@ -1,61 +1,75 @@
+import { createStore } from 'solid-js/store'
 import type { Event, Stage, Group, TournamentType } from '../../shared/types/Tournament'
 import { apiGet, apiPost } from '../utils/api'
-import { createStore, createAsyncState, type AsyncState } from './createStore'
 
-interface EventManageState extends AsyncState<Event> {
+interface EventManageState {
+  data: Event | null
+  loading: boolean
+  error: string | null
   selectedEventId: string | null
   activeStageTab: 'group' | 'knockout'
   generatingGroups: boolean
 }
 
-const createInitialState = (): EventManageState => ({
-  ...createAsyncState<Event>(),
+const getInitialState = (): EventManageState => ({
+  data: null,
+  loading: false,
+  error: null,
   selectedEventId: null,
   activeStageTab: 'group',
   generatingGroups: false,
 })
 
-const eventManageStore = createStore<EventManageState>(createInitialState())
+const [eventManageState, setEventManageState] =
+  createStore<EventManageState>(getInitialState())
 
-export const {
-  useStore: useEventManageStore,
-  useSelector: useEventManageSelector,
-  getState: getEventManageState,
-} = eventManageStore
+export { eventManageState }
+
+const fetchEvent = async (eventId: string) => {
+  setEventManageState({ loading: true, error: null })
+  try {
+    const data = await apiGet<Event>('event', { _id: eventId })
+    setEventManageState({ data, loading: false, error: null })
+  } catch (err) {
+    setEventManageState({
+      loading: false,
+      error: err instanceof Error ? err.message : 'Failed to fetch event',
+    })
+  }
+}
 
 export const eventManageActions = {
   selectEvent: async (eventId: string | null) => {
-    setSelectedEventId(eventId)
+    setEventManageState({ selectedEventId: eventId })
     if (!eventId) {
-      clearEventData()
+      setEventManageState({ data: null, loading: false, error: null })
       return
     }
     await fetchEvent(eventId)
   },
 
   setActiveStageTab: (tab: 'group' | 'knockout') => {
-    eventManageStore.setState({ activeStageTab: tab })
+    setEventManageState({ activeStageTab: tab })
   },
 
   generateGroups: async () => {
-    const state = eventManageStore.getState()
-    if (!state.selectedEventId) return
+    const { selectedEventId } = eventManageState
+    if (!selectedEventId) return
 
-    setGeneratingGroups(true)
+    setEventManageState({ generatingGroups: true })
     try {
-      await apiPost<Group[]>('generateGroups', { _id: state.selectedEventId })
-      await fetchEvent(state.selectedEventId)
+      await apiPost<Group[]>('generateGroups', { _id: selectedEventId })
+      await fetchEvent(selectedEventId)
     } catch (err) {
-      setErrorState(err)
+      setEventManageState({
+        error: err instanceof Error ? err.message : 'Failed to generate groups',
+      })
     } finally {
-      setGeneratingGroups(false)
+      setEventManageState({ generatingGroups: false })
     }
   },
 
-  getEventStages: (): Stage[] => {
-    const state = eventManageStore.getState()
-    return state.data?.eventStages || []
-  },
+  getEventStages: (): Stage[] => eventManageState.data?.eventStages || [],
 
   getGroupStage: () => {
     const stages = eventManageActions.getEventStages()
@@ -74,10 +88,7 @@ export const eventManageActions = {
     return (groupStage?.groups?.length ?? 0) > 0
   },
 
-  getEventType: (): TournamentType | undefined => {
-    const state = eventManageStore.getState()
-    return state.data?.type
-  },
+  getEventType: (): TournamentType | undefined => eventManageState.data?.type,
 
   getPlayerColumnTitle: (): string => {
     const eventType = eventManageActions.getEventType()
@@ -86,38 +97,5 @@ export const eventManageActions = {
     return 'Player'
   },
 
-  reset: () => {
-    eventManageStore.setState(createInitialState())
-  },
+  reset: () => setEventManageState(getInitialState()),
 }
-
-const setSelectedEventId = (eventId: string | null) =>
-  eventManageStore.setState({ selectedEventId: eventId })
-
-const clearEventData = () =>
-  eventManageStore.setState({ data: null, loading: false, error: null })
-
-const fetchEvent = async (eventId: string) => {
-  setLoadingState()
-  try {
-    const data = await apiGet<Event>('event', { _id: eventId })
-    setSuccessState(data)
-  } catch (err) {
-    setErrorState(err)
-  }
-}
-
-const setLoadingState = () =>
-  eventManageStore.setState({ loading: true, error: null })
-
-const setSuccessState = (data: Event) =>
-  eventManageStore.setState({ data, loading: false, error: null })
-
-const setErrorState = (err: unknown) =>
-  eventManageStore.setState({
-    loading: false,
-    error: err instanceof Error ? err.message : 'Failed to fetch event',
-  })
-
-const setGeneratingGroups = (generating: boolean) =>
-  eventManageStore.setState({ generatingGroups: generating })
