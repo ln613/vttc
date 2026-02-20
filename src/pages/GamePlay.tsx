@@ -293,6 +293,7 @@ const containerStyle: JSX.CSSProperties = {
   'background-color': '#1a1a2e',
   display: 'flex',
   'flex-direction': 'column',
+  'user-select': 'none',
 }
 
 const contentStyle: JSX.CSSProperties = {

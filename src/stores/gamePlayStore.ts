@@ -1,8 +1,10 @@
 import { createStore } from 'solid-js/store'
 import type { Event, BestOfOption } from '../../shared/types/Tournament'
-import type { Match } from '../../shared/types/Match'
+import type { Match, GameConfig } from '../../shared/types/Match'
+import { DEFAULT_GAME_CONFIG } from '../../shared/types/Match'
 import type { Player } from '../../shared/types/Player'
 import { apiGet, apiPost } from '../utils/api'
+import { validateGameScore } from '../../shared/rules/matchRules'
 
 interface GamePlayState {
   data: Event | null
@@ -110,12 +112,21 @@ const debouncedSaveGame = () => {
   }, SAVE_DEBOUNCE_MS)
 }
 
+type SearchParamValue = string | string[] | undefined
+type SearchParams = Partial<Record<string, SearchParamValue>>
+
+const getStringParam = (value: SearchParamValue): string | null => {
+  if (value === undefined) return null
+  if (Array.isArray(value)) return value[0] ?? null
+  return value
+}
+
 export const gamePlayActions = {
-  initializeFromUrl: async (params: URLSearchParams) => {
-    const eventId = params.get('eventId')
-    const stage = params.get('stage') as 'group' | 'knockout'
-    const groupIndex = parseInt(params.get('groupIndex') || '0', 10)
-    const matchId = params.get('matchId')
+  initializeFromUrl: async (params: SearchParams) => {
+    const eventId = getStringParam(params.eventId)
+    const stage = (getStringParam(params.stage) as 'group' | 'knockout') ?? 'group'
+    const groupIndex = parseInt(getStringParam(params.groupIndex) || '0', 10)
+    const matchId = getStringParam(params.matchId)
 
     validateParams(eventId, matchId)
 
@@ -164,6 +175,14 @@ export const gamePlayActions = {
   addPointToSide: (side: 1 | 2) => {
     const newScore1 = side === 1 ? gamePlayState.score1 + 1 : gamePlayState.score1
     const newScore2 = side === 2 ? gamePlayState.score2 + 1 : gamePlayState.score2
+
+    // Validate score before updating
+    const gameConfig: GameConfig = { ...DEFAULT_GAME_CONFIG }
+    const errors = validateGameScore(newScore1, newScore2, gameConfig)
+    if (errors.length > 0) {
+      return // Don't update if score is invalid
+    }
+
     const newServingSide = calculateServingSide(
       newScore1,
       newScore2,
