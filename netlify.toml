@@ -7,6 +7,3 @@
   targetPort = 5173
   command = "npm run dev:client"
   autoLaunch = false
-
-[functions]
-  node_bundler = "esbuild"
