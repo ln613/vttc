@@ -99,11 +99,18 @@ const NarrowHeader = () => {
 const ScoreBoxes = () => {
   const leftSide = () => gamePlayState.leftSide
   const rightSide = () => (leftSide() === 1 ? 2 : 1)
+  const winningSide = () => gamePlayActions.getGameWinningSide()
+  const isMatchFinished = () => gamePlayActions.isMatchFinished()
 
   return (
-    <div style={scoreBoxesContainerStyle}>
-      <ScoreBox side={leftSide()} isLeft={true} />
-      <ScoreBox side={rightSide()} isLeft={false} />
+    <div style={scoreBoxesOuterStyle}>
+      <div style={scoreBoxesContainerStyle}>
+        <ScoreBox side={leftSide()} isLeft={true} />
+        <ScoreBox side={rightSide()} isLeft={false} />
+      </div>
+      <Show when={winningSide()}>
+        <GameEndButton isMatchFinished={isMatchFinished()} />
+      </Show>
     </div>
   )
 }
@@ -127,6 +134,9 @@ const ScoreBox = (props: ScoreBoxProps) => {
       ? gamePlayActions.getSide1Players()
       : gamePlayActions.getSide2Players()
   const isServing = () => servingSide() === props.side
+  const winningSide = () => gamePlayActions.getGameWinningSide()
+  const isWinner = () => winningSide() === props.side
+  const isGameOver = () => winningSide() !== undefined
 
   let pointBoxRef: HTMLDivElement | undefined
   const [fontSize, setFontSize] = createSignal(120)
@@ -154,10 +164,14 @@ const ScoreBox = (props: ScoreBoxProps) => {
   })
 
   const handleAddPoint = () => {
+    if (isGameOver()) return
     gamePlayActions.addPointToSide(props.side)
   }
 
+  const isLoserSide = () => isGameOver() && !isWinner()
+
   const handleDeductPoint = () => {
+    if (isLoserSide()) return
     gamePlayActions.deductPointFromSide(props.side)
   }
 
@@ -169,20 +183,28 @@ const ScoreBox = (props: ScoreBoxProps) => {
     <div style={scoreBoxWrapperStyle}>
       <ParticipantNames players={players()} />
       <div style={scoreAreaContainerStyle}>
-        <button style={getPlusButtonStyle(isServing())} onClick={handleAddPoint}>
+        <button
+          style={getPlusButtonStyle(isServing(), isGameOver())}
+          onClick={handleAddPoint}
+          disabled={isGameOver()}
+        >
           +
         </button>
         <div
           ref={pointBoxRef}
-          style={getPointBoxStyle(isServing())}
+          style={getPointBoxStyle(isServing(), isGameOver())}
           onClick={handleAddPoint}
         >
-          <div style={getScoreDisplayStyle(fontSize())}>{score()}</div>
+          <div style={getScoreDisplayStyle(fontSize(), isWinner())}>{score()}</div>
         </div>
         <GamesWonBadge gamesWon={gamesWon()} isLeft={props.isLeft} />
         <TimeoutBadge timeout={timeout()} isLeft={props.isLeft} onToggle={handleToggleTimeout} />
       </div>
-      <button style={getMinusButtonStyle(isServing())} onClick={handleDeductPoint}>
+      <button
+        style={getMinusButtonStyle(isServing(), isLoserSide())}
+        onClick={handleDeductPoint}
+        disabled={isLoserSide()}
+      >
         −
       </button>
     </div>
@@ -230,6 +252,29 @@ const ParticipantNames = (props: ParticipantNamesProps) => {
 const formatPlayerNames = (players: Player[]): string => {
   if (!players || players.length === 0) return 'Player'
   return players.map((p) => `${p.firstName} ${p.lastName}`).join(' / ')
+}
+
+// Game End Button Component (Next Game / Finish)
+interface GameEndButtonProps {
+  isMatchFinished: boolean
+}
+
+const GameEndButton = (props: GameEndButtonProps) => {
+  const handleClick = () => {
+    if (props.isMatchFinished) {
+      gamePlayActions.finishMatch()
+    } else {
+      gamePlayActions.nextGame()
+    }
+  }
+
+  const label = () => (props.isMatchFinished ? 'Finish' : 'Next Game')
+
+  return (
+    <button style={gameEndButtonStyle} onClick={handleClick}>
+      {label()}
+    </button>
+  )
 }
 
 // Init Dialog Component
@@ -359,6 +404,12 @@ const gameInfoStyle: JSX.CSSProperties = {
   'text-align': 'right',
 }
 
+const scoreBoxesOuterStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  flex: 1,
+}
+
 const scoreBoxesContainerStyle: JSX.CSSProperties = {
   display: 'flex',
   gap: '8px',
@@ -424,7 +475,7 @@ const participantNamesStyle: JSX.CSSProperties = {
   width: '100%',
 }
 
-const getPlusButtonStyle = (isServing: boolean): JSX.CSSProperties => ({
+const getPlusButtonStyle = (isServing: boolean, isGameOver: boolean): JSX.CSSProperties => ({
   width: '100%',
   height: '60px',
   'border-radius': '12px 12px 0 0',
@@ -433,32 +484,33 @@ const getPlusButtonStyle = (isServing: boolean): JSX.CSSProperties => ({
   color: '#fff',
   'font-size': '32px',
   'font-weight': 700,
-  cursor: 'pointer',
+  cursor: isGameOver ? 'default' : 'pointer',
+  opacity: isGameOver ? 0.5 : 1,
   display: 'flex',
   'align-items': 'center',
   'justify-content': 'center',
 })
 
-const getPointBoxStyle = (isServing: boolean): JSX.CSSProperties => ({
+const getPointBoxStyle = (isServing: boolean, isGameOver: boolean): JSX.CSSProperties => ({
   width: '100%',
   flex: 1,
   'background-color': isServing ? '#c0392b' : '#2980b9',
   display: 'flex',
   'align-items': 'center',
   'justify-content': 'center',
-  cursor: 'pointer',
+  cursor: isGameOver ? 'default' : 'pointer',
   overflow: 'hidden',
   'min-height': 0,
 })
 
-const getScoreDisplayStyle = (fontSize: number): JSX.CSSProperties => ({
+const getScoreDisplayStyle = (fontSize: number, isWinner: boolean): JSX.CSSProperties => ({
   'font-size': `${fontSize}px`,
   'font-weight': 700,
-  color: '#fff',
+  color: isWinner ? '#ffd700' : '#fff',
   'line-height': 1,
 })
 
-const getMinusButtonStyle = (isServing: boolean): JSX.CSSProperties => ({
+const getMinusButtonStyle = (isServing: boolean, isDisabled: boolean): JSX.CSSProperties => ({
   width: '100%',
   height: '60px',
   'border-radius': '0 0 12px 12px',
@@ -467,11 +519,28 @@ const getMinusButtonStyle = (isServing: boolean): JSX.CSSProperties => ({
   color: '#fff',
   'font-size': '32px',
   'font-weight': 700,
-  cursor: 'pointer',
+  cursor: isDisabled ? 'default' : 'pointer',
+  opacity: isDisabled ? 0.5 : 1,
   display: 'flex',
   'align-items': 'center',
   'justify-content': 'center',
 })
+
+const gameEndButtonStyle: JSX.CSSProperties = {
+  width: '100%',
+  height: '60px',
+  'border-radius': '12px',
+  border: 'none',
+  'background-color': '#27ae60',
+  color: '#fff',
+  'font-size': '24px',
+  'font-weight': 700,
+  cursor: 'pointer',
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'center',
+  'margin-top': '4px',
+}
 
 const dialogOverlayStyle: JSX.CSSProperties = {
   position: 'fixed',

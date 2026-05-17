@@ -4,7 +4,11 @@ import type { Match, GameConfig } from '../../shared/types/Match'
 import { DEFAULT_GAME_CONFIG } from '../../shared/types/Match'
 import type { Player } from '../../shared/types/Player'
 import { apiGet, apiPost } from '../utils/api'
-import { validateGameScore } from '../../shared/rules/matchRules'
+import {
+  validateGameScore,
+  determineGameWinner,
+  gamesNeededToWin,
+} from '../../shared/rules/matchRules'
 
 interface GamePlayState {
   data: Event | null
@@ -173,11 +177,14 @@ export const gamePlayActions = {
   },
 
   addPointToSide: (side: 1 | 2) => {
+    // Disable add point if game is already won
+    if (gamePlayActions.getGameWinningSide()) return
+
     const newScore1 = side === 1 ? gamePlayState.score1 + 1 : gamePlayState.score1
     const newScore2 = side === 2 ? gamePlayState.score2 + 1 : gamePlayState.score2
 
     // Validate score before updating
-    const gameConfig: GameConfig = { ...DEFAULT_GAME_CONFIG }
+    const gameConfig = gamePlayActions.getCurrentGameConfig()
     const errors = validateGameScore(newScore1, newScore2, gameConfig)
     if (errors.length > 0) {
       return // Don't update if score is invalid
@@ -288,6 +295,50 @@ export const gamePlayActions = {
         ? gamePlayActions.getSide1Players()
         : gamePlayActions.getSide2Players()
     return formatPlayerNames(players)
+  },
+
+  getCurrentGameConfig: (): GameConfig => {
+    return { ...DEFAULT_GAME_CONFIG }
+  },
+
+  getGameWinningSide: (): 1 | 2 | undefined => {
+    const config = gamePlayActions.getCurrentGameConfig()
+    return determineGameWinner(gamePlayState.score1, gamePlayState.score2, config)
+  },
+
+  isMatchFinished: (): boolean => {
+    const match = gamePlayActions.getCurrentMatch()
+    if (!match) return false
+    const numberOfGames = gamePlayActions.getNumberOfGames()
+    const needed = gamesNeededToWin(numberOfGames)
+    const winningSide = gamePlayActions.getGameWinningSide()
+    const gamesWon1 = match.gamesWon1 + (winningSide === 1 ? 1 : 0)
+    const gamesWon2 = match.gamesWon2 + (winningSide === 2 ? 1 : 0)
+    return gamesWon1 >= needed || gamesWon2 >= needed
+  },
+
+  nextGame: () => {
+    const numberOfGames = gamePlayActions.getNumberOfGames()
+    const nextIndex = gamePlayState.currentGameIndex + 1
+    if (nextIndex >= numberOfGames) return
+
+    setGamePlayState({
+      currentGameIndex: nextIndex,
+      score1: 0,
+      score2: 0,
+      servingSide: gamePlayState.initialServingSide,
+      timeout1: false,
+      timeout2: false,
+    })
+  },
+
+  finishMatch: () => {
+    // Save the final game score immediately, then could navigate away
+    if (saveDebounceTimer) {
+      clearTimeout(saveDebounceTimer)
+      saveDebounceTimer = null
+    }
+    gamePlayActions.saveGame()
   },
 
   saveGame: async () => {
