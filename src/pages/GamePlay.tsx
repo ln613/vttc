@@ -272,7 +272,7 @@ const InitDialog = () => {
         </div>
         <div style={dialogFieldStyle}>
           <SingleSelectTags
-            label="Who is on left"
+            label="Who is on umpire's left"
             options={options()}
             selectedValue={selectedLeft()}
             onChange={handleLeftSideChange}

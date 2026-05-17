@@ -47,7 +47,7 @@
 ## Init Dialog (show on load)
 
 - Who serves first: single select tags (participant 1, participant 2, vertical)
-- Who is on left: single select tags (participant 1, participant 2, vertical)
+- Who is on umpire's left: single select tags (participant 1, participant 2, vertical)
 - OK button
 
 ### interaction
