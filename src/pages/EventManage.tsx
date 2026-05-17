@@ -270,6 +270,11 @@ const MatchRow = (props: MatchRowProps) => {
           Start
         </Button>
       </Show>
+      <Show when={hasStarted() && !hasResult()}>
+        <Button onClick={handleStartClick} color="#e67e22" size="small">
+          Continue
+        </Button>
+      </Show>
     </div>
   )
 }
