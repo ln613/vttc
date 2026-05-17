@@ -1,5 +1,5 @@
 const getApiHost = () => {
-  return import.meta.env.DEV ? 'http://localhost:8888' : ''
+  return import.meta.env.DEV ? `http://${window.location.hostname}:8888` : ''
 }
 
 export const api = async <T>(type: string, params: Record<string, string> = {}): Promise<T> => {

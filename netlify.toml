@@ -7,3 +7,4 @@
   targetPort = 5173
   command = "npm run dev:client"
   autoLaunch = false
+  address = "0.0.0.0"

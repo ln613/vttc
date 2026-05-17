@@ -237,8 +237,8 @@ interface MatchRowProps {
 
 const MatchRow = (props: MatchRowProps) => {
   const navigate = useNavigate()
-  const side1Name = () => getMatchSideName(props.match.side1)
-  const side2Name = () => getMatchSideName(props.match.side2)
+  const side1Players = () => getMatchSidePlayers(props.match.side1)
+  const side2Players = () => getMatchSidePlayers(props.match.side2)
   const hasResult = () =>
     props.match.winningSide !== undefined && props.match.winningSide !== null
   const hasStarted = () =>
@@ -257,8 +257,8 @@ const MatchRow = (props: MatchRowProps) => {
     <div style={matchRowStyle}>
       <div style={matchContentContainerStyle}>
         <MatchResultDisplay
-          side1Name={side1Name()}
-          side2Name={side2Name()}
+          side1Players={side1Players()}
+          side2Players={side2Players()}
           gamesWon1={props.match.gamesWon1}
           gamesWon2={props.match.gamesWon2}
           hasResult={hasResult()}
@@ -279,45 +279,110 @@ const MatchRow = (props: MatchRowProps) => {
   )
 }
 
-const getMatchSideName = (side: Player[]): string => {
-  if (!side || side.length === 0) return 'Unknown'
-  return side.map((p) => `${p.firstName} ${p.lastName}`).join(' / ')
+interface SidePlayer {
+  firstName: string
+  lastName: string
+}
+
+const getMatchSidePlayers = (side: Player[]): SidePlayer[] => {
+  if (!side || side.length === 0) return [{ firstName: 'Unknown', lastName: '' }]
+  return side.map((p) => ({ firstName: p.firstName, lastName: p.lastName }))
 }
 
 interface MatchResultDisplayProps {
-  side1Name: string
-  side2Name: string
+  side1Players: SidePlayer[]
+  side2Players: SidePlayer[]
   gamesWon1: number
   gamesWon2: number
   hasResult: boolean
 }
 
 const MatchResultDisplay = (props: MatchResultDisplayProps) => {
-  const side1IsBold = () => props.hasResult && props.gamesWon1 > props.gamesWon2
-  const side2IsBold = () => props.hasResult && props.gamesWon2 > props.gamesWon1
+  const side1IsWinner = () =>
+    props.hasResult && props.gamesWon1 > props.gamesWon2
+  const side2IsWinner = () =>
+    props.hasResult && props.gamesWon2 > props.gamesWon1
 
   return (
     <div style={matchResultStyle}>
       <div style={matchLeftSideStyle}>
-        <span style={side1IsBold() ? boldTextStyle : normalTextStyle}>
-          {props.side1Name}
-        </span>
-        <span style={side1IsBold() ? boldScoreStyle : normalScoreStyle}>
+        <PlayerNameDisplay
+          players={props.side1Players}
+          align="right"
+          isWinner={side1IsWinner()}
+        />
+        <span
+          style={
+            side1IsWinner() ? winningScoreStyle : losingScoreStyle
+          }
+        >
           {props.gamesWon1}
         </span>
       </div>
       <span style={scoreSeparatorStyle}>:</span>
       <div style={matchRightSideStyle}>
-        <span style={side2IsBold() ? boldScoreStyle : normalScoreStyle}>
+        <span
+          style={
+            side2IsWinner() ? winningScoreStyle : losingScoreStyle
+          }
+        >
           {props.gamesWon2}
         </span>
-        <span style={side2IsBold() ? boldTextStyle : normalTextStyle}>
-          {props.side2Name}
-        </span>
+        <PlayerNameDisplay
+          players={props.side2Players}
+          align="left"
+          isWinner={side2IsWinner()}
+        />
       </div>
     </div>
   )
 }
+
+interface PlayerNameDisplayProps {
+  players: SidePlayer[]
+  align: 'left' | 'right'
+  isWinner: boolean
+}
+
+const PlayerNameDisplay = (props: PlayerNameDisplayProps) => (
+  <div
+    style={{
+      display: 'flex',
+      'flex-direction': 'column',
+      'align-items': props.align === 'right' ? 'flex-end' : 'flex-start',
+    }}
+  >
+    <For each={props.players}>
+      {(player, index) => (
+        <>
+          <Show when={index() > 0}>
+            <span style={playerSeparatorStyle}>/</span>
+          </Show>
+          <span
+            style={{
+              'font-size': '15px',
+              'font-weight': props.isWinner ? 700 : 400,
+              color: props.isWinner ? '#2c3e50' : '#555',
+              'line-height': '1.2',
+            }}
+          >
+            {player.firstName}
+          </span>
+          <span
+            style={{
+              'font-size': '13px',
+              'font-weight': props.isWinner ? 600 : 400,
+              color: props.isWinner ? '#34495e' : '#888',
+              'line-height': '1.2',
+            }}
+          >
+            {player.lastName}
+          </span>
+        </>
+      )}
+    </For>
+  </div>
+)
 
 interface GameScoresDisplayProps {
   games: Game[]
@@ -382,6 +447,7 @@ interface GroupTableProps {
 }
 
 const GroupTable = (props: GroupTableProps) => (
+  <div style={tableWrapperStyle}>
   <table style={tableStyle}>
     <thead>
       <tr>
@@ -408,6 +474,7 @@ const GroupTable = (props: GroupTableProps) => (
       </For>
     </tbody>
   </table>
+  </div>
 )
 
 interface GroupTableRowProps {
@@ -425,19 +492,33 @@ const GroupTableRow = (props: GroupTableRowProps) => {
   const differenceDisplay = () =>
     difference() >= 0 ? `+${difference()}` : String(difference())
 
+  const rowBg = () => (props.rank % 2 === 0 ? '#f8f9fa' : '#fff')
+  const cellStyle = (): JSX.CSSProperties => ({
+    ...tdStyle,
+    'background-color': rowBg(),
+  })
+
   return (
     <tr>
-      <td style={tdStyle}>{props.rank}</td>
-      <td style={{ ...tdStyle, 'text-align': 'left' }}>{playerDisplay()}</td>
-      <td style={tdStyle}>{total()}</td>
-      <td style={tdStyle}>{stats().matchesWon}</td>
-      <td style={tdStyle}>{stats().matchesLost}</td>
-      <td style={tdStyle}>{differenceDisplay()}</td>
-      <td style={tdStyle}>{winPercentage()}%</td>
-      <td style={tdStyle}>{stats().matchesWon}</td>
-      <td style={tdStyle}>{stats().matchesLost}</td>
-      <td style={tdStyle}>{stats().gamesWon}</td>
-      <td style={tdStyle}>{stats().gamesLost}</td>
+      <td style={cellStyle()}>{props.rank}</td>
+      <td style={{ ...cellStyle(), 'text-align': 'left', 'font-weight': 500 }}>
+        {playerDisplay()}
+      </td>
+      <td style={cellStyle()}>{total()}</td>
+      <td style={{ ...cellStyle(), 'font-weight': 600, color: '#27ae60' }}>
+        {stats().matchesWon}
+      </td>
+      <td style={{ ...cellStyle(), color: '#e74c3c' }}>
+        {stats().matchesLost}
+      </td>
+      <td style={cellStyle()}>{differenceDisplay()}</td>
+      <td style={{ ...cellStyle(), 'font-weight': 500 }}>
+        {winPercentage()}%
+      </td>
+      <td style={cellStyle()}>{stats().matchesWon}</td>
+      <td style={cellStyle()}>{stats().matchesLost}</td>
+      <td style={cellStyle()}>{stats().gamesWon}</td>
+      <td style={cellStyle()}>{stats().gamesLost}</td>
     </tr>
   )
 }
@@ -507,37 +588,52 @@ const generateGroupsStyle: JSX.CSSProperties = {
 
 const groupContainerStyle: JSX.CSSProperties = {
   'background-color': '#fff',
-  'border-radius': '8px',
-  padding: '20px',
-  'box-shadow': '0 2px 4px rgba(0, 0, 0, 0.1)',
+  'border-radius': '12px',
+  padding: '0',
+  'box-shadow': '0 2px 8px rgba(0, 0, 0, 0.08)',
+  overflow: 'hidden',
+  border: '1px solid #e8e8e8',
 }
 
 const groupTitleStyle: JSX.CSSProperties = {
-  'font-size': '18px',
+  'font-size': '16px',
   'font-weight': 700,
-  color: '#333',
-  'margin-bottom': '16px',
+  color: '#fff',
+  margin: '0',
+  padding: '14px 20px',
+  'background': 'linear-gradient(135deg, #2c3e50, #34495e)',
+  'letter-spacing': '0.5px',
+}
+
+const tableWrapperStyle: JSX.CSSProperties = {
+  'overflow-x': 'auto',
+  '-webkit-overflow-scrolling': 'touch',
 }
 
 const tableStyle: JSX.CSSProperties = {
   width: '100%',
   'border-collapse': 'collapse',
-  'font-size': '14px',
+  'font-size': '13px',
+  'min-width': '600px',
 }
 
 const thStyle: JSX.CSSProperties = {
-  padding: '12px 8px',
+  padding: '10px 8px',
   'text-align': 'center',
-  'border-bottom': '2px solid #ddd',
-  'background-color': '#f9f9f9',
+  'border-bottom': '2px solid #e67e22',
+  'background-color': '#fafafa',
   'font-weight': 700,
-  color: '#333',
+  'font-size': '12px',
+  color: '#666',
+  'text-transform': 'uppercase',
+  'letter-spacing': '0.5px',
 }
 
 const tdStyle: JSX.CSSProperties = {
-  padding: '12px 8px',
+  padding: '10px 8px',
   'text-align': 'center',
-  'border-bottom': '1px solid #eee',
+  'border-bottom': '1px solid #f0f0f0',
+  color: '#444',
 }
 
 const emptyContentStyle: JSX.CSSProperties = {
@@ -547,9 +643,10 @@ const emptyContentStyle: JSX.CSSProperties = {
 }
 
 const matchScheduleContainerStyle: JSX.CSSProperties = {
-  'margin-top': '16px',
-  'border-top': '1px solid #eee',
-  'padding-top': '12px',
+  'margin-top': '0',
+  'padding': '16px 20px',
+  'background-color': '#fafafa',
+  'border-top': '1px solid #f0f0f0',
 }
 
 const collapsibleHeaderStyle: JSX.CSSProperties = {
@@ -560,38 +657,44 @@ const collapsibleHeaderStyle: JSX.CSSProperties = {
   border: 'none',
   cursor: 'pointer',
   padding: '8px 0',
-  'font-size': '14px',
-  color: '#666',
+  'font-size': '15px',
+  color: '#2c3e50',
+  width: '100%',
 }
 
 const collapsibleTitleStyle: JSX.CSSProperties = {
-  'font-weight': 600,
+  'font-weight': 700,
+  'letter-spacing': '0.3px',
 }
 
 const matchScheduleContentStyle: JSX.CSSProperties = {
   display: 'flex',
   'flex-direction': 'column',
-  gap: '12px',
+  gap: '10px',
   'margin-top': '12px',
+  padding: '12px',
+  'background-color': '#f0f2f5',
+  'border-radius': '8px',
 }
 
 const matchRowStyle: JSX.CSSProperties = {
   display: 'flex',
-  'flex-direction': 'row',
+  'flex-direction': 'column',
   'align-items': 'center',
-  'justify-content': 'space-between',
-  gap: '12px',
-  padding: '8px 12px',
-  'background-color': '#f9f9f9',
-  'border-radius': '4px',
+  gap: '10px',
+  padding: '14px 16px',
+  'background-color': '#fff',
+  'border-radius': '10px',
+  'border-left': '4px solid #3498db',
+  'box-shadow': '0 1px 4px rgba(0, 0, 0, 0.08)',
 }
 
 const matchContentContainerStyle: JSX.CSSProperties = {
   display: 'flex',
   'flex-direction': 'column',
   'align-items': 'center',
-  gap: '4px',
-  flex: '1',
+  gap: '6px',
+  width: '100%',
 }
 
 const matchResultStyle: JSX.CSSProperties = {
@@ -599,14 +702,13 @@ const matchResultStyle: JSX.CSSProperties = {
   'align-items': 'center',
   'justify-content': 'center',
   width: '100%',
-  'font-size': '14px',
 }
 
 const matchLeftSideStyle: JSX.CSSProperties = {
   display: 'flex',
   'align-items': 'center',
   'justify-content': 'flex-end',
-  gap: '8px',
+  gap: '12px',
   flex: '1',
 }
 
@@ -614,35 +716,51 @@ const matchRightSideStyle: JSX.CSSProperties = {
   display: 'flex',
   'align-items': 'center',
   'justify-content': 'flex-start',
-  gap: '8px',
+  gap: '12px',
   flex: '1',
 }
 
 const scoreSeparatorStyle: JSX.CSSProperties = {
-  color: '#666',
-  padding: '0 8px',
+  color: '#999',
+  padding: '0 6px',
+  'font-size': '20px',
+  'font-weight': 300,
+}
+
+const winningScoreStyle: JSX.CSSProperties = {
+  'font-weight': 800,
+  'font-size': '28px',
+  color: '#e67e22',
+}
+
+const losingScoreStyle: JSX.CSSProperties = {
+  'font-weight': 400,
+  'font-size': '28px',
+  color: '#bbb',
+}
+
+const playerSeparatorStyle: JSX.CSSProperties = {
+  'font-size': '11px',
+  color: '#aaa',
+  margin: '2px 0',
 }
 
 const boldScoreStyle: JSX.CSSProperties = {
   'font-weight': 700,
+  color: '#e67e22',
 }
 
 const normalScoreStyle: JSX.CSSProperties = {
   'font-weight': 400,
-}
-
-const boldTextStyle: JSX.CSSProperties = {
-  'font-weight': 700,
-}
-
-const normalTextStyle: JSX.CSSProperties = {
-  'font-weight': 400,
+  color: '#999',
 }
 
 const gameScoresStyle: JSX.CSSProperties = {
-  'font-size': '12px',
-  color: '#666',
-  'padding-left': '4px',
+  'font-size': '13px',
+  color: '#888',
+  'background-color': '#f8f8f8',
+  padding: '4px 10px',
+  'border-radius': '12px',
 }
 
 const gameScoreSeparatorStyle: JSX.CSSProperties = {
