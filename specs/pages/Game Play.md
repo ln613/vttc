@@ -54,3 +54,4 @@
 ### interaction
 
 - on who is on left changed: change the participant on the left score box accordingly
+- on OK clicked, save the info to the match to DB, so when coming back to the match (when the continue button is clicked), no need to show the dialog again 

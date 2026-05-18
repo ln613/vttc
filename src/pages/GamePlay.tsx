@@ -123,11 +123,7 @@ interface ScoreBoxProps {
 const ScoreBox = (props: ScoreBoxProps) => {
   const servingSide = () => gamePlayState.servingSide
   const score = () => (props.side === 1 ? gamePlayState.score1 : gamePlayState.score2)
-  const gamesWon = () => {
-    const match = gamePlayActions.getCurrentMatch()
-    if (!match) return 0
-    return props.side === 1 ? match.gamesWon1 : match.gamesWon2
-  }
+  const gamesWon = () => gamePlayActions.getGamesWon(props.side)
   const timeout = () => (props.side === 1 ? gamePlayState.timeout1 : gamePlayState.timeout2)
   const players = () =>
     props.side === 1

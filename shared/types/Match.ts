@@ -48,6 +48,8 @@ export interface Match {
   gamesWon1: number // Games won by side 1
   gamesWon2: number // Games won by side 2
   winningSide?: 1 | 2
+  initialServingSide?: 1 | 2 // Which side serves first (set by umpire)
+  leftSide?: 1 | 2 // Which side is on umpire's left (set by umpire)
 }
 
 /**

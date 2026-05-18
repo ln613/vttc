@@ -1278,6 +1278,103 @@ const compareByStatsOnly = (p1, p2) => {
 }
 
 /**
+ * Save match setup (initial serving side and left side)
+ */
+export const saveMatchSetup = async (body) => {
+  validateSaveMatchSetupInput(body)
+
+  const { _id, matchId, initialServingSide, leftSide } = body
+
+  const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
+
+  const event = await collection.findOne({ _id: toObjectId(_id) })
+  if (!event) throwError('Event not found')
+
+  const updatedStages = updateMatchInStages(
+    event.eventStages,
+    matchId,
+    (match) => ({
+      ...match,
+      initialServingSide,
+      leftSide,
+    }),
+  )
+
+  await collection.updateOne(
+    { _id: toObjectId(_id) },
+    { $set: { eventStages: updatedStages } },
+  )
+
+  return { success: true }
+}
+
+const validateSaveMatchSetupInput = (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body._id) throwError('Event ID is required')
+  if (!body.matchId) throwError('Match ID is required')
+  if (!body.initialServingSide) throwError('Initial serving side is required')
+  if (!body.leftSide) throwError('Left side is required')
+}
+
+const updateMatchInStages = (eventStages, matchId, updateFn) => {
+  const updatedStages = [...eventStages]
+
+  // Try group stage
+  const groupStageIndex = updatedStages.findIndex((s) => s.type === 'group')
+  if (groupStageIndex !== -1) {
+    const groupStage = updatedStages[groupStageIndex]
+    for (let gi = 0; gi < groupStage.groups.length; gi++) {
+      const group = groupStage.groups[gi]
+      const matchIndex = group.matches.findIndex((m) => m._id === matchId)
+      if (matchIndex !== -1) {
+        const updatedMatch = updateFn(group.matches[matchIndex])
+        const updatedGroups = groupStage.groups.map((g, i) =>
+          i === gi
+            ? {
+                ...g,
+                matches: g.matches.map((m, mi) =>
+                  mi === matchIndex ? updatedMatch : m,
+                ),
+              }
+            : g,
+        )
+        updatedStages[groupStageIndex] = { ...groupStage, groups: updatedGroups }
+        return updatedStages
+      }
+    }
+  }
+
+  // Try knockout stage
+  const knockoutStageIndex = updatedStages.findIndex((s) => s.type === 'knockout')
+  if (knockoutStageIndex !== -1) {
+    const knockoutStage = updatedStages[knockoutStageIndex]
+    for (let ri = 0; ri < knockoutStage.rounds.length; ri++) {
+      const round = knockoutStage.rounds[ri]
+      const matchIndex = round.matches.findIndex((m) => m.match?._id === matchId)
+      if (matchIndex !== -1) {
+        const knockoutMatch = round.matches[matchIndex]
+        const updatedMatch = updateFn(knockoutMatch.match)
+        const updatedRounds = knockoutStage.rounds.map((r, i) =>
+          i === ri
+            ? {
+                ...r,
+                matches: r.matches.map((m, mi) =>
+                  mi === matchIndex ? { ...m, match: updatedMatch } : m,
+                ),
+              }
+            : r,
+        )
+        updatedStages[knockoutStageIndex] = { ...knockoutStage, rounds: updatedRounds }
+        return updatedStages
+      }
+    }
+  }
+
+  throwError('Match not found')
+}
+
+/**
  * Update a game in a match
  */
 export const updateGame = async (body) => {

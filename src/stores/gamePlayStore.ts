@@ -21,6 +21,8 @@ interface GamePlayState {
   currentGameIndex: number
   score1: number
   score2: number
+  gamesWon1: number
+  gamesWon2: number
   servingSide: 1 | 2
   initialServingSide: 1 | 2
   leftSide: 1 | 2
@@ -42,6 +44,8 @@ const getInitialState = (): GamePlayState => ({
   currentGameIndex: 0,
   score1: 0,
   score2: 0,
+  gamesWon1: 0,
+  gamesWon2: 0,
   servingSide: 1,
   initialServingSide: 1,
   leftSide: 1,
@@ -71,12 +75,63 @@ const fetchEvent = async (eventId: string) => {
   try {
     const data = await apiGet<Event>('event', { _id: eventId })
     setGamePlayState({ data, loading: false, error: null })
+    restoreMatchSetupIfExists()
   } catch (err) {
     setGamePlayState({
       loading: false,
       error: err instanceof Error ? err.message : 'Failed to fetch event',
     })
   }
+}
+
+const restoreMatchSetupIfExists = () => {
+  const match = gamePlayActions.getCurrentMatch()
+  if (!match) return
+  if (match.initialServingSide && match.leftSide) {
+    setGamePlayState({
+      initialServingSide: match.initialServingSide,
+      leftSide: match.leftSide,
+      showInitDialog: false,
+    })
+    restoreGameProgress(match)
+  }
+}
+
+const restoreGameProgress = (match: Match) => {
+  const gamesWon1 = match.games.filter((g) => g.winningSide === 1).length
+  const gamesWon2 = match.games.filter((g) => g.winningSide === 2).length
+
+  // Find the current game: latest game without a winner, or the next game index
+  const currentGameIndex = findCurrentGameIndex(match)
+  const currentGame = match.games[currentGameIndex]
+
+  const score1 = currentGame?.score1 ?? 0
+  const score2 = currentGame?.score2 ?? 0
+  const servingSide = calculateServingSide(
+    score1,
+    score2,
+    match.initialServingSide as 1 | 2,
+  )
+
+  setGamePlayState({
+    currentGameIndex,
+    score1,
+    score2,
+    gamesWon1,
+    gamesWon2,
+    servingSide,
+  })
+}
+
+const findCurrentGameIndex = (match: Match): number => {
+  if (match.games.length === 0) return 0
+
+  // Find the first game without a winner
+  const unfinishedIndex = match.games.findIndex((g) => !g.winningSide)
+  if (unfinishedIndex !== -1) return unfinishedIndex
+
+  // All games have winners - show the last game
+  return match.games.length - 1
 }
 
 const calculateServingSide = (
@@ -104,6 +159,20 @@ const parseBestOfOption = (bestOf: BestOfOption | undefined): number => {
 const formatPlayerNames = (players: Player[]): string => {
   if (!players || players.length === 0) return 'Player'
   return players.map((p) => `${p.firstName} ${p.lastName}`).join(' / ')
+}
+
+const saveMatchSetup = async () => {
+  if (!gamePlayState.eventId || !gamePlayState.matchId) return
+  try {
+    await apiPost('saveMatchSetup', {
+      _id: gamePlayState.eventId,
+      matchId: gamePlayState.matchId,
+      initialServingSide: gamePlayState.initialServingSide,
+      leftSide: gamePlayState.leftSide,
+    })
+  } catch {
+    // Silently fail - setup save is not critical
+  }
 }
 
 const debouncedSaveGame = () => {
@@ -174,6 +243,7 @@ export const gamePlayActions = {
 
   confirmInitDialog: () => {
     setGamePlayState({ showInitDialog: false })
+    saveMatchSetup()
   },
 
   addPointToSide: (side: 1 | 2) => {
@@ -307,14 +377,16 @@ export const gamePlayActions = {
   },
 
   isMatchFinished: (): boolean => {
-    const match = gamePlayActions.getCurrentMatch()
-    if (!match) return false
     const numberOfGames = gamePlayActions.getNumberOfGames()
     const needed = gamesNeededToWin(numberOfGames)
     const winningSide = gamePlayActions.getGameWinningSide()
-    const gamesWon1 = match.gamesWon1 + (winningSide === 1 ? 1 : 0)
-    const gamesWon2 = match.gamesWon2 + (winningSide === 2 ? 1 : 0)
+    const gamesWon1 = gamePlayState.gamesWon1 + (winningSide === 1 ? 1 : 0)
+    const gamesWon2 = gamePlayState.gamesWon2 + (winningSide === 2 ? 1 : 0)
     return gamesWon1 >= needed || gamesWon2 >= needed
+  },
+
+  getGamesWon: (side: 1 | 2): number => {
+    return side === 1 ? gamePlayState.gamesWon1 : gamePlayState.gamesWon2
   },
 
   nextGame: () => {
@@ -322,10 +394,16 @@ export const gamePlayActions = {
     const nextIndex = gamePlayState.currentGameIndex + 1
     if (nextIndex >= numberOfGames) return
 
+    const winningSide = gamePlayActions.getGameWinningSide()
+    const newGamesWon1 = gamePlayState.gamesWon1 + (winningSide === 1 ? 1 : 0)
+    const newGamesWon2 = gamePlayState.gamesWon2 + (winningSide === 2 ? 1 : 0)
+
     setGamePlayState({
       currentGameIndex: nextIndex,
       score1: 0,
       score2: 0,
+      gamesWon1: newGamesWon1,
+      gamesWon2: newGamesWon2,
       servingSide: gamePlayState.initialServingSide,
       timeout1: false,
       timeout2: false,
