@@ -1,4 +1,4 @@
-import { onMount, onCleanup, createSignal, Show, For, type JSX } from 'solid-js'
+import { onMount, onCleanup, createSignal, Show, type JSX } from 'solid-js'
 import { useSearchParams, useNavigate } from '@solidjs/router'
 import {
   gamePlayState,
@@ -7,6 +7,7 @@ import {
 import type { Player } from '../../shared/types/Player'
 import SingleSelectTags from '../components/SingleSelectTags'
 import Button from '../components/Button'
+import MatchConfirmDialog from '../components/MatchConfirmDialog'
 
 const GamePlay = () => {
   const [searchParams] = useSearchParams()
@@ -24,8 +25,9 @@ const GamePlay = () => {
     gamePlayActions.reset()
   })
 
-  const handleExit = () => {
+  const handleExit = async () => {
     gamePlayActions.closeMenu()
+    await gamePlayActions.exitAndFlush()
     navigate(-1)
   }
 
@@ -407,66 +409,15 @@ const FinishConfirmDialog = () => {
   }
 
   return (
-    <div style={dialogOverlayStyle}>
-      <div style={finishDialogContentStyle}>
-        <div style={finishDialogMessageStyle}>
-          Show the match result to both sides and confirm the result with them
-        </div>
-        <MatchResultPreview
-          preview={preview()}
-          participant1Name={participant1Name()}
-          participant2Name={participant2Name()}
-        />
-        <div style={finishDialogButtonsStyle}>
-          <Button onClick={handleCancel}>Cancel</Button>
-          <Button onClick={handleConfirm}>Confirm</Button>
-        </div>
-      </div>
-    </div>
+    <MatchConfirmDialog
+      preview={preview()}
+      participant1Name={participant1Name()}
+      participant2Name={participant2Name()}
+      onCancel={handleCancel}
+      onConfirm={handleConfirm}
+    />
   )
 }
-
-interface MatchResultPreviewProps {
-  preview: {
-    gamesWon1: number
-    gamesWon2: number
-    games: { score1: number; score2: number; winningSide?: 1 | 2 }[]
-  }
-  participant1Name: string
-  participant2Name: string
-}
-
-const MatchResultPreview = (props: MatchResultPreviewProps) => (
-  <div style={matchResultContainerStyle}>
-    <div style={matchResultHeaderStyle}>
-      <div style={matchResultNameStyle}>{props.participant1Name}</div>
-      <div style={matchResultScoreStyle}>
-        {props.preview.gamesWon1} - {props.preview.gamesWon2}
-      </div>
-      <div style={matchResultNameStyle}>{props.participant2Name}</div>
-    </div>
-    <div style={gameResultsListStyle}>
-      <For each={props.preview.games}>
-        {(game, index) => (
-          <div style={gameResultRowStyle}>
-            <div style={gameResultLabelStyle}>Game {index() + 1}</div>
-            <div
-              style={getGameScoreStyle(game.winningSide === 1)}
-            >
-              {game.score1}
-            </div>
-            <div style={gameResultSeparatorStyle}>-</div>
-            <div
-              style={getGameScoreStyle(game.winningSide === 2)}
-            >
-              {game.score2}
-            </div>
-          </div>
-        )}
-      </For>
-    </div>
-  </div>
-)
 
 // Init Dialog Component
 const InitDialog = () => {
@@ -845,96 +796,6 @@ const dialogButtonContainerStyle: JSX.CSSProperties = {
   display: 'flex',
   'justify-content': 'center',
   'margin-top': '24px',
-}
-
-// Finish Confirm Dialog Styles
-const finishDialogContentStyle: JSX.CSSProperties = {
-  'background-color': '#fff',
-  'border-radius': '12px',
-  padding: '24px',
-  'min-width': '320px',
-  'max-width': '90vw',
-}
-
-const finishDialogMessageStyle: JSX.CSSProperties = {
-  'font-size': '16px',
-  'font-weight': 600,
-  color: '#333',
-  'text-align': 'center',
-  'margin-bottom': '20px',
-  'line-height': 1.5,
-}
-
-const finishDialogButtonsStyle: JSX.CSSProperties = {
-  display: 'flex',
-  'justify-content': 'center',
-  gap: '16px',
-  'margin-top': '24px',
-}
-
-const matchResultContainerStyle: JSX.CSSProperties = {
-  'background-color': '#f5f5f5',
-  'border-radius': '8px',
-  padding: '16px',
-}
-
-const matchResultHeaderStyle: JSX.CSSProperties = {
-  display: 'flex',
-  'align-items': 'center',
-  'justify-content': 'space-between',
-  'margin-bottom': '12px',
-  'padding-bottom': '12px',
-  'border-bottom': '2px solid #ddd',
-}
-
-const matchResultNameStyle: JSX.CSSProperties = {
-  'font-size': '14px',
-  'font-weight': 600,
-  color: '#333',
-  flex: 1,
-  'text-align': 'center',
-  'word-break': 'break-word',
-}
-
-const matchResultScoreStyle: JSX.CSSProperties = {
-  'font-size': '28px',
-  'font-weight': 700,
-  color: '#333',
-  'min-width': '80px',
-  'text-align': 'center',
-}
-
-const gameResultsListStyle: JSX.CSSProperties = {
-  display: 'flex',
-  'flex-direction': 'column',
-  gap: '8px',
-}
-
-const gameResultRowStyle: JSX.CSSProperties = {
-  display: 'flex',
-  'align-items': 'center',
-  'justify-content': 'center',
-  gap: '8px',
-}
-
-const gameResultLabelStyle: JSX.CSSProperties = {
-  'font-size': '13px',
-  color: '#888',
-  'min-width': '60px',
-  'text-align': 'right',
-}
-
-const getGameScoreStyle = (isWinner: boolean): JSX.CSSProperties => ({
-  'font-size': '16px',
-  'font-weight': isWinner ? 700 : 400,
-  color: isWinner ? '#27ae60' : '#666',
-  'min-width': '24px',
-  'text-align': 'center',
-})
-
-const gameResultSeparatorStyle: JSX.CSSProperties = {
-  'font-size': '14px',
-  color: '#999',
 }
 
 export default GamePlay

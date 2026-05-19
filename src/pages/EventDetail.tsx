@@ -2,6 +2,7 @@ import { Show, For, onMount, onCleanup, type JSX } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { Header } from '../components/Header'
 import Button from '../components/Button'
+import MatchConfirmDialog from '../components/MatchConfirmDialog'
 import { eventDetailState, eventDetailActions } from '../stores/eventDetailStore'
 import type { Group, GroupParticipant } from '../../shared/types/Tournament'
 import type { Player } from '../../shared/types/Player'
@@ -56,7 +57,32 @@ const EventDetail = () => {
         <EventHeader />
         <EventContent />
       </div>
+      <Show when={eventDetailState.showConfirmDialog}>
+        <ConfirmMatchDialog />
+      </Show>
     </div>
+  )
+}
+
+const ConfirmMatchDialog = () => {
+  const preview = () => eventDetailActions.getConfirmDialogPreview()
+  const participant1Name = () =>
+    eventDetailActions.getConfirmDialogParticipantName(1)
+  const participant2Name = () =>
+    eventDetailActions.getConfirmDialogParticipantName(2)
+
+  return (
+    <Show when={preview()}>
+      {(p) => (
+        <MatchConfirmDialog
+          preview={p()}
+          participant1Name={participant1Name()}
+          participant2Name={participant2Name()}
+          onCancel={() => eventDetailActions.cancelConfirmDialog()}
+          onConfirm={() => eventDetailActions.confirmMatch()}
+        />
+      )}
+    </Show>
   )
 }
 
@@ -277,8 +303,11 @@ const MatchRow = (props: MatchRowProps) => {
   const side2Players = () => getMatchSidePlayers(props.match.side2)
   const hasResult = () =>
     props.match.winningSide !== undefined && props.match.winningSide !== null
+  const isConfirmed = () => props.match.confirmed === true
   const hasStarted = () =>
     hasResult() || (props.match.games && props.match.games.length > 0)
+  const isConfirming = () =>
+    eventDetailState.confirmingMatchId === props.match._id
 
   const handleStartClick = () => {
     const eventId = eventDetailState.eventId
@@ -287,6 +316,10 @@ const MatchRow = (props: MatchRowProps) => {
         `/game-play?eventId=${eventId}&stage=group&groupIndex=${props.groupIndex}&matchId=${props.match._id}`,
       )
     }
+  }
+
+  const handleConfirmClick = () => {
+    eventDetailActions.showConfirmDialog(props.match._id)
   }
 
   return (
@@ -309,6 +342,16 @@ const MatchRow = (props: MatchRowProps) => {
       <Show when={hasStarted() && !hasResult()}>
         <Button onClick={handleStartClick} color="#e67e22" size="small">
           Continue
+        </Button>
+      </Show>
+      <Show when={hasResult() && !isConfirmed()}>
+        <Button
+          onClick={handleConfirmClick}
+          color="#e74c3c"
+          size="small"
+          disabled={isConfirming()}
+        >
+          {isConfirming() ? 'Confirming...' : 'Confirm'}
         </Button>
       </Show>
     </div>

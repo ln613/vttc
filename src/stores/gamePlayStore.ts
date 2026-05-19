@@ -1,6 +1,6 @@
 import { createStore } from 'solid-js/store'
 import type { Event, BestOfOption } from '../../shared/types/Tournament'
-import type { Match, GameConfig } from '../../shared/types/Match'
+import type { Match, GameConfig, HandicapParams } from '../../shared/types/Match'
 import { DEFAULT_GAME_CONFIG } from '../../shared/types/Match'
 import type { Player } from '../../shared/types/Player'
 import { apiGet, apiPost } from '../utils/api'
@@ -8,6 +8,8 @@ import {
   validateGameScore,
   determineGameWinner,
   gamesNeededToWin,
+  getHandicapStartingScore,
+  createHandicapGameConfig,
 } from '../../shared/rules/matchRules'
 
 interface GameResult {
@@ -77,6 +79,12 @@ const [gamePlayState, setGamePlayState] =
 let saveDebounceTimer: ReturnType<typeof setTimeout> | null = null
 const SAVE_DEBOUNCE_MS = 3000
 
+// Track in-flight save promise so other stores can wait for it
+let pendingSavePromise: Promise<void> | null = null
+
+export const waitForPendingSave = (): Promise<void> =>
+  pendingSavePromise ?? Promise.resolve()
+
 export { gamePlayState }
 
 const validateParams = (eventId: string | null, matchId: string | null) => {
@@ -118,9 +126,12 @@ const restoreGameProgress = (match: Match) => {
   // Find the current game: latest game without a winner, or the next game index
   const currentGameIndex = findCurrentGameIndex(match)
   const currentGame = match.games[currentGameIndex]
+  const isNewGame = !currentGame
 
-  const score1 = currentGame?.score1 ?? 0
-  const score2 = currentGame?.score2 ?? 0
+  // If this is a new game (no game data in DB yet), use handicap starting scores
+  const startingScores = isNewGame ? getStartingScores() : { score1: 0, score2: 0 }
+  const score1 = currentGame?.score1 ?? startingScores.score1
+  const score2 = currentGame?.score2 ?? startingScores.score2
   const gameFirstServeSide = getGameFirstServeSide(
     match.initialServingSide as 1 | 2,
     currentGameIndex,
@@ -157,7 +168,10 @@ const findCurrentGameIndex = (match: Match): number => {
   const unfinishedIndex = match.games.findIndex((g) => !g.winningSide)
   if (unfinishedIndex !== -1) return unfinishedIndex
 
-  // All games have winners - show the last game
+  // All games have winners - if match not finished, advance to next game
+  if (!match.winningSide) return match.games.length
+
+  // Match is finished - show the last game
   return match.games.length - 1
 }
 
@@ -192,6 +206,31 @@ const formatPlayerNames = (players: Player[]): string => {
   return players.map((p) => `${p.firstName} ${p.lastName}`).join(' / ')
 }
 
+const isHandicapEnabled = (): boolean => {
+  return gamePlayState.data?.handicapEnabled === true
+}
+
+const getEventHandicapParams = (): HandicapParams | undefined => {
+  const event = gamePlayState.data
+  if (!event || !event.handicapEnabled) return undefined
+  return {
+    divisor: event.handicapDifference,
+    maxPoints: event.handicapMaxPoints,
+  }
+}
+
+const getStartingScores = (): { score1: number; score2: number } => {
+  if (!isHandicapEnabled()) return { score1: 0, score2: 0 }
+
+  const match = gamePlayActions.getCurrentMatch()
+  if (!match) return { score1: 0, score2: 0 }
+
+  const handicapParams = getEventHandicapParams()
+  if (!handicapParams) return { score1: 0, score2: 0 }
+
+  return getHandicapStartingScore(match.side1, match.side2, handicapParams)
+}
+
 const saveMatchSetup = async () => {
   if (!gamePlayState.eventId || !gamePlayState.matchId) return
   try {
@@ -220,6 +259,14 @@ const cancelPendingSave = () => {
   if (saveDebounceTimer) {
     clearTimeout(saveDebounceTimer)
     saveDebounceTimer = null
+  }
+}
+
+const flushPendingSave = (): Promise<void> | undefined => {
+  if (saveDebounceTimer) {
+    clearTimeout(saveDebounceTimer)
+    saveDebounceTimer = null
+    return gamePlayActions.saveGame()
   }
 }
 
@@ -300,10 +347,11 @@ export const gamePlayActions = {
       gamePlayState.initialServingSide,
       gamePlayState.currentGameIndex,
     )
+    const startingScores = getStartingScores()
 
     setGamePlayState({
-      score1: 0,
-      score2: 0,
+      score1: startingScores.score1,
+      score2: startingScores.score2,
       servingSide: newServingSide,
       timeout1: false,
       timeout2: false,
@@ -331,10 +379,12 @@ export const gamePlayActions = {
       }
     }
 
+    const startingScores = getStartingScores()
+
     setGamePlayState({
       currentGameIndex: 0,
-      score1: 0,
-      score2: 0,
+      score1: startingScores.score1,
+      score2: startingScores.score2,
       gamesWon1: 0,
       gamesWon2: 0,
       servingSide: gamePlayState.initialServingSide,
@@ -475,7 +525,20 @@ export const gamePlayActions = {
   },
 
   getCurrentGameConfig: (): GameConfig => {
-    return { ...DEFAULT_GAME_CONFIG }
+    if (!isHandicapEnabled()) return { ...DEFAULT_GAME_CONFIG }
+
+    const match = gamePlayActions.getCurrentMatch()
+    if (!match) return { ...DEFAULT_GAME_CONFIG }
+
+    const handicapParams = getEventHandicapParams()
+    if (!handicapParams) return { ...DEFAULT_GAME_CONFIG }
+
+    return createHandicapGameConfig(
+      match.side1,
+      match.side2,
+      false,
+      handicapParams,
+    )
   },
 
   getGameWinningSide: (): 1 | 2 | undefined => {
@@ -525,10 +588,12 @@ export const gamePlayActions = {
       nextIndex,
     )
 
+    const startingScores = getStartingScores()
+
     setGamePlayState({
       currentGameIndex: nextIndex,
-      score1: 0,
-      score2: 0,
+      score1: startingScores.score1,
+      score2: startingScores.score2,
       gamesWon1: newGamesWon1,
       gamesWon2: newGamesWon2,
       servingSide: nextGameFirstServeSide,
@@ -568,18 +633,18 @@ export const gamePlayActions = {
   },
 
   confirmFinishMatch: async () => {
-    // Now actually save and navigate
+    // Cancel any pending debounced save - finishMatch will set the final result
     cancelPendingSave()
-    await gamePlayActions.saveGame()
 
     const preview = gamePlayActions.getFinishMatchPreview()
 
-    // Call finishMatch API with the full result
+    // Call finishMatch API with the full result and confirm in one call
     if (gamePlayState.eventId && gamePlayState.matchId) {
       try {
         await apiPost('finishMatch', {
           _id: gamePlayState.eventId,
           matchId: gamePlayState.matchId,
+          confirmed: true,
           result: preview.games.map((g) => ({
             score1: g.score1,
             score2: g.score2,
@@ -605,16 +670,23 @@ export const gamePlayActions = {
 
     setGamePlayState({ isSaving: true, saveError: null })
 
+    const savePromise = apiPost('updateGame', {
+      _id: gamePlayState.eventId,
+      matchId: gamePlayState.matchId,
+      gameNumber: gamePlayState.currentGameIndex + 1,
+      score: {
+        score1: gamePlayState.score1,
+        score2: gamePlayState.score2,
+      },
+    })
+
+    pendingSavePromise = savePromise.then(
+      () => { pendingSavePromise = null },
+      () => { pendingSavePromise = null },
+    )
+
     try {
-      await apiPost('updateGame', {
-        _id: gamePlayState.eventId,
-        matchId: gamePlayState.matchId,
-        gameNumber: gamePlayState.currentGameIndex + 1,
-        score: {
-          score1: gamePlayState.score1,
-          score2: gamePlayState.score2,
-        },
-      })
+      await savePromise
       setGamePlayState({ isSaving: false })
     } catch (err) {
       setGamePlayState({
@@ -624,8 +696,12 @@ export const gamePlayActions = {
     }
   },
 
+  exitAndFlush: async () => {
+    await flushPendingSave()
+  },
+
   reset: () => {
-    cancelPendingSave()
+    flushPendingSave()
     setGamePlayState(getInitialState())
   },
 }

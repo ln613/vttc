@@ -956,7 +956,7 @@ const advanceKnockoutRound = (stage, event) => {
 export const finishMatch = async (body) => {
   validateFinishMatchInput(body)
 
-  const { _id, matchId, result } = body
+  const { _id, matchId, result, confirmed } = body
 
   const db = getDB()
   const collection = db.collection(EVENTS_COLLECTION)
@@ -978,12 +978,13 @@ export const finishMatch = async (body) => {
         matchFound = true
 
         const match = group.matches[matchIndex]
-        if (match.winningSide != null) {
-          throwError('Match is already finished')
+        if (match.confirmed) {
+          throwError('Match is already confirmed')
         }
 
         // Update match with result
         const updatedMatch = updateMatchWithResult(match, result)
+        if (confirmed) updatedMatch.confirmed = true
 
         // Update group stats
         const updatedGroup = updateGroupAfterMatch(group, updatedMatch, matchIndex)
@@ -1033,11 +1034,12 @@ export const finishMatch = async (body) => {
           matchFound = true
 
           const knockoutMatch = round.matches[matchIndex]
-          if (knockoutMatch.winner) {
-            throwError('Match is already finished')
+          if (knockoutMatch.match?.confirmed) {
+            throwError('Match is already confirmed')
           }
 
           const updatedMatch = updateMatchWithResult(knockoutMatch.match, result)
+          if (confirmed) updatedMatch.confirmed = true
           const winner =
             updatedMatch.winningSide === 1 ? knockoutMatch.participant1 : knockoutMatch.participant2
 
@@ -1277,6 +1279,51 @@ const compareByStatsOnly = (p1, p2) => {
     return p2.stats.pointDifference - p1.stats.pointDifference
   }
   return p2.stats.pointsWon - p1.stats.pointsWon
+}
+
+/**
+ * Confirm a finished match result
+ */
+export const confirmMatch = async (body) => {
+  validateConfirmMatchInput(body)
+
+  const { _id, matchId } = body
+
+  const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
+
+  const event = await collection.findOne({ _id: toObjectId(_id) })
+  if (!event) throwError('Event not found')
+
+  const updatedStages = updateMatchInStages(
+    event.eventStages,
+    matchId,
+    (match) => {
+      if (match.winningSide == null) {
+        throwError('Match is not finished yet')
+      }
+      if (match.confirmed) {
+        throwError('Match is already confirmed')
+      }
+      return {
+        ...match,
+        confirmed: true,
+      }
+    },
+  )
+
+  await collection.updateOne(
+    { _id: toObjectId(_id) },
+    { $set: { eventStages: updatedStages } },
+  )
+
+  return { success: true }
+}
+
+const validateConfirmMatchInput = (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body._id) throwError('Event ID is required')
+  if (!body.matchId) throwError('Match ID is required')
 }
 
 /**

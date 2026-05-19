@@ -16,6 +16,8 @@
         "npm:@types/node@^24.10.1",
         "npm:eslint@^9.39.1",
         "npm:globals@^16.5.0",
+        "npm:mongodb-memory-server@^11.0.1",
+        "npm:mongodb@^6.3.0",
         "npm:netlify-cli@^23.13.0",
         "npm:solid-js@^1.9.5",
         "npm:typescript-eslint@^8.46.4",

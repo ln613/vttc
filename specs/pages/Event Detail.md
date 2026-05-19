@@ -34,6 +34,7 @@ The player column title is "Players" for double event and "Team" for team event,
   - results of each game: "11 : 6, 10 : 12, ...", left side represents the left participant (Eric in this case), the winning numbers are bold.
   - Start button (if not started yet, align right, green, small)
   - Continue button (if already started but not finished, orange, small)
+  - Confirm button (if finished but not confirmed, red, small)
 
 ### Knockout
 

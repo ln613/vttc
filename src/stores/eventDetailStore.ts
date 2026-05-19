@@ -1,7 +1,10 @@
 import { createStore } from 'solid-js/store'
 import type { Event, Stage, TournamentType } from '../../shared/types/Tournament'
 import type { Group } from '../../shared/types/Tournament'
+import type { Match } from '../../shared/types/Match'
+import type { MatchPreview } from '../components/MatchConfirmDialog'
 import { apiGet, apiPost } from '../utils/api'
+import { waitForPendingSave } from './gamePlayStore'
 
 interface EventDetailState {
   data: Event | null
@@ -12,6 +15,9 @@ interface EventDetailState {
   generatingGroups: boolean
   expandedMatchSchedules: Record<number, boolean>
   scrollPosition: number
+  confirmingMatchId: string | null
+  showConfirmDialog: boolean
+  confirmDialogMatchId: string | null
 }
 
 const getInitialState = (): EventDetailState => ({
@@ -23,6 +29,9 @@ const getInitialState = (): EventDetailState => ({
   generatingGroups: false,
   expandedMatchSchedules: {},
   scrollPosition: 0,
+  confirmingMatchId: null,
+  showConfirmDialog: false,
+  confirmDialogMatchId: null,
 })
 
 const [eventDetailState, setEventDetailState] =
@@ -54,6 +63,8 @@ export const eventDetailActions = {
         eventId,
       })
     }
+    // Wait for any in-flight game save to complete before fetching
+    await waitForPendingSave()
     await fetchEvent(eventId, isSameEvent && eventDetailState.data !== null)
   },
 
@@ -122,5 +133,90 @@ export const eventDetailActions = {
     return 'Player'
   },
 
+  showConfirmDialog: (matchId: string) => {
+    setEventDetailState({
+      showConfirmDialog: true,
+      confirmDialogMatchId: matchId,
+    })
+  },
+
+  cancelConfirmDialog: () => {
+    setEventDetailState({
+      showConfirmDialog: false,
+      confirmDialogMatchId: null,
+    })
+  },
+
+  getConfirmDialogMatch: (): Match | undefined => {
+    const matchId = eventDetailState.confirmDialogMatchId
+    if (!matchId || !eventDetailState.data) return undefined
+    return findMatchById(eventDetailState.data, matchId)
+  },
+
+  getConfirmDialogPreview: (): MatchPreview | undefined => {
+    const match = eventDetailActions.getConfirmDialogMatch()
+    if (!match) return undefined
+    return buildMatchPreview(match)
+  },
+
+  getConfirmDialogParticipantName: (side: 1 | 2): string => {
+    const match = eventDetailActions.getConfirmDialogMatch()
+    if (!match) return 'Player'
+    const players = side === 1 ? match.side1 : match.side2
+    if (!players || players.length === 0) return 'Player'
+    return players.map((p) => `${p.firstName} ${p.lastName}`).join(' / ')
+  },
+
+  confirmMatch: async () => {
+    const matchId = eventDetailState.confirmDialogMatchId
+    const { eventId } = eventDetailState
+    if (!eventId || !matchId) return
+
+    setEventDetailState({ confirmingMatchId: matchId })
+    try {
+      await apiPost('confirmMatch', { _id: eventId, matchId })
+      await fetchEvent(eventId, true)
+    } catch (err) {
+      setEventDetailState({
+        error:
+          err instanceof Error ? err.message : 'Failed to confirm match',
+      })
+    } finally {
+      setEventDetailState({
+        confirmingMatchId: null,
+        showConfirmDialog: false,
+        confirmDialogMatchId: null,
+      })
+    }
+  },
+
   reset: () => setEventDetailState(getInitialState()),
 }
+
+const findMatchById = (event: Event, matchId: string): Match | undefined => {
+  for (const stage of event.eventStages || []) {
+    if (stage.type === 'group') {
+      for (const group of stage.groups) {
+        const match = group.matches.find((m) => m._id === matchId)
+        if (match) return match
+      }
+    }
+    if (stage.type === 'knockout') {
+      for (const round of stage.rounds) {
+        const km = round.matches.find((m) => m.match?._id === matchId)
+        if (km?.match) return km.match
+      }
+    }
+  }
+  return undefined
+}
+
+const buildMatchPreview = (match: Match): MatchPreview => ({
+  gamesWon1: match.gamesWon1,
+  gamesWon2: match.gamesWon2,
+  games: match.games.map((g) => ({
+    score1: g.score1,
+    score2: g.score2,
+    winningSide: g.winningSide,
+  })),
+})
