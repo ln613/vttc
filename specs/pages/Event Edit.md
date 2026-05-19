@@ -8,6 +8,7 @@ Vertical
 - title "Add Event" or "Edit Event" (h1, align left)
 - Tournament: dropdown (all tournaments)
 - date picker
+- Time: dropdown (From 8AM to 6PM, half hour interval)
 - Name: input (initial value after tournament and date are selected "{tournament name} - {date}") *
 - Max Participants: dropdown (Unlimited, 4 to 128, default Unlimited)
 - Number of Matches section
@@ -42,4 +43,9 @@ Select the number of participants who will advance from the group stage, only vi
 ## interaction
 
 - on load: call get tournaments API to populate the tournaments dropdown
-- on save: confirm and call save event API
+- on save
+  - call save event API
+  - show loading indicator and dim the screen while saving
+  - on success: show saved message and go back
+  - on fail: show err msg
+- on cancel: confirm cancel if there are changes

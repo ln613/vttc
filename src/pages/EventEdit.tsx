@@ -26,6 +26,27 @@ const KNOCKOUT_GAMES_OPTIONS: BestOfOption[] = [
 ]
 const QUALIFIERS_OPTIONS: QualifiersCount[] = ['Top 1', 'Top 2', 'Top 3', 'All']
 
+const generateTimeOptions = () => {
+  const options = []
+  for (let hour = 8; hour <= 18; hour++) {
+    const period = hour >= 12 ? 'PM' : 'AM'
+    const displayHour = hour > 12 ? hour - 12 : hour
+    options.push({
+      value: `${displayHour}:00 ${period}`,
+      label: `${displayHour}:00 ${period}`,
+    })
+    if (hour < 18) {
+      options.push({
+        value: `${displayHour}:30 ${period}`,
+        label: `${displayHour}:30 ${period}`,
+      })
+    }
+  }
+  return options
+}
+
+const TIME_OPTIONS = generateTimeOptions()
+
 const generateHandicapDifferenceOptions = () => {
   const options = []
   for (let i = 100; i <= 400; i += 50) {
@@ -65,10 +86,48 @@ const containerStyle: JSX.CSSProperties = {
   display: 'flex',
   'flex-direction': 'column',
   'min-height': '100vh',
+  position: 'relative',
 }
 
 const contentStyle: JSX.CSSProperties = {
   padding: '24px',
+}
+
+const overlayStyle: JSX.CSSProperties = {
+  position: 'fixed',
+  top: '0',
+  left: '0',
+  right: '0',
+  bottom: '0',
+  'background-color': 'rgba(0, 0, 0, 0.5)',
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'center',
+  'z-index': '1000',
+}
+
+const overlayMessageStyle: JSX.CSSProperties = {
+  'background-color': '#fff',
+  padding: '32px 48px',
+  'border-radius': '12px',
+  'font-size': '18px',
+  'font-weight': 600,
+  color: '#333',
+  'box-shadow': '0 4px 20px rgba(0, 0, 0, 0.15)',
+  'text-align': 'center',
+}
+
+const savedMessageStyle: JSX.CSSProperties = {
+  ...overlayMessageStyle,
+  color: '#27ae60',
+}
+
+const errorMessageStyle: JSX.CSSProperties = {
+  color: '#e74c3c',
+  'font-size': '14px',
+  'font-weight': 500,
+  'margin-top': '16px',
+  'text-align': 'left',
 }
 
 const titleStyle: JSX.CSSProperties = {
@@ -117,9 +176,31 @@ const EventEdit = (props: EventEditProps) => {
       label: t.name,
     }))
 
+  const handleCancel = () => {
+    if (props.onCancel) {
+      props.onCancel()
+      return
+    }
+    if (eventEditActions.hasChanges()) {
+      const confirmed = window.confirm('You have unsaved changes. Are you sure you want to cancel?')
+      if (!confirmed) return
+    }
+    navigate(-1)
+  }
+
   return (
     <div style={containerStyle}>
       <Header />
+      <Show when={eventEditState.saving}>
+        <div style={overlayStyle}>
+          <div style={overlayMessageStyle}>Saving...</div>
+        </div>
+      </Show>
+      <Show when={eventEditState.saved}>
+        <div style={overlayStyle}>
+          <div style={savedMessageStyle}>Saved!</div>
+        </div>
+      </Show>
       <div style={contentStyle}>
         <h1 style={titleStyle}>{props.isEdit ? 'Edit Event' : 'Add Event'}</h1>
         <Select
@@ -133,6 +214,13 @@ const EventEdit = (props: EventEditProps) => {
           label="Date"
           value={eventEditState.formData.date}
           onChange={(value) => eventEditActions.setField('date', value)}
+        />
+        <Select
+          label="Time"
+          name="time"
+          value={eventEditState.formData.time}
+          onChange={(value) => eventEditActions.setField('time', value)}
+          options={TIME_OPTIONS}
         />
         <Input
           label="Name"
@@ -154,13 +242,17 @@ const EventEdit = (props: EventEditProps) => {
         <NumberOfGamesSection />
         <QualifiersSection />
         <HandicapSection />
+        <Show when={eventEditState.error}>
+          <div style={errorMessageStyle}>{eventEditState.error}</div>
+        </Show>
         <div style={buttonContainerStyle}>
-          <Button color="#e74c3c" onClick={() => (props.onCancel ? props.onCancel() : navigate(-1))}>
+          <Button color="#e74c3c" onClick={handleCancel}>
             Cancel
           </Button>
           <Button
             color="#27ae60"
             onClick={() => eventEditActions.saveEvent(props.onSave || (() => navigate(-1)))}
+            disabled={eventEditState.saving}
           >
             Save
           </Button>

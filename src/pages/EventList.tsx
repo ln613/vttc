@@ -2,12 +2,15 @@ import { Show, For, onMount } from 'solid-js'
 import type { JSX } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { Header } from '../components/Header'
+import Button from '../components/Button'
 import { eventListState, eventListActions } from '../stores/eventListStore'
 import { eventState } from '../stores/eventStore'
 import { authState } from '../stores/authStore'
 import type { EventOption } from '../stores/eventStore'
 
 const EventList = () => {
+  const navigate = useNavigate()
+
   onMount(() => {
     if (!eventState.data) {
       eventListActions.fetchEvents()
@@ -18,7 +21,14 @@ const EventList = () => {
     <div style={containerStyle}>
       <Header />
       <div style={contentStyle}>
-        <h1 style={titleStyle}>Event List</h1>
+        <div style={pageHeaderStyle}>
+          <h1 style={titleStyle}>Event List</h1>
+          <Show when={authState.isAdmin}>
+            <Button color="#27ae60" size="small" onClick={() => navigate('/event/new')}>
+              New Event
+            </Button>
+          </Show>
+        </div>
         <EventListContent />
       </div>
     </div>
@@ -113,12 +123,19 @@ const contentStyle: JSX.CSSProperties = {
   padding: '20px',
 }
 
+const pageHeaderStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'justify-content': 'space-between',
+  'align-items': 'center',
+  'margin-bottom': '20px',
+}
+
 const titleStyle: JSX.CSSProperties = {
   'text-align': 'left',
   'font-size': '28px',
   'font-weight': 700,
   color: '#333',
-  'margin-bottom': '20px',
+  margin: '0',
 }
 
 const listStyle: JSX.CSSProperties = {

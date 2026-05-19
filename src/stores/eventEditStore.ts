@@ -7,6 +7,7 @@ export interface EventEditFormData {
   _id?: string
   tournamentId: string
   date: Date | null
+  time: string
   maxParticipants: string
   name: string
   groupGames: BestOfOption
@@ -21,13 +22,16 @@ export interface EventEditFormData {
 
 interface EventEditState {
   formData: EventEditFormData
+  initialFormData: EventEditFormData
   saving: boolean
+  saved: boolean
   error: string | null
 }
 
 const defaultFormData: EventEditFormData = {
   tournamentId: '',
   date: null,
+  time: '',
   maxParticipants: 'Unlimited',
   name: '',
   groupGames: 'Best of 3',
@@ -42,7 +46,9 @@ const defaultFormData: EventEditFormData = {
 
 const getInitialState = (): EventEditState => ({
   formData: { ...defaultFormData },
+  initialFormData: { ...defaultFormData },
   saving: false,
+  saved: false,
   error: null,
 })
 
@@ -55,6 +61,7 @@ const mapEventToFormData = (event: Event): EventEditFormData => ({
   _id: event._id,
   tournamentId: event.tournamentId,
   date: event.date ? new Date(event.date) : null,
+  time: event.time || '',
   maxParticipants:
     event.maxParticipants === 0 ? 'Unlimited' : String(event.maxParticipants),
   name: event.eventName || '',
@@ -70,19 +77,22 @@ const mapEventToFormData = (event: Event): EventEditFormData => ({
 
 export const eventEditActions = {
   initForm: (initialData?: Partial<EventEditFormData>) => {
+    const formData = { ...defaultFormData, ...initialData }
     setEventEditState({
-      formData: { ...defaultFormData, ...initialData },
+      formData,
+      initialFormData: { ...formData },
       saving: false,
+      saved: false,
       error: null,
     })
   },
 
   loadEvent: async (eventId: string) => {
-    setEventEditState({ saving: false, error: null })
+    setEventEditState({ saving: false, saved: false, error: null })
     try {
       const event = await apiGet<Event>('event', { _id: eventId })
       const formData = mapEventToFormData(event)
-      setEventEditState({ formData })
+      setEventEditState({ formData, initialFormData: { ...formData } })
     } catch (err) {
       setEventEditState({
         error: err instanceof Error ? err.message : 'Failed to load event',
@@ -117,21 +127,25 @@ export const eventEditActions = {
       return
     }
 
-    const confirmed = window.confirm('Are you sure you want to save this event?')
-    if (!confirmed) return
-
     setEventEditState({ saving: true, error: null })
 
     try {
       await apiPost('saveEvent', buildSavePayload(formData))
-      setEventEditState({ saving: false })
-      onSuccess?.(formData)
+      setEventEditState({ saving: false, saved: true })
+      setTimeout(() => {
+        onSuccess?.(formData)
+      }, 1500)
     } catch (err) {
       setEventEditState({
         saving: false,
         error: err instanceof Error ? err.message : 'Failed to save event',
       })
     }
+  },
+
+  hasChanges: (): boolean => {
+    const { formData, initialFormData } = eventEditState
+    return JSON.stringify(formData) !== JSON.stringify(initialFormData)
   },
 
   resetForm: () => setEventEditState(getInitialState()),
@@ -158,6 +172,7 @@ const buildSavePayload = (formData: EventEditFormData) => ({
   _id: formData._id,
   tournamentId: formData.tournamentId,
   date: formData.date?.toISOString().split('T')[0],
+  time: formData.time || '',
   maxParticipants:
     formData.maxParticipants === 'Unlimited'
       ? 0

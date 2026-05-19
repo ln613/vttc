@@ -13,6 +13,7 @@ export interface EventOption {
   participants: Participant[]
   hasSchedule?: boolean
   date: string
+  time?: string
 }
 
 interface EventState {

@@ -222,6 +222,7 @@ export interface Tournament {
 export interface Event extends Tournament {
   tournamentId: string
   date: string
+  time: string // e.g. "8:00 AM", "8:30 AM", ... "6:00 PM"
   maxParticipants: number // 0 = unlimited
   eventName: string // Default: {tournament name} - {date}
   groupGames: BestOfOption // Number of games per match in group stage
