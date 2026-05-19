@@ -1,131 +1,75 @@
-import { Show, For, onMount, onCleanup, type JSX } from 'solid-js'
-import { useNavigate, useParams } from '@solidjs/router'
+import { Show, For, onMount, onCleanup, createSignal, type JSX } from 'solid-js'
+import { useNavigate } from '@solidjs/router'
 import { Header } from '../components/Header'
+import Select from '../components/Select'
 import Button from '../components/Button'
-import MatchConfirmDialog from '../components/MatchConfirmDialog'
-import { eventDetailState, eventDetailActions } from '../stores/eventDetailStore'
+import { eventManageState, eventManageActions } from '../stores/eventManageStore'
+import { eventState, eventActions } from '../stores/eventStore'
 import type { Group, GroupParticipant } from '../../shared/types/Tournament'
 import type { Player } from '../../shared/types/Player'
 import type { Match, Game } from '../../shared/types/Match'
 
-const EventDetail = () => {
-  const params = useParams()
-  let lastScrollY = eventDetailState.scrollPosition
-  let isUnmounting = false
-
+const EventManage = () => {
   onMount(() => {
-    if (params.id) {
-      eventDetailActions.loadEvent(params.id)
+    if (!eventState.data) {
+      eventActions.fetchEvents()
     }
-    restoreScrollPosition()
-  })
-
-  const restoreScrollPosition = () => {
-    const savedPosition = eventDetailState.scrollPosition
-    if (savedPosition > 0) {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          window.scrollTo(0, savedPosition)
-        })
-      })
-      setTimeout(() => {
-        window.scrollTo(0, savedPosition)
-      }, 100)
-    }
-  }
-
-  const handleScroll = () => {
-    if (!isUnmounting) {
-      lastScrollY = window.scrollY
-    }
-  }
-
-  onMount(() => {
-    window.addEventListener('scroll', handleScroll)
   })
 
   onCleanup(() => {
-    isUnmounting = true
-    window.removeEventListener('scroll', handleScroll)
-    eventDetailActions.saveScrollPosition(lastScrollY)
+    eventManageActions.reset()
   })
 
   return (
     <div style={containerStyle}>
       <Header />
       <div style={contentStyle}>
-        <EventHeader />
+        <h1 style={titleStyle}>Manage Event</h1>
+        <EventSelector />
         <EventContent />
       </div>
-      <Show when={eventDetailState.showConfirmDialog}>
-        <ConfirmMatchDialog />
-      </Show>
     </div>
   )
 }
 
-const ConfirmMatchDialog = () => {
-  const preview = () => eventDetailActions.getConfirmDialogPreview()
-  const participant1Name = () =>
-    eventDetailActions.getConfirmDialogParticipantName(1)
-  const participant2Name = () =>
-    eventDetailActions.getConfirmDialogParticipantName(2)
+const EventSelector = () => {
+  const options = () =>
+    eventState.data?.map((e) => ({
+      value: e._id,
+      label: e.eventName,
+    })) || []
+
+  const handleEventChange = (eventId: string) => {
+    eventManageActions.selectEvent(eventId || null)
+  }
 
   return (
-    <Show when={preview()}>
-      {(p) => (
-        <MatchConfirmDialog
-          preview={p()}
-          participant1Name={participant1Name()}
-          participant2Name={participant2Name()}
-          onCancel={() => eventDetailActions.cancelConfirmDialog()}
-          onConfirm={() => eventDetailActions.confirmMatch()}
-        />
-      )}
-    </Show>
+    <Select
+      label="Event"
+      name="event"
+      value={eventManageState.selectedEventId || ''}
+      onChange={handleEventChange}
+      options={options()}
+      placeholder="-- Select an event --"
+    />
   )
-}
-
-const EventHeader = () => {
-  const eventName = () => eventDetailState.data?.eventName || ''
-  const dateDisplay = () => formatDate(eventDetailState.data?.date)
-  const timeDisplay = () => eventDetailState.data?.time || ''
-
-  return (
-    <Show when={eventDetailState.data}>
-      <h1 style={eventNameStyle}>{eventName()}</h1>
-      <div style={dateStyle}>{dateDisplay()}</div>
-      <Show when={timeDisplay()}>
-        <div style={timeStyle}>{timeDisplay()}</div>
-      </Show>
-    </Show>
-  )
-}
-
-const formatDate = (date?: string): string => {
-  if (!date) return ''
-  const d = new Date(date)
-  return d.toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
 }
 
 const EventContent = () => (
-  <Show when={!eventDetailState.loading} fallback={<div>Loading...</div>}>
-    <Show when={eventDetailState.data}>
-      <div style={eventContentStyle}>
-        <StageTabs />
-        <StageContent />
-      </div>
+  <Show when={eventManageState.selectedEventId}>
+    <Show when={!eventManageState.loading} fallback={<div>Loading...</div>}>
+      <Show when={eventManageState.data}>
+        <div style={eventContentStyle}>
+          <StageTabs />
+          <StageContent />
+        </div>
+      </Show>
     </Show>
   </Show>
 )
 
 const StageTabs = () => {
-  const event = () => eventDetailState.data
+  const event = () => eventManageState.data
 
   return (
     <Show when={event()}>
@@ -139,13 +83,11 @@ const StageTabs = () => {
         return (
           <div style={tabsContainerStyle}>
             <For each={tabs}>
-              {(tab, index) => (
+              {(tab) => (
                 <TabButton
                   label={tab.label}
-                  isActive={eventDetailState.activeStageTab === tab.key}
-                  isFirst={index() === 0}
-                  isLast={index() === tabs.length - 1}
-                  onClick={() => eventDetailActions.setActiveStageTab(tab.key)}
+                  isActive={eventManageState.activeStageTab === tab.key}
+                  onClick={() => eventManageActions.setActiveStageTab(tab.key)}
                 />
               )}
             </For>
@@ -159,29 +101,21 @@ const StageTabs = () => {
 interface TabButtonProps {
   label: string
   isActive: boolean
-  isFirst: boolean
-  isLast: boolean
   onClick: () => void
 }
 
 const TabButton = (props: TabButtonProps) => {
-  const borderRadius = (): string => {
-    if (props.isFirst) return '8px 0 0 8px'
-    if (props.isLast) return '0 8px 8px 0'
-    return '0'
-  }
-
   const tabStyle = (): JSX.CSSProperties => ({
-    flex: '1',
     padding: '12px 24px',
     border: 'none',
-    'border-right': props.isLast ? 'none' : '1px solid #ddd',
-    'border-radius': borderRadius(),
-    'background-color': props.isActive ? '#2185d0' : 'transparent',
+    'border-bottom': props.isActive
+      ? '3px solid #e67e22'
+      : '3px solid transparent',
+    'background-color': 'transparent',
     cursor: 'pointer',
     'font-weight': props.isActive ? 700 : 400,
     'font-size': '16px',
-    color: props.isActive ? 'white' : '#333',
+    color: props.isActive ? '#e67e22' : '#666',
     transition: 'all 0.2s ease',
   })
 
@@ -194,7 +128,7 @@ const TabButton = (props: TabButtonProps) => {
 
 const StageContent = () => (
   <Show
-    when={eventDetailState.activeStageTab === 'group'}
+    when={eventManageState.activeStageTab === 'group'}
     fallback={<KnockoutStageContent />}
   >
     <GroupStageContent />
@@ -202,8 +136,8 @@ const StageContent = () => (
 )
 
 const GroupStageContent = () => {
-  const hasGroups = () => eventDetailActions.hasGroups()
-  const groupStage = () => eventDetailActions.getGroupStage()
+  const hasGroups = () => eventManageActions.hasGroups()
+  const groupStage = () => eventManageActions.getGroupStage()
 
   return (
     <Show when={hasGroups()} fallback={<GenerateGroupsSection />}>
@@ -218,18 +152,16 @@ const GroupStageContent = () => {
 
 const GenerateGroupsSection = () => {
   const handleGenerateGroups = () => {
-    eventDetailActions.generateGroups()
+    eventManageActions.generateGroups()
   }
 
   return (
     <div style={generateGroupsStyle}>
       <Button
         onClick={handleGenerateGroups}
-        disabled={eventDetailState.generatingGroups}
+        disabled={eventManageState.generatingGroups}
       >
-        {eventDetailState.generatingGroups
-          ? 'Generating...'
-          : 'Generate Groups'}
+        {eventManageState.generatingGroups ? 'Generating...' : 'Generate Groups'}
       </Button>
     </div>
   )
@@ -240,9 +172,8 @@ interface GroupDisplayProps {
 }
 
 const GroupDisplay = (props: GroupDisplayProps) => {
-  const playerColumnTitle = () => eventDetailActions.getPlayerColumnTitle()
-  const rankedParticipants = () =>
-    getRankedParticipants(props.group.participants)
+  const playerColumnTitle = () => eventManageActions.getPlayerColumnTitle()
+  const rankedParticipants = () => getRankedParticipants(props.group.participants)
 
   return (
     <div style={groupContainerStyle}>
@@ -251,10 +182,7 @@ const GroupDisplay = (props: GroupDisplayProps) => {
         participants={rankedParticipants()}
         playerColumnTitle={playerColumnTitle()}
       />
-      <MatchSchedule
-        matches={props.group.matches}
-        groupIndex={props.group.index}
-      />
+      <MatchSchedule matches={props.group.matches} groupIndex={props.group.index} />
     </div>
   )
 }
@@ -265,7 +193,7 @@ interface MatchScheduleProps {
 }
 
 const MatchSchedule = (props: MatchScheduleProps) => {
-  const isExpanded = () => eventDetailActions.isMatchScheduleExpanded(props.groupIndex)
+  const [isExpanded, setIsExpanded] = createSignal(false)
 
   return (
     <Show when={props.matches && props.matches.length > 0}>
@@ -273,7 +201,7 @@ const MatchSchedule = (props: MatchScheduleProps) => {
         <CollapsibleHeader
           title="Match Schedule"
           isExpanded={isExpanded()}
-          onToggle={() => eventDetailActions.toggleMatchSchedule(props.groupIndex)}
+          onToggle={() => setIsExpanded(!isExpanded())}
         />
         <Show when={isExpanded()}>
           <div style={matchScheduleContentStyle}>
@@ -313,23 +241,16 @@ const MatchRow = (props: MatchRowProps) => {
   const side2Players = () => getMatchSidePlayers(props.match.side2)
   const hasResult = () =>
     props.match.winningSide !== undefined && props.match.winningSide !== null
-  const isConfirmed = () => props.match.confirmed === true
   const hasStarted = () =>
     hasResult() || (props.match.games && props.match.games.length > 0)
-  const isConfirming = () =>
-    eventDetailState.confirmingMatchId === props.match._id
 
   const handleStartClick = () => {
-    const eventId = eventDetailState.eventId
+    const eventId = eventManageState.selectedEventId
     if (eventId) {
       navigate(
         `/game-play?eventId=${eventId}&stage=group&groupIndex=${props.groupIndex}&matchId=${props.match._id}`,
       )
     }
-  }
-
-  const handleConfirmClick = () => {
-    eventDetailActions.showConfirmDialog(props.match._id)
   }
 
   return (
@@ -352,16 +273,6 @@ const MatchRow = (props: MatchRowProps) => {
       <Show when={hasStarted() && !hasResult()}>
         <Button onClick={handleStartClick} color="#e67e22" size="small">
           Continue
-        </Button>
-      </Show>
-      <Show when={hasResult() && !isConfirmed()}>
-        <Button
-          onClick={handleConfirmClick}
-          color="#e74c3c"
-          size="small"
-          disabled={isConfirming()}
-        >
-          {isConfirming() ? 'Confirming...' : 'Confirm'}
         </Button>
       </Show>
     </div>
@@ -401,7 +312,9 @@ const MatchResultDisplay = (props: MatchResultDisplayProps) => {
           isWinner={side1IsWinner()}
         />
         <span
-          style={side1IsWinner() ? winningScoreStyle : losingScoreStyle}
+          style={
+            side1IsWinner() ? winningScoreStyle : losingScoreStyle
+          }
         >
           {props.gamesWon1}
         </span>
@@ -409,7 +322,9 @@ const MatchResultDisplay = (props: MatchResultDisplayProps) => {
       <span style={scoreSeparatorStyle}>:</span>
       <div style={matchRightSideStyle}>
         <span
-          style={side2IsWinner() ? winningScoreStyle : losingScoreStyle}
+          style={
+            side2IsWinner() ? winningScoreStyle : losingScoreStyle
+          }
         >
           {props.gamesWon2}
         </span>
@@ -533,32 +448,32 @@ interface GroupTableProps {
 
 const GroupTable = (props: GroupTableProps) => (
   <div style={tableWrapperStyle}>
-    <table style={tableStyle}>
-      <thead>
-        <tr>
-          <th style={thStyle}>Rank</th>
-          <th style={{ ...thStyle, 'text-align': 'left' }}>
-            {props.playerColumnTitle}
-          </th>
-          <th style={thStyle}>Total</th>
-          <th style={thStyle}>W</th>
-          <th style={thStyle}>L</th>
-          <th style={thStyle}>+/-</th>
-          <th style={thStyle}>Win %</th>
-          <th style={thStyle}>MW</th>
-          <th style={thStyle}>ML</th>
-          <th style={thStyle}>GW</th>
-          <th style={thStyle}>GL</th>
-        </tr>
-      </thead>
-      <tbody>
-        <For each={props.participants}>
-          {(gp, index) => (
-            <GroupTableRow participant={gp} rank={index() + 1} />
-          )}
-        </For>
-      </tbody>
-    </table>
+  <table style={tableStyle}>
+    <thead>
+      <tr>
+        <th style={thStyle}>Rank</th>
+        <th style={{ ...thStyle, 'text-align': 'left' }}>
+          {props.playerColumnTitle}
+        </th>
+        <th style={thStyle}>Total</th>
+        <th style={thStyle}>W</th>
+        <th style={thStyle}>L</th>
+        <th style={thStyle}>+/-</th>
+        <th style={thStyle}>Win %</th>
+        <th style={thStyle}>MW</th>
+        <th style={thStyle}>ML</th>
+        <th style={thStyle}>GW</th>
+        <th style={thStyle}>GL</th>
+      </tr>
+    </thead>
+    <tbody>
+      <For each={props.participants}>
+        {(gp, index) => (
+          <GroupTableRow participant={gp} rank={index() + 1} />
+        )}
+      </For>
+    </tbody>
+  </table>
   </div>
 )
 
@@ -586,9 +501,7 @@ const GroupTableRow = (props: GroupTableRowProps) => {
   return (
     <tr>
       <td style={cellStyle()}>{props.rank}</td>
-      <td
-        style={{ ...cellStyle(), 'text-align': 'left', 'font-weight': 500 }}
-      >
+      <td style={{ ...cellStyle(), 'text-align': 'left', 'font-weight': 500 }}>
         {playerDisplay()}
       </td>
       <td style={cellStyle()}>{total()}</td>
@@ -617,9 +530,7 @@ const getPlayerDisplay = (gp: GroupParticipant): string => {
     const sortedPlayers = [...participant.players].sort(
       (a, b) => (b.rating || 0) - (a.rating || 0),
     )
-    return sortedPlayers
-      .map((p) => `${p.firstName} ${p.lastName}`)
-      .join(' / ')
+    return sortedPlayers.map((p) => `${p.firstName} ${p.lastName}`).join(' / ')
   }
 
   if ('firstName' in participant && 'lastName' in participant) {
@@ -642,31 +553,14 @@ const containerStyle: JSX.CSSProperties = {
 const contentStyle: JSX.CSSProperties = {
   'max-width': '1200px',
   margin: '0 auto',
-  padding: '16px 20px 20px',
+  padding: '20px',
 }
 
-const eventNameStyle: JSX.CSSProperties = {
+const titleStyle: JSX.CSSProperties = {
   'text-align': 'left',
   'font-size': '28px',
   'font-weight': 700,
   color: '#333',
-  'margin-top': '0',
-  'margin-bottom': '4px',
-}
-
-const dateStyle: JSX.CSSProperties = {
-  'text-align': 'left',
-  'font-size': '18px',
-  'font-weight': 400,
-  color: '#555',
-  'margin-bottom': '2px',
-}
-
-const timeStyle: JSX.CSSProperties = {
-  'text-align': 'left',
-  'font-size': '16px',
-  'font-weight': 400,
-  color: '#555',
   'margin-bottom': '20px',
 }
 
@@ -676,10 +570,9 @@ const eventContentStyle: JSX.CSSProperties = {
 
 const tabsContainerStyle: JSX.CSSProperties = {
   display: 'flex',
-  border: '1px solid #ddd',
-  'border-radius': '8px',
+  gap: '4px',
+  'border-bottom': '1px solid #ddd',
   'margin-bottom': '20px',
-  'background-color': '#fff',
 }
 
 const groupsListStyle: JSX.CSSProperties = {
@@ -708,7 +601,7 @@ const groupTitleStyle: JSX.CSSProperties = {
   color: '#fff',
   margin: '0',
   padding: '14px 20px',
-  background: 'linear-gradient(135deg, #2c3e50, #34495e)',
+  'background': 'linear-gradient(135deg, #2c3e50, #34495e)',
   'letter-spacing': '0.5px',
 }
 
@@ -751,7 +644,7 @@ const emptyContentStyle: JSX.CSSProperties = {
 
 const matchScheduleContainerStyle: JSX.CSSProperties = {
   'margin-top': '0',
-  padding: '16px 20px',
+  'padding': '16px 20px',
   'background-color': '#fafafa',
   'border-top': '1px solid #f0f0f0',
 }
@@ -765,7 +658,7 @@ const collapsibleHeaderStyle: JSX.CSSProperties = {
   cursor: 'pointer',
   padding: '8px 0',
   'font-size': '15px',
-  color: '#1a1a2e',
+  color: '#2c3e50',
   width: '100%',
 }
 
@@ -842,7 +735,7 @@ const winningScoreStyle: JSX.CSSProperties = {
 const losingScoreStyle: JSX.CSSProperties = {
   'font-weight': 400,
   'font-size': '28px',
-  color: '#666',
+  color: '#bbb',
 }
 
 const playerSeparatorStyle: JSX.CSSProperties = {
@@ -853,17 +746,17 @@ const playerSeparatorStyle: JSX.CSSProperties = {
 
 const boldScoreStyle: JSX.CSSProperties = {
   'font-weight': 700,
-  color: '#d35400',
+  color: '#e67e22',
 }
 
 const normalScoreStyle: JSX.CSSProperties = {
   'font-weight': 400,
-  color: '#555',
+  color: '#999',
 }
 
 const gameScoresStyle: JSX.CSSProperties = {
   'font-size': '13px',
-  color: '#555',
+  color: '#888',
   'background-color': '#f8f8f8',
   padding: '4px 10px',
   'border-radius': '12px',
@@ -877,4 +770,4 @@ const gameDelimiterStyle: JSX.CSSProperties = {
   'margin-right': '8px',
 }
 
-export default EventDetail
+export default EventManage
