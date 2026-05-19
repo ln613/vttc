@@ -10,6 +10,8 @@ interface EventDetailState {
   eventId: string | null
   activeStageTab: 'group' | 'knockout'
   generatingGroups: boolean
+  expandedMatchSchedules: Record<number, boolean>
+  scrollPosition: number
 }
 
 const getInitialState = (): EventDetailState => ({
@@ -19,6 +21,8 @@ const getInitialState = (): EventDetailState => ({
   eventId: null,
   activeStageTab: 'group',
   generatingGroups: false,
+  expandedMatchSchedules: {},
+  scrollPosition: 0,
 })
 
 const [eventDetailState, setEventDetailState] =
@@ -26,8 +30,10 @@ const [eventDetailState, setEventDetailState] =
 
 export { eventDetailState }
 
-const fetchEvent = async (eventId: string) => {
-  setEventDetailState({ loading: true, error: null })
+const fetchEvent = async (eventId: string, silent: boolean) => {
+  if (!silent) {
+    setEventDetailState({ loading: true, error: null })
+  }
   try {
     const data = await apiGet<Event>('event', { _id: eventId })
     setEventDetailState({ data, loading: false, error: null })
@@ -41,12 +47,30 @@ const fetchEvent = async (eventId: string) => {
 
 export const eventDetailActions = {
   loadEvent: async (eventId: string) => {
-    setEventDetailState({ eventId })
-    await fetchEvent(eventId)
+    const isSameEvent = eventDetailState.eventId === eventId
+    if (!isSameEvent) {
+      setEventDetailState({
+        ...getInitialState(),
+        eventId,
+      })
+    }
+    await fetchEvent(eventId, isSameEvent && eventDetailState.data !== null)
   },
 
   setActiveStageTab: (tab: 'group' | 'knockout') => {
     setEventDetailState({ activeStageTab: tab })
+  },
+
+  toggleMatchSchedule: (groupIndex: number) => {
+    const current = eventDetailState.expandedMatchSchedules[groupIndex] ?? false
+    setEventDetailState('expandedMatchSchedules', groupIndex, !current)
+  },
+
+  isMatchScheduleExpanded: (groupIndex: number): boolean =>
+    eventDetailState.expandedMatchSchedules[groupIndex] ?? false,
+
+  saveScrollPosition: (position: number) => {
+    setEventDetailState({ scrollPosition: position })
   },
 
   generateGroups: async () => {
@@ -56,7 +80,7 @@ export const eventDetailActions = {
     setEventDetailState({ generatingGroups: true })
     try {
       await apiPost<Group[]>('generateGroups', { _id: eventId })
-      await fetchEvent(eventId)
+      await fetchEvent(eventId, false)
     } catch (err) {
       setEventDetailState({
         error:

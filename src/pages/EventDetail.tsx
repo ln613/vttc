@@ -1,4 +1,4 @@
-import { Show, For, onMount, onCleanup, createSignal, type JSX } from 'solid-js'
+import { Show, For, onMount, onCleanup, type JSX } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { Header } from '../components/Header'
 import Button from '../components/Button'
@@ -9,15 +9,44 @@ import type { Match, Game } from '../../shared/types/Match'
 
 const EventDetail = () => {
   const params = useParams()
+  let lastScrollY = eventDetailState.scrollPosition
+  let isUnmounting = false
 
   onMount(() => {
     if (params.id) {
       eventDetailActions.loadEvent(params.id)
     }
+    restoreScrollPosition()
+  })
+
+  const restoreScrollPosition = () => {
+    const savedPosition = eventDetailState.scrollPosition
+    if (savedPosition > 0) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          window.scrollTo(0, savedPosition)
+        })
+      })
+      setTimeout(() => {
+        window.scrollTo(0, savedPosition)
+      }, 100)
+    }
+  }
+
+  const handleScroll = () => {
+    if (!isUnmounting) {
+      lastScrollY = window.scrollY
+    }
+  }
+
+  onMount(() => {
+    window.addEventListener('scroll', handleScroll)
   })
 
   onCleanup(() => {
-    eventDetailActions.reset()
+    isUnmounting = true
+    window.removeEventListener('scroll', handleScroll)
+    eventDetailActions.saveScrollPosition(lastScrollY)
   })
 
   return (
@@ -196,7 +225,7 @@ interface MatchScheduleProps {
 }
 
 const MatchSchedule = (props: MatchScheduleProps) => {
-  const [isExpanded, setIsExpanded] = createSignal(false)
+  const isExpanded = () => eventDetailActions.isMatchScheduleExpanded(props.groupIndex)
 
   return (
     <Show when={props.matches && props.matches.length > 0}>
@@ -204,7 +233,7 @@ const MatchSchedule = (props: MatchScheduleProps) => {
         <CollapsibleHeader
           title="Match Schedule"
           isExpanded={isExpanded()}
-          onToggle={() => setIsExpanded(!isExpanded())}
+          onToggle={() => eventDetailActions.toggleMatchSchedule(props.groupIndex)}
         />
         <Show when={isExpanded()}>
           <div style={matchScheduleContentStyle}>
