@@ -517,13 +517,28 @@ const getRankedParticipants = (
   participants: GroupParticipant[],
 ): GroupParticipant[] =>
   [...participants].sort((a, b) => {
+    // Use server-computed ranking when available
+    if (a.ranking != null && b.ranking != null) {
+      return a.ranking - b.ranking
+    }
+    // Fallback: MW descending, then ML ascending (lower is better),
+    // then GD, GW, PD, PW
     if (b.stats.matchesWon !== a.stats.matchesWon) {
       return b.stats.matchesWon - a.stats.matchesWon
+    }
+    if (a.stats.matchesLost !== b.stats.matchesLost) {
+      return a.stats.matchesLost - b.stats.matchesLost
     }
     if (b.stats.gameDifference !== a.stats.gameDifference) {
       return b.stats.gameDifference - a.stats.gameDifference
     }
-    return b.stats.gamesWon - a.stats.gamesWon
+    if (b.stats.gamesWon !== a.stats.gamesWon) {
+      return b.stats.gamesWon - a.stats.gamesWon
+    }
+    if (b.stats.pointDifference !== a.stats.pointDifference) {
+      return b.stats.pointDifference - a.stats.pointDifference
+    }
+    return b.stats.pointsWon - a.stats.pointsWon
   })
 
 interface GroupTableProps {
@@ -544,13 +559,12 @@ const GroupTable = (props: GroupTableProps) => (
           <th style={thStyle}>W</th>
           <th style={thStyle}>L</th>
           <th style={thStyle}>+/-</th>
-          <th style={thStyle}>Win %</th>
-          <th style={thStyle}>MW</th>
-          <th style={thStyle}>ML</th>
           <th style={thStyle}>GW</th>
           <th style={thStyle}>GL</th>
+          <th style={thStyle}>G+/-</th>
           <th style={thStyle}>PW</th>
           <th style={thStyle}>PL</th>
+          <th style={thStyle}>P+/-</th>
         </tr>
       </thead>
       <tbody>
@@ -572,12 +586,14 @@ interface GroupTableRowProps {
 const GroupTableRow = (props: GroupTableRowProps) => {
   const stats = () => props.participant.stats
   const total = () => stats().matchesWon + stats().matchesLost
-  const winPercentage = () =>
-    total() > 0 ? ((stats().matchesWon / total()) * 100).toFixed(1) : '0.0'
   const playerDisplay = () => getPlayerDisplay(props.participant)
-  const difference = () => stats().matchesWon - stats().matchesLost
-  const differenceDisplay = () =>
-    difference() >= 0 ? `+${difference()}` : String(difference())
+  const matchDifference = () => stats().matchesWon - stats().matchesLost
+  const matchDifferenceDisplay = () =>
+    formatDifference(matchDifference())
+  const gameDifferenceDisplay = () =>
+    formatDifference(stats().gameDifference)
+  const pointDifferenceDisplay = () =>
+    formatDifference(stats().pointDifference)
 
   const rowBg = () => (props.rank % 2 === 0 ? '#f8f9fa' : '#fff')
   const cellStyle = (): JSX.CSSProperties => ({
@@ -600,19 +616,19 @@ const GroupTableRow = (props: GroupTableRowProps) => {
       <td style={{ ...cellStyle(), color: '#e74c3c' }}>
         {stats().matchesLost}
       </td>
-      <td style={cellStyle()}>{differenceDisplay()}</td>
-      <td style={{ ...cellStyle(), 'font-weight': 500 }}>
-        {winPercentage()}%
-      </td>
-      <td style={cellStyle()}>{stats().matchesWon}</td>
-      <td style={cellStyle()}>{stats().matchesLost}</td>
+      <td style={cellStyle()}>{matchDifferenceDisplay()}</td>
       <td style={cellStyle()}>{stats().gamesWon}</td>
       <td style={cellStyle()}>{stats().gamesLost}</td>
+      <td style={cellStyle()}>{gameDifferenceDisplay()}</td>
       <td style={cellStyle()}>{stats().pointsWon}</td>
       <td style={cellStyle()}>{stats().pointsLost}</td>
+      <td style={cellStyle()}>{pointDifferenceDisplay()}</td>
     </tr>
   )
 }
+
+const formatDifference = (value: number): string =>
+  value >= 0 ? `+${value}` : String(value)
 
 const getPlayerDisplay = (gp: GroupParticipant): string => {
   const participant = gp.participant

@@ -1230,6 +1230,47 @@ const getParticipantSideInMatch = (match, participant) => {
   return undefined
 }
 
+const subGroupByMatchesLost = (participants) => {
+  const byML = new Map()
+  for (const p of participants) {
+    const ml = p.stats.matchesLost
+    if (!byML.has(ml)) byML.set(ml, [])
+    byML.get(ml).push(p)
+  }
+  return byML
+}
+
+const resolveTiedGroup = (tied, matches, ranked, startRank) => {
+  let currentRank = startRank
+
+  if (tied.length === 1) {
+    ranked.push({ ...tied[0], ranking: currentRank })
+    currentRank++
+  } else if (tied.length === 2) {
+    const winner = getHeadToHeadWinner(tied[0].participant, tied[1].participant, matches)
+    if (winner) {
+      const first = isSameParticipantEntity(winner, tied[0].participant) ? tied[0] : tied[1]
+      const second = first === tied[0] ? tied[1] : tied[0]
+      ranked.push({ ...first, ranking: currentRank })
+      ranked.push({ ...second, ranking: currentRank + 1 })
+    } else {
+      const sortedTie = [...tied].sort(compareByStatsOnly)
+      for (let i = 0; i < sortedTie.length; i++) {
+        ranked.push({ ...sortedTie[i], ranking: currentRank + i })
+      }
+    }
+    currentRank += 2
+  } else {
+    const sortedTie = [...tied].sort(compareByStatsOnly)
+    for (let i = 0; i < sortedTie.length; i++) {
+      ranked.push({ ...sortedTie[i], ranking: currentRank + i })
+    }
+    currentRank += tied.length
+  }
+
+  return currentRank
+}
+
 const rankGroupParticipants = (participants, matches) => {
   const sorted = [...participants].sort((a, b) => b.stats.matchesWon - a.stats.matchesWon)
 
@@ -1245,31 +1286,20 @@ const rankGroupParticipants = (participants, matches) => {
   const matchesWonValues = Array.from(byMatchesWon.keys()).sort((a, b) => b - a)
 
   for (const mw of matchesWonValues) {
-    const tied = byMatchesWon.get(mw)
+    const mwGroup = byMatchesWon.get(mw)
 
-    if (tied.length === 1) {
-      ranked.push({ ...tied[0], ranking: currentRank })
+    if (mwGroup.length === 1) {
+      ranked.push({ ...mwGroup[0], ranking: currentRank })
       currentRank++
-    } else if (tied.length === 2) {
-      const winner = getHeadToHeadWinner(tied[0].participant, tied[1].participant, matches)
-      if (winner) {
-        const first = isSameParticipantEntity(winner, tied[0].participant) ? tied[0] : tied[1]
-        const second = first === tied[0] ? tied[1] : tied[0]
-        ranked.push({ ...first, ranking: currentRank })
-        ranked.push({ ...second, ranking: currentRank + 1 })
-      } else {
-        const sortedTie = [...tied].sort(compareByStatsOnly)
-        for (let i = 0; i < sortedTie.length; i++) {
-          ranked.push({ ...sortedTie[i], ranking: currentRank + i })
-        }
-      }
-      currentRank += 2
     } else {
-      const sortedTie = [...tied].sort(compareByStatsOnly)
-      for (let i = 0; i < sortedTie.length; i++) {
-        ranked.push({ ...sortedTie[i], ranking: currentRank + i })
+      // Sub-group by ML (lower ML is better)
+      const byML = subGroupByMatchesLost(mwGroup)
+      const mlValues = Array.from(byML.keys()).sort((a, b) => a - b)
+
+      for (const ml of mlValues) {
+        const mlGroup = byML.get(ml)
+        currentRank = resolveTiedGroup(mlGroup, matches, ranked, currentRank)
       }
-      currentRank += tied.length
     }
   }
 

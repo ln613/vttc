@@ -20,12 +20,12 @@ Vertical
 - title "Group {n}"
 - the group table, e.g.,
 
-| Rank | Player | Total | W | L | +/- | Win % | MW | ML | GW | GL | PW | PL |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| 1 | Eric Huang | 3 | 3 | 0 | +3 | 100.0% | 3 | 0 | 6 | 0 | 66 | 36
-| 2 | Nan Li | 3 | 2 | 1 | +1 | 66.7% | 2 | 1 | 4 | 2 | 56 | 46
-| 3 | Leo Chang | 3 | 1 | 2 | -1 | 33.3% | 1 | 2 | 2 | 5 | 46 | 56
-| 4 | Karim Maanaki | 3 | 0 | 3 | -3 | 0.0% | 0 | 3 | 1 | 6 | 36 | 66
+| Rank | Player | Total | W | L | +/- | GW | GL | G+/- | PW | PL | P+/-
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| 1 | Eric Huang | 3 | 3 | 0 | +3 | 6 | 0 | 6 | 66 | 36 | 30
+| 2 | Nan Li | 3 | 2 | 1 | +1 | 4 | 2 | 2 | 56 | 46 | 10
+| 3 | Leo Chang | 3 | 1 | 2 | -1 | 2 | 5 | -3 | 46 | 56 | -10
+| 4 | Karim Maanaki | 3 | 0 | 3 | -3 | 1 | 6 | -5 | 36 | 66 | -30
 
 The player column title is "Players" for double event and "Team" for team event, and the column content will show all player (order by rating desc) names joined by " / ".
 
