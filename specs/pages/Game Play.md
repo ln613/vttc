@@ -52,6 +52,12 @@
 - click on "-" button: deduct 1 point (min 0)
 - when score change, call the update game API (debounce for 3 secs)
 - if one side reach game winning point, show the winning number in yellow, and disable the "add point" action. Also show the "Next Game" button or "Finish" button (green bg) depending on whether the match is finished. The button will be under the "-" button and covers both score boxes. Both the "-" buttons are still visible but only the one on the winning side is clickable/enabled, if clicked, the "Next Game"/"Finish" button will disapear
+- click on "Next Game": clear game score, update match score, update the serving side (alternate first serve side after each game)
+- click on "Finish", show a confirm dialog:
+  - "Show the match result to both sides and confirm the result with them"
+  - the updated match result with each game's result (just update in memory, do not actually update and send to db before confirm)
+  - cancel and confirm buttons
+    - on confirm, clear game score, update match score, go back to event detail page
 - click on "T" toggles the style of "T" (dark bg white text or white bg black text), the dark bg means the timeout has been called by the player(s) on that side 
 
 ## Init Dialog (show on load)

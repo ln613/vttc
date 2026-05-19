@@ -711,7 +711,7 @@ const collapsibleHeaderStyle: JSX.CSSProperties = {
   cursor: 'pointer',
   padding: '8px 0',
   'font-size': '15px',
-  color: '#2c3e50',
+  color: '#1a1a2e',
   width: '100%',
 }
 
@@ -789,7 +789,7 @@ const winningScoreStyle: JSX.CSSProperties = {
 const losingScoreStyle: JSX.CSSProperties = {
   'font-weight': 400,
   'font-size': '28px',
-  color: '#bbb',
+  color: '#666',
 }
 
 const playerSeparatorStyle: JSX.CSSProperties = {
@@ -800,17 +800,17 @@ const playerSeparatorStyle: JSX.CSSProperties = {
 
 const boldScoreStyle: JSX.CSSProperties = {
   'font-weight': 700,
-  color: '#e67e22',
+  color: '#d35400',
 }
 
 const normalScoreStyle: JSX.CSSProperties = {
   'font-weight': 400,
-  color: '#999',
+  color: '#555',
 }
 
 const gameScoresStyle: JSX.CSSProperties = {
   'font-size': '13px',
-  color: '#888',
+  color: '#555',
   'background-color': '#f8f8f8',
   padding: '4px 10px',
   'border-radius': '12px',

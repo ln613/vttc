@@ -10,6 +10,12 @@ import {
   gamesNeededToWin,
 } from '../../shared/rules/matchRules'
 
+interface GameResult {
+  score1: number
+  score2: number
+  winningSide?: 1 | 2
+}
+
 interface GamePlayState {
   data: Event | null
   loading: boolean
@@ -33,6 +39,8 @@ interface GamePlayState {
   timeout2: boolean
   menuOpen: boolean
   matchSubmitted: boolean
+  showFinishDialog: boolean
+  gameHistory: GameResult[]
 }
 
 const getInitialState = (): GamePlayState => ({
@@ -58,6 +66,8 @@ const getInitialState = (): GamePlayState => ({
   timeout2: false,
   menuOpen: false,
   matchSubmitted: false,
+  showFinishDialog: false,
+  gameHistory: [],
 })
 
 const [gamePlayState, setGamePlayState] =
@@ -111,13 +121,22 @@ const restoreGameProgress = (match: Match) => {
 
   const score1 = currentGame?.score1 ?? 0
   const score2 = currentGame?.score2 ?? 0
-  const servingSide = calculateServingSide(
-    score1,
-    score2,
+  const gameFirstServeSide = getGameFirstServeSide(
     match.initialServingSide as 1 | 2,
+    currentGameIndex,
   )
+  const servingSide = calculateServingSide(score1, score2, gameFirstServeSide)
 
   const matchSubmitted = match.winningSide != null
+
+  // Restore game history from completed games
+  const gameHistory: GameResult[] = match.games
+    .filter((g) => g.winningSide)
+    .map((g) => ({
+      score1: g.score1,
+      score2: g.score2,
+      winningSide: g.winningSide,
+    }))
 
   setGamePlayState({
     currentGameIndex,
@@ -127,6 +146,7 @@ const restoreGameProgress = (match: Match) => {
     gamesWon2,
     servingSide,
     matchSubmitted,
+    gameHistory,
   })
 }
 
@@ -141,19 +161,23 @@ const findCurrentGameIndex = (match: Match): number => {
   return match.games.length - 1
 }
 
+const getOpposingSide = (side: 1 | 2): 1 | 2 => (side === 1 ? 2 : 1)
+
+const getGameFirstServeSide = (
+  initialServingSide: 1 | 2,
+  gameIndex: number,
+): 1 | 2 =>
+  gameIndex % 2 === 0 ? initialServingSide : getOpposingSide(initialServingSide)
+
 const calculateServingSide = (
   score1: number,
   score2: number,
-  initialServingSide: 1 | 2,
+  gameFirstServeSide: 1 | 2,
 ): 1 | 2 => {
   const totalPoints = score1 + score2
   const serveBlocks = Math.floor(totalPoints / 2)
   const shouldSwitch = serveBlocks % 2 === 1
-  return shouldSwitch
-    ? initialServingSide === 1
-      ? 2
-      : 1
-    : initialServingSide
+  return shouldSwitch ? getOpposingSide(gameFirstServeSide) : gameFirstServeSide
 }
 
 const parseBestOfOption = (bestOf: BestOfOption | undefined): number => {
@@ -272,7 +296,10 @@ export const gamePlayActions = {
 
   resetCurrentGame: () => {
     cancelPendingSave()
-    const newServingSide = gamePlayState.initialServingSide
+    const newServingSide = getGameFirstServeSide(
+      gamePlayState.initialServingSide,
+      gamePlayState.currentGameIndex,
+    )
 
     setGamePlayState({
       score1: 0,
@@ -314,6 +341,7 @@ export const gamePlayActions = {
       timeout1: false,
       timeout2: false,
       matchSubmitted: false,
+      gameHistory: [],
     })
   },
 
@@ -331,10 +359,14 @@ export const gamePlayActions = {
       return // Don't update if score is invalid
     }
 
+    const gameFirstServeSide = getGameFirstServeSide(
+      gamePlayState.initialServingSide,
+      gamePlayState.currentGameIndex,
+    )
     const newServingSide = calculateServingSide(
       newScore1,
       newScore2,
-      gamePlayState.initialServingSide,
+      gameFirstServeSide,
     )
 
     setGamePlayState({
@@ -349,10 +381,14 @@ export const gamePlayActions = {
   deductPointFromSide: (side: 1 | 2) => {
     const newScore1 = side === 1 ? Math.max(0, gamePlayState.score1 - 1) : gamePlayState.score1
     const newScore2 = side === 2 ? Math.max(0, gamePlayState.score2 - 1) : gamePlayState.score2
+    const gameFirstServeSide = getGameFirstServeSide(
+      gamePlayState.initialServingSide,
+      gamePlayState.currentGameIndex,
+    )
     const newServingSide = calculateServingSide(
       newScore1,
       newScore2,
-      gamePlayState.initialServingSide,
+      gameFirstServeSide,
     )
 
     setGamePlayState({
@@ -461,6 +497,7 @@ export const gamePlayActions = {
   },
 
   nextGame: () => {
+    cancelPendingSave()
     const numberOfGames = gamePlayActions.getNumberOfGames()
     const nextIndex = gamePlayState.currentGameIndex + 1
     if (nextIndex >= numberOfGames) return
@@ -469,23 +506,98 @@ export const gamePlayActions = {
     const newGamesWon1 = gamePlayState.gamesWon1 + (winningSide === 1 ? 1 : 0)
     const newGamesWon2 = gamePlayState.gamesWon2 + (winningSide === 2 ? 1 : 0)
 
+    // Record current game in history
+    const newGameHistory = [
+      ...gamePlayState.gameHistory,
+      {
+        score1: gamePlayState.score1,
+        score2: gamePlayState.score2,
+        winningSide,
+      },
+    ]
+
+    // Save the current game score before moving to next game
+    gamePlayActions.saveGame()
+
+    // Alternate first serve side after each game
+    const nextGameFirstServeSide = getGameFirstServeSide(
+      gamePlayState.initialServingSide,
+      nextIndex,
+    )
+
     setGamePlayState({
       currentGameIndex: nextIndex,
       score1: 0,
       score2: 0,
       gamesWon1: newGamesWon1,
       gamesWon2: newGamesWon2,
-      servingSide: gamePlayState.initialServingSide,
+      servingSide: nextGameFirstServeSide,
       timeout1: false,
       timeout2: false,
+      gameHistory: newGameHistory,
     })
   },
 
   finishMatch: () => {
-    // Save the final game score immediately, then could navigate away
+    // Show the confirm dialog with match result preview (do not save to db yet)
+    setGamePlayState({ showFinishDialog: true })
+  },
+
+  cancelFinishMatch: () => {
+    setGamePlayState({ showFinishDialog: false })
+  },
+
+  getFinishMatchPreview: (): {
+    gamesWon1: number
+    gamesWon2: number
+    games: GameResult[]
+  } => {
+    const winningSide = gamePlayActions.getGameWinningSide()
+    const currentGameResult: GameResult = {
+      score1: gamePlayState.score1,
+      score2: gamePlayState.score2,
+      winningSide,
+    }
+    const allGames = [...gamePlayState.gameHistory, currentGameResult]
+    const gamesWon1 =
+      gamePlayState.gamesWon1 + (winningSide === 1 ? 1 : 0)
+    const gamesWon2 =
+      gamePlayState.gamesWon2 + (winningSide === 2 ? 1 : 0)
+
+    return { gamesWon1, gamesWon2, games: allGames }
+  },
+
+  confirmFinishMatch: async () => {
+    // Now actually save and navigate
     cancelPendingSave()
-    gamePlayActions.saveGame()
-    setGamePlayState({ matchSubmitted: true })
+    await gamePlayActions.saveGame()
+
+    const preview = gamePlayActions.getFinishMatchPreview()
+
+    // Call finishMatch API with the full result
+    if (gamePlayState.eventId && gamePlayState.matchId) {
+      try {
+        await apiPost('finishMatch', {
+          _id: gamePlayState.eventId,
+          matchId: gamePlayState.matchId,
+          result: preview.games.map((g) => ({
+            score1: g.score1,
+            score2: g.score2,
+          })),
+        })
+      } catch {
+        // Silently fail
+      }
+    }
+
+    setGamePlayState({
+      matchSubmitted: true,
+      showFinishDialog: false,
+      score1: 0,
+      score2: 0,
+      gamesWon1: preview.gamesWon1,
+      gamesWon2: preview.gamesWon2,
+    })
   },
 
   saveGame: async () => {
