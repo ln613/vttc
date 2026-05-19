@@ -11,9 +11,13 @@ import Button from '../components/Button'
 const GamePlay = () => {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  let containerRef: HTMLDivElement | undefined
 
   onMount(() => {
     gamePlayActions.initializeFromUrl(searchParams)
+    if (containerRef) {
+      preventDoubleTapZoom(containerRef)
+    }
   })
 
   onCleanup(() => {
@@ -26,7 +30,7 @@ const GamePlay = () => {
   }
 
   return (
-    <div style={containerStyle}>
+    <div ref={containerRef} style={containerStyle}>
       <div style={contentStyle}>
         <Header onExit={handleExit} />
         <ScoreBoxes />
@@ -36,6 +40,30 @@ const GamePlay = () => {
       </Show>
     </div>
   )
+}
+
+const preventDoubleTapZoom = (element: HTMLElement) => {
+  let lastTouchEnd = 0
+
+  const handleTouchEnd = (e: TouchEvent) => {
+    const now = Date.now()
+    if (now - lastTouchEnd <= 300) {
+      e.preventDefault()
+    }
+    lastTouchEnd = now
+  }
+
+  const handleDblClick = (e: Event) => {
+    e.preventDefault()
+  }
+
+  element.addEventListener('touchend', handleTouchEnd, { passive: false })
+  element.addEventListener('dblclick', handleDblClick)
+
+  onCleanup(() => {
+    element.removeEventListener('touchend', handleTouchEnd)
+    element.removeEventListener('dblclick', handleDblClick)
+  })
 }
 
 const createIsWideScreen = () => {
@@ -416,11 +444,13 @@ const InitDialog = () => {
 
 // Styles
 const containerStyle: JSX.CSSProperties = {
-  'min-height': '100vh',
+  height: '100dvh',
   'background-color': '#1a1a2e',
   display: 'flex',
   'flex-direction': 'column',
   'user-select': 'none',
+  'touch-action': 'manipulation',
+  overflow: 'hidden',
 }
 
 const contentStyle: JSX.CSSProperties = {
@@ -428,6 +458,7 @@ const contentStyle: JSX.CSSProperties = {
   display: 'flex',
   'flex-direction': 'column',
   padding: '16px',
+  'min-height': 0,
 }
 
 const wideHeaderStyle: JSX.CSSProperties = {
@@ -583,6 +614,7 @@ const scoreBoxWrapperStyle: JSX.CSSProperties = {
   'flex-direction': 'column',
   'align-items': 'stretch',
   'min-width': 0,
+  'min-height': 0,
 }
 
 const scoreAreaContainerStyle: JSX.CSSProperties = {
