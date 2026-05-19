@@ -308,7 +308,12 @@ export const compareParticipantsForRanking = (
     return p2.stats.matchesWon - p1.stats.matchesWon
   }
 
-  // 2. Head-to-head (for 2-way tie only - this is called separately for multi-way ties)
+  // 2. Number of matches lost (lower is better)
+  if (p1.stats.matchesLost !== p2.stats.matchesLost) {
+    return p1.stats.matchesLost - p2.stats.matchesLost
+  }
+
+  // 3. Head-to-head (for 2-way tie only - this is called separately for multi-way ties)
   const h2hWinner = getHeadToHeadWinner(p1.participant, p2.participant, matches)
   if (h2hWinner) {
     return isSameParticipant(h2hWinner, p1.participant) ? -1 : 1
@@ -376,6 +381,82 @@ export const recalculateStatsForSubset = (
 }
 
 /**
+ * Sub-group participants by matches lost (within a MW tie group)
+ */
+const subGroupByMatchesLost = (
+  participants: GroupParticipant[],
+): Map<number, GroupParticipant[]> => {
+  const byML = new Map<number, GroupParticipant[]>()
+  for (const p of participants) {
+    const ml = p.stats.matchesLost
+    if (!byML.has(ml)) {
+      byML.set(ml, [])
+    }
+    byML.get(ml)!.push(p)
+  }
+  return byML
+}
+
+/**
+ * Resolve a tied group using head-to-head (2-way) or subset stats (3+ way)
+ */
+const resolveTiedGroup = (
+  tied: GroupParticipant[],
+  matches: Match[],
+  ranked: GroupParticipant[],
+  startRank: number,
+): number => {
+  let currentRank = startRank
+
+  if (tied.length === 1) {
+    ranked.push({ ...tied[0], ranking: currentRank })
+    currentRank++
+  } else if (tied.length === 2) {
+    // 2-way tie: use head-to-head
+    const winner = getHeadToHeadWinner(
+      tied[0].participant,
+      tied[1].participant,
+      matches,
+    )
+
+    if (winner) {
+      const [first, second] = isSameParticipant(winner, tied[0].participant)
+        ? [tied[0], tied[1]]
+        : [tied[1], tied[0]]
+      ranked.push({ ...first, ranking: currentRank })
+      ranked.push({ ...second, ranking: currentRank + 1 })
+    } else {
+      // Tie remains, use stats
+      const sortedTie = [...tied].sort(compareByStatsOnly)
+      for (const p of sortedTie) {
+        ranked.push({ ...p, ranking: currentRank })
+        currentRank++
+      }
+      return currentRank
+    }
+    currentRank += 2
+  } else {
+    // 3+ way tie: use subset stats
+    const subsetMatches = getMatchesBetweenParticipants(tied, matches)
+    const recalculated = recalculateStatsForSubset(tied, subsetMatches)
+
+    // Sort by the tie-breaker rules
+    const sortedTie = [...recalculated].sort(compareByStatsOnly)
+
+    for (const p of sortedTie) {
+      // Find the original participant to preserve full stats
+      const original = tied.find((t) =>
+        isSameParticipant(t.participant, p.participant),
+      )!
+      ranked.push({ ...original, ranking: currentRank })
+      currentRank++
+    }
+  }
+
+  return currentRank
+}
+
+/**
  * Rank participants within a group
  */
 export const rankGroupParticipants = (
@@ -404,53 +485,20 @@ export const rankGroupParticipants = (
   const matchesWonValues = Array.from(byMatchesWon.keys()).sort((a, b) => b - a)
 
   for (const mw of matchesWonValues) {
-    const tied = byMatchesWon.get(mw)!
+    const mwGroup = byMatchesWon.get(mw)!
 
-    if (tied.length === 1) {
+    if (mwGroup.length === 1) {
       // No tie, assign rank directly
-      ranked.push({ ...tied[0], ranking: currentRank })
+      ranked.push({ ...mwGroup[0], ranking: currentRank })
       currentRank++
-    } else if (tied.length === 2) {
-      // 2-way tie: use head-to-head
-      const winner = getHeadToHeadWinner(
-        tied[0].participant,
-        tied[1].participant,
-        matches,
-      )
-
-      if (winner) {
-        const [first, second] = isSameParticipant(winner, tied[0].participant)
-          ? [tied[0], tied[1]]
-          : [tied[1], tied[0]]
-        ranked.push({ ...first, ranking: currentRank })
-        ranked.push({ ...second, ranking: currentRank + 1 })
-      } else {
-        // Tie remains, use stats
-        const sortedTie = [...tied].sort(compareByStatsOnly)
-        for (const p of sortedTie) {
-          ranked.push({ ...p, ranking: currentRank })
-          currentRank++
-        }
-        currentRank -= tied.length // Reset for next iteration
-        currentRank += tied.length
-        continue
-      }
-      currentRank += 2
     } else {
-      // 3+ way tie: use subset stats
-      const subsetMatches = getMatchesBetweenParticipants(tied, matches)
-      const recalculated = recalculateStatsForSubset(tied, subsetMatches)
+      // MW tied: sub-group by ML (lower ML is better)
+      const byML = subGroupByMatchesLost(mwGroup)
+      const mlValues = Array.from(byML.keys()).sort((a, b) => a - b)
 
-      // Sort by the tie-breaker rules
-      const sortedTie = [...recalculated].sort(compareByStatsOnly)
-
-      for (const p of sortedTie) {
-        // Find the original participant to preserve full stats
-        const original = tied.find((t) =>
-          isSameParticipant(t.participant, p.participant),
-        )!
-        ranked.push({ ...original, ranking: currentRank })
-        currentRank++
+      for (const ml of mlValues) {
+        const mlGroup = byML.get(ml)!
+        currentRank = resolveTiedGroup(mlGroup, matches, ranked, currentRank)
       }
     }
   }

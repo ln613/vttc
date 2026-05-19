@@ -56,6 +56,7 @@ The ranking of the teams/players in a group is determined based on the following
 
 1. Number of matches won (MW)
 2. When MW is tied
+  - Number of matches lost (ML, lower the better)
   - if tied between 2 teams/players, who wins the head-to-head match ranks higher
   - if 3-way (or more than 3) tie, then apply the following rules among the tied players:
     a. Number of total games won - Number of total games lost (Game Difference, GD)

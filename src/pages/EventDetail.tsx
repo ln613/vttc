@@ -549,6 +549,8 @@ const GroupTable = (props: GroupTableProps) => (
           <th style={thStyle}>ML</th>
           <th style={thStyle}>GW</th>
           <th style={thStyle}>GL</th>
+          <th style={thStyle}>PW</th>
+          <th style={thStyle}>PL</th>
         </tr>
       </thead>
       <tbody>
@@ -606,6 +608,8 @@ const GroupTableRow = (props: GroupTableRowProps) => {
       <td style={cellStyle()}>{stats().matchesLost}</td>
       <td style={cellStyle()}>{stats().gamesWon}</td>
       <td style={cellStyle()}>{stats().gamesLost}</td>
+      <td style={cellStyle()}>{stats().pointsWon}</td>
+      <td style={cellStyle()}>{stats().pointsLost}</td>
     </tr>
   )
 }
