@@ -1278,6 +1278,51 @@ const compareByStatsOnly = (p1, p2) => {
 }
 
 /**
+ * Reset a match in an event (clear all games)
+ */
+export const resetMatch = async (body) => {
+  validateResetMatchInput(body)
+
+  const { _id, matchId } = body
+
+  const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
+
+  const event = await collection.findOne({ _id: toObjectId(_id) })
+  if (!event) throwError('Event not found')
+
+  const updatedStages = updateMatchInStages(
+    event.eventStages,
+    matchId,
+    (match) => {
+      if (match.winningSide != null) {
+        throwError('Cannot reset a finished and submitted match')
+      }
+      return {
+        ...match,
+        games: [],
+        gamesWon1: 0,
+        gamesWon2: 0,
+        winningSide: undefined,
+      }
+    },
+  )
+
+  await collection.updateOne(
+    { _id: toObjectId(_id) },
+    { $set: { eventStages: updatedStages } },
+  )
+
+  return { success: true }
+}
+
+const validateResetMatchInput = (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body._id) throwError('Event ID is required')
+  if (!body.matchId) throwError('Match ID is required')
+}
+
+/**
  * Save match setup (initial serving side and left side)
  */
 export const saveMatchSetup = async (body) => {

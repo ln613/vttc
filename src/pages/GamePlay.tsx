@@ -1,5 +1,5 @@
 import { onMount, onCleanup, createSignal, Show, type JSX } from 'solid-js'
-import { useSearchParams } from '@solidjs/router'
+import { useSearchParams, useNavigate } from '@solidjs/router'
 import {
   gamePlayState,
   gamePlayActions,
@@ -10,6 +10,7 @@ import Button from '../components/Button'
 
 const GamePlay = () => {
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
 
   onMount(() => {
     gamePlayActions.initializeFromUrl(searchParams)
@@ -19,10 +20,15 @@ const GamePlay = () => {
     gamePlayActions.reset()
   })
 
+  const handleExit = () => {
+    gamePlayActions.closeMenu()
+    navigate(-1)
+  }
+
   return (
     <div style={containerStyle}>
       <div style={contentStyle}>
-        <Header />
+        <Header onExit={handleExit} />
         <ScoreBoxes />
       </div>
       <Show when={gamePlayState.showInitDialog && !gamePlayState.loading}>
@@ -47,24 +53,95 @@ const createIsWideScreen = () => {
   return isWide
 }
 
-const Header = () => {
+// Hamburger Menu Components
+
+const HamburgerIcon = () => (
+  <button style={hamburgerButtonStyle} onClick={() => gamePlayActions.toggleMenu()}>
+    <div style={hamburgerLineStyle} />
+    <div style={hamburgerLineStyle} />
+    <div style={hamburgerLineStyle} />
+  </button>
+)
+
+interface HamburgerMenuProps {
+  onExit: () => void
+}
+
+const HamburgerMenu = (props: HamburgerMenuProps) => {
+  const matchSubmitted = () => gamePlayState.matchSubmitted
+
+  const handleResetGame = () => {
+    if (confirm('Are you sure you want to reset the current game?')) {
+      gamePlayActions.resetCurrentGame()
+    } else {
+      gamePlayActions.closeMenu()
+    }
+  }
+
+  const handleResetMatch = () => {
+    if (matchSubmitted()) return
+    if (confirm('Are you sure you want to reset the whole match?')) {
+      gamePlayActions.resetWholeMatch()
+    } else {
+      gamePlayActions.closeMenu()
+    }
+  }
+
+  const handleExit = () => {
+    props.onExit()
+  }
+
+  return (
+    <>
+      <div style={menuOverlayStyle} onClick={() => gamePlayActions.closeMenu()} />
+      <div style={menuDropdownStyle}>
+        <button style={menuItemStyle} onClick={handleResetGame}>
+          Reset Game
+        </button>
+        <button
+          style={getMenuItemStyle(matchSubmitted())}
+          onClick={handleResetMatch}
+          disabled={matchSubmitted()}
+        >
+          Reset Match
+        </button>
+        <button style={menuItemStyle} onClick={handleExit}>
+          Exit
+        </button>
+      </div>
+    </>
+  )
+}
+
+interface HeaderProps {
+  onExit: () => void
+}
+
+const Header = (props: HeaderProps) => {
   const isWideScreen = createIsWideScreen()
   return (
-    <Show when={isWideScreen()} fallback={<NarrowHeader />}>
-      <WideHeader />
+    <Show when={isWideScreen()} fallback={<NarrowHeader onExit={props.onExit} />}>
+      <WideHeader onExit={props.onExit} />
     </Show>
   )
 }
 
-const WideHeader = () => {
+const WideHeader = (props: HeaderProps) => {
   const event = () => gamePlayState.data
   const stageName = () => gamePlayActions.getStageName()
   const currentGameIndex = () => gamePlayState.currentGameIndex
   const numberOfGames = () => gamePlayActions.getNumberOfGames()
+  const menuOpen = () => gamePlayState.menuOpen
 
   return (
     <Show when={event()}>
       <div style={wideHeaderStyle}>
+        <div style={hamburgerContainerStyle}>
+          <HamburgerIcon />
+          <Show when={menuOpen()}>
+            <HamburgerMenu onExit={props.onExit} />
+          </Show>
+        </div>
         <div style={stageNameStyle}>{stageName()}</div>
         <div style={eventNameWideStyle}>{event()!.eventName}</div>
         <div style={gameInfoStyle}>
@@ -75,16 +152,25 @@ const WideHeader = () => {
   )
 }
 
-const NarrowHeader = () => {
+const NarrowHeader = (props: HeaderProps) => {
   const event = () => gamePlayState.data
   const stageName = () => gamePlayActions.getStageName()
   const currentGameIndex = () => gamePlayState.currentGameIndex
   const numberOfGames = () => gamePlayActions.getNumberOfGames()
+  const menuOpen = () => gamePlayState.menuOpen
 
   return (
     <Show when={event()}>
       <div style={narrowHeaderContainerStyle}>
-        <div style={eventNameNarrowStyle}>{event()!.eventName}</div>
+        <div style={narrowHeaderTopRowStyle}>
+          <div style={hamburgerContainerStyle}>
+            <HamburgerIcon />
+            <Show when={menuOpen()}>
+              <HamburgerMenu onExit={props.onExit} />
+            </Show>
+          </div>
+          <div style={eventNameNarrowStyle}>{event()!.eventName}</div>
+        </div>
         <div style={stageGameRowStyle}>
           <div style={stageNameStyle}>{stageName()}</div>
           <div style={gameInfoStyle}>
@@ -369,6 +455,12 @@ const narrowHeaderContainerStyle: JSX.CSSProperties = {
   'margin-bottom': '16px',
 }
 
+const narrowHeaderTopRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  'margin-bottom': '8px',
+}
+
 const eventNameNarrowStyle: JSX.CSSProperties = {
   'font-size': '20px',
   'font-weight': 700,
@@ -377,7 +469,7 @@ const eventNameNarrowStyle: JSX.CSSProperties = {
   overflow: 'hidden',
   'text-overflow': 'ellipsis',
   'white-space': 'nowrap',
-  'margin-bottom': '8px',
+  flex: 1,
 }
 
 const stageGameRowStyle: JSX.CSSProperties = {
@@ -399,6 +491,79 @@ const gameInfoStyle: JSX.CSSProperties = {
   color: '#fff',
   'text-align': 'right',
 }
+
+// Hamburger menu styles
+const hamburgerContainerStyle: JSX.CSSProperties = {
+  position: 'relative',
+  'margin-right': '12px',
+}
+
+const hamburgerButtonStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  'justify-content': 'center',
+  'align-items': 'center',
+  gap: '5px',
+  width: '36px',
+  height: '36px',
+  background: 'none',
+  border: 'none',
+  cursor: 'pointer',
+  padding: '4px',
+}
+
+const hamburgerLineStyle: JSX.CSSProperties = {
+  width: '24px',
+  height: '3px',
+  'background-color': '#fff',
+  'border-radius': '2px',
+}
+
+const menuOverlayStyle: JSX.CSSProperties = {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  'z-index': 99,
+}
+
+const menuDropdownStyle: JSX.CSSProperties = {
+  position: 'absolute',
+  top: '40px',
+  left: 0,
+  'background-color': '#2c2c4a',
+  'border-radius': '8px',
+  'min-width': '180px',
+  'box-shadow': '0 4px 16px rgba(0, 0, 0, 0.4)',
+  'z-index': 100,
+  overflow: 'hidden',
+}
+
+const menuItemStyle: JSX.CSSProperties = {
+  display: 'block',
+  width: '100%',
+  padding: '14px 20px',
+  background: 'none',
+  border: 'none',
+  color: '#fff',
+  'font-size': '16px',
+  'text-align': 'left',
+  cursor: 'pointer',
+}
+
+const getMenuItemStyle = (disabled: boolean): JSX.CSSProperties => ({
+  display: 'block',
+  width: '100%',
+  padding: '14px 20px',
+  background: 'none',
+  border: 'none',
+  color: disabled ? '#666' : '#fff',
+  'font-size': '16px',
+  'text-align': 'left',
+  cursor: disabled ? 'default' : 'pointer',
+  opacity: disabled ? 0.5 : 1,
+})
 
 const scoreBoxesOuterStyle: JSX.CSSProperties = {
   display: 'flex',

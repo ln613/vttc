@@ -31,6 +31,8 @@ interface GamePlayState {
   saveError: string | null
   timeout1: boolean
   timeout2: boolean
+  menuOpen: boolean
+  matchSubmitted: boolean
 }
 
 const getInitialState = (): GamePlayState => ({
@@ -54,6 +56,8 @@ const getInitialState = (): GamePlayState => ({
   saveError: null,
   timeout1: false,
   timeout2: false,
+  menuOpen: false,
+  matchSubmitted: false,
 })
 
 const [gamePlayState, setGamePlayState] =
@@ -113,6 +117,8 @@ const restoreGameProgress = (match: Match) => {
     match.initialServingSide as 1 | 2,
   )
 
+  const matchSubmitted = match.winningSide != null
+
   setGamePlayState({
     currentGameIndex,
     score1,
@@ -120,6 +126,7 @@ const restoreGameProgress = (match: Match) => {
     gamesWon1,
     gamesWon2,
     servingSide,
+    matchSubmitted,
   })
 }
 
@@ -185,6 +192,13 @@ const debouncedSaveGame = () => {
   }, SAVE_DEBOUNCE_MS)
 }
 
+const cancelPendingSave = () => {
+  if (saveDebounceTimer) {
+    clearTimeout(saveDebounceTimer)
+    saveDebounceTimer = null
+  }
+}
+
 type SearchParamValue = string | string[] | undefined
 type SearchParams = Partial<Record<string, SearchParamValue>>
 
@@ -217,6 +231,8 @@ export const gamePlayActions = {
       showInitDialog: true,
       isSaving: false,
       saveError: null,
+      menuOpen: false,
+      matchSubmitted: false,
     })
 
     await fetchEvent(eventId!)
@@ -244,6 +260,61 @@ export const gamePlayActions = {
   confirmInitDialog: () => {
     setGamePlayState({ showInitDialog: false })
     saveMatchSetup()
+  },
+
+  toggleMenu: () => {
+    setGamePlayState({ menuOpen: !gamePlayState.menuOpen })
+  },
+
+  closeMenu: () => {
+    setGamePlayState({ menuOpen: false })
+  },
+
+  resetCurrentGame: () => {
+    cancelPendingSave()
+    const newServingSide = gamePlayState.initialServingSide
+
+    setGamePlayState({
+      score1: 0,
+      score2: 0,
+      servingSide: newServingSide,
+      timeout1: false,
+      timeout2: false,
+      menuOpen: false,
+    })
+
+    debouncedSaveGame()
+  },
+
+  resetWholeMatch: async () => {
+    if (gamePlayState.matchSubmitted) return
+    cancelPendingSave()
+
+    setGamePlayState({ menuOpen: false })
+
+    // Call API to reset match in DB
+    if (gamePlayState.eventId && gamePlayState.matchId) {
+      try {
+        await apiPost('resetMatch', {
+          _id: gamePlayState.eventId,
+          matchId: gamePlayState.matchId,
+        })
+      } catch {
+        // Silently fail
+      }
+    }
+
+    setGamePlayState({
+      currentGameIndex: 0,
+      score1: 0,
+      score2: 0,
+      gamesWon1: 0,
+      gamesWon2: 0,
+      servingSide: gamePlayState.initialServingSide,
+      timeout1: false,
+      timeout2: false,
+      matchSubmitted: false,
+    })
   },
 
   addPointToSide: (side: 1 | 2) => {
@@ -412,11 +483,9 @@ export const gamePlayActions = {
 
   finishMatch: () => {
     // Save the final game score immediately, then could navigate away
-    if (saveDebounceTimer) {
-      clearTimeout(saveDebounceTimer)
-      saveDebounceTimer = null
-    }
+    cancelPendingSave()
     gamePlayActions.saveGame()
+    setGamePlayState({ matchSubmitted: true })
   },
 
   saveGame: async () => {
@@ -444,10 +513,7 @@ export const gamePlayActions = {
   },
 
   reset: () => {
-    if (saveDebounceTimer) {
-      clearTimeout(saveDebounceTimer)
-      saveDebounceTimer = null
-    }
+    cancelPendingSave()
     setGamePlayState(getInitialState())
   },
 }

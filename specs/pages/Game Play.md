@@ -3,6 +3,15 @@
 ## Layout
 
 - header
+  - hamburger icon, show/hide the following menu:
+    - Reset Game
+      - reset the current game
+      - show confirm window, "Are you sure you want to reset the current game?"
+    - Reset Match
+      - reset the whole match
+      - show confirm window, "Are you sure you want to reset the whole match?"
+      - if match is finished and submitted, the Reset Match menu will be disabled
+    - Exit: go back to the previous page
   - if screen width > 640px:
     - stage name, event name, game info
   - otherwise:
