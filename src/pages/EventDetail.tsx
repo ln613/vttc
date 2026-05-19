@@ -569,7 +569,7 @@ interface GroupTableRowProps {
 
 const GroupTableRow = (props: GroupTableRowProps) => {
   const stats = () => props.participant.stats
-  const total = () => stats().matchesPlayed
+  const total = () => stats().matchesWon + stats().matchesLost
   const winPercentage = () =>
     total() > 0 ? ((stats().matchesWon / total()) * 100).toFixed(1) : '0.0'
   const playerDisplay = () => getPlayerDisplay(props.participant)
