@@ -1,4 +1,5 @@
 import { Show, onMount, onCleanup, type JSX } from 'solid-js'
+import { useParams, useNavigate } from '@solidjs/router'
 import { Header } from '../components/Header'
 import Input from '../components/Input'
 import Select from '../components/Select'
@@ -94,9 +95,16 @@ const buttonContainerStyle: JSX.CSSProperties = {
 }
 
 const EventEdit = (props: EventEditProps) => {
-  onMount(() => {
-    tournamentActions.fetchTournaments()
-    eventEditActions.initForm(props.initialData)
+  const params = useParams<{ id?: string }>()
+  const navigate = useNavigate()
+
+  onMount(async () => {
+    await tournamentActions.fetchTournaments()
+    if (props.isEdit && params.id) {
+      await eventEditActions.loadEvent(params.id)
+    } else {
+      eventEditActions.initForm(props.initialData)
+    }
   })
 
   onCleanup(() => {
@@ -147,12 +155,12 @@ const EventEdit = (props: EventEditProps) => {
         <QualifiersSection />
         <HandicapSection />
         <div style={buttonContainerStyle}>
-          <Button color="#e74c3c" onClick={props.onCancel}>
+          <Button color="#e74c3c" onClick={() => (props.onCancel ? props.onCancel() : navigate(-1))}>
             Cancel
           </Button>
           <Button
             color="#27ae60"
-            onClick={() => eventEditActions.saveEvent(props.onSave)}
+            onClick={() => eventEditActions.saveEvent(props.onSave || (() => navigate(-1)))}
           >
             Save
           </Button>

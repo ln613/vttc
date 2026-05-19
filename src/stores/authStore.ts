@@ -11,12 +11,14 @@ interface AuthUser {
 
 interface SignInResponse {
   token: string
+  isAdmin: boolean
   player: AuthUser
 }
 
 interface AuthState {
   user: AuthUser | null
   token: string | null
+  isAdmin: boolean
   loading: boolean
   error: string | null
   showSignInDialog: boolean
@@ -25,6 +27,7 @@ interface AuthState {
 const getInitialState = (): AuthState => ({
   user: loadUserFromStorage(),
   token: loadTokenFromStorage(),
+  isAdmin: loadIsAdminFromStorage(),
   loading: false,
   error: null,
   showSignInDialog: false,
@@ -47,14 +50,24 @@ const loadTokenFromStorage = (): string | null => {
   }
 }
 
-const saveToStorage = (token: string, user: AuthUser) => {
+const loadIsAdminFromStorage = (): boolean => {
+  try {
+    return localStorage.getItem('vttc_isAdmin') === 'true'
+  } catch {
+    return false
+  }
+}
+
+const saveToStorage = (token: string, user: AuthUser, isAdmin: boolean) => {
   localStorage.setItem('vttc_token', token)
   localStorage.setItem('vttc_user', JSON.stringify(user))
+  localStorage.setItem('vttc_isAdmin', String(isAdmin))
 }
 
 const clearStorage = () => {
   localStorage.removeItem('vttc_token')
   localStorage.removeItem('vttc_user')
+  localStorage.removeItem('vttc_isAdmin')
 }
 
 const [authState, setAuthState] = createStore<AuthState>(getInitialState())
@@ -79,10 +92,11 @@ export const authActions = {
         emailOrPhone,
         password,
       })
-      saveToStorage(result.token, result.player)
+      saveToStorage(result.token, result.player, result.isAdmin)
       setAuthState({
         user: result.player,
         token: result.token,
+        isAdmin: result.isAdmin,
         loading: false,
         error: null,
         showSignInDialog: false,
@@ -100,6 +114,7 @@ export const authActions = {
     setAuthState({
       user: null,
       token: null,
+      isAdmin: false,
       showSignInDialog: false,
       error: null,
     })

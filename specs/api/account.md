@@ -9,12 +9,14 @@
 
 ### Prerequisite
 
-- valid email address
-- email/phone exist in db (players table, matching email or phone)
+- email/phone is either
+  - admin username, or
+  - email/phone exist in db (players table, matching email or phone)
 
 ### Action
 
-- find the account with that email/phone
+- if admin, check admin password
+- otherwise, find the account with that email/phone
 - if password matchs
   - generate token
 - otherwise, error
@@ -22,4 +24,3 @@
 ### Output
 
 return the token or error message
-

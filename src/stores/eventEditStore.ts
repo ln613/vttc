@@ -1,6 +1,6 @@
 import { createStore } from 'solid-js/store'
-import type { BestOfOption, QualifiersCount } from '../../shared/types'
-import { apiPost } from '../utils/api'
+import type { BestOfOption, QualifiersCount, Event } from '../../shared/types'
+import { apiGet, apiPost } from '../utils/api'
 import { tournamentActions, type Tournament } from './tournamentStore'
 
 export interface EventEditFormData {
@@ -51,6 +51,23 @@ const [eventEditState, setEventEditState] =
 
 export { eventEditState }
 
+const mapEventToFormData = (event: Event): EventEditFormData => ({
+  _id: event._id,
+  tournamentId: event.tournamentId,
+  date: event.date ? new Date(event.date) : null,
+  maxParticipants:
+    event.maxParticipants === 0 ? 'Unlimited' : String(event.maxParticipants),
+  name: event.eventName || '',
+  groupGames: event.groupGames || 'Best of 3',
+  knockoutGames: event.knockoutGames || 'Best of 3 before Semifinal',
+  groupMatches: event.groupMatches || 'Best of 3',
+  knockoutMatches: event.knockoutMatches || 'Best of 3 before Semifinal',
+  qualifiers: event.qualifiers || 'Top 2',
+  handicapEnabled: event.handicapEnabled || false,
+  handicapDifference: String(event.handicapDifference || 200),
+  handicapMaxPoints: String(event.handicapMaxPoints || 5),
+})
+
 export const eventEditActions = {
   initForm: (initialData?: Partial<EventEditFormData>) => {
     setEventEditState({
@@ -58,6 +75,19 @@ export const eventEditActions = {
       saving: false,
       error: null,
     })
+  },
+
+  loadEvent: async (eventId: string) => {
+    setEventEditState({ saving: false, error: null })
+    try {
+      const event = await apiGet<Event>('event', { _id: eventId })
+      const formData = mapEventToFormData(event)
+      setEventEditState({ formData })
+    } catch (err) {
+      setEventEditState({
+        error: err instanceof Error ? err.message : 'Failed to load event',
+      })
+    }
   },
 
   setField: <K extends keyof EventEditFormData>(
