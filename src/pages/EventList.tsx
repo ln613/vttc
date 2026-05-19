@@ -12,9 +12,7 @@ const EventList = () => {
   const navigate = useNavigate()
 
   onMount(() => {
-    if (!eventState.data) {
-      eventListActions.fetchEvents()
-    }
+    eventListActions.fetchEvents()
   })
 
   return (
@@ -80,28 +78,32 @@ const EventListItem = (props: EventListItemProps) => {
     navigate(`/event/${props.event._id}`)
   }
 
-  const formattedDate = () => formatEventDate(props.event.date)
-
   return (
     <div style={itemStyle} onClick={handleClick}>
-      <div style={itemNameStyle}>{props.event.eventName}</div>
-      <div style={itemRightStyle}>
-        <div style={itemDateStyle}>{formattedDate()}</div>
-        <Show when={authState.isAdmin}>
-          <div
-            style={editIconStyle}
-            onClick={(e) => handleEditClick(e, props.event._id, navigate)}
-          >
-            <EditIcon />
-          </div>
-        </Show>
+      <div style={itemContentStyle}>
+        <div style={itemNameStyle}>{props.event.eventName}</div>
+        <div style={itemDateTimeStyle}>{formatDateTime(props.event.date, props.event.time)}</div>
       </div>
+      <Show when={authState.isAdmin}>
+        <div
+          style={editIconStyle}
+          onClick={(e) => handleEditClick(e, props.event._id, navigate)}
+        >
+          <EditIcon />
+        </div>
+      </Show>
     </div>
   )
 }
 
-const formatEventDate = (date: string): string => {
+const formatDateTime = (date: string, time?: string): string => {
   if (!date) return ''
+  const datePart = formatDate(date)
+  const timePart = time || ''
+  return timePart ? `${datePart}  ${timePart}` : datePart
+}
+
+const formatDate = (date: string): string => {
   const d = new Date(date)
   return d.toLocaleDateString('en-US', {
     weekday: 'short',
@@ -120,7 +122,7 @@ const containerStyle: JSX.CSSProperties = {
 const contentStyle: JSX.CSSProperties = {
   'max-width': '1200px',
   margin: '0 auto',
-  padding: '20px',
+  padding: '16px 20px 20px',
 }
 
 const pageHeaderStyle: JSX.CSSProperties = {
@@ -146,7 +148,6 @@ const listStyle: JSX.CSSProperties = {
 
 const itemStyle: JSX.CSSProperties = {
   display: 'flex',
-  'justify-content': 'space-between',
   'align-items': 'center',
   padding: '16px 20px',
   'background-color': '#fff',
@@ -157,21 +158,22 @@ const itemStyle: JSX.CSSProperties = {
   border: '1px solid #e8e8e8',
 }
 
+const itemContentStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  flex: '1',
+}
+
 const itemNameStyle: JSX.CSSProperties = {
   'font-size': '16px',
   'font-weight': 600,
   color: '#2c3e50',
 }
 
-const itemRightStyle: JSX.CSSProperties = {
-  display: 'flex',
-  'align-items': 'center',
-  gap: '12px',
-}
-
-const itemDateStyle: JSX.CSSProperties = {
+const itemDateTimeStyle: JSX.CSSProperties = {
   'font-size': '14px',
-  color: '#888',
+  color: '#555',
+  'margin-top': '4px',
 }
 
 const editIconStyle: JSX.CSSProperties = {

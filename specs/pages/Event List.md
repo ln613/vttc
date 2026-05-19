@@ -8,7 +8,10 @@ Vertical
 - page header row
   - title "Event List" (h1, align left)
   - for admin, "New Event" button, green bg
-- the list of events, sorted by date/time desc
+- the list of events
+  - name on top
+  - date and time on bottom (1 row)
+  - sorted by date/time desc
   - for admin, show edit icon (align right, blue), which goes to Event Edit page for that event
 
 ### interaction

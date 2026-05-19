@@ -106,11 +106,8 @@ export const eventEditActions = {
   ) => {
     const newFormData = { ...eventEditState.formData, [field]: value }
 
-    if (field === 'tournamentId' || field === 'date') {
-      const updatedName = generateEventName(
-        newFormData.tournamentId,
-        newFormData.date,
-      )
+    if (field === 'tournamentId') {
+      const updatedName = generateEventName(newFormData.tournamentId)
       if (updatedName) {
         newFormData.name = updatedName
       }
@@ -157,15 +154,11 @@ export const eventEditActions = {
 const validateForm = (formData: EventEditFormData): boolean =>
   !!formData.tournamentId && !!formData.date && !!formData.name.trim()
 
-const generateEventName = (
-  tournamentId: string,
-  date: Date | null,
-): string | null => {
-  if (!tournamentId || !date) return null
+const generateEventName = (tournamentId: string): string | null => {
+  if (!tournamentId) return null
   const tournament = tournamentActions.getTournamentById(tournamentId)
   if (!tournament) return null
-  const dateStr = date.toISOString().split('T')[0]
-  return `${tournament.name} - ${dateStr}`
+  return tournament.name
 }
 
 const buildSavePayload = (formData: EventEditFormData) => ({

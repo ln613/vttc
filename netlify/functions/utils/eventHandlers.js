@@ -62,7 +62,7 @@ export const saveEvent = async (body) => {
   }
 
   // Generate default event name
-  const eventName = name || `${tournament.name} - ${date}`
+  const eventName = name || tournament.name
 
   // Validation
   if (!isEdit) {

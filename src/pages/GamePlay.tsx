@@ -457,7 +457,7 @@ const contentStyle: JSX.CSSProperties = {
   flex: 1,
   display: 'flex',
   'flex-direction': 'column',
-  padding: '16px',
+  padding: '8px 16px 16px',
   'min-height': 0,
 }
 

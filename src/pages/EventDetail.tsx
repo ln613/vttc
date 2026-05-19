@@ -62,17 +62,21 @@ const EventDetail = () => {
 
 const EventHeader = () => {
   const eventName = () => eventDetailState.data?.eventName || ''
-  const dateTimeDisplay = () => formatDateTime(eventDetailState.data?.date)
+  const dateDisplay = () => formatDate(eventDetailState.data?.date)
+  const timeDisplay = () => eventDetailState.data?.time || ''
 
   return (
     <Show when={eventDetailState.data}>
       <h1 style={eventNameStyle}>{eventName()}</h1>
-      <h3 style={dateTimeStyle}>{dateTimeDisplay()}</h3>
+      <div style={dateStyle}>{dateDisplay()}</div>
+      <Show when={timeDisplay()}>
+        <div style={timeStyle}>{timeDisplay()}</div>
+      </Show>
     </Show>
   )
 }
 
-const formatDateTime = (date?: string): string => {
+const formatDate = (date?: string): string => {
   if (!date) return ''
   const d = new Date(date)
   return d.toLocaleDateString('en-US', {
@@ -585,7 +589,7 @@ const containerStyle: JSX.CSSProperties = {
 const contentStyle: JSX.CSSProperties = {
   'max-width': '1200px',
   margin: '0 auto',
-  padding: '20px',
+  padding: '16px 20px 20px',
 }
 
 const eventNameStyle: JSX.CSSProperties = {
@@ -593,14 +597,23 @@ const eventNameStyle: JSX.CSSProperties = {
   'font-size': '28px',
   'font-weight': 700,
   color: '#333',
+  'margin-top': '0',
   'margin-bottom': '4px',
 }
 
-const dateTimeStyle: JSX.CSSProperties = {
+const dateStyle: JSX.CSSProperties = {
   'text-align': 'left',
   'font-size': '18px',
   'font-weight': 400,
-  color: '#666',
+  color: '#555',
+  'margin-bottom': '2px',
+}
+
+const timeStyle: JSX.CSSProperties = {
+  'text-align': 'left',
+  'font-size': '16px',
+  'font-weight': 400,
+  color: '#555',
   'margin-bottom': '20px',
 }
 

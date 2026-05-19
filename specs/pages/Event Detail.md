@@ -6,7 +6,8 @@ Vertical
 
 - shared header
 - Event name (h1, align left)
-- Date - Time (h3, align left)
+- Date
+- Time
 - stage tabs (Group, Knockout...)
 
 ## Group Stage Tab

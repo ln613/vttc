@@ -23,13 +23,14 @@ const containerStyle: JSX.CSSProperties = {
 }
 
 const contentStyle: JSX.CSSProperties = {
-  padding: '24px',
+  padding: '16px 24px 24px',
 }
 
 const titleStyle: JSX.CSSProperties = {
   'font-size': '2rem',
   'font-weight': 700,
   'text-align': 'left',
+  'margin-top': '0',
   'margin-bottom': '24px',
   color: '#333',
 }

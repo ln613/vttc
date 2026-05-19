@@ -224,7 +224,7 @@ export interface Event extends Tournament {
   date: string
   time: string // e.g. "8:00 AM", "8:30 AM", ... "6:00 PM"
   maxParticipants: number // 0 = unlimited
-  eventName: string // Default: {tournament name} - {date}
+  eventName: string // Default: tournament name
   groupGames: BestOfOption // Number of games per match in group stage
   knockoutGames: BestOfOption // Number of games per match in knockout stage
   groupMatches?: BestOfOption // Number of matches per team match in group (Team only)
