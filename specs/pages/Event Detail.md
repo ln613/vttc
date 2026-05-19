@@ -1,14 +1,13 @@
-# Event Manage Page
+# Event Detail Page
 
 ## Layout
 
 Vertical
 
 - shared header
-- title "Manage Event" (h1, align left)
-- Event: dropdown (all events)
-- (display after selecting an event):
-  - stage tabs (Group, Knockout...)
+- Event name (h1, align left)
+- Date - Time (h3, align left)
+- stage tabs (Group, Knockout...)
 
 ## Group Stage Tab
 

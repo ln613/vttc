@@ -17,6 +17,7 @@ import {
   saveMatchSetup,
   resetMatch,
 } from './eventHandlers.js'
+import { signIn } from './accountHandlers.js'
 
 export const apiHandlers = {
   get: {
@@ -37,5 +38,6 @@ export const apiHandlers = {
     updateGame: (body) => updateGame(body),
     saveMatchSetup: (body) => saveMatchSetup(body),
     resetMatch: (body) => resetMatch(body),
+    signIn: (body) => signIn(body),
   },
 }

@@ -1,75 +1,72 @@
 import { Show, For, onMount, onCleanup, createSignal, type JSX } from 'solid-js'
-import { useNavigate } from '@solidjs/router'
+import { useNavigate, useParams } from '@solidjs/router'
 import { Header } from '../components/Header'
-import Select from '../components/Select'
 import Button from '../components/Button'
-import { eventManageState, eventManageActions } from '../stores/eventManageStore'
-import { eventState, eventActions } from '../stores/eventStore'
+import { eventDetailState, eventDetailActions } from '../stores/eventDetailStore'
 import type { Group, GroupParticipant } from '../../shared/types/Tournament'
 import type { Player } from '../../shared/types/Player'
 import type { Match, Game } from '../../shared/types/Match'
 
-const EventManage = () => {
+const EventDetail = () => {
+  const params = useParams()
+
   onMount(() => {
-    if (!eventState.data) {
-      eventActions.fetchEvents()
+    if (params.id) {
+      eventDetailActions.loadEvent(params.id)
     }
   })
 
   onCleanup(() => {
-    eventManageActions.reset()
+    eventDetailActions.reset()
   })
 
   return (
     <div style={containerStyle}>
       <Header />
       <div style={contentStyle}>
-        <h1 style={titleStyle}>Manage Event</h1>
-        <EventSelector />
+        <EventHeader />
         <EventContent />
       </div>
     </div>
   )
 }
 
-const EventSelector = () => {
-  const options = () =>
-    eventState.data?.map((e) => ({
-      value: e._id,
-      label: e.eventName,
-    })) || []
-
-  const handleEventChange = (eventId: string) => {
-    eventManageActions.selectEvent(eventId || null)
-  }
+const EventHeader = () => {
+  const eventName = () => eventDetailState.data?.eventName || ''
+  const dateTimeDisplay = () => formatDateTime(eventDetailState.data?.date)
 
   return (
-    <Select
-      label="Event"
-      name="event"
-      value={eventManageState.selectedEventId || ''}
-      onChange={handleEventChange}
-      options={options()}
-      placeholder="-- Select an event --"
-    />
+    <Show when={eventDetailState.data}>
+      <h1 style={eventNameStyle}>{eventName()}</h1>
+      <h3 style={dateTimeStyle}>{dateTimeDisplay()}</h3>
+    </Show>
   )
 }
 
+const formatDateTime = (date?: string): string => {
+  if (!date) return ''
+  const d = new Date(date)
+  return d.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+}
+
 const EventContent = () => (
-  <Show when={eventManageState.selectedEventId}>
-    <Show when={!eventManageState.loading} fallback={<div>Loading...</div>}>
-      <Show when={eventManageState.data}>
-        <div style={eventContentStyle}>
-          <StageTabs />
-          <StageContent />
-        </div>
-      </Show>
+  <Show when={!eventDetailState.loading} fallback={<div>Loading...</div>}>
+    <Show when={eventDetailState.data}>
+      <div style={eventContentStyle}>
+        <StageTabs />
+        <StageContent />
+      </div>
     </Show>
   </Show>
 )
 
 const StageTabs = () => {
-  const event = () => eventManageState.data
+  const event = () => eventDetailState.data
 
   return (
     <Show when={event()}>
@@ -86,8 +83,8 @@ const StageTabs = () => {
               {(tab) => (
                 <TabButton
                   label={tab.label}
-                  isActive={eventManageState.activeStageTab === tab.key}
-                  onClick={() => eventManageActions.setActiveStageTab(tab.key)}
+                  isActive={eventDetailState.activeStageTab === tab.key}
+                  onClick={() => eventDetailActions.setActiveStageTab(tab.key)}
                 />
               )}
             </For>
@@ -128,7 +125,7 @@ const TabButton = (props: TabButtonProps) => {
 
 const StageContent = () => (
   <Show
-    when={eventManageState.activeStageTab === 'group'}
+    when={eventDetailState.activeStageTab === 'group'}
     fallback={<KnockoutStageContent />}
   >
     <GroupStageContent />
@@ -136,8 +133,8 @@ const StageContent = () => (
 )
 
 const GroupStageContent = () => {
-  const hasGroups = () => eventManageActions.hasGroups()
-  const groupStage = () => eventManageActions.getGroupStage()
+  const hasGroups = () => eventDetailActions.hasGroups()
+  const groupStage = () => eventDetailActions.getGroupStage()
 
   return (
     <Show when={hasGroups()} fallback={<GenerateGroupsSection />}>
@@ -152,16 +149,18 @@ const GroupStageContent = () => {
 
 const GenerateGroupsSection = () => {
   const handleGenerateGroups = () => {
-    eventManageActions.generateGroups()
+    eventDetailActions.generateGroups()
   }
 
   return (
     <div style={generateGroupsStyle}>
       <Button
         onClick={handleGenerateGroups}
-        disabled={eventManageState.generatingGroups}
+        disabled={eventDetailState.generatingGroups}
       >
-        {eventManageState.generatingGroups ? 'Generating...' : 'Generate Groups'}
+        {eventDetailState.generatingGroups
+          ? 'Generating...'
+          : 'Generate Groups'}
       </Button>
     </div>
   )
@@ -172,8 +171,9 @@ interface GroupDisplayProps {
 }
 
 const GroupDisplay = (props: GroupDisplayProps) => {
-  const playerColumnTitle = () => eventManageActions.getPlayerColumnTitle()
-  const rankedParticipants = () => getRankedParticipants(props.group.participants)
+  const playerColumnTitle = () => eventDetailActions.getPlayerColumnTitle()
+  const rankedParticipants = () =>
+    getRankedParticipants(props.group.participants)
 
   return (
     <div style={groupContainerStyle}>
@@ -182,7 +182,10 @@ const GroupDisplay = (props: GroupDisplayProps) => {
         participants={rankedParticipants()}
         playerColumnTitle={playerColumnTitle()}
       />
-      <MatchSchedule matches={props.group.matches} groupIndex={props.group.index} />
+      <MatchSchedule
+        matches={props.group.matches}
+        groupIndex={props.group.index}
+      />
     </div>
   )
 }
@@ -245,7 +248,7 @@ const MatchRow = (props: MatchRowProps) => {
     hasResult() || (props.match.games && props.match.games.length > 0)
 
   const handleStartClick = () => {
-    const eventId = eventManageState.selectedEventId
+    const eventId = eventDetailState.eventId
     if (eventId) {
       navigate(
         `/game-play?eventId=${eventId}&stage=group&groupIndex=${props.groupIndex}&matchId=${props.match._id}`,
@@ -312,9 +315,7 @@ const MatchResultDisplay = (props: MatchResultDisplayProps) => {
           isWinner={side1IsWinner()}
         />
         <span
-          style={
-            side1IsWinner() ? winningScoreStyle : losingScoreStyle
-          }
+          style={side1IsWinner() ? winningScoreStyle : losingScoreStyle}
         >
           {props.gamesWon1}
         </span>
@@ -322,9 +323,7 @@ const MatchResultDisplay = (props: MatchResultDisplayProps) => {
       <span style={scoreSeparatorStyle}>:</span>
       <div style={matchRightSideStyle}>
         <span
-          style={
-            side2IsWinner() ? winningScoreStyle : losingScoreStyle
-          }
+          style={side2IsWinner() ? winningScoreStyle : losingScoreStyle}
         >
           {props.gamesWon2}
         </span>
@@ -448,32 +447,32 @@ interface GroupTableProps {
 
 const GroupTable = (props: GroupTableProps) => (
   <div style={tableWrapperStyle}>
-  <table style={tableStyle}>
-    <thead>
-      <tr>
-        <th style={thStyle}>Rank</th>
-        <th style={{ ...thStyle, 'text-align': 'left' }}>
-          {props.playerColumnTitle}
-        </th>
-        <th style={thStyle}>Total</th>
-        <th style={thStyle}>W</th>
-        <th style={thStyle}>L</th>
-        <th style={thStyle}>+/-</th>
-        <th style={thStyle}>Win %</th>
-        <th style={thStyle}>MW</th>
-        <th style={thStyle}>ML</th>
-        <th style={thStyle}>GW</th>
-        <th style={thStyle}>GL</th>
-      </tr>
-    </thead>
-    <tbody>
-      <For each={props.participants}>
-        {(gp, index) => (
-          <GroupTableRow participant={gp} rank={index() + 1} />
-        )}
-      </For>
-    </tbody>
-  </table>
+    <table style={tableStyle}>
+      <thead>
+        <tr>
+          <th style={thStyle}>Rank</th>
+          <th style={{ ...thStyle, 'text-align': 'left' }}>
+            {props.playerColumnTitle}
+          </th>
+          <th style={thStyle}>Total</th>
+          <th style={thStyle}>W</th>
+          <th style={thStyle}>L</th>
+          <th style={thStyle}>+/-</th>
+          <th style={thStyle}>Win %</th>
+          <th style={thStyle}>MW</th>
+          <th style={thStyle}>ML</th>
+          <th style={thStyle}>GW</th>
+          <th style={thStyle}>GL</th>
+        </tr>
+      </thead>
+      <tbody>
+        <For each={props.participants}>
+          {(gp, index) => (
+            <GroupTableRow participant={gp} rank={index() + 1} />
+          )}
+        </For>
+      </tbody>
+    </table>
   </div>
 )
 
@@ -501,7 +500,9 @@ const GroupTableRow = (props: GroupTableRowProps) => {
   return (
     <tr>
       <td style={cellStyle()}>{props.rank}</td>
-      <td style={{ ...cellStyle(), 'text-align': 'left', 'font-weight': 500 }}>
+      <td
+        style={{ ...cellStyle(), 'text-align': 'left', 'font-weight': 500 }}
+      >
         {playerDisplay()}
       </td>
       <td style={cellStyle()}>{total()}</td>
@@ -530,7 +531,9 @@ const getPlayerDisplay = (gp: GroupParticipant): string => {
     const sortedPlayers = [...participant.players].sort(
       (a, b) => (b.rating || 0) - (a.rating || 0),
     )
-    return sortedPlayers.map((p) => `${p.firstName} ${p.lastName}`).join(' / ')
+    return sortedPlayers
+      .map((p) => `${p.firstName} ${p.lastName}`)
+      .join(' / ')
   }
 
   if ('firstName' in participant && 'lastName' in participant) {
@@ -556,11 +559,19 @@ const contentStyle: JSX.CSSProperties = {
   padding: '20px',
 }
 
-const titleStyle: JSX.CSSProperties = {
+const eventNameStyle: JSX.CSSProperties = {
   'text-align': 'left',
   'font-size': '28px',
   'font-weight': 700,
   color: '#333',
+  'margin-bottom': '4px',
+}
+
+const dateTimeStyle: JSX.CSSProperties = {
+  'text-align': 'left',
+  'font-size': '18px',
+  'font-weight': 400,
+  color: '#666',
   'margin-bottom': '20px',
 }
 
@@ -601,7 +612,7 @@ const groupTitleStyle: JSX.CSSProperties = {
   color: '#fff',
   margin: '0',
   padding: '14px 20px',
-  'background': 'linear-gradient(135deg, #2c3e50, #34495e)',
+  background: 'linear-gradient(135deg, #2c3e50, #34495e)',
   'letter-spacing': '0.5px',
 }
 
@@ -644,7 +655,7 @@ const emptyContentStyle: JSX.CSSProperties = {
 
 const matchScheduleContainerStyle: JSX.CSSProperties = {
   'margin-top': '0',
-  'padding': '16px 20px',
+  padding: '16px 20px',
   'background-color': '#fafafa',
   'border-top': '1px solid #f0f0f0',
 }
@@ -771,4 +782,4 @@ const gameDelimiterStyle: JSX.CSSProperties = {
   'margin-right': '8px',
 }
 
-export default EventManage
+export default EventDetail

@@ -5,4 +5,7 @@ export interface Player {
   rating: number
   dateOfBirth?: string // ISO date string for age calculation
   sex?: 'male' | 'female'
+  email?: string
+  phone?: string
+  password?: string
 }
