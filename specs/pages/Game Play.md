@@ -57,7 +57,7 @@
   - "Show the match result to both sides and confirm the result with them"
   - the updated match result with each game's result (just update in memory, do not actually update and send to db before confirm)
   - cancel and confirm buttons
-    - on confirm, clear game score, update match score, go back to event detail page
+    - on confirm, clear game score, update match score, go back to event detail page and update the ranking table
 - click on "T" toggles the style of "T" (dark bg white text or white bg black text), the dark bg means the timeout has been called by the player(s) on that side 
 
 ## Init Dialog (show on load)

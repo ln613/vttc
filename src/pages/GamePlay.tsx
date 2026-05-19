@@ -4,6 +4,7 @@ import {
   gamePlayState,
   gamePlayActions,
 } from '../stores/gamePlayStore'
+import { eventDetailActions } from '../stores/eventDetailStore'
 import type { Player } from '../../shared/types/Player'
 import SingleSelectTags from '../components/SingleSelectTags'
 import Button from '../components/Button'
@@ -405,6 +406,8 @@ const FinishConfirmDialog = () => {
 
   const handleConfirm = async () => {
     await gamePlayActions.confirmFinishMatch()
+    // Invalidate cached event data so the ranking table refreshes on navigation back
+    eventDetailActions.invalidateData()
     navigate(`/event/${gamePlayState.eventId}`)
   }
 

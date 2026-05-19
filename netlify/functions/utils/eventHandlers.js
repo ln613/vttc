@@ -185,7 +185,29 @@ export const getEvent = async (params) => {
   const db = getDB()
   const event = await db.collection(EVENTS_COLLECTION).findOne({ _id: toObjectId(params._id) })
   if (!event) throwError('Event not found')
+
+  // Recalculate group stats from match data to ensure ranking table is always accurate
+  recalculateGroupStats(event)
+
   return event
+}
+
+const recalculateGroupStats = (event) => {
+  if (!event.eventStages) return
+
+  const groupStage = event.eventStages.find((s) => s.type === 'group')
+  if (!groupStage || !groupStage.groups) return
+
+  for (const group of groupStage.groups) {
+    if (!group.matches || !group.participants) continue
+
+    for (let i = 0; i < group.participants.length; i++) {
+      group.participants[i] = {
+        ...group.participants[i],
+        stats: calculateGroupStats(group.participants[i].participant, group.matches),
+      }
+    }
+  }
 }
 
 /**
@@ -1196,10 +1218,15 @@ const calculateGroupStats = (participant, matches) => {
   }
 }
 
+const getParticipantPlayerIds = (participant) => {
+  const players = participant.players || []
+  return new Set(players.map((p) => p._id?.toString()))
+}
+
 const getParticipantSideInMatch = (match, participant) => {
-  const participantId = (participant._id || participant.participant?._id)?.toString()
-  if (match.side1.some((p) => p._id?.toString() === participantId)) return 1
-  if (match.side2.some((p) => p._id?.toString() === participantId)) return 2
+  const playerIds = getParticipantPlayerIds(participant)
+  if (match.side1.some((p) => playerIds.has(p._id?.toString()))) return 1
+  if (match.side2.some((p) => playerIds.has(p._id?.toString()))) return 2
   return undefined
 }
 

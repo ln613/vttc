@@ -190,6 +190,10 @@ export const eventDetailActions = {
     }
   },
 
+  invalidateData: () => {
+    setEventDetailState({ data: null })
+  },
+
   reset: () => setEventDetailState(getInitialState()),
 }
 
