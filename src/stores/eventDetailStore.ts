@@ -1,18 +1,27 @@
 import { createStore } from 'solid-js/store'
-import type { Event, Stage, TournamentType } from '../../shared/types/Tournament'
-import type { Group } from '../../shared/types/Tournament'
+import type {
+  Event,
+  Stage,
+  TournamentType,
+  Group,
+  KnockoutStage,
+  KnockoutRound,
+} from '../../shared/types/Tournament'
 import type { Match } from '../../shared/types/Match'
 import type { MatchPreview } from '../components/MatchConfirmDialog'
 import { apiGet, apiPost } from '../utils/api'
 import { waitForPendingSave } from './gamePlayStore'
+
+export type StageTab = 'group' | 'knockout' | 'bracket'
 
 interface EventDetailState {
   data: Event | null
   loading: boolean
   error: string | null
   eventId: string | null
-  activeStageTab: 'group' | 'knockout'
+  activeStageTab: StageTab
   generatingGroups: boolean
+  generatingNextRound: boolean
   expandedMatchSchedules: Record<number, boolean>
   scrollPosition: number
   confirmingMatchId: string | null
@@ -27,6 +36,7 @@ const getInitialState = (): EventDetailState => ({
   eventId: null,
   activeStageTab: 'group',
   generatingGroups: false,
+  generatingNextRound: false,
   expandedMatchSchedules: {},
   scrollPosition: 0,
   confirmingMatchId: null,
@@ -68,7 +78,7 @@ export const eventDetailActions = {
     await fetchEvent(eventId, isSameEvent && eventDetailState.data !== null)
   },
 
-  setActiveStageTab: (tab: 'group' | 'knockout') => {
+  setActiveStageTab: (tab: StageTab) => {
     setEventDetailState({ activeStageTab: tab })
   },
 
@@ -111,7 +121,7 @@ export const eventDetailActions = {
     )
   },
 
-  getKnockoutStage: () => {
+  getKnockoutStage: (): KnockoutStage | undefined => {
     const stages = eventDetailActions.getEventStages()
     return stages.find(
       (s): s is Extract<Stage, { type: 'knockout' }> => s.type === 'knockout',
@@ -121,6 +131,78 @@ export const eventDetailActions = {
   hasGroups: (): boolean => {
     const groupStage = eventDetailActions.getGroupStage()
     return (groupStage?.groups?.length ?? 0) > 0
+  },
+
+  hasKnockoutRounds: (): boolean => {
+    const knockoutStage = eventDetailActions.getKnockoutStage()
+    return (knockoutStage?.rounds?.length ?? 0) > 0
+  },
+
+  getVisibleTabs: (): StageTab[] => {
+    const event = eventDetailState.data
+    if (!event) return []
+    const stagesArray = event.stages || []
+    const tabs: StageTab[] = []
+    if (stagesArray.includes('group')) tabs.push('group')
+    if (stagesArray.includes('knockout')) {
+      tabs.push('knockout')
+      tabs.push('bracket')
+    }
+    return tabs
+  },
+
+  getDefaultTab: (): StageTab => {
+    const tabs = eventDetailActions.getVisibleTabs()
+    return tabs.length > 0 ? tabs[0] : 'group'
+  },
+
+  /**
+   * Check if the "Generate Next Round" button should be visible in knockout tab.
+   * Visible when: previous round/groups are complete AND current round has no matches yet.
+   */
+  canGenerateNextRound: (): boolean => {
+    const knockoutStage = eventDetailActions.getKnockoutStage()
+    if (!knockoutStage) return false
+
+    // No rounds yet: check if group stage is complete
+    if (knockoutStage.rounds.length === 0) {
+      const groupStage = eventDetailActions.getGroupStage()
+      if (groupStage) {
+        return groupStage.groups.length > 0 && groupStage.groups.every((g) => g.isComplete)
+      }
+      // Knockout-only: always can generate first round if participants exist
+      return (eventDetailState.data?.participants?.length ?? 0) >= 4
+    }
+
+    // Find current incomplete round
+    const currentRound = knockoutStage.rounds.find((r) => !r.isComplete)
+    if (!currentRound) return false
+
+    // Current round has no matches generated yet (empty placeholder round)
+    return currentRound.matches.length === 0
+  },
+
+  generateNextRound: async () => {
+    const { eventId } = eventDetailState
+    if (!eventId) return
+
+    setEventDetailState({ generatingNextRound: true })
+    try {
+      await apiPost('generateKnockout', { _id: eventId })
+      await fetchEvent(eventId, false)
+    } catch (err) {
+      setEventDetailState({
+        error:
+          err instanceof Error ? err.message : 'Failed to generate next round',
+      })
+    } finally {
+      setEventDetailState({ generatingNextRound: false })
+    }
+  },
+
+  getKnockoutRounds: (): KnockoutRound[] => {
+    const knockoutStage = eventDetailActions.getKnockoutStage()
+    return knockoutStage?.rounds || []
   },
 
   getEventType: (): TournamentType | undefined =>

@@ -1011,8 +1011,10 @@ export const finishMatch = async (body) => {
         // Update group stats
         const updatedGroup = updateGroupAfterMatch(group, updatedMatch, matchIndex)
 
-        // Check if group is complete
-        const groupComplete = updatedGroup.matches.every((m) => m.winningSide !== undefined)
+        // Check if group is complete (all matches finished AND confirmed)
+        const groupComplete = updatedGroup.matches.every(
+          (m) => m.winningSide !== undefined && m.confirmed,
+        )
 
         const updatedGroupStage = {
           ...groupStage,
@@ -1023,22 +1025,16 @@ export const finishMatch = async (body) => {
 
         // If all groups complete, calculate advanced participants
         if (updatedGroupStage.groups.every((g) => g.isComplete)) {
-          const advancedParticipants = []
-          for (const g of updatedGroupStage.groups) {
-            const ranked = rankGroupParticipants(g.participants, g.matches)
-            const advancing = ranked.slice(0, groupStage.config.advancingCount)
-            for (const gp of advancing) {
-              advancedParticipants.push({
-                participant: gp.participant,
-                groupIndex: g.index,
-                ranking: gp.ranking,
-              })
-            }
-          }
+          const advancedParticipants = calculateAdvancedParticipants(updatedGroupStage)
           updatedGroupStage.advancedParticipants = advancedParticipants
         }
 
         updatedStages[groupStageIndex] = updatedGroupStage
+
+        // If confirmed and round complete, generate next round schedule
+        if (confirmed && updatedGroupStage.groups.every((g) => g.isComplete)) {
+          generateNextRoundIfNeeded(updatedStages, event)
+        }
         break
       }
     }
@@ -1071,9 +1067,11 @@ export const finishMatch = async (body) => {
             winner,
           }
 
-          const roundComplete = round.matches.every((m, i) =>
-            i === matchIndex ? updatedKnockoutMatch.winner : m.winner,
-          )
+          // Round is complete only if all matches are finished AND confirmed
+          const roundComplete = round.matches.every((m, i) => {
+            const km = i === matchIndex ? updatedKnockoutMatch : m
+            return km.winner && km.match?.confirmed
+          })
 
           const updatedRounds = knockoutStage.rounds.map((r, i) =>
             i === ri
@@ -1088,6 +1086,11 @@ export const finishMatch = async (body) => {
           updatedStages[knockoutStageIndex] = {
             ...knockoutStage,
             rounds: updatedRounds,
+          }
+
+          // If confirmed and round complete, generate next round schedule
+          if (confirmed && roundComplete) {
+            generateNextRoundIfNeeded(updatedStages, event)
           }
           break
         }
@@ -1352,6 +1355,7 @@ export const confirmMatch = async (body) => {
   const event = await collection.findOne({ _id: toObjectId(_id) })
   if (!event) throwError('Event not found')
 
+  // Set confirmed on the match
   const updatedStages = updateMatchInStages(
     event.eventStages,
     matchId,
@@ -1368,6 +1372,9 @@ export const confirmMatch = async (body) => {
       }
     },
   )
+
+  // After confirming, update group/round completion and generate next round if needed
+  updateStageCompletionAfterConfirm(updatedStages, event)
 
   await collection.updateOne(
     { _id: toObjectId(_id) },
@@ -1566,8 +1573,10 @@ export const updateGame = async (body) => {
         // Update group stats
         const updatedGroup = updateGroupAfterMatch(group, updatedMatch, matchIndex)
 
-        // Check if group is complete
-        const groupComplete = updatedGroup.matches.every((m) => m.winningSide !== undefined)
+        // Check if group is complete (all matches finished AND confirmed)
+        const groupComplete = updatedGroup.matches.every(
+          (m) => m.winningSide !== undefined && m.confirmed,
+        )
 
         const updatedGroupStage = {
           ...groupStage,
@@ -1578,19 +1587,7 @@ export const updateGame = async (body) => {
 
         // If all groups complete, calculate advanced participants
         if (updatedGroupStage.groups.every((g) => g.isComplete)) {
-          const advancedParticipants = []
-          for (const g of updatedGroupStage.groups) {
-            const ranked = rankGroupParticipants(g.participants, g.matches)
-            const advancing = ranked.slice(0, groupStage.config.advancingCount)
-            for (const gp of advancing) {
-              advancedParticipants.push({
-                participant: gp.participant,
-                groupIndex: g.index,
-                ranking: gp.ranking,
-              })
-            }
-          }
-          updatedGroupStage.advancedParticipants = advancedParticipants
+          updatedGroupStage.advancedParticipants = calculateAdvancedParticipants(updatedGroupStage)
         }
 
         updatedStages[groupStageIndex] = updatedGroupStage
@@ -1632,9 +1629,11 @@ export const updateGame = async (body) => {
             winner,
           }
 
-          const roundComplete = round.matches.every((m, i) =>
-            i === matchIndex ? updatedKnockoutMatch.winner : m.winner,
-          )
+          // Round is complete only if all matches are finished AND confirmed
+          const roundComplete = round.matches.every((m, i) => {
+            const km = i === matchIndex ? updatedKnockoutMatch : m
+            return km.winner && km.match?.confirmed
+          })
 
           const updatedRounds = knockoutStage.rounds.map((r, i) =>
             i === ri
@@ -1785,4 +1784,105 @@ const updateMatchWithGameScore = (match, gameNumber, score) => {
     gamesWon2,
     winningSide: gamesWon1 >= needed ? 1 : gamesWon2 >= needed ? 2 : undefined,
   }
+}
+
+/**
+ * Calculate advanced participants from completed groups
+ */
+const calculateAdvancedParticipants = (groupStage) => {
+  const advancedParticipants = []
+  for (const g of groupStage.groups) {
+    const ranked = rankGroupParticipants(g.participants, g.matches)
+    const advancing = ranked.slice(0, groupStage.config.advancingCount)
+    for (const gp of advancing) {
+      advancedParticipants.push({
+        participant: gp.participant,
+        groupIndex: g.index,
+        ranking: gp.ranking,
+      })
+    }
+  }
+  return advancedParticipants
+}
+
+/**
+ * After confirming a match, re-evaluate group/round completion and
+ * generate next round schedule if conditions are met
+ */
+const updateStageCompletionAfterConfirm = (updatedStages, event) => {
+  // Check group stage completion
+  const groupStageIndex = updatedStages.findIndex((s) => s.type === 'group')
+  if (groupStageIndex !== -1) {
+    const groupStage = updatedStages[groupStageIndex]
+    const updatedGroups = groupStage.groups.map((g) => {
+      const groupComplete = g.matches.every(
+        (m) => m.winningSide !== undefined && m.confirmed,
+      )
+      return { ...g, isComplete: groupComplete }
+    })
+    const updatedGroupStage = { ...groupStage, groups: updatedGroups }
+
+    if (updatedGroups.every((g) => g.isComplete)) {
+      updatedGroupStage.advancedParticipants = calculateAdvancedParticipants(updatedGroupStage)
+    }
+    updatedStages[groupStageIndex] = updatedGroupStage
+  }
+
+  // Check knockout stage round completion
+  const knockoutStageIndex = updatedStages.findIndex((s) => s.type === 'knockout')
+  if (knockoutStageIndex !== -1) {
+    const knockoutStage = updatedStages[knockoutStageIndex]
+    const updatedRounds = knockoutStage.rounds.map((r) => {
+      const roundComplete = r.matches.every(
+        (m) => m.winner && m.match?.confirmed,
+      )
+      return { ...r, isComplete: roundComplete }
+    })
+    updatedStages[knockoutStageIndex] = { ...knockoutStage, rounds: updatedRounds }
+  }
+
+  // Generate next round if current round is complete
+  generateNextRoundIfNeeded(updatedStages, event)
+}
+
+/**
+ * If the current round is complete, auto-generate the match schedule for the next round
+ */
+const generateNextRoundIfNeeded = (updatedStages, event) => {
+  const knockoutStageIndex = updatedStages.findIndex((s) => s.type === 'knockout')
+  if (knockoutStageIndex === -1) return
+
+  const knockoutStage = updatedStages[knockoutStageIndex]
+  if (!knockoutStage.rounds || knockoutStage.rounds.length === 0) {
+    // No knockout rounds yet. Check if group stage is complete and knockout should start
+    const groupStage = updatedStages.find((s) => s.type === 'group')
+    if (groupStage && groupStage.groups.every((g) => g.isComplete) && groupStage.advancedParticipants?.length > 0) {
+      const participants = groupStage.advancedParticipants.map((ap) => ({
+        participant: ap.participant,
+        groupIndex: ap.groupIndex,
+        ranking: ap.ranking,
+      }))
+      const newKnockoutStage = createKnockoutStage(participants, event.nop, knockoutStage.config, event)
+      updatedStages[knockoutStageIndex] = newKnockoutStage
+    }
+    return
+  }
+
+  // Find the current incomplete round
+  const currentRoundIndex = knockoutStage.rounds.findIndex((r) => !r.isComplete)
+  if (currentRoundIndex === -1) return // All rounds complete
+  if (currentRoundIndex >= knockoutStage.rounds.length - 1) return // Last round, nothing to generate
+
+  const currentRound = knockoutStage.rounds[currentRoundIndex]
+  const allComplete = currentRound.matches.every(
+    (m) => m.winner && m.match?.confirmed,
+  )
+  if (!allComplete) return
+
+  // Mark current round as complete and generate next round
+  const updatedKnockoutStage = advanceKnockoutRound(
+    { ...knockoutStage, rounds: knockoutStage.rounds.map((r, i) => i === currentRoundIndex ? { ...r, isComplete: true } : r) },
+    event,
+  )
+  updatedStages[knockoutStageIndex] = updatedKnockoutStage
 }

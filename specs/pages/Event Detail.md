@@ -8,11 +8,11 @@ Vertical
 - Event name (h1, align left)
 - Date
 - Time
-- stage tabs (Group, Knockout...)
+- Group, Knockout, bracket (tab visibility based on stages type)
 
 ## Group Stage Tab
 
-- Generate Groups button (if no groups)
+- Generate Groups button (if no groups, only for admin)
 - list of groups
 
 ### Group
@@ -38,11 +38,21 @@ The Total column is the total matches played so far.
   - Continue button (if already started but not finished, orange, small)
   - Confirm button (if finished but not confirmed, red, small)
 
-### Knockout
-
-empty
-
 ### interaction
 
 - on Generate Groups click: call generate groups API
 - on Start button click: go to Game Play page with the selected event, stage and match, start with Game 1
+
+## Knockout Stage Tab
+
+- Generate Next Round button (if previous round/groups already complete, and current round is still not generated, only for admin)
+- list of rounds
+
+### Round
+
+- title "Round of {n}" (n = 16, 32...), or "Quarterfinals", "Semifinals", "Final"
+- the match schedule of the round
+
+## Bracket Tab
+
+- Shows the bracket of the knockout stage

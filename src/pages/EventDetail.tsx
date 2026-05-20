@@ -1,10 +1,12 @@
-import { Show, For, onMount, onCleanup, type JSX } from 'solid-js'
+import { Show, For, Switch, Match as MatchCase, onMount, onCleanup, type JSX } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { Header } from '../components/Header'
 import Button from '../components/Button'
 import MatchConfirmDialog from '../components/MatchConfirmDialog'
 import { eventDetailState, eventDetailActions } from '../stores/eventDetailStore'
-import type { Group, GroupParticipant } from '../../shared/types/Tournament'
+import type { StageTab } from '../stores/eventDetailStore'
+import { authState } from '../stores/authStore'
+import type { Group, GroupParticipant, KnockoutRound, KnockoutMatch as KnockoutMatchType } from '../../shared/types/Tournament'
 import type { Player } from '../../shared/types/Player'
 import type { Match, Game } from '../../shared/types/Match'
 
@@ -124,34 +126,30 @@ const EventContent = () => (
   </Show>
 )
 
+const TAB_LABELS: Record<StageTab, string> = {
+  group: 'Group',
+  knockout: 'Knockout',
+  bracket: 'Bracket',
+}
+
 const StageTabs = () => {
-  const event = () => eventDetailState.data
+  const tabs = () => eventDetailActions.getVisibleTabs()
 
   return (
-    <Show when={event()}>
-      {(e) => {
-        const stages = e().stages || []
-        const tabs = stages.map((stage) => ({
-          key: stage as 'group' | 'knockout',
-          label: stage === 'group' ? 'Group' : 'Knockout',
-        }))
-
-        return (
-          <div style={tabsContainerStyle}>
-            <For each={tabs}>
-              {(tab, index) => (
-                <TabButton
-                  label={tab.label}
-                  isActive={eventDetailState.activeStageTab === tab.key}
-                  isFirst={index() === 0}
-                  isLast={index() === tabs.length - 1}
-                  onClick={() => eventDetailActions.setActiveStageTab(tab.key)}
-                />
-              )}
-            </For>
-          </div>
-        )
-      }}
+    <Show when={tabs().length > 0}>
+      <div style={tabsContainerStyle}>
+        <For each={tabs()}>
+          {(tab, index) => (
+            <TabButton
+              label={TAB_LABELS[tab]}
+              isActive={eventDetailState.activeStageTab === tab}
+              isFirst={index() === 0}
+              isLast={index() === tabs().length - 1}
+              onClick={() => eventDetailActions.setActiveStageTab(tab)}
+            />
+          )}
+        </For>
+      </div>
     </Show>
   )
 }
@@ -193,12 +191,17 @@ const TabButton = (props: TabButtonProps) => {
 }
 
 const StageContent = () => (
-  <Show
-    when={eventDetailState.activeStageTab === 'group'}
-    fallback={<KnockoutStageContent />}
-  >
-    <GroupStageContent />
-  </Show>
+  <Switch fallback={<GroupStageContent />}>
+    <MatchCase when={eventDetailState.activeStageTab === 'group'}>
+      <GroupStageContent />
+    </MatchCase>
+    <MatchCase when={eventDetailState.activeStageTab === 'knockout'}>
+      <KnockoutStageContent />
+    </MatchCase>
+    <MatchCase when={eventDetailState.activeStageTab === 'bracket'}>
+      <BracketContent />
+    </MatchCase>
+  </Switch>
 )
 
 const GroupStageContent = () => {
@@ -222,16 +225,18 @@ const GenerateGroupsSection = () => {
   }
 
   return (
-    <div style={generateGroupsStyle}>
-      <Button
-        onClick={handleGenerateGroups}
-        disabled={eventDetailState.generatingGroups}
-      >
-        {eventDetailState.generatingGroups
-          ? 'Generating...'
-          : 'Generate Groups'}
-      </Button>
-    </div>
+    <Show when={authState.isAdmin}>
+      <div style={generateGroupsStyle}>
+        <Button
+          onClick={handleGenerateGroups}
+          disabled={eventDetailState.generatingGroups}
+        >
+          {eventDetailState.generatingGroups
+            ? 'Generating...'
+            : 'Generate Groups'}
+        </Button>
+      </div>
+    </Show>
   )
 }
 
@@ -254,6 +259,7 @@ const GroupDisplay = (props: GroupDisplayProps) => {
       <MatchSchedule
         matches={props.group.matches}
         groupIndex={props.group.index}
+        stage="group"
       />
     </div>
   )
@@ -262,6 +268,7 @@ const GroupDisplay = (props: GroupDisplayProps) => {
 interface MatchScheduleProps {
   matches: Match[]
   groupIndex: number
+  stage: 'group' | 'knockout'
 }
 
 const MatchSchedule = (props: MatchScheduleProps) => {
@@ -279,7 +286,7 @@ const MatchSchedule = (props: MatchScheduleProps) => {
           <div style={matchScheduleContentStyle}>
             <For each={props.matches}>
               {(match) => (
-                <MatchRow match={match} groupIndex={props.groupIndex} />
+                <MatchRow match={match} groupIndex={props.groupIndex} stage={props.stage} />
               )}
             </For>
           </div>
@@ -305,6 +312,7 @@ const CollapsibleHeader = (props: CollapsibleHeaderProps) => (
 interface MatchRowProps {
   match: Match
   groupIndex: number
+  stage: 'group' | 'knockout'
 }
 
 const MatchRow = (props: MatchRowProps) => {
@@ -323,7 +331,7 @@ const MatchRow = (props: MatchRowProps) => {
     const eventId = eventDetailState.eventId
     if (eventId) {
       navigate(
-        `/game-play?eventId=${eventId}&stage=group&groupIndex=${props.groupIndex}&matchId=${props.match._id}`,
+        `/game-play?eventId=${eventId}&stage=${props.stage}&groupIndex=${props.groupIndex}&matchId=${props.match._id}`,
       )
     }
   }
@@ -649,11 +657,227 @@ const getPlayerDisplay = (gp: GroupParticipant): string => {
   return 'Unknown'
 }
 
-const KnockoutStageContent = () => (
-  <div style={emptyContentStyle}></div>
-)
+// ==================== KNOCKOUT STAGE ====================
 
-// Styles
+const KnockoutStageContent = () => {
+  const canGenerate = () => eventDetailActions.canGenerateNextRound()
+  const rounds = () => eventDetailActions.getKnockoutRounds()
+
+  return (
+    <div>
+      <Show when={canGenerate() && authState.isAdmin}>
+        <GenerateNextRoundSection />
+      </Show>
+      <Show when={rounds().length > 0}>
+        <div style={groupsListStyle}>
+          <For each={rounds()}>
+            {(round) => <KnockoutRoundDisplay round={round} />}
+          </For>
+        </div>
+      </Show>
+    </div>
+  )
+}
+
+const GenerateNextRoundSection = () => {
+  const handleClick = () => {
+    eventDetailActions.generateNextRound()
+  }
+
+  return (
+    <div style={generateGroupsStyle}>
+      <Button
+        onClick={handleClick}
+        disabled={eventDetailState.generatingNextRound}
+      >
+        {eventDetailState.generatingNextRound
+          ? 'Generating...'
+          : 'Generate Next Round'}
+      </Button>
+    </div>
+  )
+}
+
+interface KnockoutRoundDisplayProps {
+  round: KnockoutRound
+}
+
+const KnockoutRoundDisplay = (props: KnockoutRoundDisplayProps) => {
+  const roundMatches = () =>
+    props.round.matches
+      .filter((km) => km.match != null)
+      .map((km) => km.match!)
+
+  // Use a unique index offset so knockout round schedules don't collide with group indexes
+  const scheduleIndex = () => 1000 + props.round.index
+
+  return (
+    <div style={groupContainerStyle}>
+      <h3 style={knockoutRoundTitleStyle}>{props.round.name}</h3>
+      <div style={knockoutMatchesContainerStyle}>
+        <For each={props.round.matches}>
+          {(km) => <KnockoutMatchDisplay knockoutMatch={km} roundIndex={props.round.index} />}
+        </For>
+      </div>
+    </div>
+  )
+}
+
+interface KnockoutMatchDisplayProps {
+  knockoutMatch: KnockoutMatchType
+  roundIndex: number
+}
+
+const KnockoutMatchDisplay = (props: KnockoutMatchDisplayProps) => {
+  const navigate = useNavigate()
+  const isBye = () => props.knockoutMatch.isBye2 || props.knockoutMatch.isBye1
+  const match = () => props.knockoutMatch.match
+
+  const participant1Name = () =>
+    getKnockoutParticipantName(props.knockoutMatch.participant1)
+  const participant2Name = () =>
+    props.knockoutMatch.isBye2
+      ? 'BYE'
+      : getKnockoutParticipantName(props.knockoutMatch.participant2)
+
+  return (
+    <Show
+      when={!isBye()}
+      fallback={
+        <div style={knockoutByeRowStyle}>
+          <span style={knockoutByeNameStyle}>{participant1Name()}</span>
+          <span style={knockoutByeLabelStyle}>BYE</span>
+        </div>
+      }
+    >
+      <Show when={match()}>
+        {(m) => (
+          <MatchRow
+            match={m()}
+            groupIndex={props.roundIndex}
+            stage="knockout"
+          />
+        )}
+      </Show>
+    </Show>
+  )
+}
+
+const getKnockoutParticipantName = (participant?: {
+  participant?: { players?: Player[]; firstName?: string; lastName?: string; name?: string }
+}): string => {
+  if (!participant) return 'TBD'
+  const p = participant.participant
+  if (!p) return 'TBD'
+
+  if ('players' in p && Array.isArray(p.players) && p.players.length > 0) {
+    return p.players
+      .map((pl: Player) => `${pl.firstName} ${pl.lastName}`)
+      .join(' / ')
+  }
+
+  if ('firstName' in p && p.firstName) {
+    return `${p.firstName} ${p.lastName || ''}`
+  }
+
+  if ('name' in p && p.name) {
+    return p.name as string
+  }
+
+  return 'TBD'
+}
+
+// ==================== BRACKET TAB ====================
+
+const BracketContent = () => {
+  const rounds = () => eventDetailActions.getKnockoutRounds()
+
+  return (
+    <Show
+      when={rounds().length > 0}
+      fallback={<div style={emptyContentStyle}>No bracket data available</div>}
+    >
+      <div style={bracketContainerStyle}>
+        <For each={rounds()}>
+          {(round) => (
+            <div style={bracketRoundColumnStyle}>
+              <div style={bracketRoundHeaderStyle}>{round.name}</div>
+              <div style={bracketRoundMatchesStyle}>
+                <For each={round.matches}>
+                  {(km) => <BracketMatchCard knockoutMatch={km} />}
+                </For>
+              </div>
+            </div>
+          )}
+        </For>
+      </div>
+    </Show>
+  )
+}
+
+interface BracketMatchCardProps {
+  knockoutMatch: KnockoutMatchType
+}
+
+const BracketMatchCard = (props: BracketMatchCardProps) => {
+  const isBye = () => props.knockoutMatch.isBye2 || props.knockoutMatch.isBye1
+  const p1Name = () => getKnockoutParticipantName(props.knockoutMatch.participant1)
+  const p2Name = () =>
+    isBye() ? 'BYE' : getKnockoutParticipantName(props.knockoutMatch.participant2)
+  const match = () => props.knockoutMatch.match
+  const winnerId = () => {
+    const w = props.knockoutMatch.winner
+    if (!w) return undefined
+    return w.participant?._id || (w as any)?._id
+  }
+  const p1Id = () => {
+    const p = props.knockoutMatch.participant1
+    return p?.participant?._id || (p as any)?._id
+  }
+  const p1IsWinner = () => winnerId() != null && winnerId() === p1Id()
+  const p2IsWinner = () => winnerId() != null && !p1IsWinner() && !isBye()
+
+  return (
+    <div style={bracketMatchCardStyle}>
+      <div
+        style={{
+          ...bracketMatchPlayerStyle,
+          'font-weight': p1IsWinner() ? 700 : 400,
+          'background-color': p1IsWinner() ? '#e8f5e9' : '#fff',
+        }}
+      >
+        <span style={bracketPlayerNameStyle}>{p1Name()}</span>
+        <Show when={match()}>
+          <span style={bracketScoreStyle}>{match()!.gamesWon1}</span>
+        </Show>
+      </div>
+      <div
+        style={{
+          ...bracketMatchPlayerStyle,
+          'font-weight': p2IsWinner() ? 700 : 400,
+          'background-color': p2IsWinner() ? '#e8f5e9' : isBye() ? '#f5f5f5' : '#fff',
+          'border-top': '1px solid #e0e0e0',
+        }}
+      >
+        <span
+          style={{
+            ...bracketPlayerNameStyle,
+            color: isBye() ? '#999' : '#333',
+            'font-style': isBye() ? 'italic' : 'normal',
+          }}
+        >
+          {p2Name()}
+        </span>
+        <Show when={match() && !isBye()}>
+          <span style={bracketScoreStyle}>{match()!.gamesWon2}</span>
+        </Show>
+      </div>
+    </div>
+  )
+}
+
+// ==================== STYLES ====================
+
 const containerStyle: JSX.CSSProperties = {
   'min-height': '100vh',
   'background-color': '#f5f5f5',
@@ -730,6 +954,44 @@ const groupTitleStyle: JSX.CSSProperties = {
   padding: '14px 20px',
   background: 'linear-gradient(135deg, #2c3e50, #34495e)',
   'letter-spacing': '0.5px',
+}
+
+const knockoutRoundTitleStyle: JSX.CSSProperties = {
+  'font-size': '16px',
+  'font-weight': 700,
+  color: '#fff',
+  margin: '0',
+  padding: '14px 20px',
+  background: 'linear-gradient(135deg, #8e44ad, #9b59b6)',
+  'letter-spacing': '0.5px',
+}
+
+const knockoutMatchesContainerStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '10px',
+  padding: '16px 20px',
+}
+
+const knockoutByeRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'space-between',
+  padding: '12px 16px',
+  'background-color': '#f8f9fa',
+  'border-radius': '8px',
+  border: '1px dashed #ddd',
+}
+
+const knockoutByeNameStyle: JSX.CSSProperties = {
+  'font-weight': 600,
+  color: '#333',
+}
+
+const knockoutByeLabelStyle: JSX.CSSProperties = {
+  'font-style': 'italic',
+  color: '#999',
+  'font-size': '14px',
 }
 
 const tableWrapperStyle: JSX.CSSProperties = {
@@ -895,6 +1157,73 @@ const gameScoreSeparatorStyle: JSX.CSSProperties = {
 
 const gameDelimiterStyle: JSX.CSSProperties = {
   'margin-right': '8px',
+}
+
+// Bracket styles
+const bracketContainerStyle: JSX.CSSProperties = {
+  display: 'flex',
+  gap: '16px',
+  'overflow-x': 'auto',
+  padding: '16px 0',
+  '-webkit-overflow-scrolling': 'touch',
+}
+
+const bracketRoundColumnStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  'min-width': '220px',
+  gap: '8px',
+}
+
+const bracketRoundHeaderStyle: JSX.CSSProperties = {
+  'font-size': '14px',
+  'font-weight': 700,
+  color: '#555',
+  'text-align': 'center',
+  padding: '8px',
+  'background-color': '#f0f0f0',
+  'border-radius': '8px',
+  'text-transform': 'uppercase',
+  'letter-spacing': '0.5px',
+}
+
+const bracketRoundMatchesStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '12px',
+  'justify-content': 'space-around',
+  flex: '1',
+}
+
+const bracketMatchCardStyle: JSX.CSSProperties = {
+  'border-radius': '8px',
+  overflow: 'hidden',
+  border: '1px solid #e0e0e0',
+  'box-shadow': '0 1px 3px rgba(0,0,0,0.08)',
+}
+
+const bracketMatchPlayerStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'justify-content': 'space-between',
+  'align-items': 'center',
+  padding: '8px 12px',
+  'font-size': '13px',
+}
+
+const bracketPlayerNameStyle: JSX.CSSProperties = {
+  color: '#333',
+  'white-space': 'nowrap',
+  overflow: 'hidden',
+  'text-overflow': 'ellipsis',
+  'max-width': '160px',
+}
+
+const bracketScoreStyle: JSX.CSSProperties = {
+  'font-weight': 700,
+  'font-size': '14px',
+  color: '#e67e22',
+  'min-width': '20px',
+  'text-align': 'center',
 }
 
 export default EventDetail

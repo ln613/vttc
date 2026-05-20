@@ -235,14 +235,14 @@ Submit the full result of a match (all game scores at once).
 - calculate each game's winning side
 - calculate games won by each side
 - determine the match winning side (the side that wins the majority of games, i.e., best-of-N)
-- if confirmed = true, mark the match as confirmed
+- if confirmed = true, mark the match as confirmed, and generate match schedule for next round if conditions met (see detail in the confirm api)
 - if match is in group stage:
   - update group stats (matches won/lost, games won/lost, points won/lost, point difference) for both participants
-  - if all matches in the group are finished, mark the group as complete
+  - if all matches in the group are finished and confirmed, mark the group as complete
   - if all groups are complete, calculate advanced participants based on group rankings and advancing count
 - if match is in knockout stage:
   - set the knockout match winner based on the match winning side
-  - if all matches in the round are finished, mark the round as complete
+  - if all matches in the round are finished and confirmed, mark the round as complete
 - save to db
 
 ### Output
@@ -268,6 +268,7 @@ Confirm a finished match result. Once confirmed, the match result is final and c
 ### Action
 
 - set confirmed = true on the match
+- if the current round is complete, (for group stage, all matches from all groups are finished and confirmed, for knockout stage, all matches in the current round are finished and confirmed), generate the match schedule for the next round
 - save to db
 
 ### Output
