@@ -211,3 +211,65 @@ return the generated knockout round
 ### Output
 
 return the updated match
+
+## Finish Match
+
+Submit the full result of a match (all game scores at once).
+
+### input
+
+- event id *
+- match id *
+- result * (array of game scores, each with score1 and score2)
+- confirmed = false
+
+### Prerequisite
+
+- event exists
+- match exists in the event (in group stage or knockout stage)
+- match is not already confirmed
+
+### Action
+
+- validate the result: each game score must produce a valid game winner according to game config (target points, golden rule, deuce rule)
+- calculate each game's winning side
+- calculate games won by each side
+- determine the match winning side (the side that wins the majority of games, i.e., best-of-N)
+- if confirmed = true, mark the match as confirmed
+- if match is in group stage:
+  - update group stats (matches won/lost, games won/lost, points won/lost, point difference) for both participants
+  - if all matches in the group are finished, mark the group as complete
+  - if all groups are complete, calculate advanced participants based on group rankings and advancing count
+- if match is in knockout stage:
+  - set the knockout match winner based on the match winning side
+  - if all matches in the round are finished, mark the round as complete
+- save to db
+
+### Output
+
+return { success: true }
+
+## Confirm Match
+
+Confirm a finished match result. Once confirmed, the match result is final and cannot be changed.
+
+### input
+
+- event id *
+- match id *
+
+### Prerequisite
+
+- event exists
+- match exists in the event (in group stage or knockout stage)
+- match is finished (has a winning side)
+- match is not already confirmed
+
+### Action
+
+- set confirmed = true on the match
+- save to db
+
+### Output
+
+return { success: true }
