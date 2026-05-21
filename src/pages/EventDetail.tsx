@@ -827,21 +827,71 @@ const BracketContent = () => {
     >
       <div style={bracketContainerStyle}>
         <For each={rounds()}>
-          {(round) => (
-            <div style={bracketRoundColumnStyle}>
-              <div style={bracketRoundHeaderStyle}>{round.name}</div>
-              <div style={bracketRoundMatchesStyle}>
-                <For each={round.matches}>
-                  {(km) => <BracketMatchCard knockoutMatch={km} />}
-                </For>
+          {(round, roundIndex) => (
+            <>
+              <div style={bracketRoundColumnStyle}>
+                <div style={bracketRoundHeaderStyle}>{round.name}</div>
+                <div style={bracketRoundMatchesStyle}>
+                  <For each={round.matches}>
+                    {(km) => (
+                      <div style={bracketMatchSlotStyle}>
+                        <BracketMatchCard knockoutMatch={km} />
+                      </div>
+                    )}
+                  </For>
+                </div>
               </div>
-            </div>
+              <Show when={roundIndex() < rounds().length - 1}>
+                <BracketRoundConnector matchCount={round.matches.length} />
+              </Show>
+            </>
           )}
         </For>
       </div>
     </Show>
   )
 }
+
+interface BracketRoundConnectorProps {
+  matchCount: number
+}
+
+const BracketRoundConnector = (props: BracketRoundConnectorProps) => {
+  const pairCount = () => Math.floor(props.matchCount / 2)
+
+  return (
+    <div style={connectorColumnStyle}>
+      <div style={connectorHeaderSpacerStyle} />
+      <div style={connectorMatchesAreaStyle}>
+        <For each={Array.from({ length: pairCount() })}>
+          {() => <ConnectorPair />}
+        </For>
+      </div>
+    </div>
+  )
+}
+
+const ConnectorPair = () => (
+  <div style={connectorPairStyle}>
+    {/* Left half: bracket shape ┐┘ */}
+    <div style={connectorLeftHalfStyle}>
+      {/* Top match-aligned slot */}
+      <div style={connectorSlotStyle}>
+        <div style={connectorSlotSpacerStyle} />
+        <div style={connectorSlotCornerTopStyle} />
+      </div>
+      {/* Bottom match-aligned slot */}
+      <div style={connectorSlotStyle}>
+        <div style={connectorSlotCornerBottomStyle} />
+        <div style={connectorSlotSpacerStyle} />
+      </div>
+    </div>
+    {/* Right half: horizontal line from merge point to next round */}
+    <div style={connectorRightHalfStyle}>
+      <div style={connectorMergeLineStyle} />
+    </div>
+  </div>
+)
 
 interface BracketMatchCardProps {
   knockoutMatch: KnockoutMatchType
@@ -1216,10 +1266,10 @@ const gameDelimiterStyle: JSX.CSSProperties = {
 // Bracket styles
 const bracketContainerStyle: JSX.CSSProperties = {
   display: 'flex',
-  gap: '16px',
   'overflow-x': 'auto',
   padding: '16px 0',
   '-webkit-overflow-scrolling': 'touch',
+  'align-items': 'stretch',
 }
 
 const bracketRoundColumnStyle: JSX.CSSProperties = {
@@ -1244,9 +1294,14 @@ const bracketRoundHeaderStyle: JSX.CSSProperties = {
 const bracketRoundMatchesStyle: JSX.CSSProperties = {
   display: 'flex',
   'flex-direction': 'column',
-  gap: '12px',
-  'justify-content': 'space-around',
   flex: '1',
+}
+
+const bracketMatchSlotStyle: JSX.CSSProperties = {
+  flex: '1',
+  display: 'flex',
+  'align-items': 'center',
+  padding: '6px 0',
 }
 
 const bracketMatchCardStyle: JSX.CSSProperties = {
@@ -1254,6 +1309,7 @@ const bracketMatchCardStyle: JSX.CSSProperties = {
   overflow: 'hidden',
   border: '1px solid #e0e0e0',
   'box-shadow': '0 1px 3px rgba(0,0,0,0.08)',
+  width: '100%',
 }
 
 const bracketMatchPlayerStyle: JSX.CSSProperties = {
@@ -1278,6 +1334,69 @@ const bracketScoreStyle: JSX.CSSProperties = {
   color: '#e67e22',
   'min-width': '20px',
   'text-align': 'center',
+}
+
+// Bracket connector styles
+const connectorColumnStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  width: '40px',
+  'flex-shrink': '0',
+}
+
+const connectorHeaderSpacerStyle: JSX.CSSProperties = {
+  height: '40px', // match the round header height (padding 8px*2 + font ~14px + gap 8px)
+}
+
+const connectorMatchesAreaStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  flex: '1',
+}
+
+const connectorPairStyle: JSX.CSSProperties = {
+  flex: '1',
+  display: 'flex',
+}
+
+const connectorLeftHalfStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  width: '50%',
+}
+
+const connectorSlotStyle: JSX.CSSProperties = {
+  flex: '1',
+  display: 'flex',
+  'flex-direction': 'column',
+}
+
+const connectorSlotSpacerStyle: JSX.CSSProperties = {
+  flex: '1',
+}
+
+const connectorSlotCornerTopStyle: JSX.CSSProperties = {
+  flex: '1',
+  'border-right': '2px solid #ccc',
+  'border-top': '2px solid #ccc',
+}
+
+const connectorSlotCornerBottomStyle: JSX.CSSProperties = {
+  flex: '1',
+  'border-right': '2px solid #ccc',
+  'border-bottom': '2px solid #ccc',
+}
+
+const connectorRightHalfStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  width: '50%',
+}
+
+const connectorMergeLineStyle: JSX.CSSProperties = {
+  height: '2px',
+  width: '100%',
+  'background-color': '#ccc',
 }
 
 export default EventDetail
