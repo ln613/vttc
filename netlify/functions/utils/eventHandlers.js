@@ -1391,7 +1391,11 @@ const validateConfirmMatchInput = (body) => {
 }
 
 /**
- * Reset a match in an event (clear all games)
+ * Reset a confirmed match in an event
+ * - delete all games and info related to the match
+ * - reset the complete flag on the group if needed
+ * - delete the next round schedule if exists
+ * - only allowed if no match in the next round has started/finished
  */
 export const resetMatch = async (body) => {
   validateResetMatchInput(body)
@@ -1404,22 +1408,26 @@ export const resetMatch = async (body) => {
   const event = await collection.findOne({ _id: toObjectId(_id) })
   if (!event) throwError('Event not found')
 
-  const updatedStages = updateMatchInStages(
-    event.eventStages,
-    matchId,
-    (match) => {
-      if (match.winningSide != null) {
-        throwError('Cannot reset a finished and submitted match')
-      }
-      return {
-        ...match,
-        games: [],
-        gamesWon1: 0,
-        gamesWon2: 0,
-        winningSide: undefined,
-      }
-    },
-  )
+  const updatedStages = [...event.eventStages]
+  let matchFound = false
+
+  // Try group stage
+  const groupStageIndex = updatedStages.findIndex((s) => s.type === 'group')
+  if (groupStageIndex !== -1) {
+    const result = tryResetGroupMatch(updatedStages, groupStageIndex, matchId)
+    if (result) matchFound = true
+  }
+
+  // Try knockout stage
+  if (!matchFound) {
+    const knockoutStageIndex = updatedStages.findIndex((s) => s.type === 'knockout')
+    if (knockoutStageIndex !== -1) {
+      const result = tryResetKnockoutMatch(updatedStages, knockoutStageIndex, matchId)
+      if (result) matchFound = true
+    }
+  }
+
+  if (!matchFound) throwError('Match not found')
 
   await collection.updateOne(
     { _id: toObjectId(_id) },
@@ -1433,6 +1441,160 @@ const validateResetMatchInput = (body) => {
   if (!body) throwError('Request body is required')
   if (!body._id) throwError('Event ID is required')
   if (!body.matchId) throwError('Match ID is required')
+}
+
+const tryResetGroupMatch = (updatedStages, groupStageIndex, matchId) => {
+  const groupStage = updatedStages[groupStageIndex]
+
+  for (let gi = 0; gi < groupStage.groups.length; gi++) {
+    const group = groupStage.groups[gi]
+    const matchIndex = group.matches.findIndex((m) => m._id === matchId)
+    if (matchIndex === -1) continue
+
+    const match = group.matches[matchIndex]
+    validateMatchCanBeReset(match)
+    validateNoNextRoundStartedForGroup(updatedStages, groupStage)
+
+    // Reset the match
+    const resetMatchObj = createResetMatch(match)
+
+    // Rebuild the group with updated match and recalculated stats
+    const updatedGroup = updateGroupAfterMatch(group, resetMatchObj, matchIndex)
+    updatedGroup.isComplete = false
+
+    // Update group stage
+    const updatedGroups = groupStage.groups.map((g, i) =>
+      i === gi ? updatedGroup : g,
+    )
+    const updatedGroupStage = {
+      ...groupStage,
+      groups: updatedGroups,
+      advancedParticipants: [],
+    }
+    updatedStages[groupStageIndex] = updatedGroupStage
+
+    // Delete knockout round schedule if exists
+    deleteKnockoutScheduleIfExists(updatedStages)
+
+    return true
+  }
+
+  return false
+}
+
+const tryResetKnockoutMatch = (updatedStages, knockoutStageIndex, matchId) => {
+  const knockoutStage = updatedStages[knockoutStageIndex]
+
+  for (let ri = 0; ri < knockoutStage.rounds.length; ri++) {
+    const round = knockoutStage.rounds[ri]
+    const matchIndex = round.matches.findIndex((m) => m.match?._id === matchId)
+    if (matchIndex === -1) continue
+
+    const knockoutMatch = round.matches[matchIndex]
+    validateMatchCanBeReset(knockoutMatch.match)
+    validateNoNextKnockoutRoundStarted(knockoutStage, ri)
+
+    // Reset the match
+    const resetMatchObj = createResetMatch(knockoutMatch.match)
+    const updatedKnockoutMatch = {
+      ...knockoutMatch,
+      match: resetMatchObj,
+      winner: undefined,
+    }
+
+    // Update round
+    const updatedRounds = knockoutStage.rounds.map((r, i) => {
+      if (i === ri) {
+        return {
+          ...r,
+          matches: r.matches.map((m, mi) =>
+            mi === matchIndex ? updatedKnockoutMatch : m,
+          ),
+          isComplete: false,
+        }
+      }
+      // Delete next round schedule (clear matches)
+      if (i === ri + 1) {
+        return { ...r, matches: [], isComplete: false }
+      }
+      return r
+    })
+
+    updatedStages[knockoutStageIndex] = {
+      ...knockoutStage,
+      rounds: updatedRounds,
+    }
+
+    return true
+  }
+
+  return false
+}
+
+const validateMatchCanBeReset = (match) => {
+  if (!match) throwError('Match not found')
+  if (match.winningSide == null) throwError('Match is not finished')
+  if (!match.confirmed) throwError('Match is not confirmed')
+}
+
+const validateNoNextRoundStartedForGroup = (updatedStages, groupStage) => {
+  const knockoutStage = updatedStages.find((s) => s.type === 'knockout')
+  if (!knockoutStage || !knockoutStage.rounds || knockoutStage.rounds.length === 0) return
+
+  const firstRound = knockoutStage.rounds[0]
+  const anyStarted = firstRound.matches.some(
+    (m) => m.match && (m.match.games?.length > 0 || m.match.winningSide != null),
+  )
+  if (anyStarted) {
+    throwError('Cannot reset match: next round has already started')
+  }
+}
+
+const validateNoNextKnockoutRoundStarted = (knockoutStage, currentRoundIndex) => {
+  const nextRoundIndex = currentRoundIndex + 1
+  if (nextRoundIndex >= knockoutStage.rounds.length) return
+
+  const nextRound = knockoutStage.rounds[nextRoundIndex]
+  if (!nextRound.matches || nextRound.matches.length === 0) return
+
+  const anyStarted = nextRound.matches.some(
+    (m) => m.match && (m.match.games?.length > 0 || m.match.winningSide != null),
+  )
+  if (anyStarted) {
+    throwError('Cannot reset match: next round has already started')
+  }
+}
+
+const createResetMatch = (match) => ({
+  ...match,
+  games: [],
+  gamesWon1: 0,
+  gamesWon2: 0,
+  winningSide: undefined,
+  confirmed: undefined,
+  initialServingSide: undefined,
+  leftSide: undefined,
+})
+
+const deleteKnockoutScheduleIfExists = (updatedStages) => {
+  const knockoutStageIndex = updatedStages.findIndex((s) => s.type === 'knockout')
+  if (knockoutStageIndex === -1) return
+
+  const knockoutStage = updatedStages[knockoutStageIndex]
+  if (!knockoutStage.rounds || knockoutStage.rounds.length === 0) return
+
+  // Clear all rounds (reset to empty placeholder rounds)
+  const clearedRounds = knockoutStage.rounds.map((r) => ({
+    ...r,
+    matches: [],
+    isComplete: false,
+  }))
+
+  updatedStages[knockoutStageIndex] = {
+    ...knockoutStage,
+    rounds: clearedRounds,
+    seedingList: [],
+  }
 }
 
 /**

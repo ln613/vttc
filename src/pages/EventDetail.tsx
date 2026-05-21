@@ -326,6 +326,12 @@ const MatchRow = (props: MatchRowProps) => {
     hasResult() || (props.match.games && props.match.games.length > 0)
   const isConfirming = () =>
     eventDetailState.confirmingMatchId === props.match._id
+  const isResetting = () =>
+    eventDetailState.resettingMatchId === props.match._id
+  const canReset = () =>
+    authState.isAdmin &&
+    isConfirmed() &&
+    eventDetailActions.canResetMatch(props.match._id, props.stage, props.groupIndex)
 
   const handleStartClick = () => {
     const eventId = eventDetailState.eventId
@@ -338,6 +344,12 @@ const MatchRow = (props: MatchRowProps) => {
 
   const handleConfirmClick = () => {
     eventDetailActions.showConfirmDialog(props.match._id)
+  }
+
+  const handleResetClick = () => {
+    if (confirm('Are you sure you want to reset this match? All game data will be deleted.')) {
+      eventDetailActions.resetMatch(props.match._id)
+    }
   }
 
   return (
@@ -370,6 +382,16 @@ const MatchRow = (props: MatchRowProps) => {
           disabled={isConfirming()}
         >
           {isConfirming() ? 'Confirming...' : 'Confirm'}
+        </Button>
+      </Show>
+      <Show when={canReset()}>
+        <Button
+          onClick={handleResetClick}
+          color="#e74c3c"
+          size="small"
+          disabled={isResetting()}
+        >
+          {isResetting() ? 'Resetting...' : 'Reset'}
         </Button>
       </Show>
     </div>

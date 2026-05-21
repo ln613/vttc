@@ -27,6 +27,7 @@ interface EventDetailState {
   confirmingMatchId: string | null
   showConfirmDialog: boolean
   confirmDialogMatchId: string | null
+  resettingMatchId: string | null
 }
 
 const getInitialState = (): EventDetailState => ({
@@ -42,6 +43,7 @@ const getInitialState = (): EventDetailState => ({
   confirmingMatchId: null,
   showConfirmDialog: false,
   confirmDialogMatchId: null,
+  resettingMatchId: null,
 })
 
 const [eventDetailState, setEventDetailState] =
@@ -272,11 +274,100 @@ export const eventDetailActions = {
     }
   },
 
+  /**
+   * Check if a match can be reset (only for admin).
+   * A match can be reset if it is finished and confirmed,
+   * and no match in the next round has started/finished.
+   */
+  canResetMatch: (matchId: string, stage: 'group' | 'knockout', groupIndex: number): boolean => {
+    const event = eventDetailState.data
+    if (!event) return false
+
+    if (stage === 'group') {
+      return canResetGroupMatch(event, matchId)
+    }
+    return canResetKnockoutMatch(event, matchId, groupIndex)
+  },
+
+  resetMatch: async (matchId: string) => {
+    const { eventId } = eventDetailState
+    if (!eventId || !matchId) return
+
+    setEventDetailState({ resettingMatchId: matchId })
+    try {
+      await apiPost('resetMatch', { _id: eventId, matchId })
+      await fetchEvent(eventId, true)
+    } catch (err) {
+      setEventDetailState({
+        error:
+          err instanceof Error ? err.message : 'Failed to reset match',
+      })
+    } finally {
+      setEventDetailState({ resettingMatchId: null })
+    }
+  },
+
   invalidateData: () => {
     setEventDetailState({ data: null })
   },
 
   reset: () => setEventDetailState(getInitialState()),
+}
+
+const canResetGroupMatch = (event: Event, matchId: string): boolean => {
+  const groupStage = event.eventStages?.find(
+    (s): s is Extract<Stage, { type: 'group' }> => s.type === 'group',
+  )
+  if (!groupStage) return false
+
+  // Find the match in any group
+  for (const group of groupStage.groups) {
+    const match = group.matches.find((m) => m._id === matchId)
+    if (!match) continue
+    if (match.winningSide == null || !match.confirmed) return false
+
+    // Check if any knockout round match has started
+    const knockoutStage = event.eventStages?.find(
+      (s): s is Extract<Stage, { type: 'knockout' }> => s.type === 'knockout',
+    )
+    if (!knockoutStage || knockoutStage.rounds.length === 0) return true
+
+    const firstRound = knockoutStage.rounds[0]
+    const anyStarted = firstRound.matches.some(
+      (m) => m.match && ((m.match.games?.length ?? 0) > 0 || m.match.winningSide != null),
+    )
+    return !anyStarted
+  }
+
+  return false
+}
+
+const canResetKnockoutMatch = (event: Event, matchId: string, roundIndex: number): boolean => {
+  const knockoutStage = event.eventStages?.find(
+    (s): s is Extract<Stage, { type: 'knockout' }> => s.type === 'knockout',
+  )
+  if (!knockoutStage) return false
+
+  // Find the match
+  for (const round of knockoutStage.rounds) {
+    const km = round.matches.find((m) => m.match?._id === matchId)
+    if (!km) continue
+    if (!km.match || km.match.winningSide == null || !km.match.confirmed) return false
+
+    // Check if next round has any started matches
+    const nextRoundIndex = round.index + 1
+    if (nextRoundIndex >= knockoutStage.rounds.length) return true
+
+    const nextRound = knockoutStage.rounds[nextRoundIndex]
+    if (!nextRound.matches || nextRound.matches.length === 0) return true
+
+    const anyStarted = nextRound.matches.some(
+      (m) => m.match && ((m.match.games?.length ?? 0) > 0 || m.match.winningSide != null),
+    )
+    return !anyStarted
+  }
+
+  return false
 }
 
 const findMatchById = (event: Event, matchId: string): Match | undefined => {

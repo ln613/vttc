@@ -37,6 +37,13 @@ The Total column is the total matches played so far.
   - Start button (if not started yet, align right, green, small)
   - Continue button (if already started but not finished, orange, small)
   - Confirm button (if finished but not confirmed, red, small)
+  - Reset button (if finished and confirmed, red, small, only for admin)
+    - only visible if no match in the next round has started/finished
+    - confirm with the user before reset
+    - delete all games and info related to the match
+    - reset the complete flag on the group if needed
+    - delete the next round schedule if exist
+    - after reset, show the start button
 
 ### interaction
 
