@@ -8,6 +8,9 @@ Vertical
 - Event name (h1, align left)
 - Date
 - Time
+- Summary
+  - "Best of 3 in group, Best of 5 in knockout, Handicap (200)"...
+  - if knockout stage is Best of 3 before Semifinal/Quarterfinal, then there is no need to show "Best of 3 in group"
 - Group, Knockout, bracket (tab visibility based on stages type)
 
 ## Group Stage Tab

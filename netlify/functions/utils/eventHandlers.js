@@ -945,38 +945,41 @@ const createSubsequentRoundSeedingList = (previousSeedingList, previousMatches) 
 }
 
 const advanceKnockoutRound = (stage, event) => {
-  const currentRoundIndex = stage.rounds.findIndex((r) => !r.isComplete)
-  if (currentRoundIndex === -1 || currentRoundIndex >= stage.rounds.length - 1) {
-    return stage
+  // Find a complete round whose next round has no matches yet
+  for (let i = 0; i < stage.rounds.length - 1; i++) {
+    const round = stage.rounds[i]
+    const nextRound = stage.rounds[i + 1]
+
+    const allMatchesComplete = round.matches.length > 0 && round.matches.every((m) => m.winner)
+    if (!allMatchesComplete) continue
+    if (nextRound.matches.length > 0) continue // Next round already populated
+
+    const updatedCurrentRound = { ...round, isComplete: true }
+
+    const nextSeedingList = createSubsequentRoundSeedingList(stage.seedingList, round.matches)
+    const nextRoundNames = getKnockoutRoundName(
+      nextRound.participantCount,
+      stage.rounds[0].participantCount,
+    )
+    const nextRoundMatches = createKnockoutMatches(nextSeedingList, event, nextRoundNames.name)
+
+    const updatedNextRound = {
+      ...nextRound,
+      matches: nextRoundMatches,
+    }
+
+    const updatedRounds = [...stage.rounds]
+    updatedRounds[i] = updatedCurrentRound
+    updatedRounds[i + 1] = updatedNextRound
+
+    return {
+      ...stage,
+      seedingList: nextSeedingList,
+      rounds: updatedRounds,
+    }
   }
 
-  const currentRound = stage.rounds[currentRoundIndex]
-  const allMatchesComplete = currentRound.matches.every((m) => m.winner)
-  if (!allMatchesComplete) return stage
-
-  const updatedCurrentRound = { ...currentRound, isComplete: true }
-
-  const nextSeedingList = createSubsequentRoundSeedingList(stage.seedingList, currentRound.matches)
-  const nextRoundNames = getKnockoutRoundName(
-    stage.rounds[currentRoundIndex + 1].participantCount,
-    stage.rounds[0].participantCount,
-  )
-  const nextRoundMatches = createKnockoutMatches(nextSeedingList, event, nextRoundNames.name)
-
-  const nextRound = {
-    ...stage.rounds[currentRoundIndex + 1],
-    matches: nextRoundMatches,
-  }
-
-  const updatedRounds = [...stage.rounds]
-  updatedRounds[currentRoundIndex] = updatedCurrentRound
-  updatedRounds[currentRoundIndex + 1] = nextRound
-
-  return {
-    ...stage,
-    seedingList: nextSeedingList,
-    rounds: updatedRounds,
-  }
+  return stage
 }
 
 /**
@@ -2002,7 +2005,7 @@ const updateStageCompletionAfterConfirm = (updatedStages, event) => {
   if (knockoutStageIndex !== -1) {
     const knockoutStage = updatedStages[knockoutStageIndex]
     const updatedRounds = knockoutStage.rounds.map((r) => {
-      const roundComplete = r.matches.every(
+      const roundComplete = r.matches.length > 0 && r.matches.every(
         (m) => m.winner && m.match?.confirmed,
       )
       return { ...r, isComplete: roundComplete }
@@ -2037,21 +2040,43 @@ const generateNextRoundIfNeeded = (updatedStages, event) => {
     return
   }
 
-  // Find the current incomplete round
-  const currentRoundIndex = knockoutStage.rounds.findIndex((r) => !r.isComplete)
-  if (currentRoundIndex === -1) return // All rounds complete
-  if (currentRoundIndex >= knockoutStage.rounds.length - 1) return // Last round, nothing to generate
+  // Find a complete round whose next round has no matches yet
+  for (let i = 0; i < knockoutStage.rounds.length - 1; i++) {
+    const round = knockoutStage.rounds[i]
+    const nextRound = knockoutStage.rounds[i + 1]
 
-  const currentRound = knockoutStage.rounds[currentRoundIndex]
-  const allComplete = currentRound.matches.every(
+    const roundFullyComplete = isRoundFullyComplete(round)
+    if (!roundFullyComplete) continue
+    if (nextRound.matches.length > 0) continue // Next round already populated
+
+    // Generate next round matches directly
+    const nextSeedingList = createSubsequentRoundSeedingList(knockoutStage.seedingList, round.matches)
+    const nextRoundNames = getKnockoutRoundName(
+      nextRound.participantCount,
+      knockoutStage.rounds[0].participantCount,
+    )
+    const nextRoundMatches = createKnockoutMatches(nextSeedingList, event, nextRoundNames.name)
+
+    const updatedRounds = knockoutStage.rounds.map((r, idx) => {
+      if (idx === i) return { ...r, isComplete: true }
+      if (idx === i + 1) return { ...r, matches: nextRoundMatches }
+      return r
+    })
+
+    updatedStages[knockoutStageIndex] = {
+      ...knockoutStage,
+      seedingList: nextSeedingList,
+      rounds: updatedRounds,
+    }
+    return
+  }
+}
+
+/**
+ * Check if a knockout round is fully complete (has matches, all with winners and confirmed)
+ */
+const isRoundFullyComplete = (round) => {
+  return round.matches.length > 0 && round.matches.every(
     (m) => m.winner && m.match?.confirmed,
   )
-  if (!allComplete) return
-
-  // Mark current round as complete and generate next round
-  const updatedKnockoutStage = advanceKnockoutRound(
-    { ...knockoutStage, rounds: knockoutStage.rounds.map((r, i) => i === currentRoundIndex ? { ...r, isComplete: true } : r) },
-    event,
-  )
-  updatedStages[knockoutStageIndex] = updatedKnockoutStage
 }

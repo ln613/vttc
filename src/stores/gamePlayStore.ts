@@ -1,5 +1,5 @@
 import { createStore } from 'solid-js/store'
-import type { Event, BestOfOption } from '../../shared/types/Tournament'
+import type { Event } from '../../shared/types/Tournament'
 import type { Match, GameConfig, HandicapParams } from '../../shared/types/Match'
 import { DEFAULT_GAME_CONFIG } from '../../shared/types/Match'
 import type { Player } from '../../shared/types/Player'
@@ -194,11 +194,16 @@ const calculateServingSide = (
   return shouldSwitch ? getOpposingSide(gameFirstServeSide) : gameFirstServeSide
 }
 
-const parseBestOfOption = (bestOf: BestOfOption | undefined): number => {
-  if (!bestOf) return 5
-  if (bestOf.includes('3')) return 3
-  if (bestOf.includes('5')) return 5
-  return 5
+const getKnockoutRoundName = (): string | undefined => {
+  if (!gamePlayState.data || !gamePlayState.matchId) return undefined
+  const stages = gamePlayState.data.eventStages || []
+  const knockoutStage = stages.find((s) => s.type === 'knockout')
+  if (!knockoutStage || knockoutStage.type !== 'knockout') return undefined
+  for (const round of knockoutStage.rounds) {
+    const found = round.matches.find((m) => m.match?._id === gamePlayState.matchId)
+    if (found) return round.name
+  }
+  return undefined
 }
 
 const formatPlayerNames = (players: Player[]): string => {
@@ -501,19 +506,13 @@ export const gamePlayActions = {
     if (gamePlayState.stage === 'group') {
       return `Group ${gamePlayState.groupIndex + 1}`
     }
-    // For knockout, we would need more info to determine round name
-    return 'Knockout'
+    return getKnockoutRoundName() ?? 'Knockout'
   },
 
   getNumberOfGames: (): number => {
-    if (!gamePlayState.data) return 5
-
-    const bestOf =
-      gamePlayState.stage === 'group'
-        ? gamePlayState.data.groupGames
-        : gamePlayState.data.knockoutGames
-
-    return parseBestOfOption(bestOf)
+    const match = gamePlayActions.getCurrentMatch()
+    if (match?.config?.numberOfGames) return match.config.numberOfGames
+    return 5
   },
 
   getParticipantName: (side: 1 | 2): string => {

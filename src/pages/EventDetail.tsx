@@ -92,6 +92,7 @@ const EventHeader = () => {
   const eventName = () => eventDetailState.data?.eventName || ''
   const dateDisplay = () => formatDate(eventDetailState.data?.date)
   const timeDisplay = () => eventDetailState.data?.time || ''
+  const summary = () => eventDetailActions.getEventSummary()
 
   return (
     <Show when={eventDetailState.data}>
@@ -99,6 +100,9 @@ const EventHeader = () => {
       <div style={dateStyle}>{dateDisplay()}</div>
       <Show when={timeDisplay()}>
         <div style={timeStyle}>{timeDisplay()}</div>
+      </Show>
+      <Show when={summary()}>
+        <div style={summaryStyle}>{summary()}</div>
       </Show>
     </Show>
   )
@@ -943,6 +947,14 @@ const timeStyle: JSX.CSSProperties = {
   'font-size': '16px',
   'font-weight': 400,
   color: '#555',
+  'margin-bottom': '2px',
+}
+
+const summaryStyle: JSX.CSSProperties = {
+  'text-align': 'left',
+  'font-size': '14px',
+  'font-weight': 400,
+  color: '#777',
   'margin-bottom': '20px',
 }
 

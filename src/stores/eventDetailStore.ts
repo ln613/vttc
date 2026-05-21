@@ -3,6 +3,7 @@ import type {
   Event,
   Stage,
   TournamentType,
+  BestOfOption,
   Group,
   KnockoutStage,
   KnockoutRound,
@@ -320,6 +321,12 @@ export const eventDetailActions = {
     }
   },
 
+  getEventSummary: (): string => {
+    const event = eventDetailState.data
+    if (!event) return ''
+    return buildEventSummary(event)
+  },
+
   invalidateData: () => {
     setEventDetailState({ data: null })
   },
@@ -410,3 +417,33 @@ const buildMatchPreview = (match: Match): MatchPreview => ({
     winningSide: g.winningSide,
   })),
 })
+
+const isKnockoutBestOf3Before = (knockoutGames: BestOfOption): boolean =>
+  knockoutGames === 'Best of 3 before Semifinal' ||
+  knockoutGames === 'Best of 3 before Quarterfinal'
+
+const buildEventSummary = (event: Event): string => {
+  const parts: string[] = []
+  const hasGroup = event.stages?.includes('group')
+  const hasKnockout = event.stages?.includes('knockout')
+  const knockoutIsBestOf3Before =
+    hasKnockout && isKnockoutBestOf3Before(event.knockoutGames)
+
+  if (knockoutIsBestOf3Before) {
+    // "Best of 3 before Semifinal/Quarterfinal" already covers group (Best of 3)
+    parts.push(event.knockoutGames)
+  } else {
+    if (hasGroup) {
+      parts.push(`${event.groupGames} in group`)
+    }
+    if (hasKnockout) {
+      parts.push(`${event.knockoutGames} in knockout`)
+    }
+  }
+
+  if (event.handicapEnabled) {
+    parts.push(`Handicap (${event.handicapDifference})`)
+  }
+
+  return parts.join(', ')
+}
