@@ -600,6 +600,10 @@ const generateGroupMatchSchedule = (participants) => {
 /**
  * Generate knockout round
  */
+const isFirstRoundEmpty = (knockoutStage) =>
+  knockoutStage.rounds.length > 0 &&
+  knockoutStage.rounds[0].matches.length === 0
+
 export const generateKnockout = async (body) => {
   if (!body) throwError('Request body is required')
   if (!body._id) throwError('Event ID is required')
@@ -622,7 +626,10 @@ export const generateKnockout = async (body) => {
 
   let updatedKnockoutStage
 
-  if (knockoutStage.rounds.length === 0) {
+  const needsFreshKnockout = knockoutStage.rounds.length === 0 ||
+    isFirstRoundEmpty(knockoutStage)
+
+  if (needsFreshKnockout) {
     // First round - create initial knockout bracket
     let participants
 
@@ -676,7 +683,7 @@ const validateGenerateKnockoutRules = (event) => {
 
   if (groupStage) {
     const allGroupsComplete = groupStage.groups.every((g) => g.isComplete)
-    if (!allGroupsComplete && knockoutStage.rounds.length === 0) {
+    if (!allGroupsComplete && (knockoutStage.rounds.length === 0 || isFirstRoundEmpty(knockoutStage))) {
       errors.push('All group stage matches must be completed first')
     }
   }
@@ -2015,8 +2022,8 @@ const generateNextRoundIfNeeded = (updatedStages, event) => {
   if (knockoutStageIndex === -1) return
 
   const knockoutStage = updatedStages[knockoutStageIndex]
-  if (!knockoutStage.rounds || knockoutStage.rounds.length === 0) {
-    // No knockout rounds yet. Check if group stage is complete and knockout should start
+  if (!knockoutStage.rounds || knockoutStage.rounds.length === 0 || isFirstRoundEmpty(knockoutStage)) {
+    // No knockout rounds yet (or cleared after reset). Check if group stage is complete and knockout should start
     const groupStage = updatedStages.find((s) => s.type === 'group')
     if (groupStage && groupStage.groups.every((g) => g.isComplete) && groupStage.advancedParticipants?.length > 0) {
       const participants = groupStage.advancedParticipants.map((ap) => ({

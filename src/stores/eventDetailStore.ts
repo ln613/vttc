@@ -166,11 +166,16 @@ export const eventDetailActions = {
     const knockoutStage = eventDetailActions.getKnockoutStage()
     if (!knockoutStage) return false
 
+    const groupStage = eventDetailActions.getGroupStage()
+    const isGroupStageComplete = groupStage
+      ? groupStage.groups.length > 0 &&
+        groupStage.groups.every((g) => g.isComplete)
+      : true
+
     // No rounds yet: check if group stage is complete
     if (knockoutStage.rounds.length === 0) {
-      const groupStage = eventDetailActions.getGroupStage()
       if (groupStage) {
-        return groupStage.groups.length > 0 && groupStage.groups.every((g) => g.isComplete)
+        return isGroupStageComplete
       }
       // Knockout-only: always can generate first round if participants exist
       return (eventDetailState.data?.participants?.length ?? 0) >= 4
@@ -181,7 +186,15 @@ export const eventDetailActions = {
     if (!currentRound) return false
 
     // Current round has no matches generated yet (empty placeholder round)
-    return currentRound.matches.length === 0
+    if (currentRound.matches.length === 0) {
+      // If it is the first round, also require group stage to be complete
+      if (currentRound.index === 0 && groupStage) {
+        return isGroupStageComplete
+      }
+      return true
+    }
+
+    return false
   },
 
   generateNextRound: async () => {

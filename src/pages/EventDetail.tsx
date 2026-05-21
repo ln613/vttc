@@ -248,10 +248,12 @@ const GroupDisplay = (props: GroupDisplayProps) => {
   const playerColumnTitle = () => eventDetailActions.getPlayerColumnTitle()
   const rankedParticipants = () =>
     getRankedParticipants(props.group.participants)
+  const titleStyle = () =>
+    props.group.isComplete ? groupTitleCompleteStyle : groupTitleStyle
 
   return (
     <div style={groupContainerStyle}>
-      <h3 style={groupTitleStyle}>Group {props.group.index + 1}</h3>
+      <h3 style={titleStyle()}>Group {props.group.index + 1}</h3>
       <GroupTable
         participants={rankedParticipants()}
         playerColumnTitle={playerColumnTitle()}
@@ -847,25 +849,33 @@ const BracketMatchCard = (props: BracketMatchCardProps) => {
   const p2Name = () =>
     isBye() ? 'BYE' : getKnockoutParticipantName(props.knockoutMatch.participant2)
   const match = () => props.knockoutMatch.match
-  const winnerId = () => {
-    const w = props.knockoutMatch.winner
-    if (!w) return undefined
-    return w.participant?._id || (w as any)?._id
+  const isFinished = () => match()?.winningSide != null
+  const p1IsWinner = () => match()?.winningSide === 1
+  const p2IsWinner = () => match()?.winningSide === 2 && !isBye()
+  const p1IsLeading = () =>
+    !isFinished() && match() != null && match()!.gamesWon1 > match()!.gamesWon2
+  const p2IsLeading = () =>
+    !isFinished() && !isBye() && match() != null && match()!.gamesWon2 > match()!.gamesWon1
+
+  const p1BgColor = () => {
+    if (p1IsWinner()) return '#e8f5e9'
+    if (p1IsLeading()) return '#f5f5eb'
+    return '#fff'
   }
-  const p1Id = () => {
-    const p = props.knockoutMatch.participant1
-    return p?.participant?._id || (p as any)?._id
+  const p2BgColor = () => {
+    if (p2IsWinner()) return '#e8f5e9'
+    if (p2IsLeading()) return '#f5f5eb'
+    if (isBye()) return '#f5f5f5'
+    return '#fff'
   }
-  const p1IsWinner = () => winnerId() != null && winnerId() === p1Id()
-  const p2IsWinner = () => winnerId() != null && !p1IsWinner() && !isBye()
 
   return (
     <div style={bracketMatchCardStyle}>
       <div
         style={{
           ...bracketMatchPlayerStyle,
-          'font-weight': p1IsWinner() ? 700 : 400,
-          'background-color': p1IsWinner() ? '#e8f5e9' : '#fff',
+          'font-weight': p1IsWinner() || p1IsLeading() ? 700 : 400,
+          'background-color': p1BgColor(),
         }}
       >
         <span style={bracketPlayerNameStyle}>{p1Name()}</span>
@@ -876,8 +886,8 @@ const BracketMatchCard = (props: BracketMatchCardProps) => {
       <div
         style={{
           ...bracketMatchPlayerStyle,
-          'font-weight': p2IsWinner() ? 700 : 400,
-          'background-color': p2IsWinner() ? '#e8f5e9' : isBye() ? '#f5f5f5' : '#fff',
+          'font-weight': p2IsWinner() || p2IsLeading() ? 700 : 400,
+          'background-color': p2BgColor(),
           'border-top': '1px solid #e0e0e0',
         }}
       >
@@ -975,6 +985,16 @@ const groupTitleStyle: JSX.CSSProperties = {
   margin: '0',
   padding: '14px 20px',
   background: 'linear-gradient(135deg, #2c3e50, #34495e)',
+  'letter-spacing': '0.5px',
+}
+
+const groupTitleCompleteStyle: JSX.CSSProperties = {
+  'font-size': '16px',
+  'font-weight': 700,
+  color: '#fff',
+  margin: '0',
+  padding: '14px 20px',
+  background: 'linear-gradient(135deg, #1e7e34, #27ae60)',
   'letter-spacing': '0.5px',
 }
 
