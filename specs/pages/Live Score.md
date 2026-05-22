@@ -57,6 +57,10 @@ Each table will show:
   - player2 of the match (or for team, player3/player4), followed by the game score
   - table number (yellow, big, top-center)
 
+## Match Queue section
+
+The match that is not playable at the moment because some players in the match are playing on other tables should be displayed in a disabled style
+
 ## Interactions
 
 - on page load, retrieve the Match Queue and table assignment

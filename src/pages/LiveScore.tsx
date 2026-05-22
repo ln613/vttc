@@ -85,7 +85,7 @@ interface TableRowProps {
 }
 
 const TableRow = (props: TableRowProps) => (
-  <div style={tableRowStyle}>
+  <div style={getTableRowStyle(props.tables.length)}>
     <For each={props.tables}>
       {(tableNum) => {
         const table = () => liveScoreActions.getTable(tableNum)
@@ -279,9 +279,10 @@ const MatchQueueRow = (props: MatchQueueRowProps) => {
   const match = () => props.item.match
   const side1Name = () => formatPlayersShort(match()?.side1 || [])
   const side2Name = () => formatPlayersShort(match()?.side2 || [])
+  const playable = () => liveScoreActions.isMatchPlayable(props.item)
 
   return (
-    <div style={queueRowStyle}>
+    <div style={playable() ? queueRowStyle : queueRowDisabledStyle}>
       <div style={queueEventNameStyle}>{props.item.eventName}</div>
       <div style={queueStageStyle}>{props.item.stageName}</div>
       <div style={queueMatchStyle}>
@@ -394,22 +395,24 @@ const matchQueueMobileStyle: JSX.CSSProperties = {
 }
 
 // Table row
-const tableRowStyle: JSX.CSSProperties = {
-  display: 'flex',
+const getTableRowStyle = (columns: number): JSX.CSSProperties => ({
+  display: 'grid',
+  'grid-template-columns': `repeat(${columns}, 1fr)`,
   gap: '8px',
   flex: 1,
   'min-height': 0,
-}
+})
 
 // Available table
 const availableTableStyle: JSX.CSSProperties = {
-  flex: 1,
+  'min-width': 0,
   display: 'flex',
   'align-items': 'center',
   'justify-content': 'center',
   'background-color': '#27ae60',
   'border-radius': '12px',
   'min-height': 0,
+  overflow: 'hidden',
 }
 
 const availableTableNumberStyle: JSX.CSSProperties = {
@@ -421,7 +424,7 @@ const availableTableNumberStyle: JSX.CSSProperties = {
 
 // Assigned table
 const getAssignedTableStyle = (isNotStarted: boolean): JSX.CSSProperties => ({
-  flex: 1,
+  'min-width': 0,
   display: 'flex',
   'flex-direction': 'column',
   'align-items': 'center',
@@ -606,6 +609,13 @@ const queueVsStyle: JSX.CSSProperties = {
   color: 'rgba(255,255,255,0.5)',
   margin: '0 4px',
   'font-size': '11px',
+}
+
+// Disabled queue row (match not playable - players on tables)
+const queueRowDisabledStyle: JSX.CSSProperties = {
+  ...queueRowStyle,
+  'background-color': 'rgba(255,255,255,0.03)',
+  opacity: '0.5',
 }
 
 export default LiveScore

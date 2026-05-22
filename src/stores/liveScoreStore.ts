@@ -4,6 +4,7 @@ import type {
   MatchQueueItem,
   LiveScoreData,
 } from '../../shared/types/Table'
+import type { Player } from '../../shared/types/Player'
 import { apiGet } from '../utils/api'
 
 interface LiveScoreState {
@@ -57,6 +58,39 @@ const stopPolling = () => {
   }
 }
 
+const getPlayerIdsOnTables = (): Set<string> => {
+  const ids = new Set<string>()
+  for (const table of liveScoreState.tables) {
+    if (table.status !== 'assigned' || !table.match) continue
+    const match = table.match.match
+    if (!match) continue
+    addPlayerIds(match.side1 || [], ids)
+    addPlayerIds(match.side2 || [], ids)
+  }
+  return ids
+}
+
+const addPlayerIds = (players: Player[], ids: Set<string>) => {
+  for (const p of players) {
+    if (p._id) ids.add(p._id.toString())
+  }
+}
+
+const hasPlayerConflict = (
+  item: MatchQueueItem,
+  playersOnTables: Set<string>,
+): boolean => {
+  const match = item.match
+  if (!match) return false
+  for (const p of match.side1 || []) {
+    if (p._id && playersOnTables.has(p._id.toString())) return true
+  }
+  for (const p of match.side2 || []) {
+    if (p._id && playersOnTables.has(p._id.toString())) return true
+  }
+  return false
+}
+
 export const liveScoreActions = {
   fetchLiveScore: async () => {
     setLiveScoreState({ loading: true, error: null })
@@ -74,6 +108,11 @@ export const liveScoreActions = {
 
   getAvailableTables: (): TableAssignment[] =>
     liveScoreState.tables.filter((t) => t.status === 'available'),
+
+  isMatchPlayable: (item: MatchQueueItem): boolean => {
+    const playersOnTables = getPlayerIdsOnTables()
+    return !hasPlayerConflict(item, playersOnTables)
+  },
 
   reset: () => {
     stopPolling()
