@@ -39,3 +39,33 @@
 .read-the-docs {
   color: #888;
 }
+
+.hide-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome/Safari/Opera */
+}
+
+@keyframes flashBorder {
+  0%,
+  100% {
+    border-color: #f1c40f;
+    box-shadow: 0 0 8px rgba(241, 196, 15, 0.6);
+  }
+  50% {
+    border-color: transparent;
+    box-shadow: none;
+  }
+}
+
+@keyframes flashPoint {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}

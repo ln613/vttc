@@ -6,6 +6,7 @@ import EventParticipantEdit from './pages/EventParticipantEdit'
 import EventList from './pages/EventList'
 import EventDetail from './pages/EventDetail'
 import GamePlay from './pages/GamePlay'
+import LiveScore from './pages/LiveScore'
 
 const App = () => (
   <Router>
@@ -18,6 +19,7 @@ const App = () => (
     <Route path="/event/participants" component={EventParticipantEdit} />
     <Route path="/event/:id" component={EventDetail} />
     <Route path="/game-play" component={GamePlay} />
+    <Route path="/live-score" component={LiveScore} />
   </Router>
 )
 

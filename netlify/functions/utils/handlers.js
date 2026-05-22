@@ -19,6 +19,7 @@ import {
   resetMatch,
 } from './eventHandlers.js'
 import { signIn } from './accountHandlers.js'
+import { getLiveScore, rebuildMatchQueue } from './liveScoreHandlers.js'
 
 export const apiHandlers = {
   get: {
@@ -27,6 +28,7 @@ export const apiHandlers = {
     tournament: (params) => getTournament(params),
     events: (params) => getEvents(params),
     event: (params) => getEvent(params),
+    liveScore: () => getLiveScore(),
   },
   post: {
     saveTournament: (body) => saveTournament(body),
@@ -41,5 +43,6 @@ export const apiHandlers = {
     saveMatchSetup: (body) => saveMatchSetup(body),
     resetMatch: (body) => resetMatch(body),
     signIn: (body) => signIn(body),
+    rebuildMatchQueue: () => rebuildMatchQueue(),
   },
 }
