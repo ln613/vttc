@@ -25,6 +25,7 @@ export interface Game {
   score1: number // Points for side 1
   score2: number // Points for side 2
   winningSide?: 1 | 2
+  lastScoredSide?: 1 | 2 // Which side scored the most recent point
 }
 
 /**

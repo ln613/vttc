@@ -143,9 +143,10 @@ const isMatchFinishedAndConfirmed = (match) =>
   match.winningSide != null && match.confirmed === true
 
 const getMatchStatus = (match) => {
-  if (!match.games || match.games.length === 0) return 'not_started'
   if (match.winningSide != null) return 'not_started' // finished but not confirmed, treat as not started for table display
-  return 'in_progress'
+  if (match.initialServingSide != null && match.leftSide != null) return 'in_progress' // match setup done = started
+  if (match.games && match.games.length > 0) return 'in_progress'
+  return 'not_started'
 }
 
 // ==================== TABLE STATE PERSISTENCE ====================
@@ -481,13 +482,17 @@ export const getLiveScore = async () => {
   const savedState = await loadTableState()
   let tables = savedState?.tables || createInitialTables()
 
-  // Reconcile: remove assignments for matches that are now finished/confirmed
+  // Reconcile: remove finished assignments and refresh match data on assigned tables
   tables = reconcileTableAssignments(tables, allMatchItems)
+
+  // Filter out matches already assigned to tables
+  const assignedMatchIds = getAssignedMatchIds(tables)
+  const unassignedQueue = filterOutAssignedMatches(matchQueue, assignedMatchIds)
 
   // Check auto-start conditions
   const hasStartedEvent = events.length > 0
   const allAvailable = tables.every((t) => t.status === 'available')
-  const queueEmpty = matchQueue.length === 0
+  const queueEmpty = unassignedQueue.length === 0
 
   if (queueEmpty && allAvailable && hasStartedEvent) {
     // Re-extract - this is the auto-start trigger
@@ -500,7 +505,7 @@ export const getLiveScore = async () => {
   }
 
   // Assign tables to matches
-  const result = assignTablesToMatches(tables, matchQueue, allMatchItems)
+  const result = assignTablesToMatches(tables, unassignedQueue, allMatchItems)
   await saveTableState(result.tables, result.remainingQueue)
 
   return { tables: result.tables, matchQueue: result.remainingQueue }
@@ -520,19 +525,46 @@ const extractAllRemainingMatches = (events) => {
  * Remove assignments for matches that are now finished and confirmed
  */
 const reconcileTableAssignments = (tables, currentMatchItems) => {
-  const currentMatchIds = new Set(currentMatchItems.map((i) => i.matchId))
+  const currentMatchMap = buildCurrentMatchMap(currentMatchItems)
 
   return tables.map((table) => {
     if (table.status !== 'assigned' || !table.match) return table
 
+    const freshItem = currentMatchMap.get(table.match.matchId)
+
     // If the match is no longer in the remaining matches, it's been finished/confirmed
-    if (!currentMatchIds.has(table.match.matchId)) {
+    if (!freshItem) {
       return { ...table, match: undefined, status: 'available' }
     }
 
-    return table
+    // Update the table's match data with fresh data (games, scores, matchStatus)
+    return {
+      ...table,
+      match: { ...freshItem, tableNumber: table.tableNumber },
+    }
   })
 }
+
+const buildCurrentMatchMap = (matchItems) => {
+  const map = new Map()
+  for (const item of matchItems) {
+    map.set(item.matchId, item)
+  }
+  return map
+}
+
+const getAssignedMatchIds = (tables) => {
+  const ids = new Set()
+  for (const table of tables) {
+    if (table.status === 'assigned' && table.match?.matchId) {
+      ids.add(table.match.matchId)
+    }
+  }
+  return ids
+}
+
+const filterOutAssignedMatches = (queue, assignedMatchIds) =>
+  queue.filter((item) => !assignedMatchIds.has(item.matchId))
 
 /**
  * Rebuild match queue (triggered after match confirm/reset)
@@ -548,8 +580,12 @@ export const rebuildMatchQueue = async () => {
   // Reconcile
   tables = reconcileTableAssignments(tables, allMatchItems)
 
+  // Filter out matches already assigned to tables
+  const assignedMatchIds = getAssignedMatchIds(tables)
+  const unassignedQueue = filterOutAssignedMatches(matchQueue, assignedMatchIds)
+
   // Assign
-  const result = assignTablesToMatches(tables, matchQueue, allMatchItems)
+  const result = assignTablesToMatches(tables, unassignedQueue, allMatchItems)
   await saveTableState(result.tables, result.remainingQueue)
 
   return { tables: result.tables, matchQueue: result.remainingQueue }

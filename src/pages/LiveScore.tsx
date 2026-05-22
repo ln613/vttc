@@ -213,17 +213,18 @@ interface GameScoreItemProps {
 const GameScoreItem = (props: GameScoreItemProps) => {
   const side1Won = () => props.game.winningSide === 1
   const side2Won = () => props.game.winningSide === 2
+  const lastScoredSide = () => props.game.lastScoredSide
 
   return (
     <span style={gameScoreItemStyle}>
       <span
-        style={getScoreNumberStyle(side1Won(), props.isLatest)}
+        style={getScoreNumberStyle(side1Won(), props.isLatest, lastScoredSide() === 1)}
       >
         {props.game.score1}
       </span>
       <span style={scoreColonStyle}>:</span>
       <span
-        style={getScoreNumberStyle(side2Won(), props.isLatest)}
+        style={getScoreNumberStyle(side2Won(), props.isLatest, lastScoredSide() === 2)}
       >
         {props.game.score2}
       </span>
@@ -411,7 +412,7 @@ const getAssignedTableStyle = (isNotStarted: boolean): JSX.CSSProperties => ({
   gap: '2px',
   padding: '8px',
   'border-radius': '12px',
-  'background-color': isNotStarted ? '#c0392b' : '#e67e22',
+  'background-color': isNotStarted ? '#c0392b' : '#2980b9',
   border: isNotStarted ? '3px solid #f1c40f' : '3px solid transparent',
   'min-height': 0,
   overflow: 'hidden',
@@ -483,10 +484,11 @@ const gameScoreItemStyle: JSX.CSSProperties = {
 const getScoreNumberStyle = (
   isWinner: boolean,
   isLatest: boolean,
+  isLastScored: boolean,
 ): JSX.CSSProperties => ({
-  'font-weight': isWinner ? 800 : 400,
-  color: isWinner ? '#f1c40f' : '#fff',
-  animation: isLatest && !isWinner ? 'none' : 'none',
+  'font-weight': isWinner || (isLatest && isLastScored) ? 800 : 400,
+  color: isWinner ? '#f1c40f' : isLatest && isLastScored ? '#00e5ff' : '#fff',
+  animation: isLatest && isLastScored ? 'flashPoint 1s ease-in-out infinite' : 'none',
 })
 
 const scoreColonStyle: JSX.CSSProperties = {

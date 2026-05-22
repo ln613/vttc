@@ -43,6 +43,7 @@ interface GamePlayState {
   matchSubmitted: boolean
   showFinishDialog: boolean
   gameHistory: GameResult[]
+  lastScoredSide: 1 | 2 | null
 }
 
 const getInitialState = (): GamePlayState => ({
@@ -70,6 +71,7 @@ const getInitialState = (): GamePlayState => ({
   matchSubmitted: false,
   showFinishDialog: false,
   gameHistory: [],
+  lastScoredSide: null,
 })
 
 const [gamePlayState, setGamePlayState] =
@@ -361,6 +363,7 @@ export const gamePlayActions = {
       timeout1: false,
       timeout2: false,
       menuOpen: false,
+      lastScoredSide: null,
     })
 
     debouncedSaveGame()
@@ -397,6 +400,7 @@ export const gamePlayActions = {
       timeout2: false,
       matchSubmitted: false,
       gameHistory: [],
+      lastScoredSide: null,
     })
   },
 
@@ -428,6 +432,7 @@ export const gamePlayActions = {
       score1: newScore1,
       score2: newScore2,
       servingSide: newServingSide,
+      lastScoredSide: side,
     })
 
     debouncedSaveGame()
@@ -599,6 +604,7 @@ export const gamePlayActions = {
       timeout1: false,
       timeout2: false,
       gameHistory: newGameHistory,
+      lastScoredSide: null,
     })
   },
 
@@ -677,6 +683,7 @@ export const gamePlayActions = {
         score1: gamePlayState.score1,
         score2: gamePlayState.score2,
       },
+      lastScoredSide: gamePlayState.lastScoredSide,
     })
 
     pendingSavePromise = savePromise.then(

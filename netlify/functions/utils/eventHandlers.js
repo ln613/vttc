@@ -1710,7 +1710,7 @@ const updateMatchInStages = (eventStages, matchId, updateFn) => {
 export const updateGame = async (body) => {
   validateUpdateGameInput(body)
 
-  const { _id, matchId, gameNumber, score } = body
+  const { _id, matchId, gameNumber, score, lastScoredSide } = body
 
   const db = getDB()
   const collection = db.collection(EVENTS_COLLECTION)
@@ -1740,7 +1740,7 @@ export const updateGame = async (body) => {
         throwErrors(errors)
 
         // Update match with new game score
-        const updatedMatch = updateMatchWithGameScore(match, gameNumber, score)
+        const updatedMatch = updateMatchWithGameScore(match, gameNumber, score, lastScoredSide)
 
         // Update group stats
         const updatedGroup = updateGroupAfterMatch(group, updatedMatch, matchIndex)
@@ -1786,7 +1786,7 @@ export const updateGame = async (body) => {
           throwErrors(errors)
 
           // Update match with new game score
-          const updatedMatch = updateMatchWithGameScore(match, gameNumber, score)
+          const updatedMatch = updateMatchWithGameScore(match, gameNumber, score, lastScoredSide)
           const knockoutMatch = round.matches[matchIndex]
           const winner =
             updatedMatch.winningSide === 1
@@ -1918,7 +1918,7 @@ const validateScoreLimit = (score1, score2, targetPoints, isGolden) => {
   return errors
 }
 
-const updateMatchWithGameScore = (match, gameNumber, score) => {
+const updateMatchWithGameScore = (match, gameNumber, score, lastScoredSide) => {
   const gameIndex = gameNumber - 1
   const { score1, score2 } = score
 
@@ -1929,6 +1929,7 @@ const updateMatchWithGameScore = (match, gameNumber, score) => {
     score1,
     score2,
     winningSide: determineGameWinner(score1, score2, match.config.gameConfig),
+    lastScoredSide: lastScoredSide || undefined,
   }
 
   // Update games array

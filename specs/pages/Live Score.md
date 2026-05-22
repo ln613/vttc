@@ -44,7 +44,7 @@ Each table will show:
 - match assigned
   - bg color
     - match not started: red bg, flashing yellow border
-    - match in progress: orange bg
+    - match in progress: blue (#2980b9) bg
   - table number (yellow, big, top-center)
   - event name
   - stage ("Group {n}", "Semifinal"...)
