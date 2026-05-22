@@ -137,29 +137,45 @@ const AssignedTable = (props: AssignedTableProps) => {
   const match = () => props.matchItem.match
   const side1Players = () => match()?.side1 || []
   const side2Players = () => match()?.side2 || []
+  const bestOf = () => match()?.config?.numberOfGames
+  const isInProgress = () => !isNotStarted()
+  const gamesWon1 = () => match()?.gamesWon1 ?? 0
+  const gamesWon2 = () => match()?.gamesWon2 ?? 0
 
   return (
     <div style={getAssignedTableStyle(isNotStarted())}>
       <div style={tableNumberAssignedStyle}>{props.tableNumber}</div>
       <div style={eventNameTableStyle}>{props.matchItem.eventName}</div>
       <div style={stageNameTableStyle}>{props.matchItem.stageName}</div>
-      <TablePlayerDisplay players={side1Players()} />
+      <Show when={bestOf()}>
+        <div style={bestOfTableStyle}>Best of {bestOf()}</div>
+      </Show>
+      <TablePlayerDisplay players={side1Players()} gamesWon={gamesWon1()} showScore={isInProgress()} />
       <TableScoreDisplay
         match={match()}
         isNotStarted={isNotStarted()}
       />
-      <TablePlayerDisplay players={side2Players()} />
+      <TablePlayerDisplay players={side2Players()} gamesWon={gamesWon2()} showScore={isInProgress()} />
     </div>
   )
 }
 
 interface TablePlayerDisplayProps {
   players: Player[]
+  gamesWon: number
+  showScore: boolean
 }
 
 const TablePlayerDisplay = (props: TablePlayerDisplayProps) => {
   const display = () => formatPlayersForTable(props.players)
-  return <div style={tablePlayerStyle}>{display()}</div>
+  return (
+    <div style={tablePlayerRowStyle}>
+      <span style={tablePlayerStyle}>{display()}</span>
+      <Show when={props.showScore}>
+        <span style={gameScoreBadgeStyle}>{props.gamesWon}</span>
+      </Show>
+    </div>
+  )
 }
 
 const formatPlayersForTable = (players: Player[]): string => {
@@ -444,6 +460,21 @@ const stageNameTableStyle: JSX.CSSProperties = {
   'text-align': 'center',
 }
 
+const bestOfTableStyle: JSX.CSSProperties = {
+  'font-size': '11px',
+  'font-weight': 500,
+  color: 'rgba(255,255,255,0.7)',
+  'text-align': 'center',
+}
+
+const tablePlayerRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'center',
+  gap: '6px',
+  'max-width': '100%',
+}
+
 const tablePlayerStyle: JSX.CSSProperties = {
   'font-size': '13px',
   'font-weight': 600,
@@ -452,7 +483,14 @@ const tablePlayerStyle: JSX.CSSProperties = {
   overflow: 'hidden',
   'text-overflow': 'ellipsis',
   'white-space': 'nowrap',
-  'max-width': '100%',
+}
+
+const gameScoreBadgeStyle: JSX.CSSProperties = {
+  'font-size': '16px',
+  'font-weight': 800,
+  color: '#f1c40f',
+  'min-width': '20px',
+  'text-align': 'center',
 }
 
 const vsStyle: JSX.CSSProperties = {

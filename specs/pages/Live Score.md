@@ -48,11 +48,12 @@ Each table will show:
   - table number (yellow, big, top-center)
   - event name
   - stage ("Group {n}", "Semifinal"...)
-  - player1 of the match, or for team, player1/player2
+  - "Best of {n}"
+  - player1 of the match (or for team, player1/player2), followed by the game score
   - score
     - match not started: "vs"
     - match in progress: scores of each game, current game on right most, "11:7, 4:8...", highlight the winning number and flash the most recent point    
-  - player2 of the match, or for team, player3/player4
+  - player2 of the match (or for team, player3/player4), followed by the game score
   - table number (yellow, big, top-center)
 
 ## Interactions
