@@ -49,6 +49,7 @@ Each table will show:
   - event name
   - stage ("Group {n}", "Semifinal"...)
   - "Best of {n}"
+  - space
   - player1 of the match (or for team, player1/player2), followed by the game score
   - score
     - match not started: "vs"

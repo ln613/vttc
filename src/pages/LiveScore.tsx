@@ -150,6 +150,7 @@ const AssignedTable = (props: AssignedTableProps) => {
       <Show when={bestOf()}>
         <div style={bestOfTableStyle}>Best of {bestOf()}</div>
       </Show>
+      <div style={tableSpacer} />
       <TablePlayerDisplay players={side1Players()} gamesWon={gamesWon1()} showScore={isInProgress()} />
       <TableScoreDisplay
         match={match()}
@@ -465,6 +466,10 @@ const bestOfTableStyle: JSX.CSSProperties = {
   'font-weight': 500,
   color: 'rgba(255,255,255,0.7)',
   'text-align': 'center',
+}
+
+const tableSpacer: JSX.CSSProperties = {
+  flex: '0 0 8px',
 }
 
 const tablePlayerRowStyle: JSX.CSSProperties = {
