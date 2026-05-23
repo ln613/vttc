@@ -18,7 +18,7 @@ import {
   saveMatchSetup,
   resetMatch,
 } from './eventHandlers.js'
-import { signIn } from './accountHandlers.js'
+import { signIn, updateProfile } from './accountHandlers.js'
 import { getLiveScore, rebuildMatchQueue } from './liveScoreHandlers.js'
 
 export const apiHandlers = {
@@ -43,6 +43,7 @@ export const apiHandlers = {
     saveMatchSetup: (body) => saveMatchSetup(body),
     resetMatch: (body) => resetMatch(body),
     signIn: (body) => signIn(body),
+    updateProfile: (body) => updateProfile(body),
     rebuildMatchQueue: () => rebuildMatchQueue(),
   },
 }

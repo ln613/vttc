@@ -120,6 +120,13 @@ export const authActions = {
     })
   },
 
+  updateUser: (updates: Partial<AuthUser>) => {
+    if (!authState.user) return
+    const updatedUser = { ...authState.user, ...updates }
+    setAuthState({ user: updatedUser })
+    localStorage.setItem('vttc_user', JSON.stringify(updatedUser))
+  },
+
   isSignedIn: (): boolean => authState.user !== null && authState.token !== null,
 }
 

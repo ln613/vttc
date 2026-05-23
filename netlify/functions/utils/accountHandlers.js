@@ -1,4 +1,4 @@
-import { getDB } from './db.js'
+import { getDB, save } from './db.js'
 import crypto from 'crypto'
 
 const PLAYERS_COLLECTION = 'players'
@@ -147,4 +147,65 @@ export const signIn = async (body) => {
   }
 
   return authenticatePlayer(emailOrPhone, password)
+}
+
+/**
+ * Validate update profile input
+ */
+const validateUpdateProfileInput = (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body._id) throwError('User id is required')
+}
+
+/**
+ * Validate email format (if provided)
+ */
+const validateEmailIfProvided = (email) => {
+  if (email && !isValidEmail(email)) {
+    throwError('Invalid email address')
+  }
+}
+
+/**
+ * Validate Canadian phone number (if provided)
+ */
+const validateCanadianPhoneIfProvided = (phone) => {
+  if (phone && !isValidCanadianPhone(phone)) {
+    throwError('Invalid Canadian phone number')
+  }
+}
+
+/**
+ * Check if a phone number is a valid Canadian phone number
+ */
+const isValidCanadianPhone = (phone) => {
+  const digits = phone.replace(/\D/g, '')
+  if (digits.length === 10) {
+    return /^[2-9]\d{2}[2-9]\d{6}$/.test(digits)
+  }
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return /^1[2-9]\d{2}[2-9]\d{6}$/.test(digits)
+  }
+  return false
+}
+
+/**
+ * Update player profile
+ */
+export const updateProfile = async (body) => {
+  validateUpdateProfileInput(body)
+  validateEmailIfProvided(body.email)
+  validateCanadianPhoneIfProvided(body.phone)
+
+  const updateData = {
+    _id: body._id,
+    firstName: body.firstName || '',
+    lastName: body.lastName || '',
+    email: body.email || '',
+    phone: body.phone || '',
+  }
+
+  await save(PLAYERS_COLLECTION, updateData)
+
+  return { success: true }
 }
