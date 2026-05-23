@@ -59,7 +59,8 @@ Each table will show:
 
 ## Match Queue section
 
-The match that is not playable at the moment because some players in the match are playing on other tables should be displayed in a disabled style
+- The match that is not playable at the moment because some players in the match are playing on other tables should be displayed in a disabled style
+- Match Queue should auto scroll (medium to low speed) in a loop, when it reaches the end, jump back to top
 
 ## Interactions
 

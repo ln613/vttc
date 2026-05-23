@@ -251,8 +251,43 @@ const GameScoreItem = (props: GameScoreItemProps) => {
 
 // ==================== MATCH QUEUE ====================
 
+const MATCH_QUEUE_SCROLL_SPEED = 1
+const MATCH_QUEUE_SCROLL_INTERVAL = 50
+
+const useAutoScroll = (ref: () => HTMLDivElement | undefined) => {
+  let intervalId: ReturnType<typeof setInterval> | undefined
+
+  const startAutoScroll = () => {
+    intervalId = setInterval(() => {
+      const el = ref()
+      if (!el) return
+      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1
+      if (atBottom) {
+        el.scrollTop = 0
+      } else {
+        el.scrollTop += MATCH_QUEUE_SCROLL_SPEED
+      }
+    }, MATCH_QUEUE_SCROLL_INTERVAL)
+  }
+
+  const stopAutoScroll = () => {
+    if (intervalId !== undefined) {
+      clearInterval(intervalId)
+      intervalId = undefined
+    }
+  }
+
+  onMount(() => {
+    startAutoScroll()
+    onCleanup(stopAutoScroll)
+  })
+}
+
 const MatchQueue = () => {
+  let listRef: HTMLDivElement | undefined
   const queue = () => liveScoreState.matchQueue
+
+  useAutoScroll(() => listRef)
 
   return (
     <div style={matchQueueContainerStyle}>
@@ -261,7 +296,7 @@ const MatchQueue = () => {
         when={queue().length > 0}
         fallback={<div style={emptyQueueStyle}>No matches in queue</div>}
       >
-        <div class="hide-scrollbar" style={matchQueueListStyle}>
+        <div ref={listRef} class="hide-scrollbar" style={matchQueueListStyle}>
           <For each={queue()}>
             {(item) => <MatchQueueRow item={item} />}
           </For>

@@ -19,6 +19,10 @@ export const Header = () => (
 const TopBar = () => {
   const navigate = useNavigate()
 
+  const handleLiveScoreClick = () => {
+    navigate('/live-score')
+  }
+
   const handleEventsClick = () => {
     navigate('/events')
   }
@@ -34,9 +38,14 @@ const TopBar = () => {
   return (
     <div style={topBarStyle}>
       <div style={topBarContentStyle}>
-        <button style={navLinkStyle} onClick={handleEventsClick}>
-          Events
-        </button>
+        <div style={navLeftStyle}>
+          <button style={liveScoreButtonStyle} onClick={handleLiveScoreClick}>
+            <LiveScoreIcon />
+          </button>
+          <button style={navLinkStyle} onClick={handleEventsClick}>
+            Events
+          </button>
+        </div>
         <button style={accountButtonStyle} onClick={handleAccountClick}>
           <AccountIcon />
         </button>
@@ -44,6 +53,28 @@ const TopBar = () => {
     </div>
   )
 }
+
+const LiveScoreIcon = () => (
+  <span style={liveBadgeStyle}>
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#fff"
+      stroke-width="2.5"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <circle cx="12" cy="12" r="2" fill="#fff" />
+      <path d="M16.24 7.76a6 6 0 0 1 0 8.49" />
+      <path d="M7.76 16.24a6 6 0 0 1 0-8.49" />
+      <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+      <path d="M4.93 19.07a10 10 0 0 1 0-14.14" />
+    </svg>
+    <span style={liveTextStyle}>LIVE</span>
+  </span>
+)
 
 const AccountIcon = () => (
   <svg
@@ -129,6 +160,39 @@ const topBarContentStyle: JSX.CSSProperties = {
   display: 'flex',
   'align-items': 'center',
   'justify-content': 'space-between',
+}
+
+const navLeftStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  gap: '4px',
+}
+
+const liveScoreButtonStyle: JSX.CSSProperties = {
+  background: 'none',
+  border: 'none',
+  cursor: 'pointer',
+  padding: '4px',
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'center',
+}
+
+const liveBadgeStyle: JSX.CSSProperties = {
+  display: 'inline-flex',
+  'align-items': 'center',
+  gap: '4px',
+  'background-color': '#e53935',
+  'border-radius': '6px',
+  padding: '4px 8px',
+}
+
+const liveTextStyle: JSX.CSSProperties = {
+  color: '#fff',
+  'font-size': '12px',
+  'font-weight': 800,
+  'letter-spacing': '0.5px',
+  'line-height': 1,
 }
 
 const navLinkStyle: JSX.CSSProperties = {
