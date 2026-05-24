@@ -4,7 +4,7 @@ import { Header } from '../components/Header'
 import Input from '../components/Input'
 import Button from '../components/Button'
 import { accountPageState, accountPageActions } from '../stores/accountPageStore'
-import { authActions } from '../stores/authStore'
+import { authState, authActions } from '../stores/authStore'
 
 const containerStyle: JSX.CSSProperties = {
   display: 'flex',
@@ -40,7 +40,13 @@ const sectionTitleStyle: JSX.CSSProperties = {
   'text-align': 'left',
 }
 
-const editIconButtonStyle: JSX.CSSProperties = {
+const actionIconsStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  gap: '8px',
+}
+
+const iconButtonStyle: JSX.CSSProperties = {
   background: 'none',
   border: 'none',
   cursor: 'pointer',
@@ -51,10 +57,14 @@ const editIconButtonStyle: JSX.CSSProperties = {
   color: '#3498db',
 }
 
-const buttonContainerStyle: JSX.CSSProperties = {
-  display: 'flex',
-  gap: '16px',
-  'margin-top': '24px',
+const cancelIconStyle: JSX.CSSProperties = {
+  ...iconButtonStyle,
+  color: '#e74c3c',
+}
+
+const saveIconStyle: JSX.CSSProperties = {
+  ...iconButtonStyle,
+  color: '#27ae60',
 }
 
 const signOutContainerStyle: JSX.CSSProperties = {
@@ -99,6 +109,44 @@ const savedMessageStyle: JSX.CSSProperties = {
   color: '#27ae60',
 }
 
+const spinnerStyle: JSX.CSSProperties = {
+  display: 'inline-block',
+  width: '20px',
+  height: '20px',
+  border: '2px solid #ddd',
+  'border-top-color': '#3498db',
+  'border-radius': '50%',
+  animation: 'spin 0.8s linear infinite',
+}
+
+const dialogStyle: JSX.CSSProperties = {
+  'background-color': '#fff',
+  padding: '24px',
+  'border-radius': '12px',
+  width: '90%',
+  'max-width': '400px',
+  'box-shadow': '0 4px 20px rgba(0, 0, 0, 0.15)',
+}
+
+const dialogTitleStyle: JSX.CSSProperties = {
+  'font-size': '1.2rem',
+  'font-weight': 700,
+  'margin-top': '0',
+  'margin-bottom': '16px',
+  color: '#333',
+}
+
+const dialogButtonContainerStyle: JSX.CSSProperties = {
+  display: 'flex',
+  gap: '12px',
+  'margin-top': '20px',
+  'justify-content': 'flex-end',
+}
+
+const changePasswordButtonContainerStyle: JSX.CSSProperties = {
+  'margin-top': '20px',
+}
+
 const Account = () => {
   const navigate = useNavigate()
 
@@ -129,9 +177,21 @@ const Account = () => {
           </Button>
         </div>
       </div>
+      <Show when={accountPageState.showChangePasswordDialog}>
+        <ChangePasswordDialog />
+      </Show>
+      <SpinnerKeyframes />
     </div>
   )
 }
+
+const SpinnerKeyframes = () => (
+  <style>{`
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  `}</style>
+)
 
 const SavingOverlay = () => (
   <Show when={accountPageState.saving}>
@@ -165,15 +225,81 @@ const EditIcon = () => (
   </svg>
 )
 
+const CancelIcon = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+)
+
+const SaveIcon = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+)
+
+const isAdminOrSuperAdmin = () => authState.isAdmin || authState.isSuperAdmin
+
+const ProfileActionIcons = () => (
+  <Show when={!isAdminOrSuperAdmin()}>
+    <div style={actionIconsStyle}>
+      <Show when={accountPageState.saving}>
+        <div style={spinnerStyle} />
+      </Show>
+      <Show when={!accountPageState.saving}>
+        <Show when={!accountPageState.editing}>
+          <button
+            style={iconButtonStyle}
+            onClick={accountPageActions.enterEditMode}
+            title="Edit"
+          >
+            <EditIcon />
+          </button>
+        </Show>
+        <Show when={accountPageState.editing}>
+          <button
+            style={cancelIconStyle}
+            onClick={accountPageActions.exitEditMode}
+            title="Cancel"
+          >
+            <CancelIcon />
+          </button>
+          <button
+            style={saveIconStyle}
+            onClick={accountPageActions.save}
+            title="Save"
+          >
+            <SaveIcon />
+          </button>
+        </Show>
+      </Show>
+    </div>
+  </Show>
+)
+
 const ProfileSection = () => (
   <>
     <div style={sectionHeaderStyle}>
       <h3 style={sectionTitleStyle}>Profile</h3>
-      <Show when={!accountPageState.editing}>
-        <button style={editIconButtonStyle} onClick={accountPageActions.enterEditMode}>
-          <EditIcon />
-        </button>
-      </Show>
+      <ProfileActionIcons />
     </div>
     <Input
       label="First Name"
@@ -208,21 +334,69 @@ const ProfileSection = () => (
     <Show when={accountPageState.error}>
       <div style={errorMessageStyle}>{accountPageState.error}</div>
     </Show>
-    <Show when={accountPageState.editing}>
-      <div style={buttonContainerStyle}>
-        <Button color="#e74c3c" onClick={accountPageActions.exitEditMode}>
-          Cancel
-        </Button>
-        <Button
-          color="#27ae60"
-          onClick={accountPageActions.save}
-          disabled={accountPageState.saving}
-        >
-          Save
+    <Show when={!isAdminOrSuperAdmin()}>
+      <div style={changePasswordButtonContainerStyle}>
+        <Button color="#3498db" onClick={accountPageActions.showChangePassword}>
+          Change Password
         </Button>
       </div>
     </Show>
   </>
+)
+
+const ChangePasswordDialog = () => (
+  <div style={overlayStyle}>
+    <div style={dialogStyle}>
+      <h3 style={dialogTitleStyle}>Change Password</h3>
+      <Input
+        label="Current Password"
+        name="oldPassword"
+        type="password"
+        value={accountPageState.changePasswordData.oldPassword}
+        onChange={(value) =>
+          accountPageActions.setChangePasswordField('oldPassword', value)
+        }
+      />
+      <Input
+        label="New Password"
+        name="newPassword"
+        type="password"
+        value={accountPageState.changePasswordData.newPassword}
+        onChange={(value) =>
+          accountPageActions.setChangePasswordField('newPassword', value)
+        }
+      />
+      <Input
+        label="Confirm Password"
+        name="confirmPassword"
+        type="password"
+        value={accountPageState.changePasswordData.confirmPassword}
+        onChange={(value) =>
+          accountPageActions.setChangePasswordField('confirmPassword', value)
+        }
+      />
+      <Show when={accountPageState.changePasswordError}>
+        <div style={errorMessageStyle}>
+          {accountPageState.changePasswordError}
+        </div>
+      </Show>
+      <div style={dialogButtonContainerStyle}>
+        <Button
+          color="#e74c3c"
+          onClick={accountPageActions.hideChangePassword}
+        >
+          Cancel
+        </Button>
+        <Button
+          color="#27ae60"
+          onClick={accountPageActions.changePassword}
+          disabled={accountPageState.changingPassword}
+        >
+          {accountPageState.changingPassword ? 'Saving...' : 'Save'}
+        </Button>
+      </div>
+    </div>
+  </div>
 )
 
 export default Account

@@ -2081,3 +2081,55 @@ const isRoundFullyComplete = (round) => {
     (m) => m.winner && m.match?.confirmed,
   )
 }
+
+/**
+ * Reset an entire event - delete all schedules, matches and groups, keep participants
+ */
+export const resetEvent = async (body) => {
+  validateResetEventInput(body)
+
+  const { _id } = body
+
+  const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
+
+  const event = await collection.findOne({ _id: toObjectId(_id) })
+  if (!event) throwError('Event not found')
+
+  const resetStages = buildResetEventStages(event)
+
+  await collection.updateOne(
+    { _id: toObjectId(_id) },
+    { $set: { eventStages: resetStages } },
+  )
+
+  return { success: true }
+}
+
+const validateResetEventInput = (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body._id) throwError('Event ID is required')
+}
+
+const buildResetEventStages = (event) =>
+  event.eventStages.map((stage) => {
+    if (stage.type === 'group') {
+      return {
+        ...stage,
+        groups: [],
+        advancedParticipants: [],
+      }
+    }
+    if (stage.type === 'knockout') {
+      return {
+        ...stage,
+        seedingList: [],
+        rounds: stage.rounds.map((r) => ({
+          ...r,
+          matches: [],
+          isComplete: false,
+        })),
+      }
+    }
+    return stage
+  })

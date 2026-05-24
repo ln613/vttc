@@ -12,6 +12,7 @@ interface AuthUser {
 interface SignInResponse {
   token: string
   isAdmin: boolean
+  isSuperAdmin: boolean
   player: AuthUser
 }
 
@@ -19,6 +20,7 @@ interface AuthState {
   user: AuthUser | null
   token: string | null
   isAdmin: boolean
+  isSuperAdmin: boolean
   loading: boolean
   error: string | null
   showSignInDialog: boolean
@@ -28,6 +30,7 @@ const getInitialState = (): AuthState => ({
   user: loadUserFromStorage(),
   token: loadTokenFromStorage(),
   isAdmin: loadIsAdminFromStorage(),
+  isSuperAdmin: loadIsSuperAdminFromStorage(),
   loading: false,
   error: null,
   showSignInDialog: false,
@@ -58,16 +61,31 @@ const loadIsAdminFromStorage = (): boolean => {
   }
 }
 
-const saveToStorage = (token: string, user: AuthUser, isAdmin: boolean) => {
+const loadIsSuperAdminFromStorage = (): boolean => {
+  try {
+    return localStorage.getItem('vttc_isSuperAdmin') === 'true'
+  } catch {
+    return false
+  }
+}
+
+const saveToStorage = (
+  token: string,
+  user: AuthUser,
+  isAdmin: boolean,
+  isSuperAdmin: boolean,
+) => {
   localStorage.setItem('vttc_token', token)
   localStorage.setItem('vttc_user', JSON.stringify(user))
   localStorage.setItem('vttc_isAdmin', String(isAdmin))
+  localStorage.setItem('vttc_isSuperAdmin', String(isSuperAdmin))
 }
 
 const clearStorage = () => {
   localStorage.removeItem('vttc_token')
   localStorage.removeItem('vttc_user')
   localStorage.removeItem('vttc_isAdmin')
+  localStorage.removeItem('vttc_isSuperAdmin')
 }
 
 const [authState, setAuthState] = createStore<AuthState>(getInitialState())
@@ -92,11 +110,17 @@ export const authActions = {
         emailOrPhone,
         password,
       })
-      saveToStorage(result.token, result.player, result.isAdmin)
+      saveToStorage(
+        result.token,
+        result.player,
+        result.isAdmin,
+        result.isSuperAdmin,
+      )
       setAuthState({
         user: result.player,
         token: result.token,
         isAdmin: result.isAdmin,
+        isSuperAdmin: result.isSuperAdmin,
         loading: false,
         error: null,
         showSignInDialog: false,
@@ -115,6 +139,7 @@ export const authActions = {
       user: null,
       token: null,
       isAdmin: false,
+      isSuperAdmin: false,
       showSignInDialog: false,
       error: null,
     })

@@ -5,7 +5,9 @@
 Vertical
 
 - shared header
-- Event name (h1, align left)
+- Title row
+  - Event name (h1, align left)
+  - Reset Event button (red bg, only for super admin)
 - Date
 - Time
 - Summary
@@ -52,6 +54,7 @@ The Total column is the total matches played so far.
 
 - on Generate Groups click: call generate groups API
 - on Start button click: go to Game Play page with the selected event, stage and match, start with Game 1
+- on Reset Event button click: delete all schedules, matches and groups, keep the participants. confirm before reset
 
 ## Knockout Stage Tab
 

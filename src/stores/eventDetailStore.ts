@@ -29,6 +29,7 @@ interface EventDetailState {
   showConfirmDialog: boolean
   confirmDialogMatchId: string | null
   resettingMatchId: string | null
+  resettingEvent: boolean
 }
 
 const getInitialState = (): EventDetailState => ({
@@ -45,6 +46,7 @@ const getInitialState = (): EventDetailState => ({
   showConfirmDialog: false,
   confirmDialogMatchId: null,
   resettingMatchId: null,
+  resettingEvent: false,
 })
 
 const [eventDetailState, setEventDetailState] =
@@ -325,6 +327,24 @@ export const eventDetailActions = {
     const event = eventDetailState.data
     if (!event) return ''
     return buildEventSummary(event)
+  },
+
+  resetEvent: async () => {
+    const { eventId } = eventDetailState
+    if (!eventId) return
+
+    setEventDetailState({ resettingEvent: true })
+    try {
+      await apiPost('resetEvent', { _id: eventId })
+      await fetchEvent(eventId, false)
+    } catch (err) {
+      setEventDetailState({
+        error:
+          err instanceof Error ? err.message : 'Failed to reset event',
+      })
+    } finally {
+      setEventDetailState({ resettingEvent: false })
+    }
   },
 
   invalidateData: () => {

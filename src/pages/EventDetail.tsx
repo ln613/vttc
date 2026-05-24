@@ -94,9 +94,30 @@ const EventHeader = () => {
   const timeDisplay = () => eventDetailState.data?.time || ''
   const summary = () => eventDetailActions.getEventSummary()
 
+  const handleResetEvent = () => {
+    if (
+      confirm(
+        'Are you sure you want to reset this event? All schedules, matches and groups will be deleted. Participants will be kept.',
+      )
+    ) {
+      eventDetailActions.resetEvent()
+    }
+  }
+
   return (
     <Show when={eventDetailState.data}>
-      <h1 style={eventNameStyle}>{eventName()}</h1>
+      <div style={titleRowStyle}>
+        <h1 style={eventNameStyle}>{eventName()}</h1>
+        <Show when={authState.isSuperAdmin}>
+          <Button
+            onClick={handleResetEvent}
+            color="#e74c3c"
+            disabled={eventDetailState.resettingEvent}
+          >
+            {eventDetailState.resettingEvent ? 'Resetting...' : 'Reset Event'}
+          </Button>
+        </Show>
+      </div>
       <div style={dateStyle}>{dateDisplay()}</div>
       <Show when={timeDisplay()}>
         <div style={timeStyle}>{timeDisplay()}</div>
@@ -973,6 +994,13 @@ const contentStyle: JSX.CSSProperties = {
   'max-width': '1200px',
   margin: '0 auto',
   padding: '16px 20px 20px',
+}
+
+const titleRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'space-between',
+  gap: '16px',
 }
 
 const eventNameStyle: JSX.CSSProperties = {

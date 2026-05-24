@@ -9,6 +9,12 @@ interface AccountProfileData {
   phone: string
 }
 
+interface ChangePasswordData {
+  oldPassword: string
+  newPassword: string
+  confirmPassword: string
+}
+
 interface AccountPageState {
   formData: AccountProfileData
   initialFormData: AccountProfileData
@@ -16,7 +22,17 @@ interface AccountPageState {
   saving: boolean
   saved: boolean
   error: string | null
+  showChangePasswordDialog: boolean
+  changePasswordData: ChangePasswordData
+  changingPassword: boolean
+  changePasswordError: string | null
 }
+
+const getInitialChangePasswordData = (): ChangePasswordData => ({
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: '',
+})
 
 const getInitialState = (): AccountPageState => ({
   formData: { firstName: '', lastName: '', email: '', phone: '' },
@@ -25,6 +41,10 @@ const getInitialState = (): AccountPageState => ({
   saving: false,
   saved: false,
   error: null,
+  showChangePasswordDialog: false,
+  changePasswordData: getInitialChangePasswordData(),
+  changingPassword: false,
+  changePasswordError: null,
 })
 
 const [accountPageState, setAccountPageState] =
@@ -50,6 +70,15 @@ export const accountPageActions = {
   },
 
   exitEditMode: () => {
+    if (!hasFormChanged()) {
+      setAccountPageState({
+        formData: { ...accountPageState.initialFormData },
+        editing: false,
+        error: null,
+      })
+      return
+    }
+    if (!confirm('Discard unsaved changes?')) return
     setAccountPageState({
       formData: { ...accountPageState.initialFormData },
       editing: false,
@@ -98,7 +127,80 @@ export const accountPageActions = {
     }
   },
 
+  showChangePassword: () => {
+    setAccountPageState({
+      showChangePasswordDialog: true,
+      changePasswordData: getInitialChangePasswordData(),
+      changePasswordError: null,
+    })
+  },
+
+  hideChangePassword: () => {
+    setAccountPageState({
+      showChangePasswordDialog: false,
+      changePasswordData: getInitialChangePasswordData(),
+      changePasswordError: null,
+    })
+  },
+
+  setChangePasswordField: <K extends keyof ChangePasswordData>(
+    field: K,
+    value: ChangePasswordData[K],
+  ) => {
+    setAccountPageState('changePasswordData', field, value)
+  },
+
+  changePassword: async () => {
+    const { changePasswordData } = accountPageState
+    const validationError = validateChangePasswordInput(changePasswordData)
+    if (validationError) {
+      setAccountPageState({ changePasswordError: validationError })
+      return
+    }
+
+    setAccountPageState({ changingPassword: true, changePasswordError: null })
+    try {
+      await apiPost('changePassword', {
+        _id: authState.user?._id,
+        oldPassword: changePasswordData.oldPassword || undefined,
+        newPassword: changePasswordData.newPassword,
+        confirmPassword: changePasswordData.confirmPassword,
+      })
+      setAccountPageState({
+        changingPassword: false,
+        showChangePasswordDialog: false,
+        changePasswordData: getInitialChangePasswordData(),
+      })
+    } catch (err) {
+      setAccountPageState({
+        changingPassword: false,
+        changePasswordError:
+          err instanceof Error ? err.message : 'Failed to change password',
+      })
+    }
+  },
+
   reset: () => setAccountPageState(getInitialState()),
+}
+
+const hasFormChanged = (): boolean => {
+  const { formData, initialFormData } = accountPageState
+  return (
+    formData.firstName !== initialFormData.firstName ||
+    formData.lastName !== initialFormData.lastName ||
+    formData.email !== initialFormData.email ||
+    formData.phone !== initialFormData.phone
+  )
+}
+
+const validateChangePasswordInput = (data: ChangePasswordData): string | null => {
+  const errors: string[] = []
+  if (!data.newPassword) errors.push('New password is required')
+  if (data.newPassword.length < 6)
+    errors.push('Password must be at least 6 characters')
+  if (data.newPassword !== data.confirmPassword)
+    errors.push('Passwords do not match')
+  return errors.length > 0 ? errors.join('\n') : null
 }
 
 const buildProfileFromAuth = (): AccountProfileData => ({
