@@ -4,6 +4,7 @@ import { useNavigate } from '@solidjs/router'
 import { Header } from '../components/Header'
 import Button from '../components/Button'
 import { eventListState, eventListActions } from '../stores/eventListStore'
+import { parseLocalDate } from '../utils/date'
 import { authState } from '../stores/authStore'
 import type { EventOption } from '../stores/eventStore'
 
@@ -130,7 +131,7 @@ const formatDateTime = (date: string, time?: string): string => {
 }
 
 const formatDate = (date: string): string => {
-  const d = new Date(date)
+  const d = parseLocalDate(date)
   return d.toLocaleDateString('en-US', {
     weekday: 'short',
     year: 'numeric',

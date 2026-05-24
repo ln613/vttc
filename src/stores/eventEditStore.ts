@@ -1,6 +1,7 @@
 import { createStore } from 'solid-js/store'
 import type { BestOfOption, QualifiersCount, Event } from '../../shared/types'
 import { apiGet, apiPost } from '../utils/api'
+import { parseLocalDate, formatLocalDate } from '../utils/date'
 import { tournamentActions, type Tournament } from './tournamentStore'
 
 export interface EventEditFormData {
@@ -60,7 +61,7 @@ export { eventEditState }
 const mapEventToFormData = (event: Event): EventEditFormData => ({
   _id: event._id,
   tournamentId: event.tournamentId,
-  date: event.date ? new Date(event.date) : null,
+  date: event.date ? parseLocalDate(event.date) : null,
   time: event.time || '',
   maxParticipants:
     event.maxParticipants === 0 ? 'Unlimited' : String(event.maxParticipants),
@@ -164,7 +165,7 @@ const generateEventName = (tournamentId: string): string | null => {
 const buildSavePayload = (formData: EventEditFormData) => ({
   _id: formData._id,
   tournamentId: formData.tournamentId,
-  date: formData.date?.toISOString().split('T')[0],
+  date: formData.date ? formatLocalDate(formData.date) : undefined,
   time: formData.time || '',
   maxParticipants:
     formData.maxParticipants === 'Unlimited'

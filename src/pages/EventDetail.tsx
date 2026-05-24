@@ -9,6 +9,7 @@ import { authState } from '../stores/authStore'
 import type { Group, GroupParticipant, Participant, KnockoutRound, KnockoutMatch as KnockoutMatchType } from '../../shared/types/Tournament'
 import type { Player } from '../../shared/types/Player'
 import type { Match, Game } from '../../shared/types/Match'
+import { parseLocalDate } from '../utils/date'
 
 const EventDetail = () => {
   const params = useParams()
@@ -131,7 +132,7 @@ const EventHeader = () => {
 
 const formatDate = (date?: string): string => {
   if (!date) return ''
-  const d = new Date(date)
+  const d = parseLocalDate(date)
   return d.toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
