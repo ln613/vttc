@@ -91,6 +91,14 @@ const hasPlayerConflict = (
   return false
 }
 
+const isSideOnTable = (players: Player[]): boolean => {
+  const playersOnTables = getPlayerIdsOnTables()
+  for (const p of players) {
+    if (p._id && playersOnTables.has(p._id.toString())) return true
+  }
+  return false
+}
+
 export const liveScoreActions = {
   fetchLiveScore: async () => {
     setLiveScoreState({ loading: true, error: null })
@@ -113,6 +121,8 @@ export const liveScoreActions = {
     const playersOnTables = getPlayerIdsOnTables()
     return !hasPlayerConflict(item, playersOnTables)
   },
+
+  isSideOnTable: (players: Player[]): boolean => isSideOnTable(players),
 
   reset: () => {
     stopPolling()

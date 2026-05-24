@@ -314,16 +314,17 @@ const MatchQueueRow = (props: MatchQueueRowProps) => {
   const match = () => props.item.match
   const side1Name = () => formatPlayersShort(match()?.side1 || [])
   const side2Name = () => formatPlayersShort(match()?.side2 || [])
-  const playable = () => liveScoreActions.isMatchPlayable(props.item)
+  const side1OnTable = () => liveScoreActions.isSideOnTable(match()?.side1 || [])
+  const side2OnTable = () => liveScoreActions.isSideOnTable(match()?.side2 || [])
 
   return (
-    <div style={playable() ? queueRowStyle : queueRowDisabledStyle}>
+    <div style={queueRowStyle}>
       <div style={queueEventNameStyle}>{props.item.eventName}</div>
       <div style={queueStageStyle}>{props.item.stageName}</div>
       <div style={queueMatchStyle}>
-        <span style={queuePlayerStyle}>{side1Name()}</span>
+        <span style={side1OnTable() ? queuePlayerOnTableStyle : queuePlayerStyle}>{side1Name()}</span>
         <span style={queueVsStyle}> vs </span>
-        <span style={queuePlayerStyle}>{side2Name()}</span>
+        <span style={side2OnTable() ? queuePlayerOnTableStyle : queuePlayerStyle}>{side2Name()}</span>
       </div>
     </div>
   )
@@ -640,17 +641,15 @@ const queuePlayerStyle: JSX.CSSProperties = {
   'font-weight': 500,
 }
 
+const queuePlayerOnTableStyle: JSX.CSSProperties = {
+  'font-weight': 500,
+  color: '#e74c3c',
+}
+
 const queueVsStyle: JSX.CSSProperties = {
   color: 'rgba(255,255,255,0.5)',
   margin: '0 4px',
   'font-size': '11px',
-}
-
-// Disabled queue row (match not playable - players on tables)
-const queueRowDisabledStyle: JSX.CSSProperties = {
-  ...queueRowStyle,
-  'background-color': 'rgba(255,255,255,0.03)',
-  opacity: '0.5',
 }
 
 export default LiveScore
