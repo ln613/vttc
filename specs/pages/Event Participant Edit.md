@@ -6,20 +6,18 @@ Vertical
 
 - shared header
 - title "Edit Event Participants" (h1, align left)
-- Event: dropdown (all events)
-- (display after selecting an event):
-  - Add Participant button
-  - section title "List of participants - {number of participants}", if max participants is not unlimited, followed by " / {max participants}"
-  - Table of participants (alternate bg color - white, lavender)
+- Add Participant button
+- section title "List of participants - {number of participants}", if max participants is not unlimited, followed by " / {max participants}"
+- Table of participants (alternate bg color - white, lavender)
 
 ## Single Participant
 
-- table columns - Player (align left), Rating, "Delete" icon
+- table columns (align left) - Player, Rating, "Delete" icon
 - order by Rating desc
 
 ## Double/Team Participant
 
-- table columns - Players (align left), Rating, Combined Rating, "Delete" icon
+- table columns (align left) - Players, Rating, Combined Rating, "Delete" icon
 - each participant consists of multiple rows, 1 player per row (order by Rating desc), no divider between rows. The cells in Combined Rating and "Delete" icon columns are merged, and center aligned vertically
 - For team participant, if topPlayersRatingEnabled, add a column "Top {topPlayersCount} Combined"
 - order by Combined Rating desc

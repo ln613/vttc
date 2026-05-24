@@ -37,10 +37,6 @@ export const eventParticipantEditActions = {
     playerActions.fetchPlayers()
   },
 
-  setSelectedEventId: (id: string) => {
-    setEventParticipantEditState({ selectedEventId: id })
-  },
-
   openAddDialog: () => {
     setEventParticipantEditState({ showAddDialog: true })
   },

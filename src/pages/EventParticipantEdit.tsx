@@ -5,7 +5,7 @@ import Select from '../components/Select'
 import Button from '../components/Button'
 import type { Player } from '../../shared/types/Player'
 import type { Participant } from '../../shared/types/Tournament'
-import { eventState, type EventOption } from '../stores/eventStore'
+import { type EventOption } from '../stores/eventStore'
 import { playerState } from '../stores/playerStore'
 import {
   eventParticipantEditState,
@@ -61,10 +61,6 @@ const thStyle: JSX.CSSProperties = {
 const tdStyle: JSX.CSSProperties = {
   padding: '12px',
   'border-bottom': '1px solid #eee',
-}
-
-const tdPlayerStyle: JSX.CSSProperties = {
-  ...tdStyle,
   'text-align': 'left',
 }
 
@@ -85,12 +81,6 @@ const EventParticipantEdit = () => {
   onCleanup(() => {
     eventParticipantEditActions.reset()
   })
-
-  const eventOptions = () =>
-    (eventState.data || []).map((e) => ({
-      value: e._id,
-      label: e.eventName,
-    }))
 
   const selectedEvent = () => eventParticipantEditActions.getSelectedEvent()
 
@@ -114,13 +104,6 @@ const EventParticipantEdit = () => {
       <Header />
       <div style={contentStyle}>
         <h1 style={titleStyle}>Edit Event Participants</h1>
-        <Select
-          label="Event"
-          name="event"
-          value={eventParticipantEditState.selectedEventId}
-          onChange={eventParticipantEditActions.setSelectedEventId}
-          options={eventOptions()}
-        />
         <Show when={selectedEvent()}>
           {(event) => (
             <>
@@ -243,7 +226,7 @@ const DeleteIcon = (props: DeleteIconProps) => (
 
 const SingleParticipantRow = (props: SingleParticipantRowProps) => (
   <tr style={{ 'background-color': getRowBackgroundColor(props.rowIndex) }}>
-    <td style={tdPlayerStyle}>
+    <td style={tdStyle}>
       {props.participant.players[0]?.firstName}{' '}
       {props.participant.players[0]?.lastName}
     </td>
@@ -338,7 +321,7 @@ const TeamParticipantRows = (props: TeamParticipantRowsProps) => {
     <For each={sortedPlayers()}>
       {(player, index) => (
         <tr style={{ 'background-color': rowBgColor }}>
-          <td style={tdPlayerStyle}>
+          <td style={tdStyle}>
             {player.firstName} {player.lastName}
           </td>
           <td style={tdStyle}>{player.rating || 0}</td>
