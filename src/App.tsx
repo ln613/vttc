@@ -5,6 +5,7 @@ import EventEdit from './pages/EventEdit'
 import EventParticipantEdit from './pages/EventParticipantEdit'
 import EventList from './pages/EventList'
 import EventDetail from './pages/EventDetail'
+import Players from './pages/Players'
 import GamePlay from './pages/GamePlay'
 import LiveScore from './pages/LiveScore'
 import Account from './pages/Account'
@@ -13,6 +14,7 @@ const App = () => (
   <Router>
     <Route path="/" component={EventList} />
     <Route path="/events" component={EventList} />
+    <Route path="/players" component={Players} />
     <Route path="/account" component={Account} />
     <Route path="/tournament/new" component={TournamentEdit} />
     <Route path="/tournament/:id/edit" component={() => <TournamentEdit isEdit />} />
