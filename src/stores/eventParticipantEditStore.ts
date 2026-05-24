@@ -29,7 +29,10 @@ const [eventParticipantEditState, setEventParticipantEditState] =
 export { eventParticipantEditState }
 
 export const eventParticipantEditActions = {
-  init: () => {
+  init: (eventId?: string) => {
+    if (eventId) {
+      setEventParticipantEditState({ selectedEventId: eventId })
+    }
     eventActions.fetchEvents()
     playerActions.fetchPlayers()
   },

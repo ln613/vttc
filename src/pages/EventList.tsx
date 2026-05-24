@@ -4,7 +4,6 @@ import { useNavigate } from '@solidjs/router'
 import { Header } from '../components/Header'
 import Button from '../components/Button'
 import { eventListState, eventListActions } from '../stores/eventListStore'
-import { eventState } from '../stores/eventStore'
 import { authState } from '../stores/authStore'
 import type { EventOption } from '../stores/eventStore'
 
@@ -66,9 +65,28 @@ const EditIcon = () => (
   </svg>
 )
 
-const handleEditClick = (e: MouseEvent, eventId: string, navigate: (path: string) => void) => {
+const MultiUserIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="#2196F3"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+)
+
+const handleIconClick = (e: MouseEvent, path: string, navigate: (path: string) => void) => {
   e.stopPropagation()
-  navigate(`/event/${eventId}/edit`)
+  navigate(path)
 }
 
 const EventListItem = (props: EventListItemProps) => {
@@ -85,11 +103,19 @@ const EventListItem = (props: EventListItemProps) => {
         <div style={itemDateTimeStyle}>{formatDateTime(props.event.date, props.event.time)}</div>
       </div>
       <Show when={authState.isAdmin}>
-        <div
-          style={editIconStyle}
-          onClick={(e) => handleEditClick(e, props.event._id, navigate)}
-        >
-          <EditIcon />
+        <div style={actionIconsStyle}>
+          <div
+            style={iconStyle}
+            onClick={(e) => handleIconClick(e, `/event/${props.event._id}/edit`, navigate)}
+          >
+            <EditIcon />
+          </div>
+          <div
+            style={iconStyle}
+            onClick={(e) => handleIconClick(e, `/event/participants?eventId=${props.event._id}`, navigate)}
+          >
+            <MultiUserIcon />
+          </div>
         </div>
       </Show>
     </div>
@@ -176,7 +202,13 @@ const itemDateTimeStyle: JSX.CSSProperties = {
   'margin-top': '4px',
 }
 
-const editIconStyle: JSX.CSSProperties = {
+const actionIconsStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  gap: '8px',
+}
+
+const iconStyle: JSX.CSSProperties = {
   display: 'flex',
   'align-items': 'center',
   cursor: 'pointer',

@@ -12,7 +12,9 @@ Vertical
   - name on top
   - date and time on bottom (1 row)
   - sorted by date/time desc
-  - for admin, show edit icon (align right, blue), which goes to Event Edit page for that event
+  - action icons (align right, admin only)
+    - edit icon: goes to Event Edit page for that event
+    - multi-user icon: goes to Event Participant Edit page
 
 ### interaction
 

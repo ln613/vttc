@@ -1,4 +1,5 @@
 import { Show, For, onMount, onCleanup, createSignal, type JSX } from 'solid-js'
+import { useSearchParams } from '@solidjs/router'
 import { Header } from '../components/Header'
 import Select from '../components/Select'
 import Button from '../components/Button'
@@ -75,8 +76,10 @@ const deleteIconStyle: JSX.CSSProperties = {
 }
 
 const EventParticipantEdit = () => {
+  const [searchParams] = useSearchParams()
+
   onMount(() => {
-    eventParticipantEditActions.init()
+    eventParticipantEditActions.init(searchParams.eventId as string | undefined)
   })
 
   onCleanup(() => {
