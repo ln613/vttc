@@ -5,8 +5,9 @@
 Vertical
 
 - shared header
-- title "Edit Event Participants" (h1, align left)
-- Add Participant button
+- title row
+  - "Edit Event Participants" (h1, align left)
+  - Add Participant button (align right)
 - section title "List of participants - {number of participants}", if max participants is not unlimited, followed by " / {max participants}"
 - Table of participants (alternate bg color - white, lavender)
 

@@ -27,12 +27,19 @@ const contentStyle: JSX.CSSProperties = {
   padding: '16px 24px 24px',
 }
 
+const titleRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'space-between',
+  'margin-bottom': '24px',
+}
+
 const titleStyle: JSX.CSSProperties = {
   'font-size': '2rem',
   'font-weight': 700,
   'text-align': 'left',
   'margin-top': '0',
-  'margin-bottom': '24px',
+  'margin-bottom': '0',
   color: '#333',
 }
 
@@ -103,19 +110,23 @@ const EventParticipantEdit = () => {
     <div style={containerStyle}>
       <Header />
       <div style={contentStyle}>
-        <h1 style={titleStyle}>Edit Event Participants</h1>
+        <div style={titleRowStyle}>
+          <h1 style={titleStyle}>Edit Event Participants</h1>
+          <Show when={selectedEvent()}>
+            {(event) => (
+              <Button
+                color="#3498db"
+                onClick={eventParticipantEditActions.openAddDialog}
+                disabled={isAddDisabled(event())}
+              >
+                Add Participant
+              </Button>
+            )}
+          </Show>
+        </div>
         <Show when={selectedEvent()}>
           {(event) => (
             <>
-              <div style={{ 'margin-top': '16px' }}>
-                <Button
-                  color="#3498db"
-                  onClick={eventParticipantEditActions.openAddDialog}
-                  disabled={isAddDisabled(event())}
-                >
-                  Add Participant
-                </Button>
-              </div>
               <h3 style={sectionTitleStyle}>
                 {getParticipantsCountText(event())}
               </h3>
