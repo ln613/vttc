@@ -1,4 +1,5 @@
 import { getDB, toObjectId } from './db.js'
+import { autoGenerateForEvent } from './eventHandlers.js'
 
 const EVENTS_COLLECTION = 'events'
 const TABLE_STATE_COLLECTION = 'tableState'
@@ -495,8 +496,12 @@ export const getLiveScore = async () => {
   const queueEmpty = unassignedQueue.length === 0
 
   if (queueEmpty && allAvailable && hasStartedEvent) {
-    // Re-extract - this is the auto-start trigger
-    const freshItems = extractAllRemainingMatches(events)
+    // Auto-generate groups and/or schedules for started events that need them
+    await autoGenerateForStartedEvents(events)
+
+    // Re-fetch events to get fresh data after auto-generation
+    const freshEvents = await getStartedEvents()
+    const freshItems = extractAllRemainingMatches(freshEvents)
     const freshQueue = buildMatchQueue(freshItems)
     const result = assignTablesToMatches(tables, freshQueue, freshItems)
     tables = result.tables
@@ -509,6 +514,15 @@ export const getLiveScore = async () => {
   await saveTableState(result.tables, result.remainingQueue)
 
   return { tables: result.tables, matchQueue: result.remainingQueue }
+}
+
+/**
+ * Auto-generate groups and/or schedules for all started events that need them
+ */
+const autoGenerateForStartedEvents = async (events) => {
+  for (const event of events) {
+    await autoGenerateForEvent(event)
+  }
 }
 
 const extractAllRemainingMatches = (events) => {

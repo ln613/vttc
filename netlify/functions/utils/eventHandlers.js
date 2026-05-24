@@ -2133,3 +2133,175 @@ const buildResetEventStages = (event) =>
     }
     return stage
   })
+
+// ==================== AUTO-GENERATION ====================
+
+/**
+ * Auto-generate groups and/or schedule for an event if needed.
+ * Called during live score auto-start when match queue is empty.
+ * Returns true if any changes were made.
+ */
+export const autoGenerateForEvent = async (event) => {
+  let changed = false
+
+  if (needsGroupGeneration(event)) {
+    await autoGenerateGroups(event)
+    changed = true
+  }
+
+  // Re-fetch event if groups were just generated (to get fresh eventStages)
+  let freshEvent = event
+  if (changed) {
+    const db = getDB()
+    freshEvent = await db.collection(EVENTS_COLLECTION).findOne({ _id: event._id })
+  }
+
+  if (needsScheduleGeneration(freshEvent)) {
+    await autoGenerateSchedule(freshEvent)
+    changed = true
+  }
+
+  return changed
+}
+
+/**
+ * Check if event needs group generation
+ */
+const needsGroupGeneration = (event) => {
+  if (!event.stages || !event.stages.includes('group')) return false
+  const groupStage = event.eventStages?.find((s) => s.type === 'group')
+  if (!groupStage) return false
+  return groupStage.groups.length === 0 && event.participants.length >= 4
+}
+
+/**
+ * Check if event needs schedule generation (knockout bracket)
+ */
+const needsScheduleGeneration = (event) => {
+  if (!event.stages || !event.stages.includes('knockout')) return false
+
+  const knockoutStage = event.eventStages?.find((s) => s.type === 'knockout')
+  if (!knockoutStage) return false
+
+  const knockoutEmpty =
+    knockoutStage.rounds.length === 0 || isFirstRoundEmpty(knockoutStage)
+  if (!knockoutEmpty) return false
+
+  if (event.stages[0] === 'knockout') {
+    // Knockout-only event
+    return event.participants.length >= 4
+  }
+
+  // Group + Knockout event: knockout can only start if all groups complete
+  const groupStage = event.eventStages?.find((s) => s.type === 'group')
+  if (!groupStage) return false
+
+  return (
+    groupStage.groups.length > 0 &&
+    groupStage.groups.every((g) => g.isComplete) &&
+    groupStage.advancedParticipants?.length > 0
+  )
+}
+
+/**
+ * Auto-generate groups with match schedules for an event
+ */
+const autoGenerateGroups = async (event) => {
+  const groupArrays = formGroupsWithSnakeSeeding(event.participants, event.nop)
+  const numberOfGames = getBestOfNumber(event.groupGames)
+  const groups = buildGroupsWithMatches(groupArrays, numberOfGames)
+
+  const groupStageIndex = event.eventStages.findIndex((s) => s.type === 'group')
+  const updatedStages = [...event.eventStages]
+  updatedStages[groupStageIndex] = {
+    ...updatedStages[groupStageIndex],
+    groups,
+  }
+
+  const db = getDB()
+  await db
+    .collection(EVENTS_COLLECTION)
+    .updateOne({ _id: event._id }, { $set: { eventStages: updatedStages } })
+}
+
+const buildGroupsWithMatches = (groupArrays, numberOfGames) =>
+  groupArrays.map((participants, index) => {
+    const matchSchedule = generateGroupMatchSchedule(participants)
+    const matches = matchSchedule.map((schedule) => ({
+      _id: generateId(),
+      config: {
+        numberOfGames,
+        isSuddenDeath: true,
+        gameConfig: { type: 'standard', targetPoints: 11, isGolden: false },
+      },
+      side1: [schedule.side1.players[0]],
+      side2: [schedule.side2.players[0]],
+      games: [],
+      gamesWon1: 0,
+      gamesWon2: 0,
+      winningSide: undefined,
+    }))
+
+    return {
+      index,
+      participants: participants.map((p) => ({
+        participant: p,
+        stats: {
+          matchesPlayed: 0,
+          matchesWon: 0,
+          matchesLost: 0,
+          gamesWon: 0,
+          gamesLost: 0,
+          gameDifference: 0,
+          pointsWon: 0,
+          pointsLost: 0,
+          pointDifference: 0,
+        },
+      })),
+      matches,
+      isComplete: false,
+    }
+  })
+
+/**
+ * Auto-generate knockout bracket for an event
+ */
+const autoGenerateSchedule = async (event) => {
+  const knockoutStageIndex = event.eventStages.findIndex(
+    (s) => s.type === 'knockout',
+  )
+  const knockoutStage = event.eventStages[knockoutStageIndex]
+  const groupStage = event.eventStages.find((s) => s.type === 'group')
+
+  const participants = buildKnockoutParticipants(event, groupStage)
+  const newKnockoutStage = createKnockoutStage(
+    participants,
+    event.nop,
+    knockoutStage.config,
+    event,
+  )
+
+  const updatedStages = [...event.eventStages]
+  updatedStages[knockoutStageIndex] = newKnockoutStage
+
+  const db = getDB()
+  await db
+    .collection(EVENTS_COLLECTION)
+    .updateOne({ _id: event._id }, { $set: { eventStages: updatedStages } })
+}
+
+const buildKnockoutParticipants = (event, groupStage) => {
+  if (groupStage && groupStage.advancedParticipants?.length > 0) {
+    return groupStage.advancedParticipants.map((ap) => ({
+      participant: ap.participant,
+      groupIndex: ap.groupIndex,
+      ranking: ap.ranking,
+    }))
+  }
+
+  return event.participants.map((p, i) => ({
+    participant: p,
+    groupIndex: 0,
+    ranking: i + 1,
+  }))
+}
