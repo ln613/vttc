@@ -6,7 +6,7 @@ import MatchConfirmDialog from '../components/MatchConfirmDialog'
 import { eventDetailState, eventDetailActions } from '../stores/eventDetailStore'
 import type { StageTab } from '../stores/eventDetailStore'
 import { authState } from '../stores/authStore'
-import type { Group, GroupParticipant, KnockoutRound, KnockoutMatch as KnockoutMatchType } from '../../shared/types/Tournament'
+import type { Group, GroupParticipant, Participant, KnockoutRound, KnockoutMatch as KnockoutMatchType } from '../../shared/types/Tournament'
 import type { Player } from '../../shared/types/Player'
 import type { Match, Game } from '../../shared/types/Match'
 
@@ -234,7 +234,7 @@ const GroupStageContent = () => {
   const groupStage = () => eventDetailActions.getGroupStage()
 
   return (
-    <Show when={hasGroups()} fallback={<GenerateGroupsSection />}>
+    <Show when={hasGroups()} fallback={<NoGroupsSection />}>
       <div style={groupsListStyle}>
         <For each={groupStage()?.groups}>
           {(group) => <GroupDisplay group={group} />}
@@ -244,7 +244,14 @@ const GroupStageContent = () => {
   )
 }
 
-const GenerateGroupsSection = () => {
+const NoGroupsSection = () => (
+  <div>
+    <GenerateGroupsButton />
+    <ParticipantsList />
+  </div>
+)
+
+const GenerateGroupsButton = () => {
   const handleGenerateGroups = () => {
     eventDetailActions.generateGroups()
   }
@@ -263,6 +270,57 @@ const GenerateGroupsSection = () => {
       </div>
     </Show>
   )
+}
+
+const ParticipantsList = () => {
+  const participants = () => eventDetailActions.getParticipants()
+
+  return (
+    <Show when={participants().length > 0}>
+      <div style={participantsListContainerStyle}>
+        <h3 style={participantsListTitleStyle}>Players</h3>
+        <div style={participantsListStyle}>
+          <For each={participants()}>
+            {(participant, index) => (
+              <ParticipantRow participant={participant} index={index() + 1} />
+            )}
+          </For>
+        </div>
+      </div>
+    </Show>
+  )
+}
+
+interface ParticipantRowProps {
+  participant: Participant
+  index: number
+}
+
+const ParticipantRow = (props: ParticipantRowProps) => {
+  const displayName = () => getParticipantDisplayName(props.participant)
+  const rowBg = () => (props.index % 2 === 0 ? '#f8f9fa' : '#fff')
+
+  return (
+    <div
+      style={{
+        ...participantRowStyle,
+        'background-color': rowBg(),
+      }}
+    >
+      <span style={participantIndexStyle}>{props.index}</span>
+      <span style={participantNameStyle}>{displayName()}</span>
+      <span style={participantRatingStyle}>{props.participant.rating}</span>
+    </div>
+  )
+}
+
+const getParticipantDisplayName = (participant: Participant): string => {
+  if (!participant.players || participant.players.length === 0) return 'Unknown'
+  if (participant.teamName) return participant.teamName
+  const sorted = [...participant.players].sort(
+    (a, b) => (b.rating || 0) - (a.rating || 0),
+  )
+  return sorted.map((p) => `${p.firstName} ${p.lastName}`).join(' / ')
 }
 
 interface GroupDisplayProps {
@@ -1057,6 +1115,59 @@ const groupsListStyle: JSX.CSSProperties = {
 const generateGroupsStyle: JSX.CSSProperties = {
   padding: '40px',
   'text-align': 'center',
+}
+
+const participantsListContainerStyle: JSX.CSSProperties = {
+  'background-color': '#fff',
+  'border-radius': '12px',
+  'box-shadow': '0 2px 8px rgba(0, 0, 0, 0.08)',
+  overflow: 'hidden',
+  border: '1px solid #e8e8e8',
+  margin: '0 20px 20px',
+}
+
+const participantsListTitleStyle: JSX.CSSProperties = {
+  'font-size': '16px',
+  'font-weight': 700,
+  color: '#fff',
+  margin: '0',
+  padding: '14px 20px',
+  background: 'linear-gradient(135deg, #2c3e50, #34495e)',
+  'letter-spacing': '0.5px',
+}
+
+const participantsListStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+}
+
+const participantRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  padding: '10px 20px',
+  'border-bottom': '1px solid #f0f0f0',
+  gap: '12px',
+}
+
+const participantIndexStyle: JSX.CSSProperties = {
+  'font-size': '13px',
+  color: '#999',
+  'min-width': '24px',
+  'text-align': 'center',
+}
+
+const participantNameStyle: JSX.CSSProperties = {
+  'font-size': '15px',
+  'font-weight': 500,
+  color: '#333',
+  flex: '1',
+}
+
+const participantRatingStyle: JSX.CSSProperties = {
+  'font-size': '13px',
+  color: '#888',
+  'min-width': '40px',
+  'text-align': 'right',
 }
 
 const groupContainerStyle: JSX.CSSProperties = {

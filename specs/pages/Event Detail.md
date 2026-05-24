@@ -19,6 +19,7 @@ Vertical
 
 - Generate Groups button (if no groups, only for admin)
 - list of groups
+- if no groups, list of players (sort by rating desc)
 
 ### Group
 

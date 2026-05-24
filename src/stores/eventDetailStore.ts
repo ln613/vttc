@@ -7,6 +7,7 @@ import type {
   Group,
   KnockoutStage,
   KnockoutRound,
+  Participant,
 } from '../../shared/types/Tournament'
 import type { Match } from '../../shared/types/Match'
 import type { MatchPreview } from '../components/MatchConfirmDialog'
@@ -346,6 +347,11 @@ export const eventDetailActions = {
       setEventDetailState({ resettingEvent: false })
     }
   },
+
+  getParticipants: (): Participant[] =>
+    [...(eventDetailState.data?.participants || [])].sort(
+      (a, b) => (b.rating || 0) - (a.rating || 0),
+    ),
 
   invalidateData: () => {
     setEventDetailState({ data: null })
