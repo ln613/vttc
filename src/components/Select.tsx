@@ -36,7 +36,7 @@ const Select = (props: SelectProps) => {
   const selectStyle = (): JSX.CSSProperties => ({
     width: '100%',
     padding: '12px 40px 12px 16px',
-    'font-size': '14px',
+    'font-size': '16px',
     border: '1px solid #ddd',
     'border-radius': '8px',
     outline: 'none',

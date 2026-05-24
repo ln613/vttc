@@ -46,7 +46,7 @@ const labelStyle: JSX.CSSProperties = {
 
 const dateBoxStyle: JSX.CSSProperties = {
   padding: '12px 16px',
-  'font-size': '14px',
+  'font-size': '16px',
   border: '2px solid #3498db',
   'border-radius': '4px',
   'background-color': '#fff',
