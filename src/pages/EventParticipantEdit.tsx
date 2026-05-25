@@ -7,6 +7,7 @@ import type { Player } from '../../shared/types/Player'
 import type { Participant } from '../../shared/types/Tournament'
 import { type EventOption } from '../stores/eventStore'
 import { playerState } from '../stores/playerStore'
+import { authState } from '../stores/authStore'
 import {
   eventParticipantEditState,
   eventParticipantEditActions,
@@ -15,7 +16,10 @@ import {
   getParticipantsCountText,
   calculateCombinedRating,
   calculateTopNCombinedRating,
+  isPlayerPaid,
 } from '../stores/eventParticipantEditStore'
+
+// ==================== Styles ====================
 
 const containerStyle: JSX.CSSProperties = {
   display: 'flex',
@@ -71,12 +75,143 @@ const tdStyle: JSX.CSSProperties = {
   'text-align': 'left',
 }
 
-const deleteIconStyle: JSX.CSSProperties = {
+const iconStyle: JSX.CSSProperties = {
   cursor: 'pointer',
-  color: '#e74c3c',
   width: '20px',
   height: '20px',
 }
+
+const deleteIconStyle: JSX.CSSProperties = {
+  ...iconStyle,
+  color: '#e74c3c',
+}
+
+const editIconStyle: JSX.CSSProperties = {
+  ...iconStyle,
+  color: '#3498db',
+}
+
+const paymentIconStyle: JSX.CSSProperties = {
+  ...iconStyle,
+  color: '#27ae60',
+}
+
+const actionCellStyle: JSX.CSSProperties = {
+  display: 'flex',
+  gap: '8px',
+  'align-items': 'center',
+}
+
+const dialogOverlayStyle: JSX.CSSProperties = {
+  position: 'fixed',
+  top: '0',
+  left: '0',
+  right: '0',
+  bottom: '0',
+  'background-color': 'rgba(0, 0, 0, 0.5)',
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'center',
+  'z-index': 1000,
+}
+
+const dialogStyle: JSX.CSSProperties = {
+  'background-color': 'white',
+  'border-radius': '8px',
+  padding: '24px',
+  'min-width': '400px',
+  'max-width': '500px',
+}
+
+const dialogTitleStyle: JSX.CSSProperties = {
+  'font-size': '1.5rem',
+  'font-weight': 700,
+  'margin-bottom': '24px',
+  color: '#333',
+}
+
+const buttonContainerStyle: JSX.CSSProperties = {
+  display: 'flex',
+  gap: '16px',
+  'margin-top': '24px',
+  'justify-content': 'flex-end',
+}
+
+const paymentPlayerRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'space-between',
+  padding: '12px 0',
+  'border-bottom': '1px solid #eee',
+}
+
+// ==================== Icons ====================
+
+const DeleteIcon = (props: { onClick: () => void }) => (
+  <svg
+    style={deleteIconStyle}
+    onClick={props.onClick}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    <line x1="10" y1="11" x2="10" y2="17" />
+    <line x1="14" y1="11" x2="14" y2="17" />
+  </svg>
+)
+
+const EditIcon = (props: { onClick: () => void }) => (
+  <svg
+    style={editIconStyle}
+    onClick={props.onClick}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+  </svg>
+)
+
+const PaymentIcon = (props: { onClick: () => void }) => (
+  <svg
+    style={paymentIconStyle}
+    onClick={props.onClick}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <line x1="12" y1="1" x2="12" y2="23" />
+    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+  </svg>
+)
+
+// ==================== Helpers ====================
+
+const getRowBackgroundColor = (index: number): string =>
+  index % 2 === 0 ? 'white' : '#e6e6fa'
+
+const getPlayerNameStyle = (
+  event: EventOption,
+  playerId: string,
+): JSX.CSSProperties => {
+  if (!authState.isAdmin) return {}
+  if (isPlayerPaid(event, playerId)) return {}
+  return { color: 'red' }
+}
+
+// ==================== Main Component ====================
 
 const EventParticipantEdit = () => {
   const [searchParams] = useSearchParams()
@@ -136,11 +271,25 @@ const EventParticipantEdit = () => {
         </Show>
       </div>
 
-      <Show when={eventParticipantEditState.showAddDialog && selectedEvent()}>
+      <Show
+        when={eventParticipantEditState.showParticipantDialog && selectedEvent()}
+      >
         {(event) => (
-          <AddParticipantDialog
+          <ParticipantDialog
             nop={event().nop}
             players={playerState.data || []}
+            editingParticipant={eventParticipantEditState.editingParticipant}
+          />
+        )}
+      </Show>
+
+      <Show
+        when={eventParticipantEditState.showPaymentDialog && selectedEvent()}
+      >
+        {(event) => (
+          <TeamPaymentDialog
+            event={event()}
+            participant={eventParticipantEditState.paymentParticipant!}
           />
         )}
       </Show>
@@ -154,11 +303,9 @@ const EventParticipantEdit = () => {
   )
 }
 
-interface ParticipantsTableProps {
-  event: EventOption
-}
+// ==================== Participants Table ====================
 
-const ParticipantsTable = (props: ParticipantsTableProps) => (
+const ParticipantsTable = (props: { event: EventOption }) => (
   <Show
     when={props.event.nop === 1}
     fallback={<DoubleOrTeamParticipantTable event={props.event} />}
@@ -167,11 +314,9 @@ const ParticipantsTable = (props: ParticipantsTableProps) => (
   </Show>
 )
 
-interface SingleParticipantTableProps {
-  event: EventOption
-}
+// ==================== Single Participant Table ====================
 
-const SingleParticipantTable = (props: SingleParticipantTableProps) => {
+const SingleParticipantTable = (props: { event: EventOption }) => {
   const sortedParticipants = () =>
     [...props.event.participants].sort(
       (a, b) => (b.rating || 0) - (a.rating || 0),
@@ -184,9 +329,7 @@ const SingleParticipantTable = (props: SingleParticipantTableProps) => {
         <tr>
           <th style={thStyle}>Player</th>
           <th style={thStyle}>Rating</th>
-          <Show when={showDelete()}>
-            <th style={thStyle}>Action</th>
-          </Show>
+          <th style={thStyle}>Action</th>
         </tr>
       </thead>
       <tbody>
@@ -194,6 +337,7 @@ const SingleParticipantTable = (props: SingleParticipantTableProps) => {
           {(participant, index) => (
             <SingleParticipantRow
               participant={participant}
+              event={props.event}
               showDelete={showDelete()}
               rowIndex={index()}
             />
@@ -204,63 +348,52 @@ const SingleParticipantTable = (props: SingleParticipantTableProps) => {
   )
 }
 
-interface SingleParticipantRowProps {
+const SingleParticipantRow = (props: {
   participant: Participant
+  event: EventOption
   showDelete: boolean
   rowIndex: number
-}
+}) => {
+  const player = () => props.participant.players[0]
 
-const getRowBackgroundColor = (index: number): string =>
-  index % 2 === 0 ? 'white' : '#e6e6fa'
-
-interface DeleteIconProps {
-  onClick: () => void
-}
-
-const DeleteIcon = (props: DeleteIconProps) => (
-  <svg
-    style={deleteIconStyle}
-    onClick={props.onClick}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    stroke-width="2"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-  >
-    <polyline points="3 6 5 6 21 6" />
-    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-    <line x1="10" y1="11" x2="10" y2="17" />
-    <line x1="14" y1="11" x2="14" y2="17" />
-  </svg>
-)
-
-const SingleParticipantRow = (props: SingleParticipantRowProps) => (
-  <tr style={{ 'background-color': getRowBackgroundColor(props.rowIndex) }}>
-    <td style={tdStyle}>
-      {props.participant.players[0]?.firstName}{' '}
-      {props.participant.players[0]?.lastName}
-    </td>
-    <td style={tdStyle}>{props.participant.players[0]?.rating || 0}</td>
-    <Show when={props.showDelete}>
-      <td style={tdStyle}>
-        <DeleteIcon
-          onClick={() =>
-            eventParticipantEditActions.deleteParticipant(props.participant._id)
-          }
-        />
+  return (
+    <tr style={{ 'background-color': getRowBackgroundColor(props.rowIndex) }}>
+      <td
+        style={{
+          ...tdStyle,
+          ...getPlayerNameStyle(props.event, player()?._id),
+        }}
+      >
+        {player()?.firstName} {player()?.lastName}
       </td>
-    </Show>
-  </tr>
-)
-
-interface DoubleOrTeamParticipantTableProps {
-  event: EventOption
+      <td style={tdStyle}>{player()?.rating || 0}</td>
+      <td style={tdStyle}>
+        <div style={actionCellStyle}>
+          <Show when={props.showDelete}>
+            <DeleteIcon
+              onClick={() =>
+                eventParticipantEditActions.deleteParticipant(
+                  props.participant._id,
+                )
+              }
+            />
+          </Show>
+          <PaymentIcon
+            onClick={() =>
+              eventParticipantEditActions.paymentReceivedForSingles(
+                player()?._id,
+              )
+            }
+          />
+        </div>
+      </td>
+    </tr>
+  )
 }
 
-const DoubleOrTeamParticipantTable = (
-  props: DoubleOrTeamParticipantTableProps,
-) => {
+// ==================== Double/Team Participant Table ====================
+
+const DoubleOrTeamParticipantTable = (props: { event: EventOption }) => {
   const sortedParticipants = () =>
     [...props.event.participants].sort(
       (a, b) => calculateCombinedRating(b) - calculateCombinedRating(a),
@@ -282,9 +415,7 @@ const DoubleOrTeamParticipantTable = (
           <Show when={showTopNCombined()}>
             <th style={thStyle}>Top {props.event.topPlayersCount} Combined</th>
           </Show>
-          <Show when={showDelete()}>
-            <th style={thStyle}>Action</th>
-          </Show>
+          <th style={thStyle}>Action</th>
         </tr>
       </thead>
       <tbody>
@@ -304,15 +435,13 @@ const DoubleOrTeamParticipantTable = (
   )
 }
 
-interface TeamParticipantRowsProps {
+const TeamParticipantRows = (props: {
   participant: Participant
   event: EventOption
   showDelete: boolean
   showTopNCombined: boolean
   participantIndex: number
-}
-
-const TeamParticipantRows = (props: TeamParticipantRowsProps) => {
+}) => {
   const sortedPlayers = () =>
     [...props.participant.players].sort(
       (a, b) => (b.rating || 0) - (a.rating || 0),
@@ -328,11 +457,20 @@ const TeamParticipantRows = (props: TeamParticipantRowsProps) => {
 
   const rowBgColor = getRowBackgroundColor(props.participantIndex)
 
+  const handlePaymentClick = () => {
+    eventParticipantEditActions.openPaymentDialog(props.participant)
+  }
+
   return (
     <For each={sortedPlayers()}>
       {(player, index) => (
         <tr style={{ 'background-color': rowBgColor }}>
-          <td style={tdStyle}>
+          <td
+            style={{
+              ...tdStyle,
+              ...getPlayerNameStyle(props.event, player._id),
+            }}
+          >
             {player.firstName} {player.lastName}
           </td>
           <td style={tdStyle}>{player.rating || 0}</td>
@@ -352,18 +490,28 @@ const TeamParticipantRows = (props: TeamParticipantRowsProps) => {
               {topNCombined()}
             </td>
           </Show>
-          <Show when={props.showDelete && index() === 0}>
+          <Show when={index() === 0}>
             <td
               style={{ ...tdStyle, 'vertical-align': 'middle' }}
               rowSpan={sortedPlayers().length}
             >
-              <DeleteIcon
-                onClick={() =>
-                  eventParticipantEditActions.deleteParticipant(
-                    props.participant._id,
-                  )
-                }
-              />
+              <div style={actionCellStyle}>
+                <EditIcon
+                  onClick={() =>
+                    eventParticipantEditActions.openEditDialog(props.participant)
+                  }
+                />
+                <Show when={props.showDelete}>
+                  <DeleteIcon
+                    onClick={() =>
+                      eventParticipantEditActions.deleteParticipant(
+                        props.participant._id,
+                      )
+                    }
+                  />
+                </Show>
+                <PaymentIcon onClick={handlePaymentClick} />
+              </div>
             </td>
           </Show>
         </tr>
@@ -372,49 +520,24 @@ const TeamParticipantRows = (props: TeamParticipantRowsProps) => {
   )
 }
 
-interface AddParticipantDialogProps {
+// ==================== Participant Dialog ====================
+
+const ParticipantDialog = (props: {
   nop: number
   players: Player[]
-}
+  editingParticipant: Participant | null
+}) => {
+  const isEditMode = () => props.editingParticipant !== null
 
-const dialogOverlayStyle: JSX.CSSProperties = {
-  position: 'fixed',
-  top: '0',
-  left: '0',
-  right: '0',
-  bottom: '0',
-  'background-color': 'rgba(0, 0, 0, 0.5)',
-  display: 'flex',
-  'align-items': 'center',
-  'justify-content': 'center',
-  'z-index': 1000,
-}
+  const getInitialPlayerIds = (): string[] => {
+    if (props.editingParticipant) {
+      return props.editingParticipant.players.map((p) => p._id)
+    }
+    return Array(props.nop).fill('')
+  }
 
-const dialogStyle: JSX.CSSProperties = {
-  'background-color': 'white',
-  'border-radius': '8px',
-  padding: '24px',
-  'min-width': '400px',
-  'max-width': '500px',
-}
-
-const dialogTitleStyle: JSX.CSSProperties = {
-  'font-size': '1.5rem',
-  'font-weight': 700,
-  'margin-bottom': '24px',
-  color: '#333',
-}
-
-const buttonContainerStyle: JSX.CSSProperties = {
-  display: 'flex',
-  gap: '16px',
-  'margin-top': '24px',
-  'justify-content': 'flex-end',
-}
-
-const AddParticipantDialog = (props: AddParticipantDialogProps) => {
   const [selectedPlayerIds, setSelectedPlayerIds] = createSignal<string[]>(
-    Array(props.nop).fill(''),
+    getInitialPlayerIds(),
   )
 
   const handlePlayerChange = (index: number, playerId: string) => {
@@ -424,9 +547,15 @@ const AddParticipantDialog = (props: AddParticipantDialogProps) => {
   }
 
   const handleSave = () => {
-    eventParticipantEditActions.addParticipant(
-      selectedPlayerIds().filter((id) => id !== ''),
-    )
+    const playerIds = selectedPlayerIds().filter((id) => id !== '')
+    if (isEditMode()) {
+      eventParticipantEditActions.editParticipant(
+        props.editingParticipant!._id,
+        playerIds,
+      )
+    } else {
+      eventParticipantEditActions.addParticipant(playerIds)
+    }
   }
 
   const playerOptions = () =>
@@ -444,7 +573,9 @@ const AddParticipantDialog = (props: AddParticipantDialogProps) => {
   return (
     <div style={dialogOverlayStyle}>
       <div style={dialogStyle}>
-        <h2 style={dialogTitleStyle}>Add Participant</h2>
+        <h2 style={dialogTitleStyle}>
+          {isEditMode() ? 'Edit Participant' : 'Add Participant'}
+        </h2>
         <For each={Array.from({ length: props.nop }, (_, i) => i)}>
           {(index) => (
             <Select
@@ -459,12 +590,85 @@ const AddParticipantDialog = (props: AddParticipantDialogProps) => {
         <div style={buttonContainerStyle}>
           <Button
             color="#e74c3c"
-            onClick={eventParticipantEditActions.closeAddDialog}
+            onClick={eventParticipantEditActions.closeParticipantDialog}
           >
             Cancel
           </Button>
           <Button color="#27ae60" onClick={handleSave}>
             Save
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ==================== Team Payment Dialog ====================
+
+const TeamPaymentDialog = (props: {
+  event: EventOption
+  participant: Participant
+}) => {
+  const sortedPlayers = () =>
+    [...props.participant.players].sort(
+      (a, b) => (b.rating || 0) - (a.rating || 0),
+    )
+
+  const unpaidPlayerIds = () =>
+    props.participant.players
+      .filter((p) => !isPlayerPaid(props.event, p._id))
+      .map((p) => p._id)
+
+  return (
+    <div style={dialogOverlayStyle}>
+      <div style={dialogStyle}>
+        <h2 style={dialogTitleStyle}>Payment - Team Players</h2>
+        <For each={sortedPlayers()}>
+          {(player) => (
+            <div style={paymentPlayerRowStyle}>
+              <span
+                style={
+                  isPlayerPaid(props.event, player._id)
+                    ? { color: '#27ae60' }
+                    : {}
+                }
+              >
+                {player.firstName} {player.lastName}
+                {isPlayerPaid(props.event, player._id) ? ' ✓' : ''}
+              </span>
+              <Show when={!isPlayerPaid(props.event, player._id)}>
+                <Button
+                  color="#27ae60"
+                  onClick={() =>
+                    eventParticipantEditActions.paymentReceivedForTeamPlayer(
+                      player._id,
+                    )
+                  }
+                >
+                  Confirm
+                </Button>
+              </Show>
+            </div>
+          )}
+        </For>
+        <div style={buttonContainerStyle}>
+          <Show when={unpaidPlayerIds().length > 0}>
+            <Button
+              color="#27ae60"
+              onClick={() =>
+                eventParticipantEditActions.paymentReceivedForAllTeamPlayers(
+                  unpaidPlayerIds(),
+                )
+              }
+            >
+              Confirm All
+            </Button>
+          </Show>
+          <Button
+            color="#e74c3c"
+            onClick={eventParticipantEditActions.closePaymentDialog}
+          >
+            Close
           </Button>
         </div>
       </div>

@@ -11,14 +11,20 @@ interface ToastMessage {
 
 interface EventParticipantEditState {
   selectedEventId: string
-  showAddDialog: boolean
+  showParticipantDialog: boolean
+  editingParticipant: Participant | null
+  showPaymentDialog: boolean
+  paymentParticipant: Participant | null
   toastMessage: ToastMessage | null
   saving: boolean
 }
 
 const getInitialState = (): EventParticipantEditState => ({
   selectedEventId: '',
-  showAddDialog: false,
+  showParticipantDialog: false,
+  editingParticipant: null,
+  showPaymentDialog: false,
+  paymentParticipant: null,
   toastMessage: null,
   saving: false,
 })
@@ -38,11 +44,38 @@ export const eventParticipantEditActions = {
   },
 
   openAddDialog: () => {
-    setEventParticipantEditState({ showAddDialog: true })
+    setEventParticipantEditState({
+      showParticipantDialog: true,
+      editingParticipant: null,
+    })
   },
 
-  closeAddDialog: () => {
-    setEventParticipantEditState({ showAddDialog: false })
+  openEditDialog: (participant: Participant) => {
+    setEventParticipantEditState({
+      showParticipantDialog: true,
+      editingParticipant: participant,
+    })
+  },
+
+  closeParticipantDialog: () => {
+    setEventParticipantEditState({
+      showParticipantDialog: false,
+      editingParticipant: null,
+    })
+  },
+
+  openPaymentDialog: (participant: Participant) => {
+    setEventParticipantEditState({
+      showPaymentDialog: true,
+      paymentParticipant: participant,
+    })
+  },
+
+  closePaymentDialog: () => {
+    setEventParticipantEditState({
+      showPaymentDialog: false,
+      paymentParticipant: null,
+    })
   },
 
   showToast: (type: 'success' | 'error', text: string) => {
@@ -64,8 +97,15 @@ export const eventParticipantEditActions = {
         _id: selectedEvent._id,
         playerIds,
       })
-      eventParticipantEditActions.showToast('success', 'Participant added successfully')
-      setEventParticipantEditState({ showAddDialog: false, saving: false })
+      eventParticipantEditActions.showToast(
+        'success',
+        'Participant added successfully',
+      )
+      setEventParticipantEditState({
+        showParticipantDialog: false,
+        editingParticipant: null,
+        saving: false,
+      })
       await eventActions.refreshEvents()
     } catch (error) {
       eventParticipantEditActions.showToast(
@@ -76,12 +116,46 @@ export const eventParticipantEditActions = {
     }
   },
 
+  editParticipant: async (participantId: string, playerIds: string[]) => {
+    const { selectedEventId } = eventParticipantEditState
+    const selectedEvent = eventActions.getEventById(selectedEventId)
+    if (!selectedEvent) return
+
+    setEventParticipantEditState({ saving: true })
+
+    try {
+      await apiPost('editParticipant', {
+        _id: selectedEvent._id,
+        participantId,
+        playerIds,
+      })
+      eventParticipantEditActions.showToast(
+        'success',
+        'Participant updated successfully',
+      )
+      setEventParticipantEditState({
+        showParticipantDialog: false,
+        editingParticipant: null,
+        saving: false,
+      })
+      await eventActions.refreshEvents()
+    } catch (error) {
+      eventParticipantEditActions.showToast(
+        'error',
+        error instanceof Error ? error.message : 'Failed to update participant',
+      )
+      setEventParticipantEditState({ saving: false })
+    }
+  },
+
   deleteParticipant: async (participantId: string) => {
     const { selectedEventId } = eventParticipantEditState
     const selectedEvent = eventActions.getEventById(selectedEventId)
     if (!selectedEvent) return
 
-    const confirmed = window.confirm('Are you sure you want to delete this participant?')
+    const confirmed = window.confirm(
+      'Are you sure you want to delete this participant?',
+    )
     if (!confirmed) return
 
     try {
@@ -89,7 +163,10 @@ export const eventParticipantEditActions = {
         _id: selectedEvent._id,
         participantId,
       })
-      eventParticipantEditActions.showToast('success', 'Participant deleted successfully')
+      eventParticipantEditActions.showToast(
+        'success',
+        'Participant deleted successfully',
+      )
       await eventActions.refreshEvents()
     } catch (error) {
       eventParticipantEditActions.showToast(
@@ -99,17 +176,66 @@ export const eventParticipantEditActions = {
     }
   },
 
+  paymentReceived: async (playerId: string) => {
+    const { selectedEventId } = eventParticipantEditState
+    const selectedEvent = eventActions.getEventById(selectedEventId)
+    if (!selectedEvent) return
+
+    try {
+      await apiPost('paymentReceived', {
+        _id: selectedEvent._id,
+        playerId,
+      })
+      eventParticipantEditActions.showToast(
+        'success',
+        'Payment marked as received',
+      )
+      await eventActions.refreshEvents()
+    } catch (error) {
+      eventParticipantEditActions.showToast(
+        'error',
+        error instanceof Error
+          ? error.message
+          : 'Failed to mark payment received',
+      )
+    }
+  },
+
+  paymentReceivedForSingles: async (playerId: string) => {
+    const confirmed = window.confirm(
+      'Confirm payment received for this player?',
+    )
+    if (!confirmed) return
+    await eventParticipantEditActions.paymentReceived(playerId)
+  },
+
+  paymentReceivedForTeamPlayer: async (playerId: string) => {
+    const confirmed = window.confirm(
+      'Confirm payment received for this player?',
+    )
+    if (!confirmed) return
+    await eventParticipantEditActions.paymentReceived(playerId)
+  },
+
+  paymentReceivedForAllTeamPlayers: async (playerIds: string[]) => {
+    const confirmed = window.confirm(
+      'Confirm payment received for all players in this team?',
+    )
+    if (!confirmed) return
+
+    for (const playerId of playerIds) {
+      await eventParticipantEditActions.paymentReceived(playerId)
+    }
+  },
+
   getSelectedEvent: (): EventOption | undefined =>
     eventActions.getEventById(eventParticipantEditState.selectedEventId),
 
   reset: () => setEventParticipantEditState(getInitialState()),
 }
 
-export const canShowDeleteColumn = (event: EventOption): boolean => {
-  const eventDate = new Date(event.date)
-  const now = new Date()
-  return !event.hasSchedule && eventDate > now
-}
+export const canShowDeleteColumn = (event: EventOption): boolean =>
+  !event.hasSchedule
 
 export const isAddDisabled = (event: EventOption | undefined): boolean => {
   if (!event) return true
@@ -140,4 +266,12 @@ export const calculateTopNCombinedRating = (
   return sortedPlayers
     .slice(0, topN)
     .reduce((sum, p) => sum + (p.rating || 0), 0)
+}
+
+export const isPlayerPaid = (
+  event: EventOption,
+  playerId: string,
+): boolean => {
+  const paidIds = event.paidPlayerIds || []
+  return paidIds.includes(playerId)
 }

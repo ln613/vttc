@@ -235,6 +235,7 @@ export interface Event extends Tournament {
   handicapMaxPoints: number // MP = max points given, default 5
   participants: Participant[]
   eventStages: Stage[]
+  paidPlayerIds: string[] // Player IDs that have paid for this event
 }
 
 /**

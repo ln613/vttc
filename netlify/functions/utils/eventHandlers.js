@@ -105,6 +105,7 @@ export const saveEvent = async (body) => {
     handicapDifference,
     handicapMaxPoints,
     participants: isEdit ? undefined : [], // Don't overwrite participants on edit
+    paidPlayerIds: isEdit ? undefined : [], // Don't overwrite paidPlayerIds on edit
     eventStages: isEdit
       ? undefined
       : tournament.stages.map((stageType) => {
@@ -2304,4 +2305,163 @@ const buildKnockoutParticipants = (event, groupStage) => {
     groupIndex: 0,
     ranking: i + 1,
   }))
+}
+
+/**
+ * Mark payment received for a player in an event
+ */
+export const paymentReceived = async (body) => {
+  validatePaymentReceivedInput(body)
+
+  const { _id, playerId } = body
+
+  const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
+
+  const event = await collection.findOne({ _id: toObjectId(_id) })
+  if (!event) throwError('Event not found')
+
+  validatePlayerInEvent(event, playerId)
+
+  const paidPlayerIds = event.paidPlayerIds || []
+  if (paidPlayerIds.includes(playerId)) {
+    throwError('Payment already received for this player')
+  }
+
+  await collection.updateOne(
+    { _id: toObjectId(_id) },
+    { $push: { paidPlayerIds: playerId } },
+  )
+
+  return { success: true }
+}
+
+const validatePaymentReceivedInput = (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body._id) throwError('Event ID is required')
+  if (!body.playerId) throwError('Player ID is required')
+}
+
+const validatePlayerInEvent = (event, playerId) => {
+  const found = event.participants.some((p) =>
+    p.players.some((pl) => pl._id.toString() === playerId),
+  )
+  if (!found) throwError('Player not found in event')
+}
+
+/**
+ * Edit participant in event (replace players in a team/double)
+ */
+export const editParticipant = async (body) => {
+  validateEditParticipantInput(body)
+
+  const { _id, participantId, playerIds } = body
+
+  const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
+  const playersCollection = db.collection('players')
+
+  const event = await collection.findOne({ _id: toObjectId(_id) })
+  if (!event) throwError('Event not found')
+
+  validateEventHasNoSchedule(event)
+
+  const participantIndex = event.participants.findIndex((p) => p._id === participantId)
+  if (participantIndex === -1) throwError('Participant not found')
+
+  const players = await playersCollection
+    .find({ _id: { $in: playerIds.map(toObjectId) } })
+    .toArray()
+
+  if (players.length !== playerIds.length) {
+    throwError('One or more players not found')
+  }
+
+  const errors = validateEditParticipantRules(event, players, participantId)
+  throwErrors(errors)
+
+  const rating = calculateParticipantRating(players, event.nop)
+
+  const updatedParticipant = {
+    ...event.participants[participantIndex],
+    players,
+    rating,
+  }
+
+  await collection.updateOne(
+    { _id: toObjectId(_id) },
+    { $set: { [`participants.${participantIndex}`]: updatedParticipant } },
+  )
+
+  return updatedParticipant
+}
+
+const validateEditParticipantInput = (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body._id) throwError('Event ID is required')
+  if (!body.participantId) throwError('Participant ID is required')
+  if (!body.playerIds || !Array.isArray(body.playerIds) || body.playerIds.length === 0) {
+    throwError('Player IDs are required')
+  }
+}
+
+const validateEventHasNoSchedule = (event) => {
+  const hasSchedules = event.eventStages?.some(
+    (s) =>
+      (s.type === 'group' && s.groups?.length > 0) ||
+      (s.type === 'knockout' && s.rounds?.some((r) => r.matches?.length > 0)),
+  )
+  if (hasSchedules) {
+    throwError('Cannot edit participant after schedules have been created')
+  }
+}
+
+const validateEditParticipantRules = (event, players, currentParticipantId) => {
+  const errors = []
+
+  if (players.length !== event.nop) {
+    errors.push(`Expected ${event.nop} player(s), got ${players.length}`)
+  }
+
+  const playerIds = new Set()
+  for (const player of players) {
+    const playerId = player._id.toString()
+    if (playerIds.has(playerId)) {
+      errors.push(`Duplicate player: ${playerId}`)
+    }
+    playerIds.add(playerId)
+  }
+
+  // Check rating requirement
+  if (event.restriction === 'Rated' && event.ratingLimit) {
+    const ratingErrors = validateRatingRequirement(event, players)
+    errors.push(...ratingErrors)
+  }
+
+  // Check age requirement
+  if (event.restriction === 'Age' && event.ageLimitType && event.ageLimit) {
+    for (const player of players) {
+      if (!meetsAgeRequirement(player, event.ageLimitType, event.ageLimit, event.date)) {
+        const requirement =
+          event.ageLimitType === 'U' ? `under ${event.ageLimit}` : `over ${event.ageLimit}`
+        errors.push(
+          `Player ${player.firstName} ${player.lastName} does not meet age requirement (${requirement})`,
+        )
+      }
+    }
+  }
+
+  // Check if player is already in a different participant
+  for (const player of players) {
+    const existing = event.participants.find(
+      (p) =>
+        p._id !== currentParticipantId &&
+        p.players.some((pl) => pl._id.toString() === player._id.toString()),
+    )
+    if (existing) {
+      errors.push(`Player ${player.firstName} ${player.lastName} is already in another team`)
+    }
+  }
+
+  return errors
 }

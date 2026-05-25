@@ -13,25 +13,31 @@ Vertical
 
 ## Single Participant
 
-- table columns (align left) - Player, Rating, "Delete" icon
+- table columns (align left) - Player, Rating, "Delete" icon| "Payment" icon
 - order by Rating desc
+- admin only, show player in red if payment has not been received
 
 ## Double/Team Participant
 
-- table columns (align left) - Players, Rating, Combined Rating, "Delete" icon
+- table columns (align left) - Players, Rating, Combined Rating,  "Edit" icon | "Delete" icon | "Payment" icon
 - each participant consists of multiple rows, 1 player per row (order by Rating desc), no divider between rows. The cells in Combined Rating and "Delete" icon columns are merged, and center aligned vertically
 - For team participant, if topPlayersRatingEnabled, add a column "Top {topPlayersCount} Combined"
 - order by Combined Rating desc
+- admin only, show individual player in all teams in red if payment has not been received
 
 ## interaction
 
 - on load: call get players API to populate the players dropdown
 - Add Participant button should be disabled if number of participants reach max participants
 - on Add Participant button click: show the Add Participant Dialog
-- delete column should be hidden if event has schedule or pass the start date
+- delete column should be hidden if event has schedule
 - on delete icon click: confirm and call delete participant API
+- on edit icon click: show the Participant Dialog in edit mode
+- on payment icon click:
+  - for singles event: confirm and call payment received API to mark the player has paid for the event
+  - for teams event: show a dialog listing all players in the team, each one with a "Confirm" button, and a "Confirm All" button at bottom. All buttons should confirm before calling API
 
-## Add Participant Dialog
+## Participant Dialog
 
 - title
 - list of (number of rows = nop):

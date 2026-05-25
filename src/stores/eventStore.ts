@@ -14,6 +14,7 @@ export interface EventOption {
   hasSchedule?: boolean
   date: string
   time?: string
+  paidPlayerIds: string[]
 }
 
 interface EventState {
