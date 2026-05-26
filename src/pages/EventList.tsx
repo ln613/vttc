@@ -2,10 +2,10 @@ import { Show, For, onMount } from 'solid-js'
 import type { JSX } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { Header } from '../components/Header'
-import Button from '../components/Button'
+import Toggle from '../components/Toggle'
 import { eventListState, eventListActions } from '../stores/eventListStore'
 import { parseLocalDate } from '../utils/date'
-import { authState } from '../stores/authStore'
+import { authState, authActions } from '../stores/authStore'
 import type { EventOption } from '../stores/eventStore'
 
 const EventList = () => {
@@ -21,14 +21,33 @@ const EventList = () => {
       <div style={contentStyle}>
         <div style={pageHeaderStyle}>
           <h1 style={titleStyle}>Event List</h1>
-          <Show when={authState.isAdmin}>
-            <Button color="#27ae60" size="small" onClick={() => navigate('/event/new')}>
-              New Event
-            </Button>
-          </Show>
+          <ToolsSection />
         </div>
         <EventListContent />
       </div>
+    </div>
+  )
+}
+
+const ToolsSection = () => {
+  const navigate = useNavigate()
+
+  return (
+    <div style={toolsSectionStyle}>
+      <Show when={authActions.isSignedIn()}>
+        <Toggle
+          label="My Events"
+          value={eventListState.myEventsOnly}
+          onChange={() => eventListActions.toggleMyEvents()}
+          noMargin
+          activeColor="#27ae60"
+        />
+      </Show>
+      <Show when={authState.isAdmin}>
+        <button style={addButtonStyle} onClick={() => navigate('/event/new')}>
+          +
+        </button>
+      </Show>
     </div>
   )
 }
@@ -216,6 +235,27 @@ const iconStyle: JSX.CSSProperties = {
   padding: '4px',
   'border-radius': '4px',
   transition: 'background-color 0.2s ease',
+}
+
+const toolsSectionStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  gap: '12px',
+}
+
+const addButtonStyle: JSX.CSSProperties = {
+  width: '36px',
+  height: '36px',
+  'background-color': '#27ae60',
+  color: '#fff',
+  border: 'none',
+  'border-radius': '8px',
+  'font-size': '24px',
+  cursor: 'pointer',
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'center',
+  padding: '0 0 3px 0',
 }
 
 export default EventList

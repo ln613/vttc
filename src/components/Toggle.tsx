@@ -5,6 +5,7 @@ interface ToggleProps {
   value: boolean
   onChange: (value: boolean) => void
   noMargin?: boolean
+  activeColor?: string
 }
 
 const labelStyle: JSX.CSSProperties = {
@@ -34,7 +35,7 @@ const Toggle = (props: ToggleProps) => {
     left: '0',
     right: '0',
     bottom: '0',
-    'background-color': props.value ? '#3498db' : '#ccc',
+    'background-color': props.value ? (props.activeColor || '#3498db') : '#ccc',
     'border-radius': '12px',
     transition: 'background-color 0.2s ease',
   })

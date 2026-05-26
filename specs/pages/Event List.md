@@ -7,7 +7,9 @@ Vertical
 - shared header
 - page header row
   - title "Event List" (h1, align left)
-  - for admin, "New Event" button, green bg
+  - tools section, align right
+    - if logged in, show "My Events" checkbox
+    - for admin, "+" button (new event), green bg
 - the list of events
   - name on top
   - date and time on bottom (1 row)
@@ -19,3 +21,4 @@ Vertical
 ### interaction
 
 - on Event click: go to the Event Detail page
+- when "My Events" checked, only show events that the current player participates
