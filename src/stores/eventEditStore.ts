@@ -6,6 +6,7 @@ import { tournamentActions, type Tournament } from './tournamentStore'
 
 export interface EventEditFormData {
   _id?: string
+  eventSeries: string
   tournamentId: string
   date: Date | null
   time: string
@@ -24,12 +25,14 @@ export interface EventEditFormData {
 interface EventEditState {
   formData: EventEditFormData
   initialFormData: EventEditFormData
+  eventSeriesList: string[]
   saving: boolean
   saved: boolean
   error: string | null
 }
 
 const defaultFormData: EventEditFormData = {
+  eventSeries: '',
   tournamentId: '',
   date: null,
   time: '',
@@ -48,6 +51,7 @@ const defaultFormData: EventEditFormData = {
 const getInitialState = (): EventEditState => ({
   formData: { ...defaultFormData },
   initialFormData: { ...defaultFormData },
+  eventSeriesList: [],
   saving: false,
   saved: false,
   error: null,
@@ -60,6 +64,7 @@ export { eventEditState }
 
 const mapEventToFormData = (event: Event): EventEditFormData => ({
   _id: event._id,
+  eventSeries: event.eventSeries || '',
   tournamentId: event.tournamentId,
   date: event.date ? parseLocalDate(event.date) : null,
   time: event.time || '',
@@ -86,6 +91,16 @@ export const eventEditActions = {
       saved: false,
       error: null,
     })
+  },
+
+  fetchEventSeries: async () => {
+    try {
+      const series = await apiGet<string[]>('eventSeries')
+      setEventEditState({ eventSeriesList: series })
+    } catch {
+      // Non-critical - just use empty list
+      setEventEditState({ eventSeriesList: [] })
+    }
   },
 
   loadEvent: async (eventId: string) => {
@@ -164,6 +179,7 @@ const generateEventName = (tournamentId: string): string | null => {
 
 const buildSavePayload = (formData: EventEditFormData) => ({
   _id: formData._id,
+  eventSeries: formData.eventSeries || undefined,
   tournamentId: formData.tournamentId,
   date: formData.date ? formatLocalDate(formData.date) : undefined,
   time: formData.time || '',

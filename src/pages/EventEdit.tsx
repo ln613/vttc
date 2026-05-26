@@ -2,6 +2,7 @@ import { Show, onMount, onCleanup, type JSX } from 'solid-js'
 import { useParams, useNavigate } from '@solidjs/router'
 import { Header } from '../components/Header'
 import Input from '../components/Input'
+import InputDropdown from '../components/InputDropdown'
 import Select from '../components/Select'
 import DatePicker from '../components/DatePicker'
 import SingleSelectTags from '../components/SingleSelectTags'
@@ -159,7 +160,10 @@ const EventEdit = (props: EventEditProps) => {
   const navigate = useNavigate()
 
   onMount(async () => {
-    await tournamentActions.fetchTournaments()
+    await Promise.all([
+      tournamentActions.fetchTournaments(),
+      eventEditActions.fetchEventSeries(),
+    ])
     if (props.isEdit && params.id) {
       await eventEditActions.loadEvent(params.id)
     } else {
@@ -204,6 +208,14 @@ const EventEdit = (props: EventEditProps) => {
       </Show>
       <div style={contentStyle}>
         <h1 style={titleStyle}>{props.isEdit ? 'Edit Event' : 'Add Event'}</h1>
+        <InputDropdown
+          label="Event Series"
+          name="eventSeries"
+          value={eventEditState.formData.eventSeries}
+          onChange={(value) => eventEditActions.setField('eventSeries', value)}
+          options={eventEditState.eventSeriesList}
+          placeholder="Select or enter new series"
+        />
         <Select
           label="Tournament"
           name="tournament"

@@ -6,6 +6,7 @@ Vertical
 
 - shared header
 - title "Add Event" or "Edit Event" (h1, align left)
+- Event Series: input dropdown with all existing Event Series from all events, user can select or enter new
 - Tournament: dropdown (all tournaments)
 - date picker
 - Time: dropdown (From 8AM to 6PM, half hour interval)

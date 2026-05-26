@@ -29,12 +29,27 @@ const generateId = () => {
 /**
  * Save event (create or update)
  */
+/**
+ * Get all distinct event series names from all events
+ */
+export const getEventSeries = async () => {
+  const db = getDB()
+  const series = await db
+    .collection(EVENTS_COLLECTION)
+    .distinct('eventSeries')
+  return series.filter((s) => s != null && s !== '')
+}
+
+/**
+ * Save event (create or update)
+ */
 export const saveEvent = async (body) => {
   validateSaveEventInput(body)
 
   const {
     _id,
     tournamentId,
+    eventSeries,
     date,
     time = '',
     maxParticipants = 0,
@@ -92,6 +107,7 @@ export const saveEvent = async (body) => {
     ...tournamentFields,
     ...(isEdit && { _id: toObjectId(_id) }),
     tournamentId,
+    eventSeries: eventSeries || undefined,
     date,
     time,
     maxParticipants,

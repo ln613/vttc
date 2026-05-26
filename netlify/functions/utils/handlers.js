@@ -8,6 +8,7 @@ import {
   saveEvent,
   getEvents,
   getEvent,
+  getEventSeries,
   addParticipant,
   deleteParticipant,
   editParticipant,
@@ -31,6 +32,7 @@ export const apiHandlers = {
     tournament: (params) => getTournament(params),
     events: (params) => getEvents(params),
     event: (params) => getEvent(params),
+    eventSeries: () => getEventSeries(),
     liveScore: () => getLiveScore(),
   },
   post: {
