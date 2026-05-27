@@ -193,11 +193,32 @@ const hasFormChanged = (): boolean => {
   )
 }
 
-const validateChangePasswordInput = (data: ChangePasswordData): string | null => {
+const isValidPassword = (password: string): boolean =>
+  password.length >= 8 &&
+  /[0-9]/.test(password) &&
+  /[A-Z]/.test(password) &&
+  /[a-z]/.test(password)
+
+const getPasswordErrors = (password: string): string[] => {
   const errors: string[] = []
-  if (!data.newPassword) errors.push('New password is required')
-  if (data.newPassword.length < 6)
-    errors.push('Password must be at least 6 characters')
+  if (password.length < 8) errors.push('Password must be at least 8 characters')
+  if (!/[0-9]/.test(password)) errors.push('Password must contain at least 1 number')
+  if (!/[A-Z]/.test(password))
+    errors.push('Password must contain at least 1 uppercase letter')
+  if (!/[a-z]/.test(password))
+    errors.push('Password must contain at least 1 lowercase letter')
+  return errors
+}
+
+const validateChangePasswordInput = (
+  data: ChangePasswordData,
+): string | null => {
+  const errors: string[] = []
+  if (!data.newPassword) {
+    errors.push('New password is required')
+  } else if (!isValidPassword(data.newPassword)) {
+    errors.push(...getPasswordErrors(data.newPassword))
+  }
   if (data.newPassword !== data.confirmPassword)
     errors.push('Passwords do not match')
   return errors.length > 0 ? errors.join('\n') : null

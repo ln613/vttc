@@ -27,4 +27,4 @@ Vertical
 
 - validate email and phone (Canadian phone number) upon saving
 - confirm cancel
-- click "Change Password": show "Change Password" dialog, where user enters and confirms the new password
+- click "Change Password": show "Change Password" dialog, where user enters and confirms the new password (password rules are defined in header.md)

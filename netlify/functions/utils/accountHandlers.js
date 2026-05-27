@@ -269,8 +269,8 @@ const validateChangePasswordInput = (body) => {
   if (!body) throwError('Request body is required')
   if (!body._id) throwError('User id is required')
   if (!body.newPassword) throwError('New password is required')
-  if (body.newPassword.length < 6)
-    throwError('Password must be at least 6 characters')
+  if (!isValidPasswordFormat(body.newPassword))
+    throwError('Password does not meet requirements')
   if (body.newPassword !== body.confirmPassword)
     throwError('Passwords do not match')
 }
