@@ -12,7 +12,7 @@ Vertical
 
 ## Player Table
 
-- All players with first name, last name, gender, rating
+- All players with first name, last name, sex, rating
 - email, phone columns only for admin and above
 - sort by rating desc
 
