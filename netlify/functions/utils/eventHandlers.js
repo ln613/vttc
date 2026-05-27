@@ -2581,43 +2581,48 @@ const validateGetPartialTeamsInput = (body) => {
 }
 
 const buildPartialTeamsList = (event, player) => {
-  const partialTeams = findPartialTeams(event)
-  return filterAndMapPartialTeams(partialTeams, player, event)
+  const partialTeams = findPartialTeams(event, player)
+  return mapAllPartialTeams(partialTeams, player, event)
 }
 
-const findPartialTeams = (event) =>
-  event.participants.filter((p) => p.players.length < event.nop)
+const findPartialTeams = (event, player) =>
+  event.participants.filter(
+    (p) =>
+      p.players.length < event.nop &&
+      !p.players.some((pl) => pl._id.toString() === player._id.toString()),
+  )
 
-const filterAndMapPartialTeams = (partialTeams, player, event) => {
-  const result = []
-  for (const team of partialTeams) {
-    const allPlayers = [...team.players, player]
-    if (wouldExceedRatingLimits(event, allPlayers)) continue
-    result.push(mapPartialTeamInfo(team, player, event))
-  }
-  return result
-}
+const mapAllPartialTeams = (partialTeams, player, event) =>
+  partialTeams.map((team) => mapPartialTeamInfo(team, player, event))
 
-const wouldExceedRatingLimits = (event, players) => {
-  if (event.restriction !== 'Rated' || !event.ratingLimit) return false
+const checkRatingExceeded = (event, players) => {
+  const result = { exceedsCombinedRating: false, exceedsTopN: false }
+  if (event.restriction !== 'Rated' || !event.ratingLimit) return result
 
   const combinedRating = players.reduce((sum, p) => sum + (p.rating || 0), 0)
-  if (combinedRating > event.ratingLimit) return true
+  if (combinedRating > event.ratingLimit) result.exceedsCombinedRating = true
 
   if (event.topPlayersRatingEnabled && event.topPlayersCount && event.topPlayersRatingLimit) {
     const sorted = [...players].sort((a, b) => (b.rating || 0) - (a.rating || 0))
     const topPlayers = sorted.slice(0, event.topPlayersCount)
     const topRating = topPlayers.reduce((sum, p) => sum + (p.rating || 0), 0)
-    if (topRating > event.topPlayersRatingLimit) return true
+    if (topRating > event.topPlayersRatingLimit) result.exceedsTopN = true
   }
 
-  return false
+  return result
+}
+
+const wouldExceedRatingLimits = (event, players) => {
+  const { exceedsCombinedRating, exceedsTopN } = checkRatingExceeded(event, players)
+  return exceedsCombinedRating || exceedsTopN
 }
 
 const mapPartialTeamInfo = (team, player, event) => {
   const allPlayers = [...team.players, player]
   const combinedRating = allPlayers.reduce((sum, p) => sum + (p.rating || 0), 0)
   const topN = calculateTopNRating(allPlayers, event)
+  const { exceedsCombinedRating, exceedsTopN } = checkRatingExceeded(event, allPlayers)
+  const disabled = exceedsCombinedRating || exceedsTopN
 
   return {
     participantId: team._id,
@@ -2625,6 +2630,9 @@ const mapPartialTeamInfo = (team, player, event) => {
     combinedRating,
     topN,
     topPlayersCount: event.topPlayersCount || 0,
+    disabled,
+    exceedsCombinedRating,
+    exceedsTopN,
   }
 }
 
@@ -2825,4 +2833,125 @@ const calculatePerPlayerFee = (event) => {
     return Math.round((fee / event.nop) * 100) / 100
   }
   return fee
+}
+
+/**
+ * Change team - move a player from their current partial team to another partial team
+ */
+export const changeTeam = async (body) => {
+  validateChangeTeamInput(body)
+
+  const { _id, playerId, participantId } = body
+
+  const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
+
+  const event = await collection.findOne({ _id: toObjectId(_id) })
+  if (!event) throwError('Event not found')
+
+  validateEventHasNoSchedule(event)
+
+  const player = findPlayerInEvent(event, playerId)
+  if (!player) throwError('Player is not registered for this event')
+
+  const sourceParticipant = findPlayerParticipant(event, playerId)
+  if (!sourceParticipant) throwError('Player participant not found')
+
+  const targetParticipant = event.participants.find((p) => p._id === participantId)
+  if (!targetParticipant) throwError('Target team not found')
+
+  validateTargetTeamCanAccept(targetParticipant, event, player)
+
+  await movePlayerBetweenTeams(collection, event, player, sourceParticipant, targetParticipant)
+
+  return { success: true }
+}
+
+const validateChangeTeamInput = (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body._id) throwError('Event ID is required')
+  if (!body.playerId) throwError('Player ID is required')
+  if (!body.participantId) throwError('Target participant ID is required')
+}
+
+const findPlayerInEvent = (event, playerId) => {
+  for (const p of event.participants) {
+    const player = p.players.find((pl) => pl._id.toString() === playerId.toString())
+    if (player) return player
+  }
+  return null
+}
+
+const findPlayerParticipant = (event, playerId) =>
+  event.participants.find((p) =>
+    p.players.some((pl) => pl._id.toString() === playerId.toString()),
+  )
+
+const validateTargetTeamCanAccept = (targetParticipant, event, player) => {
+  if (targetParticipant.players.length >= event.nop) {
+    throwError('Target team is already full')
+  }
+
+  const allPlayers = [...targetParticipant.players, player]
+  if (wouldExceedRatingLimits(event, allPlayers)) {
+    throwError('Adding this player would exceed the rating limit')
+  }
+}
+
+const movePlayerBetweenTeams = async (collection, event, player, source, target) => {
+  const sourceRemaining = source.players.filter(
+    (p) => p._id.toString() !== player._id.toString(),
+  )
+  const targetUpdated = [...target.players, player]
+
+  const sourceIndex = event.participants.findIndex((p) => p._id === source._id)
+  const targetIndex = event.participants.findIndex((p) => p._id === target._id)
+
+  if (sourceRemaining.length === 0) {
+    await removeSourceAndUpdateTarget(collection, event, source, target, targetUpdated, targetIndex)
+  } else {
+    await updateBothTeams(collection, event, sourceRemaining, targetUpdated, sourceIndex, targetIndex)
+  }
+}
+
+const removeSourceAndUpdateTarget = async (collection, event, source, target, targetUpdated, targetIndex) => {
+  const targetRating = calculateParticipantRating(targetUpdated, event.nop)
+  await collection.updateOne(
+    { _id: event._id },
+    {
+      $pull: { participants: { _id: source._id } },
+    },
+  )
+  // After pull, the index may have shifted. Refetch and update target.
+  const updatedEvent = await collection.findOne({ _id: event._id })
+  const newTargetIndex = updatedEvent.participants.findIndex((p) => p._id === target._id)
+  await collection.updateOne(
+    { _id: event._id },
+    {
+      $set: {
+        [`participants.${newTargetIndex}`]: {
+          ...target,
+          players: targetUpdated,
+          rating: targetRating,
+        },
+      },
+    },
+  )
+}
+
+const updateBothTeams = async (collection, event, sourceRemaining, targetUpdated, sourceIndex, targetIndex) => {
+  const sourceRating = calculateParticipantRating(sourceRemaining, event.nop)
+  const targetRating = calculateParticipantRating(targetUpdated, event.nop)
+
+  await collection.updateOne(
+    { _id: event._id },
+    {
+      $set: {
+        [`participants.${sourceIndex}.players`]: sourceRemaining,
+        [`participants.${sourceIndex}.rating`]: sourceRating,
+        [`participants.${targetIndex}.players`]: targetUpdated,
+        [`participants.${targetIndex}.rating`]: targetRating,
+      },
+    },
+  )
 }

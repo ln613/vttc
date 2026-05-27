@@ -37,11 +37,13 @@ const PartialTeamList = () => (
 const PartialTeamItem = (props: { team: PartialTeamInfo }) => {
   const isSelected = () =>
     eventListState.selectedPartialTeamId === props.team.participantId
+  const isDisabled = () => props.team.disabled
 
   return (
     <div
       style={{
         ...itemStyle,
+        ...(isDisabled() ? disabledItemStyle : {}),
         ...(isSelected() ? selectedItemStyle : {}),
       }}
       onClick={() => eventListActions.selectPartialTeam(props.team.participantId)}
@@ -49,9 +51,19 @@ const PartialTeamItem = (props: { team: PartialTeamInfo }) => {
       <div style={itemContentStyle}>
         <div style={playerNamesStyle}>{props.team.playerNames.join(', ')}</div>
         <div style={ratingInfoStyle}>
-          <span>Combined Rating: {props.team.combinedRating}</span>
+          <span
+            style={
+              props.team.exceedsCombinedRating ? exceededRatingStyle : {}
+            }
+          >
+            Combined Rating: {props.team.combinedRating}
+          </span>
           <Show when={props.team.topN !== null}>
-            <span style={topNStyle}>
+            <span
+              style={
+                props.team.exceedsTopN ? exceededRatingStyle : topNStyle
+              }
+            >
               Top {props.team.topPlayersCount}: {props.team.topN}
             </span>
           </Show>
@@ -64,11 +76,28 @@ const PartialTeamItem = (props: { team: PartialTeamInfo }) => {
   )
 }
 
+const isManageMode = () => eventListState.teammateDialogMode === 'manage'
+
 const DialogFooter = () => (
   <div style={footerStyle}>
-    <Button color="#888" onClick={() => eventListActions.skipTeammateSelection()}>
-      Skip
-    </Button>
+    <Show
+      when={isManageMode()}
+      fallback={
+        <Button
+          color="#888"
+          onClick={() => eventListActions.skipTeammateSelection()}
+        >
+          Skip
+        </Button>
+      }
+    >
+      <Button
+        color="#888"
+        onClick={() => eventListActions.closeTeammateDialog()}
+      >
+        Cancel
+      </Button>
+    </Show>
     <Button
       color="#27ae60"
       onClick={() => eventListActions.confirmTeammateSelection()}
@@ -142,6 +171,12 @@ const selectedItemStyle: JSX.CSSProperties = {
   'background-color': '#f0faf4',
 }
 
+const disabledItemStyle: JSX.CSSProperties = {
+  opacity: '0.5',
+  cursor: 'not-allowed',
+  'background-color': '#f9f9f9',
+}
+
 const itemContentStyle: JSX.CSSProperties = {
   flex: '1',
   'text-align': 'left',
@@ -164,6 +199,11 @@ const ratingInfoStyle: JSX.CSSProperties = {
 
 const topNStyle: JSX.CSSProperties = {
   color: '#888',
+}
+
+const exceededRatingStyle: JSX.CSSProperties = {
+  color: '#e74c3c',
+  'font-weight': '600',
 }
 
 const checkmarkStyle: JSX.CSSProperties = {

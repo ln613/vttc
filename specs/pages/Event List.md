@@ -24,6 +24,9 @@ Vertical
     - fee icon
       - if already registered but not paid
       - on click, show the fee info dialog
+    - multi player icon
+      - if already registered but still in a partial team
+      - on click, show the select teammate dialog (replace the skip button with cancel button)
     - edit icon (admin only): goes to Event Edit page for that event
     - multi-user icon (admin only): goes to Event Participant Edit page
 
@@ -36,8 +39,7 @@ Vertical
   - confirm the user wants to register for the event, then
     - for team event, ask the player to select teammates
       - show a dialog with a list of all partial teams of the event (e.g., for team of 3, teams with 1 or 2 players are partial teams)
-      - filter out partial teams which would exceed the combined rating limit/combined top {n} players limit if the current player is added
-      - if no partial teams available to be selected, don't show the dialog
+      - disable the partial teams which would exceed the combined rating limit/combined top {n} players limit if the current player is added (show the exceeded rating in red)
       - the title of the dialog "Select your teammate"
       - the desc "If your teammate has not registered for the event, skip this step and ask your teammate to select you as teammate when registering"
       - the list contains player name(s) of the partial teams, combined rating (including the current player), combined top {n}
