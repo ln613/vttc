@@ -2620,6 +2620,14 @@ const mapEventToFeeInfo = (e) => ({
   eventName: e.eventName,
   date: e.date,
   time: e.time,
-  registrationFee: e.registrationFee || 0,
+  registrationFee: calculatePerPlayerFee(e),
   eventSeries: e.eventSeries,
 })
+
+const calculatePerPlayerFee = (event) => {
+  const fee = event.registrationFee || 0
+  if (event.type === 'Team' && event.nop > 1) {
+    return Math.round((fee / event.nop) * 100) / 100
+  }
+  return fee
+}

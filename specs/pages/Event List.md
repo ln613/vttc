@@ -35,5 +35,5 @@ Vertical
   - if not logged in, show Sign in dialog
   - confirm the user wants to register for the event, then
     - call API to register the player for the event
-    - the API will return fees for all events (with the same event series, if available) the player registered but not paid
+    - the API will return fees for all events (with the same event series, if available) the player registered but not paid (for team event, fee = team fee / number of players per team)
     - show the fee info dialog with all events and fee info, tell the user to either go to the club to pay the fee or send e-transfer to vttc@vttc.ca and copy the name/event info to the comment box (provide a copy button)
