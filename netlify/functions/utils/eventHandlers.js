@@ -2576,6 +2576,26 @@ const parseTime = (timeStr) => {
   return { hours, minutes }
 }
 
+export const getPlayerUnpaidFees = async (body) => {
+  validateGetPlayerUnpaidFeesInput(body)
+
+  const { _id, playerId } = body
+
+  const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
+
+  const event = await collection.findOne({ _id: toObjectId(_id) })
+  if (!event) throwError('Event not found')
+
+  return getUnpaidFees(collection, event, playerId)
+}
+
+const validateGetPlayerUnpaidFeesInput = (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body._id) throwError('Event ID is required')
+  if (!body.playerId) throwError('Player ID is required')
+}
+
 const getUnpaidFees = async (collection, event, playerId) => {
   const query = buildUnpaidFeesQuery(event, playerId)
   const events = await collection.find(query).toArray()

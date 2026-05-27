@@ -9,33 +9,67 @@ const FeeInfoDialog = () => (
   <Show when={eventListState.showFeeDialog}>
     <div style={overlayStyle} onClick={() => eventListActions.closeFeeDialog()}>
       <div style={dialogStyle} onClick={(e) => e.stopPropagation()}>
-        <h2 style={dialogTitleStyle}>Registration Successful</h2>
-        <p style={dialogDescStyle}>
-          You have registered for{' '}
-          <strong>{eventListState.registeredEventName}</strong>.
-        </p>
-        <Show when={eventListState.unpaidFees.length > 0}>
-          <p style={dialogDescStyle}>
-            Please pay the registration fee(s) below. You can either go to the
-            club to pay or send an e-transfer to{' '}
-            <strong>vttc@vttc.ca</strong> and copy the name/event info to the
-            comment box.
-          </p>
-          <FeeTable fees={eventListState.unpaidFees} />
-          <TotalRow fees={eventListState.unpaidFees} />
-          <CopyButton />
+        <Show
+          when={eventListState.feeDialogMode === 'registration'}
+          fallback={<FeeInfoContent />}
+        >
+          <RegistrationContent />
         </Show>
-        <div style={dialogButtonsStyle}>
-          <Button
-            color="#27ae60"
-            onClick={() => eventListActions.closeFeeDialog()}
-          >
-            OK
-          </Button>
-        </div>
+        <DialogFooter />
       </div>
     </div>
   </Show>
+)
+
+const DialogFooter = () => (
+  <div style={dialogFooterStyle}>
+    <Show when={eventListState.unpaidFees.length > 0}>
+      <CopyButton />
+    </Show>
+    <Button
+      color="#27ae60"
+      onClick={() => eventListActions.closeFeeDialog()}
+    >
+      OK
+    </Button>
+  </div>
+)
+
+const RegistrationContent = () => (
+  <>
+    <h2 style={dialogTitleStyle}>Registration Successful</h2>
+    <p style={dialogDescStyle}>
+      You have registered for{' '}
+      <strong>{eventListState.registeredEventName}</strong>.
+    </p>
+    <Show when={eventListState.unpaidFees.length > 0}>
+      <PaymentInfo />
+    </Show>
+  </>
+)
+
+const FeeInfoContent = () => (
+  <>
+    <h2 style={{ ...dialogTitleStyle, color: '#e67e22' }}>Unpaid Fees</h2>
+    <Show
+      when={eventListState.unpaidFees.length > 0}
+      fallback={<p style={dialogDescStyle}>No unpaid fees.</p>}
+    >
+      <PaymentInfo />
+    </Show>
+  </>
+)
+
+const PaymentInfo = () => (
+  <>
+    <p style={dialogDescStyle}>
+      Please pay the registration fee(s) below. You can either go to the club
+      to pay or send an e-transfer to <strong>vttc@vttc.ca</strong> and copy
+      the name/event info to the comment box.
+    </p>
+    <FeeTable fees={eventListState.unpaidFees} />
+    <TotalRow fees={eventListState.unpaidFees} />
+  </>
 )
 
 const FeeTable = (props: { fees: UnpaidFeeInfo[] }) => (
@@ -95,11 +129,9 @@ const CopyButton = () => {
   }
 
   return (
-    <div style={copyContainerStyle}>
-      <Button color="#2196F3" onClick={handleCopy}>
-        📋 Copy Info
-      </Button>
-    </div>
+    <Button color="#2196F3" onClick={handleCopy}>
+      📋 Copy Info
+    </Button>
   )
 }
 
@@ -215,16 +247,10 @@ const totalValueStyle: JSX.CSSProperties = {
   'text-align': 'right',
 }
 
-const copyContainerStyle: JSX.CSSProperties = {
+const dialogFooterStyle: JSX.CSSProperties = {
   display: 'flex',
-  'justify-content': 'flex-end',
-  'margin-top': '8px',
-  'margin-bottom': '16px',
-}
-
-const dialogButtonsStyle: JSX.CSSProperties = {
-  display: 'flex',
-  'justify-content': 'flex-end',
+  'justify-content': 'space-between',
+  'align-items': 'center',
   'margin-top': '16px',
 }
 

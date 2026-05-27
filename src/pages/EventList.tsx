@@ -128,6 +128,23 @@ const RegisterIcon = () => (
   </svg>
 )
 
+const FeeIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="#e67e22"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <line x1="12" y1="1" x2="12" y2="23" />
+    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+  </svg>
+)
+
 const handleIconClick = (
   e: MouseEvent,
   path: string,
@@ -160,6 +177,16 @@ const shouldShowRegisterIcon = (event: EventOption): boolean => {
   return true
 }
 
+const shouldShowFeeIcon = (event: EventOption): boolean => {
+  if (authState.isAdmin) return false
+  return eventListActions.isPlayerUnpaid(event)
+}
+
+const handleFeeIconClick = (e: MouseEvent, event: EventOption) => {
+  e.stopPropagation()
+  eventListActions.showFeeInfo(event)
+}
+
 const EventListItem = (props: EventListItemProps) => {
   const navigate = useNavigate()
 
@@ -188,6 +215,14 @@ const EventListItem = (props: EventListItemProps) => {
             onClick={(e) => handleRegisterClick(e, props.event)}
           >
             <RegisterIcon />
+          </div>
+        </Show>
+        <Show when={shouldShowFeeIcon(props.event)}>
+          <div
+            style={iconStyle}
+            onClick={(e) => handleFeeIconClick(e, props.event)}
+          >
+            <FeeIcon />
           </div>
         </Show>
         <Show when={authState.isAdmin}>

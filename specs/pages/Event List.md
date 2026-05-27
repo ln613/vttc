@@ -21,6 +21,9 @@ Vertical
       - for player or non-login user
       - only if before the event start date/time
       - only if event not full
+    - fee icon
+      - if already registered but not paid
+      - on click, show the fee info dialog
     - edit icon (admin only): goes to Event Edit page for that event
     - multi-user icon (admin only): goes to Event Participant Edit page
 
@@ -33,4 +36,4 @@ Vertical
   - confirm the user wants to register for the event, then
     - call API to register the player for the event
     - the API will return fees for all events (with the same event series, if available) the player registered but not paid
-    - show a dialog with all events and fee info, tell the user to either go to the club to pay the fee or send e-transfer to vttc@vttc.ca and copy the name/event info to the comment box (provide a copy button)
+    - show the fee info dialog with all events and fee info, tell the user to either go to the club to pay the fee or send e-transfer to vttc@vttc.ca and copy the name/event info to the comment box (provide a copy button)

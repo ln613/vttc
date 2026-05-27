@@ -14,6 +14,8 @@ export interface UnpaidFeeInfo {
   eventSeries?: string
 }
 
+export type FeeDialogMode = 'registration' | 'feeInfo'
+
 interface EventListState {
   loading: boolean
   error: string | null
@@ -21,6 +23,7 @@ interface EventListState {
   registering: boolean
   registerError: string | null
   showFeeDialog: boolean
+  feeDialogMode: FeeDialogMode
   unpaidFees: UnpaidFeeInfo[]
   registeredEventName: string
 }
@@ -32,6 +35,7 @@ const getInitialState = (): EventListState => ({
   registering: false,
   registerError: null,
   showFeeDialog: false,
+  feeDialogMode: 'registration',
   unpaidFees: [],
   registeredEventName: '',
 })
@@ -146,6 +150,7 @@ const registerForEvent = async (event: EventOption) => {
     setEventListState({
       registering: false,
       showFeeDialog: true,
+      feeDialogMode: 'registration',
       unpaidFees: result.unpaidFees,
       registeredEventName: event.eventName,
     })
@@ -158,9 +163,38 @@ const registerForEvent = async (event: EventOption) => {
   }
 }
 
+const showFeeInfo = async (event: EventOption) => {
+  const playerId = authState.user?._id
+  if (!playerId) return
+
+  try {
+    const unpaidFees = await apiPost<UnpaidFeeInfo[]>('getPlayerUnpaidFees', {
+      _id: event._id,
+      playerId,
+    })
+    setEventListState({
+      showFeeDialog: true,
+      feeDialogMode: 'feeInfo',
+      unpaidFees,
+      registeredEventName: event.eventName,
+    })
+  } catch (err) {
+    // silently fail
+  }
+}
+
+const isPlayerUnpaid = (event: EventOption): boolean => {
+  const userId = authState.user?._id
+  if (!userId) return false
+  if (!isPlayerInEvent(event, userId)) return false
+  const paidIds = event.paidPlayerIds || []
+  return !paidIds.includes(userId)
+}
+
 const closeFeeDialog = () => {
   setEventListState({
     showFeeDialog: false,
+    feeDialogMode: 'registration',
     unpaidFees: [],
     registeredEventName: '',
   })
@@ -192,8 +226,10 @@ export const eventListActions = {
   toggleMyEvents,
   canRegister,
   isPlayerRegistered,
+  isPlayerUnpaid,
   getParticipantCountText,
   registerForEvent,
+  showFeeInfo,
   closeFeeDialog,
   buildFeeInfoText,
   reset: () => setEventListState(getInitialState()),
