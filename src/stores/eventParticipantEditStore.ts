@@ -15,6 +15,8 @@ interface EventParticipantEditState {
   editingParticipant: Participant | null
   showPaymentDialog: boolean
   paymentParticipant: Participant | null
+  showDeleteDialog: boolean
+  deleteParticipant: Participant | null
   toastMessage: ToastMessage | null
   saving: boolean
 }
@@ -25,6 +27,8 @@ const getInitialState = (): EventParticipantEditState => ({
   editingParticipant: null,
   showPaymentDialog: false,
   paymentParticipant: null,
+  showDeleteDialog: false,
+  deleteParticipant: null,
   toastMessage: null,
   saving: false,
 })
@@ -148,7 +152,36 @@ export const eventParticipantEditActions = {
     }
   },
 
-  deleteParticipant: async (participantId: string) => {
+  openDeleteDialog: (participant: Participant) => {
+    setEventParticipantEditState({
+      showDeleteDialog: true,
+      deleteParticipant: participant,
+    })
+  },
+
+  closeDeleteDialog: () => {
+    setEventParticipantEditState({
+      showDeleteDialog: false,
+      deleteParticipant: null,
+    })
+  },
+
+  handleDeleteClick: (participant: Participant) => {
+    const { selectedEventId } = eventParticipantEditState
+    const selectedEvent = eventActions.getEventById(selectedEventId)
+    if (!selectedEvent) return
+
+    const isTeamEvent = selectedEvent.nop > 1
+    const hasMultiplePlayers = participant.players.length > 1
+
+    if (isTeamEvent && hasMultiplePlayers) {
+      eventParticipantEditActions.openDeleteDialog(participant)
+    } else {
+      eventParticipantEditActions.deleteWholeParticipant(participant._id)
+    }
+  },
+
+  deleteWholeParticipant: async (participantId: string) => {
     const { selectedEventId } = eventParticipantEditState
     const selectedEvent = eventActions.getEventById(selectedEventId)
     if (!selectedEvent) return
@@ -167,11 +200,44 @@ export const eventParticipantEditActions = {
         'success',
         'Participant deleted successfully',
       )
+      eventParticipantEditActions.closeDeleteDialog()
       await eventActions.refreshEvents()
     } catch (error) {
       eventParticipantEditActions.showToast(
         'error',
         error instanceof Error ? error.message : 'Failed to delete participant',
+      )
+    }
+  },
+
+  deletePlayerFromTeam: async (participantId: string, playerId: string) => {
+    const { selectedEventId } = eventParticipantEditState
+    const selectedEvent = eventActions.getEventById(selectedEventId)
+    if (!selectedEvent) return
+
+    const confirmed = window.confirm(
+      'Are you sure you want to remove this player from the team?',
+    )
+    if (!confirmed) return
+
+    try {
+      await apiPost('deletePlayerFromTeam', {
+        _id: selectedEvent._id,
+        participantId,
+        playerId,
+      })
+      eventParticipantEditActions.showToast(
+        'success',
+        'Player removed from team successfully',
+      )
+      eventParticipantEditActions.closeDeleteDialog()
+      await eventActions.refreshEvents()
+    } catch (error) {
+      eventParticipantEditActions.showToast(
+        'error',
+        error instanceof Error
+          ? error.message
+          : 'Failed to remove player from team',
       )
     }
   },

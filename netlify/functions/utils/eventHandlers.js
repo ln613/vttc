@@ -446,6 +446,75 @@ const validateDeleteParticipantInput = (body) => {
 }
 
 /**
+ * Delete a single player from a team participant
+ * If the team has only 1 player left after removal, delete the whole participant
+ */
+export const deletePlayerFromTeam = async (body) => {
+  validateDeletePlayerFromTeamInput(body)
+
+  const { _id, participantId, playerId } = body
+
+  const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
+
+  const event = await collection.findOne({ _id: toObjectId(_id) })
+  if (!event) throwError('Event not found')
+
+  validateEventHasNoSchedule(event)
+
+  const participant = event.participants.find((p) => p._id === participantId)
+  if (!participant) throwError('Participant not found')
+
+  const playerIndex = participant.players.findIndex(
+    (p) => p._id.toString() === playerId,
+  )
+  if (playerIndex === -1) throwError('Player not found in team')
+
+  const remainingPlayers = participant.players.filter(
+    (p) => p._id.toString() !== playerId,
+  )
+
+  if (remainingPlayers.length === 0) {
+    return deleteWholeParticipant(collection, _id, participantId)
+  }
+
+  return updateTeamAfterPlayerRemoval(collection, event, participantId, remainingPlayers)
+}
+
+const validateDeletePlayerFromTeamInput = (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body._id) throwError('Event ID is required')
+  if (!body.participantId) throwError('Participant ID is required')
+  if (!body.playerId) throwError('Player ID is required')
+}
+
+const deleteWholeParticipant = async (collection, eventId, participantId) => {
+  await collection.updateOne(
+    { _id: toObjectId(eventId) },
+    { $pull: { participants: { _id: participantId } } },
+  )
+  return { deleted: true }
+}
+
+const updateTeamAfterPlayerRemoval = async (collection, event, participantId, remainingPlayers) => {
+  const participantIndex = event.participants.findIndex((p) => p._id === participantId)
+  const rating = calculateParticipantRating(remainingPlayers, event.nop)
+
+  const updatedParticipant = {
+    ...event.participants[participantIndex],
+    players: remainingPlayers,
+    rating,
+  }
+
+  await collection.updateOne(
+    { _id: toObjectId(event._id) },
+    { $set: { [`participants.${participantIndex}`]: updatedParticipant } },
+  )
+
+  return updatedParticipant
+}
+
+/**
  * Generate groups for an event
  */
 export const generateGroups = async (body) => {

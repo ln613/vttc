@@ -295,6 +295,17 @@ const EventParticipantEdit = () => {
         )}
       </Show>
 
+      <Show
+        when={eventParticipantEditState.showDeleteDialog && selectedEvent()}
+      >
+        {(event) => (
+          <TeamDeleteDialog
+            event={event()}
+            participant={eventParticipantEditState.deleteParticipant!}
+          />
+        )}
+      </Show>
+
       <Show when={eventParticipantEditState.toastMessage}>
         <div style={toastStyle()}>
           {eventParticipantEditState.toastMessage!.text}
@@ -373,8 +384,8 @@ const SingleParticipantRow = (props: {
           <Show when={props.showDelete}>
             <DeleteIcon
               onClick={() =>
-                eventParticipantEditActions.deleteParticipant(
-                  props.participant._id,
+                eventParticipantEditActions.handleDeleteClick(
+                  props.participant,
                 )
               }
             />
@@ -505,8 +516,8 @@ const TeamParticipantRows = (props: {
                 <Show when={props.showDelete}>
                   <DeleteIcon
                     onClick={() =>
-                      eventParticipantEditActions.deleteParticipant(
-                        props.participant._id,
+                      eventParticipantEditActions.handleDeleteClick(
+                        props.participant,
                       )
                     }
                   />
@@ -670,6 +681,64 @@ const TeamPaymentDialog = (props: {
             onClick={eventParticipantEditActions.closePaymentDialog}
           >
             Close
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ==================== Team Delete Dialog ====================
+
+const TeamDeleteDialog = (props: {
+  event: EventOption
+  participant: Participant
+}) => {
+  const sortedPlayers = () =>
+    [...props.participant.players].sort(
+      (a, b) => (b.rating || 0) - (a.rating || 0),
+    )
+
+  return (
+    <div style={dialogOverlayStyle}>
+      <div style={dialogStyle}>
+        <h2 style={dialogTitleStyle}>Delete Team Players</h2>
+        <For each={sortedPlayers()}>
+          {(player) => (
+            <div style={paymentPlayerRowStyle}>
+              <span>
+                {player.firstName} {player.lastName}
+              </span>
+              <Button
+                color="#e74c3c"
+                onClick={() =>
+                  eventParticipantEditActions.deletePlayerFromTeam(
+                    props.participant._id,
+                    player._id,
+                  )
+                }
+              >
+                Delete
+              </Button>
+            </div>
+          )}
+        </For>
+        <div style={buttonContainerStyle}>
+          <Button
+            color="#e74c3c"
+            onClick={() =>
+              eventParticipantEditActions.deleteWholeParticipant(
+                props.participant._id,
+              )
+            }
+          >
+            Delete All
+          </Button>
+          <Button
+            color="#999"
+            onClick={eventParticipantEditActions.closeDeleteDialog}
+          >
+            Cancel
           </Button>
         </div>
       </div>

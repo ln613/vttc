@@ -144,6 +144,7 @@ const selectedItemStyle: JSX.CSSProperties = {
 
 const itemContentStyle: JSX.CSSProperties = {
   flex: '1',
+  'text-align': 'left',
 }
 
 const playerNamesStyle: JSX.CSSProperties = {
@@ -151,6 +152,7 @@ const playerNamesStyle: JSX.CSSProperties = {
   'font-weight': '600',
   color: '#2c3e50',
   'margin-bottom': '4px',
+  'text-align': 'left',
 }
 
 const ratingInfoStyle: JSX.CSSProperties = {

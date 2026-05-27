@@ -31,7 +31,9 @@ Vertical
 - Add Participant button should be disabled if number of participants reach max participants
 - on Add Participant button click: show the Add Participant Dialog
 - delete column should be hidden if event has schedule
-- on delete icon click: confirm and call delete participant API
+- on delete icon click
+  - for team event, if the team contains more than 1 player, show a dialog with each player in the team, each with a delete button to delete a single player in the team, and at the bottom "Delete All" button to delete the whole team 
+  - confirm and call delete participant API
 - on edit icon click: show the Participant Dialog in edit mode
 - on payment icon click:
   - for singles event: confirm and call payment received API to mark the player has paid for the event
