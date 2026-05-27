@@ -72,9 +72,18 @@ const generateMaxParticipantsOptions = () => {
   return options
 }
 
+const generateRegistrationFeeOptions = () => {
+  const options = [{ value: '', label: '' }]
+  for (let i = 10; i <= 100; i += 5) {
+    options.push({ value: String(i), label: `$${i}` })
+  }
+  return options
+}
+
 const HANDICAP_DIFFERENCE_OPTIONS = generateHandicapDifferenceOptions()
 const MAX_POINTS_GIVEN_OPTIONS = generateMaxPointsGivenOptions()
 const MAX_PARTICIPANTS_OPTIONS = generateMaxParticipantsOptions()
+const REGISTRATION_FEE_OPTIONS = generateRegistrationFeeOptions()
 
 interface EventEditProps {
   isEdit?: boolean
@@ -250,6 +259,15 @@ const EventEdit = (props: EventEditProps) => {
             eventEditActions.setField('maxParticipants', value)
           }
           options={MAX_PARTICIPANTS_OPTIONS}
+        />
+        <Select
+          label="Registration Fee"
+          name="registrationFee"
+          value={eventEditState.formData.registrationFee}
+          onChange={(value) =>
+            eventEditActions.setField('registrationFee', value)
+          }
+          options={REGISTRATION_FEE_OPTIONS}
         />
         <NumberOfMatchesSection />
         <NumberOfGamesSection />

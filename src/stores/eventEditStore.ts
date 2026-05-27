@@ -11,6 +11,7 @@ export interface EventEditFormData {
   date: Date | null
   time: string
   maxParticipants: string
+  registrationFee: string
   name: string
   groupGames: BestOfOption
   knockoutGames: BestOfOption
@@ -37,6 +38,7 @@ const defaultFormData: EventEditFormData = {
   date: null,
   time: '',
   maxParticipants: 'Unlimited',
+  registrationFee: '',
   name: '',
   groupGames: 'Best of 3',
   knockoutGames: 'Best of 3 before Semifinal',
@@ -70,6 +72,7 @@ const mapEventToFormData = (event: Event): EventEditFormData => ({
   time: event.time || '',
   maxParticipants:
     event.maxParticipants === 0 ? 'Unlimited' : String(event.maxParticipants),
+  registrationFee: event.registrationFee ? String(event.registrationFee) : '',
   name: event.eventName || '',
   groupGames: event.groupGames || 'Best of 3',
   knockoutGames: event.knockoutGames || 'Best of 3 before Semifinal',
@@ -187,6 +190,9 @@ const buildSavePayload = (formData: EventEditFormData) => ({
     formData.maxParticipants === 'Unlimited'
       ? 0
       : parseInt(formData.maxParticipants, 10),
+  registrationFee: formData.registrationFee
+    ? parseInt(formData.registrationFee, 10)
+    : undefined,
   name: formData.name,
   groupGames: formData.groupGames,
   knockoutGames: formData.knockoutGames,

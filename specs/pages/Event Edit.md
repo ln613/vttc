@@ -12,6 +12,7 @@ Vertical
 - Time: dropdown (From 8AM to 6PM, half hour interval)
 - Name: input (initial value after tournament is selected = tournament name) *
 - Max Participants: dropdown (Unlimited, 4 to 128, default Unlimited)
+- Registration Fee: dropdown (10 to 100, interval 5)
 - Number of Matches section
 - Number of Games section
 - Number of Qualifiers section

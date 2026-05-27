@@ -234,6 +234,7 @@ export interface Event extends Tournament {
   handicapEnabled: boolean
   handicapDifference: number // D = rating difference divisor, default 200
   handicapMaxPoints: number // MP = max points given, default 5
+  registrationFee?: number // Registration fee (10 to 100, interval 5)
   participants: Participant[]
   eventStages: Stage[]
   paidPlayerIds: string[] // Player IDs that have paid for this event

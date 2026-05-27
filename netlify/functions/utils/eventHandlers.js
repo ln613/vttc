@@ -53,6 +53,7 @@ export const saveEvent = async (body) => {
     date,
     time = '',
     maxParticipants = 0,
+    registrationFee,
     name,
     groupGames = 'Best of 3',
     knockoutGames = 'Best of 3 before Semifinal',
@@ -120,6 +121,7 @@ export const saveEvent = async (body) => {
     handicapEnabled,
     handicapDifference,
     handicapMaxPoints,
+    registrationFee: registrationFee || undefined,
     participants: isEdit ? undefined : [], // Don't overwrite participants on edit
     paidPlayerIds: isEdit ? undefined : [], // Don't overwrite paidPlayerIds on edit
     eventStages: isEdit
@@ -2481,3 +2483,123 @@ const validateEditParticipantRules = (event, players, currentParticipantId) => {
 
   return errors
 }
+
+/**
+ * Register a player for an event (self-registration)
+ */
+export const registerForEvent = async (body) => {
+  validateRegisterForEventInput(body)
+
+  const { _id, playerId } = body
+
+  const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
+  const playersCollection = db.collection('players')
+
+  const event = await collection.findOne({ _id: toObjectId(_id) })
+  if (!event) throwError('Event not found')
+
+  const player = await playersCollection.findOne({ _id: toObjectId(playerId) })
+  if (!player) throwError('Player not found')
+
+  const errors = validateRegisterForEventRules(event, player)
+  throwErrors(errors)
+
+  const rating = player.rating || 0
+  const participant = {
+    _id: generateId(),
+    players: [player],
+    rating,
+  }
+
+  await collection.updateOne(
+    { _id: toObjectId(_id) },
+    { $push: { participants: participant } },
+  )
+
+  const unpaidFees = await getUnpaidFees(collection, event, playerId)
+
+  return { participant, unpaidFees }
+}
+
+const validateRegisterForEventInput = (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body._id) throwError('Event ID is required')
+  if (!body.playerId) throwError('Player ID is required')
+}
+
+const validateRegisterForEventRules = (event, player) => {
+  const errors = []
+
+  // Check event is not full
+  if (event.maxParticipants > 0 && event.participants.length >= event.maxParticipants) {
+    errors.push('Event is full')
+  }
+
+  // Check event has not started (date/time in the future)
+  if (isEventStarted(event)) {
+    errors.push('Event has already started')
+  }
+
+  // Check player is not already registered
+  const alreadyRegistered = event.participants.some((p) =>
+    p.players.some((pl) => pl._id.toString() === player._id.toString()),
+  )
+  if (alreadyRegistered) {
+    errors.push('You are already registered for this event')
+  }
+
+  return errors
+}
+
+const isEventStarted = (event) => {
+  if (!event.date) return false
+  const now = new Date()
+  const eventDate = new Date(event.date)
+  if (event.time) {
+    const timeParts = parseTime(event.time)
+    if (timeParts) {
+      eventDate.setHours(timeParts.hours, timeParts.minutes, 0, 0)
+    }
+  }
+  return now >= eventDate
+}
+
+const parseTime = (timeStr) => {
+  const match = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
+  if (!match) return null
+  let hours = parseInt(match[1], 10)
+  const minutes = parseInt(match[2], 10)
+  const period = match[3].toUpperCase()
+  if (period === 'PM' && hours !== 12) hours += 12
+  if (period === 'AM' && hours === 12) hours = 0
+  return { hours, minutes }
+}
+
+const getUnpaidFees = async (collection, event, playerId) => {
+  const query = buildUnpaidFeesQuery(event, playerId)
+  const events = await collection.find(query).toArray()
+  return events.map(mapEventToFeeInfo)
+}
+
+const buildUnpaidFeesQuery = (event, playerId) => {
+  const query = {
+    'participants.players._id': toObjectId(playerId),
+    paidPlayerIds: { $nin: [playerId] },
+  }
+  if (event.eventSeries) {
+    query.eventSeries = event.eventSeries
+  } else {
+    query._id = event._id
+  }
+  return query
+}
+
+const mapEventToFeeInfo = (e) => ({
+  _id: e._id.toString(),
+  eventName: e.eventName,
+  date: e.date,
+  time: e.time,
+  registrationFee: e.registrationFee || 0,
+  eventSeries: e.eventSeries,
+})

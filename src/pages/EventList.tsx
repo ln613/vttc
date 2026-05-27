@@ -3,6 +3,7 @@ import type { JSX } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { Header } from '../components/Header'
 import Toggle from '../components/Toggle'
+import FeeInfoDialog from '../components/FeeInfoDialog'
 import { eventListState, eventListActions } from '../stores/eventListStore'
 import { parseLocalDate } from '../utils/date'
 import { authState, authActions } from '../stores/authStore'
@@ -25,6 +26,7 @@ const EventList = () => {
         </div>
         <EventListContent />
       </div>
+      <FeeInfoDialog />
     </div>
   )
 }
@@ -54,7 +56,10 @@ const ToolsSection = () => {
 
 const EventListContent = () => (
   <Show when={!eventListState.loading} fallback={<div>Loading...</div>}>
-    <Show when={!eventListState.error} fallback={<div>{eventListState.error}</div>}>
+    <Show
+      when={!eventListState.error}
+      fallback={<div>{eventListState.error}</div>}
+    >
       <div style={listStyle}>
         <For each={eventListActions.sortedEvents()}>
           {(event) => <EventListItem event={event} />}
@@ -104,9 +109,55 @@ const MultiUserIcon = () => (
   </svg>
 )
 
-const handleIconClick = (e: MouseEvent, path: string, navigate: (path: string) => void) => {
+const RegisterIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="#27ae60"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="8.5" cy="7" r="4" />
+    <line x1="20" y1="8" x2="20" y2="14" />
+    <line x1="23" y1="11" x2="17" y2="11" />
+  </svg>
+)
+
+const handleIconClick = (
+  e: MouseEvent,
+  path: string,
+  navigate: (path: string) => void,
+) => {
   e.stopPropagation()
   navigate(path)
+}
+
+const handleRegisterClick = (e: MouseEvent, event: EventOption) => {
+  e.stopPropagation()
+
+  if (!authActions.isSignedIn()) {
+    authActions.showSignInDialog()
+    return
+  }
+
+  const confirmed = window.confirm(
+    `Do you want to register for "${event.eventName}"?`,
+  )
+  if (!confirmed) return
+
+  eventListActions.registerForEvent(event)
+}
+
+const shouldShowRegisterIcon = (event: EventOption): boolean => {
+  if (authState.isAdmin) return false
+  if (eventListActions.isPlayerRegistered(event)) return false
+  if (!eventListActions.canRegister(event)) return false
+  return true
 }
 
 const EventListItem = (props: EventListItemProps) => {
@@ -123,24 +174,49 @@ const EventListItem = (props: EventListItemProps) => {
         <Show when={props.event.eventSeries}>
           <div style={itemSeriesStyle}>{props.event.eventSeries}</div>
         </Show>
-        <div style={itemDateTimeStyle}>{formatDateTime(props.event.date, props.event.time)}</div>
+        <div style={itemDateTimeStyle}>
+          {formatDateTime(props.event.date, props.event.time)}
+        </div>
       </div>
-      <Show when={authState.isAdmin}>
-        <div style={actionIconsStyle}>
+      <div style={actionIconsStyle}>
+        <span style={participantCountStyle}>
+          {eventListActions.getParticipantCountText(props.event)}
+        </span>
+        <Show when={shouldShowRegisterIcon(props.event)}>
           <div
             style={iconStyle}
-            onClick={(e) => handleIconClick(e, `/event/${props.event._id}/edit`, navigate)}
+            onClick={(e) => handleRegisterClick(e, props.event)}
+          >
+            <RegisterIcon />
+          </div>
+        </Show>
+        <Show when={authState.isAdmin}>
+          <div
+            style={iconStyle}
+            onClick={(e) =>
+              handleIconClick(
+                e,
+                `/event/${props.event._id}/edit`,
+                navigate,
+              )
+            }
           >
             <EditIcon />
           </div>
           <div
             style={iconStyle}
-            onClick={(e) => handleIconClick(e, `/event/participants?eventId=${props.event._id}`, navigate)}
+            onClick={(e) =>
+              handleIconClick(
+                e,
+                `/event/participants?eventId=${props.event._id}`,
+                navigate,
+              )
+            }
           >
             <MultiUserIcon />
           </div>
-        </div>
-      </Show>
+        </Show>
+      </div>
     </div>
   )
 }
@@ -235,6 +311,13 @@ const actionIconsStyle: JSX.CSSProperties = {
   display: 'flex',
   'align-items': 'center',
   gap: '8px',
+}
+
+const participantCountStyle: JSX.CSSProperties = {
+  'font-size': '13px',
+  color: '#666',
+  'font-weight': 500,
+  'white-space': 'nowrap',
 }
 
 const iconStyle: JSX.CSSProperties = {

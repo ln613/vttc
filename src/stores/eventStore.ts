@@ -8,6 +8,7 @@ export interface EventOption {
   eventSeries?: string
   nop: number
   maxParticipants: number
+  registrationFee?: number
   type: TournamentType
   topPlayersRatingEnabled: boolean
   topPlayersCount?: number
