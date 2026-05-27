@@ -14,6 +14,14 @@ export interface UnpaidFeeInfo {
   eventSeries?: string
 }
 
+export interface PartialTeamInfo {
+  participantId: string
+  playerNames: string[]
+  combinedRating: number
+  topN: number | null
+  topPlayersCount: number
+}
+
 export type FeeDialogMode = 'registration' | 'feeInfo'
 
 interface EventListState {
@@ -26,6 +34,11 @@ interface EventListState {
   feeDialogMode: FeeDialogMode
   unpaidFees: UnpaidFeeInfo[]
   registeredEventName: string
+  showTeammateDialog: boolean
+  partialTeams: PartialTeamInfo[]
+  selectedPartialTeamId: string | null
+  pendingRegistrationEvent: EventOption | null
+  loadingPartialTeams: boolean
 }
 
 const getInitialState = (): EventListState => ({
@@ -38,6 +51,11 @@ const getInitialState = (): EventListState => ({
   feeDialogMode: 'registration',
   unpaidFees: [],
   registeredEventName: '',
+  showTeammateDialog: false,
+  partialTeams: [],
+  selectedPartialTeamId: null,
+  pendingRegistrationEvent: null,
+  loadingPartialTeams: false,
 })
 
 const [eventListState, setEventListState] =
@@ -136,7 +154,79 @@ interface RegisterResponse {
   unpaidFees: UnpaidFeeInfo[]
 }
 
+const isTeamEvent = (event: EventOption): boolean => event.nop > 1
+
 const registerForEvent = async (event: EventOption) => {
+  const playerId = authState.user?._id
+  if (!playerId) return
+
+  if (isTeamEvent(event)) {
+    await handleTeamEventRegistration(event, playerId)
+  } else {
+    await doRegister(event)
+  }
+}
+
+const handleTeamEventRegistration = async (
+  event: EventOption,
+  playerId: string,
+) => {
+  setEventListState({ loadingPartialTeams: true })
+  try {
+    const partialTeams = await apiPost<PartialTeamInfo[]>('getPartialTeams', {
+      _id: event._id,
+      playerId,
+    })
+    if (partialTeams.length > 0) {
+      setEventListState({
+        loadingPartialTeams: false,
+        showTeammateDialog: true,
+        partialTeams,
+        selectedPartialTeamId: null,
+        pendingRegistrationEvent: event,
+      })
+    } else {
+      setEventListState({ loadingPartialTeams: false })
+      await doRegister(event)
+    }
+  } catch {
+    setEventListState({ loadingPartialTeams: false })
+    await doRegister(event)
+  }
+}
+
+const selectPartialTeam = (participantId: string) => {
+  setEventListState('selectedPartialTeamId', participantId)
+}
+
+const confirmTeammateSelection = async () => {
+  const event = eventListState.pendingRegistrationEvent
+  if (!event) return
+  const participantId = eventListState.selectedPartialTeamId
+  closeTeammateDialog()
+  await doRegister(event, participantId ?? undefined)
+}
+
+const skipTeammateSelection = async () => {
+  const event = eventListState.pendingRegistrationEvent
+  if (!event) return
+  closeTeammateDialog()
+  await doRegister(event)
+}
+
+const closeTeammateDialog = () => {
+  setEventListState({
+    showTeammateDialog: false,
+    partialTeams: [],
+    selectedPartialTeamId: null,
+    pendingRegistrationEvent: null,
+  })
+}
+
+const doRegister = async (
+  event: EventOption,
+  participantId?: string,
+) => {
   const playerId = authState.user?._id
   if (!playerId) return
 
@@ -145,6 +235,7 @@ const registerForEvent = async (event: EventOption) => {
     const result = await apiPost<RegisterResponse>('registerForEvent', {
       _id: event._id,
       playerId,
+      ...(participantId && { participantId }),
     })
     await eventActions.refreshEvents()
     setEventListState({
@@ -229,6 +320,10 @@ export const eventListActions = {
   isPlayerUnpaid,
   getParticipantCountText,
   registerForEvent,
+  selectPartialTeam,
+  confirmTeammateSelection,
+  skipTeammateSelection,
+  closeTeammateDialog,
   showFeeInfo,
   closeFeeDialog,
   buildFeeInfoText,

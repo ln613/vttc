@@ -4,6 +4,7 @@ import { useNavigate } from '@solidjs/router'
 import { Header } from '../components/Header'
 import Toggle from '../components/Toggle'
 import FeeInfoDialog from '../components/FeeInfoDialog'
+import TeammateSelectDialog from '../components/TeammateSelectDialog'
 import { eventListState, eventListActions } from '../stores/eventListStore'
 import { parseLocalDate } from '../utils/date'
 import { authState, authActions } from '../stores/authStore'
@@ -27,6 +28,7 @@ const EventList = () => {
         <EventListContent />
       </div>
       <FeeInfoDialog />
+      <TeammateSelectDialog />
     </div>
   )
 }

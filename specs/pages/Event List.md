@@ -34,6 +34,14 @@ Vertical
 - on Register click
   - if not logged in, show Sign in dialog
   - confirm the user wants to register for the event, then
-    - call API to register the player for the event
+    - for team event, ask the player to select teammates
+      - show a dialog with a list of all partial teams of the event (e.g., for team of 3, teams with 1 or 2 players are partial teams)
+      - filter out partial teams which would exceed the combined rating limit/combined top {n} players limit if the current player is added
+      - if no partial teams available to be selected, don't show the dialog
+      - the title of the dialog "Select your teammate"
+      - the desc "If your teammate has not registered for the event, skip this step and ask your teammate to select you as teammate when registering"
+      - the list contains player name(s) of the partial teams, combined rating (including the current player), combined top {n}
+      - the "Confirm" and "Skip" buttons
+    - call API to register the player for the event (if a partial team selected, add the player to the team)
     - the API will return fees for all events (with the same event series, if available) the player registered but not paid (for team event, fee = team fee / number of players per team)
     - show the fee info dialog with all events and fee info, tell the user to either go to the club to pay the fee or send e-transfer to vttc@vttc.ca and copy the name/event info to the comment box (provide a copy button)

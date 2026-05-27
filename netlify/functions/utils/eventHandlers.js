@@ -2485,12 +2485,95 @@ const validateEditParticipantRules = (event, players, currentParticipantId) => {
 }
 
 /**
+ * Get partial teams for a team event that a player can join
+ */
+export const getPartialTeams = async (body) => {
+  validateGetPartialTeamsInput(body)
+
+  const { _id, playerId } = body
+
+  const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
+  const playersCollection = db.collection('players')
+
+  const event = await collection.findOne({ _id: toObjectId(_id) })
+  if (!event) throwError('Event not found')
+
+  const player = await playersCollection.findOne({ _id: toObjectId(playerId) })
+  if (!player) throwError('Player not found')
+
+  return buildPartialTeamsList(event, player)
+}
+
+const validateGetPartialTeamsInput = (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body._id) throwError('Event ID is required')
+  if (!body.playerId) throwError('Player ID is required')
+}
+
+const buildPartialTeamsList = (event, player) => {
+  const partialTeams = findPartialTeams(event)
+  return filterAndMapPartialTeams(partialTeams, player, event)
+}
+
+const findPartialTeams = (event) =>
+  event.participants.filter((p) => p.players.length < event.nop)
+
+const filterAndMapPartialTeams = (partialTeams, player, event) => {
+  const result = []
+  for (const team of partialTeams) {
+    const allPlayers = [...team.players, player]
+    if (wouldExceedRatingLimits(event, allPlayers)) continue
+    result.push(mapPartialTeamInfo(team, player, event))
+  }
+  return result
+}
+
+const wouldExceedRatingLimits = (event, players) => {
+  if (event.restriction !== 'Rated' || !event.ratingLimit) return false
+
+  const combinedRating = players.reduce((sum, p) => sum + (p.rating || 0), 0)
+  if (combinedRating > event.ratingLimit) return true
+
+  if (event.topPlayersRatingEnabled && event.topPlayersCount && event.topPlayersRatingLimit) {
+    const sorted = [...players].sort((a, b) => (b.rating || 0) - (a.rating || 0))
+    const topPlayers = sorted.slice(0, event.topPlayersCount)
+    const topRating = topPlayers.reduce((sum, p) => sum + (p.rating || 0), 0)
+    if (topRating > event.topPlayersRatingLimit) return true
+  }
+
+  return false
+}
+
+const mapPartialTeamInfo = (team, player, event) => {
+  const allPlayers = [...team.players, player]
+  const combinedRating = allPlayers.reduce((sum, p) => sum + (p.rating || 0), 0)
+  const topN = calculateTopNRating(allPlayers, event)
+
+  return {
+    participantId: team._id,
+    playerNames: team.players.map((p) => `${p.firstName} ${p.lastName}`),
+    combinedRating,
+    topN,
+    topPlayersCount: event.topPlayersCount || 0,
+  }
+}
+
+const calculateTopNRating = (players, event) => {
+  if (!event.topPlayersRatingEnabled || !event.topPlayersCount) return null
+  const sorted = [...players].sort((a, b) => (b.rating || 0) - (a.rating || 0))
+  const topPlayers = sorted.slice(0, event.topPlayersCount)
+  return topPlayers.reduce((sum, p) => sum + (p.rating || 0), 0)
+}
+
+/**
  * Register a player for an event (self-registration)
+ * If participantId is provided, add the player to an existing partial team
  */
 export const registerForEvent = async (body) => {
   validateRegisterForEventInput(body)
 
-  const { _id, playerId } = body
+  const { _id, playerId, participantId } = body
 
   const db = getDB()
   const collection = db.collection(EVENTS_COLLECTION)
@@ -2505,6 +2588,51 @@ export const registerForEvent = async (body) => {
   const errors = validateRegisterForEventRules(event, player)
   throwErrors(errors)
 
+  let participant
+
+  if (participantId) {
+    participant = await addPlayerToExistingTeam(collection, event, player, participantId)
+  } else {
+    participant = await createNewParticipant(collection, event, player)
+  }
+
+  const unpaidFees = await getUnpaidFees(collection, event, playerId)
+
+  return { participant, unpaidFees }
+}
+
+const addPlayerToExistingTeam = async (collection, event, player, participantId) => {
+  const participantIndex = event.participants.findIndex((p) => p._id === participantId)
+  if (participantIndex === -1) throwError('Team not found')
+
+  const team = event.participants[participantIndex]
+  validateTeamCanAcceptPlayer(team, event, player)
+
+  const updatedPlayers = [...team.players, player]
+  const rating = calculateParticipantRating(updatedPlayers, event.nop)
+
+  const updatedParticipant = { ...team, players: updatedPlayers, rating }
+
+  await collection.updateOne(
+    { _id: event._id },
+    { $set: { [`participants.${participantIndex}`]: updatedParticipant } },
+  )
+
+  return updatedParticipant
+}
+
+const validateTeamCanAcceptPlayer = (team, event, player) => {
+  if (team.players.length >= event.nop) {
+    throwError('Team is already full')
+  }
+
+  const allPlayers = [...team.players, player]
+  if (wouldExceedRatingLimits(event, allPlayers)) {
+    throwError('Adding this player would exceed the rating limit')
+  }
+}
+
+const createNewParticipant = async (collection, event, player) => {
   const rating = player.rating || 0
   const participant = {
     _id: generateId(),
@@ -2513,13 +2641,11 @@ export const registerForEvent = async (body) => {
   }
 
   await collection.updateOne(
-    { _id: toObjectId(_id) },
+    { _id: toObjectId(event._id) },
     { $push: { participants: participant } },
   )
 
-  const unpaidFees = await getUnpaidFees(collection, event, playerId)
-
-  return { participant, unpaidFees }
+  return participant
 }
 
 const validateRegisterForEventInput = (body) => {
@@ -2531,7 +2657,7 @@ const validateRegisterForEventInput = (body) => {
 const validateRegisterForEventRules = (event, player) => {
   const errors = []
 
-  // Check event is not full
+  // Check event is not full (only for new participants, not joining existing team)
   if (event.maxParticipants > 0 && event.participants.length >= event.maxParticipants) {
     errors.push('Event is full')
   }
