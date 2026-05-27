@@ -113,6 +113,7 @@ const titleRowStyle: JSX.CSSProperties = {
   'justify-content': 'space-between',
   'align-items': 'center',
   'margin-bottom': '20px',
+  gap: '12px',
 }
 
 const titleStyle: JSX.CSSProperties = {

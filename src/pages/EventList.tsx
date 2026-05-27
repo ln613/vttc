@@ -120,6 +120,9 @@ const EventListItem = (props: EventListItemProps) => {
     <div style={itemStyle} onClick={handleClick}>
       <div style={itemContentStyle}>
         <div style={itemNameStyle}>{props.event.eventName}</div>
+        <Show when={props.event.eventSeries}>
+          <div style={itemSeriesStyle}>{props.event.eventSeries}</div>
+        </Show>
         <div style={itemDateTimeStyle}>{formatDateTime(props.event.date, props.event.time)}</div>
       </div>
       <Show when={authState.isAdmin}>
@@ -214,6 +217,12 @@ const itemNameStyle: JSX.CSSProperties = {
   'font-size': '16px',
   'font-weight': 600,
   color: '#2c3e50',
+}
+
+const itemSeriesStyle: JSX.CSSProperties = {
+  'font-size': '13px',
+  color: '#888',
+  'margin-top': '2px',
 }
 
 const itemDateTimeStyle: JSX.CSSProperties = {

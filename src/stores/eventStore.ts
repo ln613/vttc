@@ -5,6 +5,7 @@ import { apiGet } from '../utils/api'
 export interface EventOption {
   _id: string
   eventName: string
+  eventSeries?: string
   nop: number
   maxParticipants: number
   type: TournamentType

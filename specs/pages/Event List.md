@@ -12,6 +12,7 @@ Vertical
     - for admin, "+" button (new event), green bg
 - the list of events
   - name on top
+  - Event Series (if available), 2nd row
   - date and time on bottom (1 row)
   - sorted by date/time desc
   - action icons (align right, admin only)

@@ -16,6 +16,8 @@ interface SignInResponse {
   player: AuthUser
 }
 
+type DialogView = 'signIn' | 'signUp' | null
+
 interface AuthState {
   user: AuthUser | null
   token: string | null
@@ -23,7 +25,7 @@ interface AuthState {
   isSuperAdmin: boolean
   loading: boolean
   error: string | null
-  showSignInDialog: boolean
+  dialogView: DialogView
 }
 
 const getInitialState = (): AuthState => ({
@@ -33,7 +35,7 @@ const getInitialState = (): AuthState => ({
   isSuperAdmin: loadIsSuperAdminFromStorage(),
   loading: false,
   error: null,
-  showSignInDialog: false,
+  dialogView: null,
 })
 
 const loadUserFromStorage = (): AuthUser | null => {
@@ -94,11 +96,15 @@ export { authState }
 
 export const authActions = {
   showSignInDialog: () => {
-    setAuthState({ showSignInDialog: true, error: null })
+    setAuthState({ dialogView: 'signIn', error: null })
   },
 
-  hideSignInDialog: () => {
-    setAuthState({ showSignInDialog: false, error: null })
+  showSignUpDialog: () => {
+    setAuthState({ dialogView: 'signUp', error: null })
+  },
+
+  hideDialog: () => {
+    setAuthState({ dialogView: null, error: null })
   },
 
   signIn: async (emailOrPhone: string, password: string) => {
@@ -123,7 +129,7 @@ export const authActions = {
         isSuperAdmin: result.isSuperAdmin,
         loading: false,
         error: null,
-        showSignInDialog: false,
+        dialogView: null,
       })
     } catch (err) {
       setAuthState({
@@ -140,7 +146,7 @@ export const authActions = {
       token: null,
       isAdmin: false,
       isSuperAdmin: false,
-      showSignInDialog: false,
+      dialogView: null,
       error: null,
     })
   },

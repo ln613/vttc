@@ -22,7 +22,14 @@ import {
   resetMatch,
   resetEvent,
 } from './eventHandlers.js'
-import { signIn, updateProfile, changePassword } from './accountHandlers.js'
+import {
+  signIn,
+  updateProfile,
+  changePassword,
+  sendVerificationCode,
+  verifyCode,
+  signUp,
+} from './accountHandlers.js'
 import { getLiveScore, rebuildMatchQueue } from './liveScoreHandlers.js'
 
 export const apiHandlers = {
@@ -51,6 +58,9 @@ export const apiHandlers = {
     resetMatch: (body) => resetMatch(body),
     resetEvent: (body) => resetEvent(body),
     signIn: (body) => signIn(body),
+    signUp: (body) => signUp(body),
+    sendVerificationCode: (body) => sendVerificationCode(body),
+    verifyCode: (body) => verifyCode(body),
     updateProfile: (body) => updateProfile(body),
     changePassword: (body) => changePassword(body),
     rebuildMatchQueue: () => rebuildMatchQueue(),
