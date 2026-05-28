@@ -38,7 +38,7 @@ Vertical
   - confirm and call delete participant API
 - on edit icon click: show the Participant Dialog in edit mode
 - on payment icon click:
-  - for singles event: confirm and call payment received API to mark the player has paid for the event
+  - for singles event: confirm (the confirm msg should include player's name) and call payment received API to mark the player has paid for the event
   - for teams event: show a dialog listing all players (with fees) in the team, each one with a "Confirm" button, and a "Confirm All" button at bottom. All buttons should confirm before calling API. Dialog should be dismissed automatically if no more unpaid players in the team.
 
 ## Participant Dialog
