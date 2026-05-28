@@ -7,6 +7,7 @@ interface AuthUser {
   lastName: string
   email?: string
   phone?: string
+  sex?: string
 }
 
 interface SignInResponse {

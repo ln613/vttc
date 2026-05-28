@@ -5,6 +5,7 @@ import { apiPost } from '../utils/api'
 interface AccountProfileData {
   firstName: string
   lastName: string
+  sex: 'male' | 'female' | ''
   email: string
   phone: string
 }
@@ -35,8 +36,8 @@ const getInitialChangePasswordData = (): ChangePasswordData => ({
 })
 
 const getInitialState = (): AccountPageState => ({
-  formData: { firstName: '', lastName: '', email: '', phone: '' },
-  initialFormData: { firstName: '', lastName: '', email: '', phone: '' },
+  formData: { firstName: '', lastName: '', sex: '', email: '', phone: '' },
+  initialFormData: { firstName: '', lastName: '', sex: '', email: '', phone: '' },
   editing: false,
   saving: false,
   saved: false,
@@ -109,6 +110,7 @@ export const accountPageActions = {
       authActions.updateUser({
         firstName: formData.firstName,
         lastName: formData.lastName,
+        sex: toDbSex(formData.sex),
         email: formData.email,
         phone: formData.phone,
       })
@@ -188,6 +190,7 @@ const hasFormChanged = (): boolean => {
   return (
     formData.firstName !== initialFormData.firstName ||
     formData.lastName !== initialFormData.lastName ||
+    formData.sex !== initialFormData.sex ||
     formData.email !== initialFormData.email ||
     formData.phone !== initialFormData.phone
   )
@@ -224,9 +227,23 @@ const validateChangePasswordInput = (
   return errors.length > 0 ? errors.join('\n') : null
 }
 
+const normalizeSex = (raw: string | undefined): 'male' | 'female' | '' => {
+  const value = (raw ?? '').trim().toLowerCase()
+  if (value === 'm' || value === 'male') return 'male'
+  if (value === 'f' || value === 'female') return 'female'
+  return ''
+}
+
+const toDbSex = (sex: AccountProfileData['sex']): 'M' | 'F' | undefined => {
+  if (sex === 'male') return 'M'
+  if (sex === 'female') return 'F'
+  return undefined
+}
+
 const buildProfileFromAuth = (): AccountProfileData => ({
   firstName: authState.user?.firstName ?? '',
   lastName: authState.user?.lastName ?? '',
+  sex: normalizeSex(authState.user?.sex),
   email: authState.user?.email ?? '',
   phone: authState.user?.phone ?? '',
 })
@@ -235,6 +252,7 @@ const buildSavePayload = (formData: AccountProfileData) => ({
   _id: authState.user?._id,
   firstName: formData.firstName,
   lastName: formData.lastName,
+  sex: toDbSex(formData.sex),
   email: formData.email,
   phone: formData.phone,
 })
@@ -259,6 +277,7 @@ const isValidEmail = (email: string): boolean => {
 }
 
 const isValidCanadianPhone = (phone: string): boolean => {
+  if (/[^\d\s\-().+]/.test(phone)) return false
   const digits = phone.replace(/\D/g, '')
   if (digits.length === 10) {
     return /^[2-9]\d{2}[2-9]\d{6}$/.test(digits)

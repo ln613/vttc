@@ -2,6 +2,7 @@ import { Show, onMount, onCleanup, type JSX } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { Header } from '../components/Header'
 import Input from '../components/Input'
+import Select from '../components/Select'
 import Button from '../components/Button'
 import { accountPageState, accountPageActions } from '../stores/accountPageStore'
 import { authState, authActions } from '../stores/authStore'
@@ -171,11 +172,13 @@ const Account = () => {
       <div style={contentStyle}>
         <h1 style={titleStyle}>Account</h1>
         <ProfileSection />
-        <div style={signOutContainerStyle}>
-          <Button color="#e74c3c" onClick={handleSignOut}>
-            Sign Out
-          </Button>
-        </div>
+        <Show when={!accountPageState.editing}>
+          <div style={signOutContainerStyle}>
+            <Button color="#e74c3c" onClick={handleSignOut}>
+              Sign Out
+            </Button>
+          </div>
+        </Show>
       </div>
       <Show when={accountPageState.showChangePasswordDialog}>
         <ChangePasswordDialog />
@@ -315,6 +318,19 @@ const ProfileSection = () => (
       onChange={(value) => accountPageActions.setField('lastName', value)}
       disabled={!accountPageState.editing}
     />
+    <Select
+      label="Sex"
+      name="sex"
+      value={accountPageState.formData.sex}
+      onChange={(value) =>
+        accountPageActions.setField('sex', value as 'male' | 'female')
+      }
+      options={[
+        { value: 'male', label: 'Male' },
+        { value: 'female', label: 'Female' },
+      ]}
+      disabled={!accountPageState.editing}
+    />
     <Input
       label="Email"
       name="email"
@@ -334,7 +350,7 @@ const ProfileSection = () => (
     <Show when={accountPageState.error}>
       <div style={errorMessageStyle}>{accountPageState.error}</div>
     </Show>
-    <Show when={!isAdminOrSuperAdmin()}>
+    <Show when={!isAdminOrSuperAdmin() && !accountPageState.editing}>
       <div style={changePasswordButtonContainerStyle}>
         <Button color="#3498db" onClick={accountPageActions.showChangePassword}>
           Change Password
