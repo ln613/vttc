@@ -397,13 +397,15 @@ const SingleParticipantRow = (props: {
               }
             />
           </Show>
-          <PaymentIcon
-            onClick={() =>
-              eventParticipantEditActions.paymentReceivedForSingles(
-                player()?._id,
-              )
-            }
-          />
+          <Show when={!isPlayerPaid(props.event, player()?._id)}>
+            <PaymentIcon
+              onClick={() =>
+                eventParticipantEditActions.paymentReceivedForSingles(
+                  player()?._id,
+                )
+              }
+            />
+          </Show>
         </div>
       </td>
     </tr>
@@ -476,6 +478,11 @@ const TeamParticipantRows = (props: {
 
   const rowBgColor = getRowBackgroundColor(props.participantIndex)
 
+  const wholeTeamPaid = () =>
+    props.participant.players.every((player) =>
+      isPlayerPaid(props.event, player._id),
+    )
+
   const handlePaymentClick = () => {
     eventParticipantEditActions.openPaymentDialog(props.participant)
   }
@@ -529,7 +536,9 @@ const TeamParticipantRows = (props: {
                     }
                   />
                 </Show>
-                <PaymentIcon onClick={handlePaymentClick} />
+                <Show when={!wholeTeamPaid()}>
+                  <PaymentIcon onClick={handlePaymentClick} />
+                </Show>
               </div>
             </td>
           </Show>
