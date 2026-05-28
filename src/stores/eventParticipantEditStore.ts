@@ -38,14 +38,6 @@ const [eventParticipantEditState, setEventParticipantEditState] =
 
 export { eventParticipantEditState }
 
-const getPlayerNameById = (event: EventOption, playerId: string): string => {
-  for (const participant of event.participants) {
-    const player = participant.players.find((p) => p._id === playerId)
-    if (player) return `${player.firstName} ${player.lastName}`
-  }
-  return ''
-}
-
 export const eventParticipantEditActions = {
   init: (eventId?: string) => {
     if (eventId) {
@@ -273,18 +265,6 @@ export const eventParticipantEditActions = {
           : 'Failed to mark payment received',
       )
     }
-  },
-
-  paymentReceivedForSingles: async (playerId: string) => {
-    const event = eventActions.getEventById(
-      eventParticipantEditState.selectedEventId,
-    )
-    const playerName = event ? getPlayerNameById(event, playerId) : ''
-    const confirmed = window.confirm(
-      `Confirm payment received for ${playerName}?`,
-    )
-    if (!confirmed) return
-    await eventParticipantEditActions.paymentReceived(playerId)
   },
 
   paymentReceivedForTeamPlayer: async (playerId: string) => {

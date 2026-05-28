@@ -400,9 +400,7 @@ const SingleParticipantRow = (props: {
           <Show when={!isPlayerPaid(props.event, player()?._id)}>
             <PaymentIcon
               onClick={() =>
-                eventParticipantEditActions.paymentReceivedForSingles(
-                  player()?._id,
-                )
+                eventParticipantEditActions.openPaymentDialog(props.participant)
               }
             />
           </Show>
@@ -650,7 +648,7 @@ const TeamPaymentDialog = (props: {
   return (
     <div style={dialogOverlayStyle}>
       <div style={dialogStyle}>
-        <h2 style={dialogTitleStyle}>Payment - Team Players</h2>
+        <h2 style={dialogTitleStyle}>Payment</h2>
         <For each={sortedPlayers()}>
           {(player) => (
             <div style={paymentPlayerRowStyle}>
@@ -681,7 +679,7 @@ const TeamPaymentDialog = (props: {
           )}
         </For>
         <div style={buttonContainerStyle}>
-          <Show when={unpaidPlayerIds().length > 0}>
+          <Show when={props.event.nop > 1 && unpaidPlayerIds().length > 0}>
             <Button
               color="#27ae60"
               onClick={() =>
