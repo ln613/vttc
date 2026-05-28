@@ -14,9 +14,9 @@ Vertical
   - name on top
   - Event Series (if available), 2nd row
   - date and time on bottom (1 row)
+  - "Registered: {number of participants}", if not unlimited, followed by "/{number of max participants}"
   - sorted by date/time desc
   - action icons (align right)
-    - "{number of participants}/{number of max participants or 'unlimited'}"
     - register icon
       - for player or non-login user
       - only if before the event start date/time

@@ -236,11 +236,11 @@ const EventListItem = (props: EventListItemProps) => {
         <div style={itemDateTimeStyle}>
           {formatDateTime(props.event.date, props.event.time)}
         </div>
+        <div style={participantCountStyle}>
+          {eventListActions.getParticipantCountText(props.event)}
+        </div>
       </div>
       <div style={actionIconsStyle}>
-        <span style={participantCountStyle}>
-          {eventListActions.getParticipantCountText(props.event)}
-        </span>
         <Show when={shouldShowRegisterIcon(props.event)}>
           <div
             style={iconStyle}
@@ -393,6 +393,7 @@ const participantCountStyle: JSX.CSSProperties = {
   color: '#666',
   'font-weight': 500,
   'white-space': 'nowrap',
+  'margin-top': '4px',
 }
 
 const iconStyle: JSX.CSSProperties = {

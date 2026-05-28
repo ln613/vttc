@@ -134,9 +134,8 @@ const isPlayerRegistered = (event: EventOption): boolean => {
 
 const getParticipantCountText = (event: EventOption): string => {
   const count = event.participants?.length || 0
-  const max =
-    event.maxParticipants > 0 ? String(event.maxParticipants) : 'unlimited'
-  return `${count}/${max}`
+  const text = `Registered: ${count}`
+  return event.maxParticipants > 0 ? `${text}/${event.maxParticipants}` : text
 }
 
 const toggleMyEvents = () => {
