@@ -13,6 +13,15 @@ Vertical
 ## Player Table
 
 - All players with first name, last name, sex, rating
-- email, phone columns only for admin and above
+- columns only for admin and above
+  - email
+  - phone
+  - payment icon
+    - if the player has unpaid events
+    - show the payment confirm dialog
 - sort by rating desc
 
+## Payment Confirm Dialog
+
+- list all events (with fees) the player registered but not paid, each with a confirm button
+- "Confirm All" button

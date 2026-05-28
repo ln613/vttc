@@ -6,7 +6,7 @@ import Button from '../components/Button'
 import type { Player } from '../../shared/types/Player'
 import type { Participant } from '../../shared/types/Tournament'
 import { type EventOption } from '../stores/eventStore'
-import { playerState } from '../stores/playerStore'
+import { playerState, getPerPlayerFee } from '../stores/playerStore'
 import { authState } from '../stores/authStore'
 import {
   eventParticipantEditState,
@@ -143,6 +143,13 @@ const paymentPlayerRowStyle: JSX.CSSProperties = {
   'justify-content': 'space-between',
   padding: '12px 0',
   'border-bottom': '1px solid #eee',
+}
+
+const paymentFeeStyle: JSX.CSSProperties = {
+  'font-weight': 600,
+  color: '#333',
+  'margin-left': 'auto',
+  'margin-right': '12px',
 }
 
 // ==================== Icons ====================
@@ -648,6 +655,7 @@ const TeamPaymentDialog = (props: {
                 {player.firstName} {player.lastName}
                 {isPlayerPaid(props.event, player._id) ? ' ✓' : ''}
               </span>
+              <span style={paymentFeeStyle}>${getPerPlayerFee(props.event)}</span>
               <Show when={!isPlayerPaid(props.event, player._id)}>
                 <Button
                   color="#27ae60"
