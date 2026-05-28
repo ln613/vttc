@@ -83,6 +83,12 @@ const markPaymentReceived = async (eventId: string, playerId: string) => {
   }
 }
 
+const closeDialogIfFullyPaid = (playerId: string) => {
+  if (getUnpaidEventsForPlayer(playerId).length === 0) {
+    setPlayerState({ paymentPlayer: null })
+  }
+}
+
 export const playerActions = {
   init: () => {
     playerActions.fetchPlayers()
@@ -134,6 +140,7 @@ export const playerActions = {
     const confirmed = window.confirm('Confirm payment received for this event?')
     if (!confirmed) return
     await markPaymentReceived(eventId, playerId)
+    closeDialogIfFullyPaid(playerId)
   },
 
   confirmAllPayments: async (playerId: string) => {
@@ -145,6 +152,7 @@ export const playerActions = {
     for (const event of events) {
       await markPaymentReceived(event._id, playerId)
     }
+    closeDialogIfFullyPaid(playerId)
   },
 
   reset: () => setPlayerState(getInitialState()),

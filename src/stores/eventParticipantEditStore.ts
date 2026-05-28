@@ -281,6 +281,7 @@ export const eventParticipantEditActions = {
     )
     if (!confirmed) return
     await eventParticipantEditActions.paymentReceived(playerId)
+    eventParticipantEditActions.closePaymentDialogIfFullyPaid()
   },
 
   paymentReceivedForAllTeamPlayers: async (playerIds: string[]) => {
@@ -292,6 +293,18 @@ export const eventParticipantEditActions = {
     for (const playerId of playerIds) {
       await eventParticipantEditActions.paymentReceived(playerId)
     }
+    eventParticipantEditActions.closePaymentDialogIfFullyPaid()
+  },
+
+  closePaymentDialogIfFullyPaid: () => {
+    const { paymentParticipant, selectedEventId } = eventParticipantEditState
+    if (!paymentParticipant) return
+    const event = eventActions.getEventById(selectedEventId)
+    if (!event) return
+    const hasUnpaid = paymentParticipant.players.some(
+      (player) => !isPlayerPaid(event, player._id),
+    )
+    if (!hasUnpaid) eventParticipantEditActions.closePaymentDialog()
   },
 
   getSelectedEvent: (): EventOption | undefined =>

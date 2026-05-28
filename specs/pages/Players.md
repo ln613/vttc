@@ -25,3 +25,4 @@ Vertical
 
 - list all events (with fees) the player registered but not paid, each with a confirm button
 - "Confirm All" button
+- Dialog should be dismissed automatically if no more unpaid events for the player.
