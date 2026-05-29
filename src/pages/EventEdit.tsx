@@ -236,6 +236,8 @@ const EventEdit = (props: EventEditProps) => {
           label="Date"
           value={eventEditState.formData.date}
           onChange={(value) => eventEditActions.setField('date', value)}
+          minYear={new Date().getFullYear() - 5}
+          maxYear={new Date().getFullYear() + 5}
         />
         <Select
           label="Time"

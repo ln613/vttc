@@ -9,7 +9,7 @@ interface InputProps {
   required?: boolean
   multiline?: boolean
   rows?: number
-  type?: 'text' | 'email' | 'tel' | 'password' | 'number' | 'date'
+  type?: 'text' | 'email' | 'tel' | 'password' | 'number'
   disabled?: boolean
   class?: string
 }

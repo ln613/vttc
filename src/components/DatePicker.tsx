@@ -5,6 +5,9 @@ interface DatePickerProps {
   value: Date | null
   onChange: (date: Date | null) => void
   class?: string
+  disabled?: boolean
+  minYear?: number
+  maxYear?: number
 }
 
 const months = [
@@ -54,6 +57,13 @@ const dateBoxStyle: JSX.CSSProperties = {
   cursor: 'pointer',
   'min-width': '150px',
   'user-select': 'none',
+}
+
+const disabledDateBoxStyle: JSX.CSSProperties = {
+  ...dateBoxStyle,
+  border: '1px solid #ddd',
+  'background-color': '#f5f5f5',
+  cursor: 'not-allowed',
 }
 
 const calendarStyle: JSX.CSSProperties = {
@@ -195,6 +205,7 @@ const DatePicker = (props: DatePickerProps) => {
   })
 
   const handleDateBoxClick = () => {
+    if (props.disabled) return
     setShowCalendar(!showCalendar())
     setShowYearDropdown(false)
   }
@@ -252,8 +263,10 @@ const DatePicker = (props: DatePickerProps) => {
 
   const getYears = () => {
     const currentYear = new Date().getFullYear()
+    const start = props.minYear ?? currentYear - 50
+    const end = props.maxYear ?? currentYear + 10
     const years: number[] = []
-    for (let year = currentYear - 50; year <= currentYear + 10; year++) {
+    for (let year = start; year <= end; year++) {
       years.push(year)
     }
     return years
@@ -272,10 +285,13 @@ const DatePicker = (props: DatePickerProps) => {
       <Show when={props.label}>
         <label style={labelStyle}>{props.label}</label>
       </Show>
-      <div style={dateBoxStyle} onClick={handleDateBoxClick}>
+      <div
+        style={props.disabled ? disabledDateBoxStyle : dateBoxStyle}
+        onClick={handleDateBoxClick}
+      >
         {formatDate(props.value) || 'Select date'}
       </div>
-      <Show when={showCalendar()}>
+      <Show when={showCalendar() && !props.disabled}>
         <div style={calendarStyle}>
           <div style={{ position: 'relative' }}>
             <div style={yearHeaderStyle} onClick={handleYearClick}>

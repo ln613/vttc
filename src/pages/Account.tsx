@@ -3,7 +3,9 @@ import { useNavigate } from '@solidjs/router'
 import { Header } from '../components/Header'
 import Input from '../components/Input'
 import Select from '../components/Select'
+import DatePicker from '../components/DatePicker'
 import Button from '../components/Button'
+import { parseLocalDate, formatLocalDate } from '../utils/date'
 import { accountPageState, accountPageActions } from '../stores/accountPageStore'
 import { authState, authActions } from '../stores/authStore'
 
@@ -331,12 +333,21 @@ const ProfileSection = () => (
       ]}
       disabled={!accountPageState.editing}
     />
-    <Input
+    <DatePicker
       label="Birth Date"
-      name="dateOfBirth"
-      type="date"
-      value={accountPageState.formData.dateOfBirth}
-      onChange={(value) => accountPageActions.setField('dateOfBirth', value)}
+      value={
+        accountPageState.formData.dateOfBirth
+          ? parseLocalDate(accountPageState.formData.dateOfBirth)
+          : null
+      }
+      onChange={(date) =>
+        accountPageActions.setField(
+          'dateOfBirth',
+          date ? formatLocalDate(date) : '',
+        )
+      }
+      minYear={new Date().getFullYear() - 100}
+      maxYear={new Date().getFullYear()}
       disabled={!accountPageState.editing}
     />
     <Input
