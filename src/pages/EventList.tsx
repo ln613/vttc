@@ -2,7 +2,7 @@ import { Show, For, onMount } from 'solid-js'
 import type { JSX } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { Header } from '../components/Header'
-import Toggle from '../components/Toggle'
+import ToggleButton from '../components/ToggleButton'
 import FeeInfoDialog from '../components/FeeInfoDialog'
 import TeammateSelectDialog from '../components/TeammateSelectDialog'
 import { eventListState, eventListActions } from '../stores/eventListStore'
@@ -22,7 +22,7 @@ const EventList = () => {
       <Header />
       <div style={contentStyle}>
         <div style={pageHeaderStyle}>
-          <h1 style={titleStyle}>Event List</h1>
+          <h1 style={titleStyle}>Events</h1>
           <ToolsSection />
         </div>
         <EventListContent />
@@ -38,13 +38,16 @@ const ToolsSection = () => {
 
   return (
     <div style={toolsSectionStyle}>
+      <ToggleButton
+        label="Today's Events"
+        value={eventListState.todayOnly}
+        onChange={() => eventListActions.toggleTodayEvents()}
+      />
       <Show when={authActions.isSignedIn()}>
-        <Toggle
+        <ToggleButton
           label="My Events"
           value={eventListState.myEventsOnly}
           onChange={() => eventListActions.toggleMyEvents()}
-          noMargin
-          activeColor="#27ae60"
         />
       </Show>
       <Show when={authState.isAdmin}>
@@ -233,7 +236,13 @@ const EventListItem = (props: EventListItemProps) => {
   }
 
   return (
-    <div style={itemStyle} onClick={handleClick}>
+    <div
+      style={{
+        ...itemStyle,
+        'background-color': eventListActions.getEventRowColor(props.event),
+      }}
+      onClick={handleClick}
+    >
       <div style={itemContentStyle}>
         <div style={itemNameStyle}>{props.event.eventName}</div>
         <Show when={props.event.eventSeries}>

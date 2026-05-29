@@ -4,6 +4,7 @@ import type {
   TournamentRestriction,
   AgeLimitType,
   Participant,
+  Stage,
 } from '../../shared/types/Tournament'
 import { apiGet } from '../utils/api'
 
@@ -26,6 +27,8 @@ export interface EventOption {
   ratingLimit?: number
   ageLimitType?: AgeLimitType
   ageLimit?: number
+  stages?: ('group' | 'knockout')[]
+  eventStages?: Stage[]
 }
 
 interface EventState {

@@ -34,6 +34,7 @@ interface EventListState {
   loading: boolean
   error: string | null
   myEventsOnly: boolean
+  todayOnly: boolean
   registering: boolean
   registerError: string | null
   showFeeDialog: boolean
@@ -52,6 +53,7 @@ const getInitialState = (): EventListState => ({
   loading: false,
   error: null,
   myEventsOnly: false,
+  todayOnly: false,
   registering: false,
   registerError: null,
   showFeeDialog: false,
@@ -73,11 +75,22 @@ export { eventListState }
 
 const sortedEvents = (): EventOption[] => {
   if (!eventState.data) return []
-  const events = eventListState.myEventsOnly
-    ? filterMyEvents(eventState.data)
-    : eventState.data
+  let events = eventState.data
+  if (eventListState.myEventsOnly) events = filterMyEvents(events)
+  if (eventListState.todayOnly) events = events.filter(isToday)
   return [...events].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+  )
+}
+
+const isToday = (event: EventOption): boolean => {
+  if (!event.date) return false
+  const d = parseLocalDate(event.date.slice(0, 10))
+  const now = new Date()
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
   )
 }
 
@@ -133,6 +146,46 @@ const parseTime = (
   if (period === 'PM' && hours !== 12) hours += 12
   if (period === 'AM' && hours === 12) hours = 0
   return { hours, minutes }
+}
+
+const isEventFinished = (event: EventOption): boolean => {
+  const stages = event.eventStages
+  if (!stages || stages.length === 0) return false
+  const knockout = stages.find((s) => s.type === 'knockout')
+  if (knockout) {
+    if (knockout.rounds.length === 0) return false
+    const lastRound = knockout.rounds[knockout.rounds.length - 1]
+    return lastRound.isComplete && lastRound.participantCount === 2
+  }
+  const group = stages.find((s) => s.type === 'group')
+  if (group) {
+    return group.groups.length > 0 && group.groups.every((g) => g.isComplete)
+  }
+  return false
+}
+
+const isPastDay = (event: EventOption): boolean => {
+  if (!event.date) return false
+  const eventDate = parseLocalDate(event.date.slice(0, 10))
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return eventDate.getTime() < today.getTime()
+}
+
+const isPastEvent = (event: EventOption): boolean =>
+  isPastDay(event) || isEventFinished(event)
+
+const isMyUpcomingEvent = (event: EventOption): boolean => {
+  const userId = authState.user?._id
+  if (!userId) return false
+  if (!isPlayerInEvent(event, userId)) return false
+  return !isPastEvent(event)
+}
+
+const getEventRowColor = (event: EventOption): string => {
+  if (isPastEvent(event)) return '#f0f0f0'
+  if (isMyUpcomingEvent(event)) return '#e8f5e9'
+  return '#fff'
 }
 
 const calculateAge = (dateOfBirth: string, referenceDate: string): number => {
@@ -193,6 +246,10 @@ const getParticipantCountText = (event: EventOption): string => {
 
 const toggleMyEvents = () => {
   setEventListState('myEventsOnly', !eventListState.myEventsOnly)
+}
+
+const toggleTodayEvents = () => {
+  setEventListState('todayOnly', !eventListState.todayOnly)
 }
 
 const fetchEvents = async () => {
@@ -449,6 +506,8 @@ export const eventListActions = {
   fetchEvents,
   sortedEvents,
   toggleMyEvents,
+  toggleTodayEvents,
+  getEventRowColor,
   isEventStarted,
   getRegisterBlockReason,
   isPlayerRegistered,

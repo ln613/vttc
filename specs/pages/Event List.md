@@ -6,9 +6,10 @@ Vertical
 
 - shared header
 - page header row
-  - title "Event List" (h1, align left)
+  - title "Events" (h1, align left)
   - tools section, align right
-    - if logged in, show "My Events" checkbox
+    - "Today's Events" toggle button (green bg/white text when on, white bg/black text when off), when checked, show today's events only
+    - if logged in, show "My Events" toggle button
     - for admin, "+" button (new event), green bg
 - the list of events
   - name on top
@@ -34,6 +35,8 @@ Vertical
       - on click, show the select teammate dialog (replace the skip button with cancel button)
     - edit icon (admin only): goes to Event Edit page for that event
     - multi-user icon (admin only): goes to Event Participant Edit page
+  - for past events (before today or already finished), use light gray bg
+  - for my upcoming or unfinished events, use light green bg
 
 ### interaction
 
