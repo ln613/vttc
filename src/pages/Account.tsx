@@ -332,6 +332,14 @@ const ProfileSection = () => (
       disabled={!accountPageState.editing}
     />
     <Input
+      label="Birth Date"
+      name="dateOfBirth"
+      type="date"
+      value={accountPageState.formData.dateOfBirth}
+      onChange={(value) => accountPageActions.setField('dateOfBirth', value)}
+      disabled={!accountPageState.editing}
+    />
+    <Input
       label="Email"
       name="email"
       type="email"

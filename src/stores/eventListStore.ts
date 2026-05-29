@@ -1,4 +1,5 @@
 import { createStore } from 'solid-js/store'
+import type { Participant } from '../../shared/types/Tournament'
 import type { EventOption } from './eventStore'
 import { eventState, eventActions } from './eventStore'
 import { authState } from './authStore'
@@ -93,9 +94,20 @@ const isPlayerInEvent = (event: EventOption, playerId: string): boolean =>
     ),
   ) ?? false
 
+const isParticipantPaid = (event: EventOption, participant: Participant): boolean => {
+  const paidIds = event.paidPlayerIds || []
+  return (
+    participant.players.length > 0 &&
+    participant.players.every((p) => paidIds.includes(p._id.toString()))
+  )
+}
+
+const countPaidParticipants = (event: EventOption): number =>
+  event.participants.filter((p) => isParticipantPaid(event, p)).length
+
 const isEventFull = (event: EventOption): boolean =>
   event.maxParticipants > 0 &&
-  event.participants.length >= event.maxParticipants
+  countPaidParticipants(event) >= event.maxParticipants
 
 const isEventStarted = (event: EventOption): boolean => {
   if (!event.date) return false
@@ -123,8 +135,47 @@ const parseTime = (
   return { hours, minutes }
 }
 
-const canRegister = (event: EventOption): boolean =>
-  !isEventFull(event) && !isEventStarted(event)
+const calculateAge = (dateOfBirth: string, referenceDate: string): number => {
+  const dob = parseLocalDate(dateOfBirth.slice(0, 10))
+  const ref = parseLocalDate(referenceDate.slice(0, 10))
+  let age = ref.getFullYear() - dob.getFullYear()
+  const monthDiff = ref.getMonth() - dob.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && ref.getDate() < dob.getDate())) age--
+  return age
+}
+
+const getRatingBlockReason = (event: EventOption): string | null => {
+  if (event.restriction !== 'Rated' || !event.ratingLimit) return null
+  const rating = authState.user?.rating ?? 0
+  if (rating > event.ratingLimit) {
+    return `Your rating (${rating}) exceeds the event limit (${event.ratingLimit}).`
+  }
+  return null
+}
+
+const getAgeBlockReason = (event: EventOption): string | null => {
+  if (event.restriction !== 'Age' || !event.ageLimitType || !event.ageLimit) {
+    return null
+  }
+  const dateOfBirth = authState.user?.dateOfBirth
+  if (!dateOfBirth) {
+    return 'Your birth date is required to register for this age-restricted event. Please add it on your account page.'
+  }
+  const age = calculateAge(dateOfBirth, event.date)
+  if (event.ageLimitType === 'U' && age > event.ageLimit) {
+    return `This event is for players under ${event.ageLimit} years old.`
+  }
+  if (event.ageLimitType === 'O' && age < event.ageLimit) {
+    return `This event is for players over ${event.ageLimit} years old.`
+  }
+  return null
+}
+
+const getRegisterBlockReason = (event: EventOption): string | null => {
+  if (!authState.user) return null
+  if (isEventFull(event)) return 'This event is full.'
+  return getRatingBlockReason(event) || getAgeBlockReason(event)
+}
 
 const isPlayerRegistered = (event: EventOption): boolean => {
   const userId = authState.user?._id
@@ -396,7 +447,8 @@ export const eventListActions = {
   fetchEvents,
   sortedEvents,
   toggleMyEvents,
-  canRegister,
+  isEventStarted,
+  getRegisterBlockReason,
   isPlayerRegistered,
   isPlayerUnpaid,
   isPlayerInPartialTeam,

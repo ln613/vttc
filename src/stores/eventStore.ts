@@ -1,5 +1,10 @@
 import { createStore } from 'solid-js/store'
-import type { TournamentType, Participant } from '../../shared/types/Tournament'
+import type {
+  TournamentType,
+  TournamentRestriction,
+  AgeLimitType,
+  Participant,
+} from '../../shared/types/Tournament'
 import { apiGet } from '../utils/api'
 
 export interface EventOption {
@@ -17,6 +22,10 @@ export interface EventOption {
   date: string
   time?: string
   paidPlayerIds: string[]
+  restriction?: TournamentRestriction
+  ratingLimit?: number
+  ageLimitType?: AgeLimitType
+  ageLimit?: number
 }
 
 interface EventState {

@@ -111,14 +111,14 @@ const MultiUserIcon = () => (
   </svg>
 )
 
-const RegisterIcon = () => (
+const RegisterIcon = (props: { warning?: boolean }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     width="18"
     height="18"
     viewBox="0 0 24 24"
     fill="none"
-    stroke="#27ae60"
+    stroke={props.warning ? '#e67e22' : '#27ae60'}
     stroke-width="2"
     stroke-linecap="round"
     stroke-linejoin="round"
@@ -184,6 +184,12 @@ const handleRegisterClick = (e: MouseEvent, event: EventOption) => {
     return
   }
 
+  const blockReason = eventListActions.getRegisterBlockReason(event)
+  if (blockReason) {
+    window.alert(blockReason)
+    return
+  }
+
   const confirmed = window.confirm(
     `Do you want to register for "${event.eventName}"?`,
   )
@@ -195,7 +201,7 @@ const handleRegisterClick = (e: MouseEvent, event: EventOption) => {
 const shouldShowRegisterIcon = (event: EventOption): boolean => {
   if (authState.isAdmin) return false
   if (eventListActions.isPlayerRegistered(event)) return false
-  if (!eventListActions.canRegister(event)) return false
+  if (eventListActions.isEventStarted(event)) return false
   return true
 }
 
@@ -246,7 +252,9 @@ const EventListItem = (props: EventListItemProps) => {
             style={iconStyle}
             onClick={(e) => handleRegisterClick(e, props.event)}
           >
-            <RegisterIcon />
+            <RegisterIcon
+              warning={!!eventListActions.getRegisterBlockReason(props.event)}
+            />
           </div>
         </Show>
         <Show when={shouldShowFeeIcon(props.event)}>

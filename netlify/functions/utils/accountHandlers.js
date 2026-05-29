@@ -179,6 +179,8 @@ const authenticatePlayer = async (emailOrPhone, password) => {
       email: player.email,
       phone: player.phone,
       sex: player.sex,
+      dateOfBirth: player.dateOfBirth,
+      rating: player.rating,
     },
   }
 }
@@ -255,6 +257,7 @@ export const updateProfile = async (body) => {
     firstName: body.firstName || '',
     lastName: body.lastName || '',
     sex: body.sex || '',
+    dateOfBirth: body.dateOfBirth || '',
     email: body.email || '',
     phone: body.phone || '',
   }
@@ -396,6 +399,8 @@ export const signUp = async (body) => {
       email: playerDoc.email,
       phone: playerDoc.phone,
       sex: playerDoc.sex,
+      dateOfBirth: playerDoc.dateOfBirth,
+      rating: playerDoc.rating,
     },
   }
 }

@@ -6,6 +6,7 @@ interface AccountProfileData {
   firstName: string
   lastName: string
   sex: 'male' | 'female' | ''
+  dateOfBirth: string
   email: string
   phone: string
 }
@@ -36,8 +37,22 @@ const getInitialChangePasswordData = (): ChangePasswordData => ({
 })
 
 const getInitialState = (): AccountPageState => ({
-  formData: { firstName: '', lastName: '', sex: '', email: '', phone: '' },
-  initialFormData: { firstName: '', lastName: '', sex: '', email: '', phone: '' },
+  formData: {
+    firstName: '',
+    lastName: '',
+    sex: '',
+    dateOfBirth: '',
+    email: '',
+    phone: '',
+  },
+  initialFormData: {
+    firstName: '',
+    lastName: '',
+    sex: '',
+    dateOfBirth: '',
+    email: '',
+    phone: '',
+  },
   editing: false,
   saving: false,
   saved: false,
@@ -111,6 +126,7 @@ export const accountPageActions = {
         firstName: formData.firstName,
         lastName: formData.lastName,
         sex: toDbSex(formData.sex),
+        dateOfBirth: formData.dateOfBirth || undefined,
         email: formData.email,
         phone: formData.phone,
       })
@@ -191,6 +207,7 @@ const hasFormChanged = (): boolean => {
     formData.firstName !== initialFormData.firstName ||
     formData.lastName !== initialFormData.lastName ||
     formData.sex !== initialFormData.sex ||
+    formData.dateOfBirth !== initialFormData.dateOfBirth ||
     formData.email !== initialFormData.email ||
     formData.phone !== initialFormData.phone
   )
@@ -244,6 +261,7 @@ const buildProfileFromAuth = (): AccountProfileData => ({
   firstName: authState.user?.firstName ?? '',
   lastName: authState.user?.lastName ?? '',
   sex: normalizeSex(authState.user?.sex),
+  dateOfBirth: (authState.user?.dateOfBirth ?? '').slice(0, 10),
   email: authState.user?.email ?? '',
   phone: authState.user?.phone ?? '',
 })
@@ -253,6 +271,7 @@ const buildSavePayload = (formData: AccountProfileData) => ({
   firstName: formData.firstName,
   lastName: formData.lastName,
   sex: toDbSex(formData.sex),
+  dateOfBirth: formData.dateOfBirth || undefined,
   email: formData.email,
   phone: formData.phone,
 })

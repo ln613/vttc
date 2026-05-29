@@ -8,6 +8,8 @@ interface AuthUser {
   email?: string
   phone?: string
   sex?: string
+  dateOfBirth?: string
+  rating?: number
 }
 
 interface SignInResponse {

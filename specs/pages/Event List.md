@@ -19,8 +19,13 @@ Vertical
   - action icons (align right)
     - register icon
       - for player or non-login user
-      - only if before the event start date/time
-      - only if event not full
+      - hidden after the event start date/time
+      - if player logged in, use warning color when
+        - event full (paid players/teams reach max)
+        - player not qualified
+          - for aged event, player doesn't have birth date info or age not qualified
+          - for rated event, player's rating not qualified
+        - on click, show the msg with reason why the player cannot register
     - fee icon
       - if already registered but not paid
       - on click, show the fee info dialog

@@ -20,6 +20,7 @@ Vertical
 - First Name input
 - Last Name input
 - Sex: dropdown ("Male", "Female")
+- Birth Date: date picker
 - Email input
 - Phone input
 - "Change Password" button (hide in edit mode)
