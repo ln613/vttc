@@ -14,7 +14,7 @@ Vertical
   - name on top
   - Event Series (if available), 2nd row
   - date and time on bottom (1 row)
-  - "Registered: {number of participants}", if not unlimited, followed by "/{number of max participants}"
+  - "Registered: {number of participants}, Paid: {number of paid participants/teams, for team event, only if the whole team have paid}, if not unlimited, followed by "Max: {number of max participants}"
   - sorted by date/time desc
   - action icons (align right)
     - register icon
