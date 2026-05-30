@@ -3,12 +3,14 @@ import type { Player } from '../../shared/types/Player'
 import { apiPost } from '../utils/api'
 import { playerActions, playerState } from './playerStore'
 import { authActions } from './authStore'
+import { normalizeSex, toDbSex, type FormSex } from '../../shared/rules/sex'
 
 interface SignUpState {
   existingPlayer: boolean
   selectedPlayerId: string
   firstName: string
   lastName: string
+  sex: FormSex
   email: string
   verificationCode: string
   emailVerified: boolean
@@ -28,6 +30,7 @@ const getInitialState = (): SignUpState => ({
   selectedPlayerId: '',
   firstName: '',
   lastName: '',
+  sex: '',
   email: '',
   verificationCode: '',
   emailVerified: false,
@@ -114,13 +117,10 @@ const sortByName = (a: Player, b: Player): number => {
 
 const playerOptions = (): { value: string; label: string }[] => {
   if (!playerState.data) return []
-  return playerState.data
-    .filter((p) => !p.hasAccount)
-    .sort(sortByName)
-    .map((p) => ({
-      value: p._id.toString(),
-      label: `${p.firstName} ${p.lastName} (${p.rating})`,
-    }))
+  return [...playerState.data].sort(sortByName).map((p) => ({
+    value: p._id.toString(),
+    label: `${p.firstName} ${p.lastName} (${p.rating})`,
+  }))
 }
 
 // Actions
@@ -174,6 +174,7 @@ const selectPlayer = (playerId: string) => {
     selectedPlayerId: playerId,
     firstName: player?.firstName ?? '',
     lastName: player?.lastName ?? '',
+    sex: normalizeSex(player?.sex),
     email: player?.email ?? '',
     emailVerified: false,
     verificationCode: '',
@@ -189,6 +190,10 @@ const setFirstName = (value: string) => {
 
 const setLastName = (value: string) => {
   setSignUpState('lastName', value)
+}
+
+const setSex = (value: FormSex) => {
+  setSignUpState('sex', value)
 }
 
 const setEmail = (value: string) => {
@@ -287,6 +292,10 @@ const signUp = async () => {
     if (signUpState.dateOfBirth) {
       body.dateOfBirth = signUpState.dateOfBirth
     }
+    const dbSex = toDbSex(signUpState.sex)
+    if (dbSex) {
+      body.sex = dbSex
+    }
     if (signUpState.existingPlayer && signUpState.selectedPlayerId) {
       body.playerId = signUpState.selectedPlayerId
     }
@@ -320,6 +329,7 @@ export const signUpActions = {
   selectPlayer,
   setFirstName,
   setLastName,
+  setSex,
   setEmail,
   setVerificationCode,
   setPhone,

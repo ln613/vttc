@@ -27,9 +27,9 @@
 - if checked, show players dropdown
   - name and rating
   - sorted by name
-  - filter out players already registered
 - first name input
 - last name input
+- sex: dropdown ("Male", "Female")
 - email input
 - "Send verification code" link (60 seconds countdown before resend)
 - verification code input (verify button, align right)

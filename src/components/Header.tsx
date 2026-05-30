@@ -277,6 +277,19 @@ const SignUpFormFields = () => (
       onChange={signUpActions.setLastName}
       disabled={signUpState.existingPlayer}
     />
+    <Select
+      label="Sex"
+      name="signUpSex"
+      value={signUpState.sex}
+      onChange={(value) =>
+        signUpActions.setSex(value as 'male' | 'female')
+      }
+      options={[
+        { value: 'male', label: 'Male' },
+        { value: 'female', label: 'Female' },
+      ]}
+      disabled={signUpState.existingPlayer}
+    />
     <Input
       label="Email"
       name="signUpEmail"

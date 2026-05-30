@@ -1,6 +1,7 @@
 import { createStore } from 'solid-js/store'
 import { authState, authActions } from './authStore'
 import { apiPost } from '../utils/api'
+import { normalizeSex, toDbSex } from '../../shared/rules/sex'
 
 interface AccountProfileData {
   firstName: string
@@ -242,19 +243,6 @@ const validateChangePasswordInput = (
   if (data.newPassword !== data.confirmPassword)
     errors.push('Passwords do not match')
   return errors.length > 0 ? errors.join('\n') : null
-}
-
-const normalizeSex = (raw: string | undefined): 'male' | 'female' | '' => {
-  const value = (raw ?? '').trim().toLowerCase()
-  if (value === 'm' || value === 'male') return 'male'
-  if (value === 'f' || value === 'female') return 'female'
-  return ''
-}
-
-const toDbSex = (sex: AccountProfileData['sex']): 'M' | 'F' | undefined => {
-  if (sex === 'male') return 'M'
-  if (sex === 'female') return 'F'
-  return undefined
 }
 
 const buildProfileFromAuth = (): AccountProfileData => ({
