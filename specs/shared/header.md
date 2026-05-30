@@ -56,13 +56,14 @@
   - hide "Send verification code" link and verification code input
   - mark the email as verified (show a green checkmark inside the email input, right aligned)
 - phone should be valid canadian/us phone number
-- Sign up button only enabled when
+- field validation
   - first name not empty
   - last name not empty
   - sex not empty
   - email valid and verified
   - phone empty or valid
   - password valid
+- if validation not passed when Sign up button click, show err msg under each field
 - when save, first name and last name should be title case 
 - if user doesn't select existing user, but sign up with the same first name and last name (case insensitive) as 1 or more existing players, then show a dialog:
   - a table with the all existing players' first name, last name, sex, email, phone and rating (hide empty columns)

@@ -27,6 +27,16 @@ interface SignUpState {
   matchedPlayers: Player[]
   selectedMatchedPlayerId: string
   showNewPlayerSuccess: boolean
+  fieldErrors: FieldErrors
+}
+
+interface FieldErrors {
+  firstName?: string
+  lastName?: string
+  sex?: string
+  email?: string
+  phone?: string
+  password?: string
 }
 
 const getInitialState = (): SignUpState => ({
@@ -51,6 +61,7 @@ const getInitialState = (): SignUpState => ({
   matchedPlayers: [],
   selectedMatchedPlayerId: '',
   showNewPlayerSuccess: false,
+  fieldErrors: {},
 })
 
 const [signUpState, setSignUpState] = createStore<SignUpState>(getInitialState())
@@ -109,13 +120,28 @@ const isEmailDisabled = (): boolean => signUpState.emailVerified
 const isVerificationDisabled = (): boolean =>
   !signUpState.email || !isValidEmail(signUpState.email)
 
-const isSignUpEnabled = (): boolean =>
-  signUpState.firstName.trim() !== '' &&
-  signUpState.lastName.trim() !== '' &&
-  signUpState.sex !== '' &&
-  isValidEmail(signUpState.email) &&
-  (signUpState.phone === '' || isValidPhone(signUpState.phone)) &&
-  isValidPassword(signUpState.password)
+const validateFields = (): FieldErrors => {
+  const errors: FieldErrors = {}
+  if (!signUpState.firstName.trim()) errors.firstName = 'First name is required'
+  if (!signUpState.lastName.trim()) errors.lastName = 'Last name is required'
+  if (signUpState.sex === '') errors.sex = 'Sex is required'
+  if (!isValidEmail(signUpState.email)) {
+    errors.email = 'Invalid email address'
+  } else if (!signUpState.emailVerified) {
+    errors.email = 'Email is not verified'
+  }
+  if (signUpState.phone !== '' && !isValidPhone(signUpState.phone)) {
+    errors.phone = 'Invalid phone number'
+  }
+  if (!isValidPassword(signUpState.password)) {
+    errors.password = 'Password does not meet requirements'
+  }
+  return errors
+}
+
+const clearFieldError = (field: keyof FieldErrors) => {
+  setSignUpState('fieldErrors', field, undefined)
+}
 
 const toTitleCase = (s: string): string =>
   s.toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase())
@@ -205,18 +231,25 @@ const selectPlayer = (playerId: string) => {
     message: null,
     error: null,
   })
+  if (player?.firstName) clearFieldError('firstName')
+  if (player?.lastName) clearFieldError('lastName')
+  if (normalizeSex(player?.sex)) clearFieldError('sex')
+  if (player?.email) clearFieldError('email')
 }
 
 const setFirstName = (value: string) => {
   setSignUpState('firstName', value)
+  clearFieldError('firstName')
 }
 
 const setLastName = (value: string) => {
   setSignUpState('lastName', value)
+  clearFieldError('lastName')
 }
 
 const setSex = (value: FormSex) => {
   setSignUpState('sex', value)
+  clearFieldError('sex')
 }
 
 const setEmail = (value: string) => {
@@ -226,6 +259,7 @@ const setEmail = (value: string) => {
     verificationCode: '',
     verificationError: null,
   })
+  clearFieldError('email')
 }
 
 const setVerificationCode = (value: string) => {
@@ -234,6 +268,7 @@ const setVerificationCode = (value: string) => {
 
 const setPhone = (value: string) => {
   setSignUpState('phone', value)
+  clearFieldError('phone')
 }
 
 const setDateOfBirth = (value: string) => {
@@ -242,6 +277,7 @@ const setDateOfBirth = (value: string) => {
 
 const setPassword = (value: string) => {
   setSignUpState('password', value)
+  clearFieldError('password')
 }
 
 const sendVerificationCode = async () => {
@@ -363,7 +399,12 @@ const isPhoneTakenByAccount = (phone: string): boolean => {
 }
 
 const signUp = async () => {
-  if (!isSignUpEnabled()) return
+  const errors = validateFields()
+  if (Object.keys(errors).length > 0) {
+    setSignUpState({ fieldErrors: errors })
+    return
+  }
+  setSignUpState({ fieldErrors: {} })
 
   if (!signUpState.existingPlayer) {
     if (!playerState.data) await playerActions.fetchPlayers()
@@ -460,7 +501,6 @@ export const signUpActions = {
   playerAlreadySignedUp,
   isEmailDisabled,
   isVerificationDisabled,
-  isSignUpEnabled,
   isValidEmail,
   isValidPhone,
   isValidPassword,

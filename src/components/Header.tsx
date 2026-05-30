@@ -223,7 +223,7 @@ const SignUpDialogContent = () => {
                 onClick={signUpActions.signUp}
                 color="#27ae60"
                 disabled={
-                  !signUpActions.isSignUpEnabled() || signUpState.loading
+                  signUpState.loading
                 }
               >
                 {signUpState.loading ? 'Signing up...' : 'Sign up'}
@@ -383,6 +383,12 @@ const PlayerDropdown = () => (
   />
 )
 
+const FieldError = (props: { error?: string }) => (
+  <Show when={props.error}>
+    <div style={fieldErrorStyle}>{props.error}</div>
+  </Show>
+)
+
 const SignUpFormFields = () => (
   <>
     <Input
@@ -392,6 +398,7 @@ const SignUpFormFields = () => (
       onChange={signUpActions.setFirstName}
       disabled={signUpState.existingPlayer}
     />
+    <FieldError error={signUpState.fieldErrors.firstName} />
     <Input
       label="Last Name"
       name="signUpLastName"
@@ -399,6 +406,7 @@ const SignUpFormFields = () => (
       onChange={signUpActions.setLastName}
       disabled={signUpState.existingPlayer}
     />
+    <FieldError error={signUpState.fieldErrors.lastName} />
     <Select
       label="Sex"
       name="signUpSex"
@@ -412,13 +420,20 @@ const SignUpFormFields = () => (
       ]}
       disabled={signUpState.existingPlayer}
     />
+    <FieldError error={signUpState.fieldErrors.sex} />
     <Input
       label="Email"
       name="signUpEmail"
       value={signUpState.email}
       onChange={signUpActions.setEmail}
       type="email"
+      disabled={signUpActions.isEmailDisabled()}
+      endAdornment={
+        signUpState.emailVerified ? <EmailVerifiedCheckmark /> : undefined
+      }
     />
+    <FieldError error={signUpState.fieldErrors.email} />
+    <EmailVerificationSection />
     <Input
       label="Phone"
       name="signUpPhone"
@@ -426,8 +441,10 @@ const SignUpFormFields = () => (
       onChange={signUpActions.setPhone}
       type="tel"
     />
+    <FieldError error={signUpState.fieldErrors.phone} />
     <DateOfBirthSection />
     <PasswordSection />
+    <FieldError error={signUpState.fieldErrors.password} />
   </>
 )
 
@@ -488,28 +505,31 @@ const SendVerificationCodeLink = () => {
 }
 
 const VerificationCodeInput = () => {
-  const isDisabled = () => signUpActions.isVerificationDisabled()
+  const inputDisabled = () => signUpActions.isVerificationDisabled()
+  const buttonDisabled = () =>
+    inputDisabled() || !signUpState.verificationCode
 
   return (
     <div style={verificationCodeRowStyle}>
-      <div style={verificationCodeInputWrapperStyle}>
-        <Input
-          label=""
-          name="verificationCode"
-          value={signUpState.verificationCode}
-          onChange={signUpActions.setVerificationCode}
-          placeholder="Verification code"
-          disabled={isDisabled()}
-        />
-      </div>
-      <Button
+      <input
+        type="text"
+        name="verificationCode"
+        value={signUpState.verificationCode}
+        onInput={(e) =>
+          signUpActions.setVerificationCode(e.currentTarget.value)
+        }
+        placeholder="Verification code"
+        disabled={inputDisabled()}
+        style={verificationCodeInputStyle(inputDisabled())}
+      />
+      <button
+        type="button"
         onClick={signUpActions.verifyCode}
-        color="#2185d0"
-        size="small"
-        disabled={isDisabled() || !signUpState.verificationCode}
+        disabled={buttonDisabled()}
+        style={verifyButtonStyle(buttonDisabled())}
       >
         Verify
-      </Button>
+      </button>
     </div>
   )
 }
@@ -694,6 +714,14 @@ const errorStyle: JSX.CSSProperties = {
   'text-align': 'center',
 }
 
+const fieldErrorStyle: JSX.CSSProperties = {
+  color: '#e74c3c',
+  'font-size': '12px',
+  'margin-top': '-12px',
+  'margin-bottom': '8px',
+  'text-align': 'left',
+}
+
 const buttonContainerStyle: JSX.CSSProperties = {
   'margin-top': '20px',
   display: 'flex',
@@ -759,13 +787,37 @@ const verificationLinkStyle: JSX.CSSProperties = {
 
 const verificationCodeRowStyle: JSX.CSSProperties = {
   display: 'flex',
-  'align-items': 'center',
-  gap: '8px',
+  'align-items': 'stretch',
 }
 
-const verificationCodeInputWrapperStyle: JSX.CSSProperties = {
+const verificationCodeInputStyle = (
+  disabled: boolean,
+): JSX.CSSProperties => ({
   flex: '1',
-}
+  padding: '12px 16px',
+  'font-size': '16px',
+  border: '1px solid #ddd',
+  'border-right': 'none',
+  'border-radius': '8px 0 0 8px',
+  outline: 'none',
+  'box-sizing': 'border-box',
+  'background-color': disabled ? '#f5f5f5' : '#fff',
+  color: '#333',
+  cursor: disabled ? 'not-allowed' : 'text',
+})
+
+const verifyButtonStyle = (disabled: boolean): JSX.CSSProperties => ({
+  padding: '0 20px',
+  'font-size': '14px',
+  'font-weight': 600,
+  border: '1px solid #2185d0',
+  'border-radius': '0 8px 8px 0',
+  'background-color': '#2185d0',
+  color: '#fff',
+  cursor: disabled ? 'not-allowed' : 'pointer',
+  opacity: disabled ? 0.6 : 1,
+  'white-space': 'nowrap',
+})
 
 const verificationErrorStyle: JSX.CSSProperties = {
   color: '#e74c3c',
