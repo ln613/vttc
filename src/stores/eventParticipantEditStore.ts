@@ -4,7 +4,6 @@ import type { Player } from '../../shared/types/Player'
 import { apiPost } from '../utils/api'
 import { eventActions, type EventOption } from './eventStore'
 import { playerActions } from './playerStore'
-import { parseLocalDate } from '../utils/date'
 
 interface ToastMessage {
   type: 'success' | 'error'
@@ -365,15 +364,6 @@ const normalizedSex = (sex: string | undefined): 'male' | 'female' | '' => {
   return ''
 }
 
-const calculatePlayerAge = (dateOfBirth: string, referenceDate: string): number => {
-  const dob = parseLocalDate(dateOfBirth.slice(0, 10))
-  const ref = parseLocalDate(referenceDate.slice(0, 10))
-  let age = ref.getFullYear() - dob.getFullYear()
-  const monthDiff = ref.getMonth() - dob.getMonth()
-  if (monthDiff < 0 || (monthDiff === 0 && ref.getDate() < dob.getDate())) age--
-  return age
-}
-
 const meetsEventSexRequirement = (
   event: EventOption,
   player: Player,
@@ -383,19 +373,6 @@ const meetsEventSexRequirement = (
   if (event.sex === 'Man') return sex === 'male'
   if (event.sex === 'Woman') return sex === 'female'
   return true
-}
-
-const meetsEventAgeRequirement = (
-  event: EventOption,
-  player: Player,
-): boolean => {
-  if (event.restriction !== 'Age' || !event.ageLimitType || !event.ageLimit) {
-    return true
-  }
-  if (!player.dateOfBirth) return false
-  const age = calculatePlayerAge(player.dateOfBirth, event.date)
-  if (event.ageLimitType === 'U') return age <= event.ageLimit
-  return age >= event.ageLimit
 }
 
 const meetsEventRatingRequirement = (
@@ -411,5 +388,4 @@ export const isPlayerQualifiedForEvent = (
   player: Player,
 ): boolean =>
   meetsEventSexRequirement(event, player) &&
-  meetsEventAgeRequirement(event, player) &&
   meetsEventRatingRequirement(event, player)

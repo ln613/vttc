@@ -48,7 +48,7 @@ Vertical
 
 - title
 - list of (number of rows = nop):
-  - "Player {n}: " + dropdown (all players ("{name} - {rating}", filter out players not qualified for the event), order by name)
+  - "Player {n}: " + dropdown (all players ("{name} - {rating}", filter out players not qualified for the event due to rating and sex), order by name)
 - button "Cancel" (red)
 - button "Save" (green)
 
