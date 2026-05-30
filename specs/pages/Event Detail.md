@@ -20,7 +20,7 @@ Vertical
 - Generate Groups button (if no groups, only for admin)
   - exlude participants that are not qualified
 - list of groups
-- if no groups, list of players (sort by rating desc)
+- if no groups, list of participants (sort by rating/combined rating desc). for admin, show unpaid participants in red
 
 ### Group
 

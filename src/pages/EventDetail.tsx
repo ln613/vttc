@@ -279,7 +279,7 @@ const ParticipantsList = () => {
   return (
     <Show when={participants().length > 0}>
       <div style={participantsListContainerStyle}>
-        <h3 style={participantsListTitleStyle}>Players</h3>
+        <h3 style={participantsListTitleStyle}>Participants</h3>
         <div style={participantsListStyle}>
           <For each={participants()}>
             {(participant, index) => (
@@ -297,9 +297,19 @@ interface ParticipantRowProps {
   index: number
 }
 
+const isParticipantUnpaid = (participant: Participant): boolean => {
+  const paidIds = eventDetailState.data?.paidPlayerIds || []
+  if (!participant.players?.length) return true
+  return !participant.players.every((p) => paidIds.includes(p._id.toString()))
+}
+
 const ParticipantRow = (props: ParticipantRowProps) => {
   const displayName = () => getParticipantDisplayName(props.participant)
   const rowBg = () => (props.index % 2 === 0 ? '#f8f9fa' : '#fff')
+  const showUnpaid = () =>
+    authState.isAdmin && isParticipantUnpaid(props.participant)
+  const unpaidColor = (): JSX.CSSProperties =>
+    showUnpaid() ? { color: '#e74c3c' } : {}
 
   return (
     <div
@@ -309,7 +319,9 @@ const ParticipantRow = (props: ParticipantRowProps) => {
       }}
     >
       <span style={participantIndexStyle}>{props.index}</span>
-      <span style={participantNameStyle}>{displayName()}</span>
+      <span style={{ ...participantNameStyle, ...unpaidColor() }}>
+        {displayName()}
+      </span>
       <span style={participantRatingStyle}>{props.participant.rating}</span>
     </div>
   )
