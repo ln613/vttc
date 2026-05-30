@@ -35,7 +35,7 @@
 - verification code input (verify button, align right)
 - phone input
 - date of birth: date picker
-  - optional, but show the notes "Date of birth is required if you want to register age-restricted events"
+  - optional, but show the notes "Date of birth is required if you want to register for age-restricted events"
 - password input
 - "Sign up" button (green bg)
   - on click: call the Sign in API to sign the user in
@@ -54,7 +54,7 @@
 - disable "Send verification code" link and verification code input when email is empty or invalid
 - after verification code verified successfully
   - hide "Send verification code" link and verification code input
-  - mark the email as verified
+  - mark the email as verified (show a green checkmark inside the email input, right aligned)
 - phone should be valid canadian/us phone number
 - Sign up button only enabled when
   - first name not empty

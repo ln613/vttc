@@ -297,6 +297,9 @@ const SignUpFormFields = () => (
       onChange={signUpActions.setEmail}
       type="email"
       disabled={signUpActions.isEmailDisabled()}
+      endAdornment={
+        signUpState.emailVerified ? <EmailVerifiedCheckmark /> : undefined
+      }
     />
     <EmailVerificationSection />
     <Input
@@ -309,6 +312,21 @@ const SignUpFormFields = () => (
     <DateOfBirthSection />
     <PasswordSection />
   </>
+)
+
+const EmailVerifiedCheckmark = () => (
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="#27ae60"
+    stroke-width="3"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
 )
 
 const EmailVerificationSection = () => (
@@ -395,7 +413,8 @@ const DateOfBirthSection = () => (
       maxYear={new Date().getFullYear()}
     />
     <div style={dateOfBirthNoteStyle}>
-      Date of birth is required if you want to register age-restricted events
+      Date of birth is required if you want to register for age-restricted
+      events
     </div>
   </div>
 )

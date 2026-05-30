@@ -12,6 +12,7 @@ interface InputProps {
   type?: 'text' | 'email' | 'tel' | 'password' | 'number'
   disabled?: boolean
   class?: string
+  endAdornment?: JSX.Element
 }
 
 const labelStyle: JSX.CSSProperties = {
@@ -30,6 +31,20 @@ const requiredStyle: JSX.CSSProperties = {
 
 const containerStyle: JSX.CSSProperties = {
   'margin-bottom': '16px',
+}
+
+const inputWrapperStyle: JSX.CSSProperties = {
+  position: 'relative',
+}
+
+const endAdornmentStyle: JSX.CSSProperties = {
+  position: 'absolute',
+  right: '12px',
+  top: '50%',
+  transform: 'translateY(-50%)',
+  display: 'flex',
+  'align-items': 'center',
+  'pointer-events': 'none',
 }
 
 const Input = (props: InputProps) => {
@@ -75,18 +90,23 @@ const Input = (props: InputProps) => {
       <Show
         when={props.multiline}
         fallback={
-          <input
-            id={props.name}
-            name={props.name}
-            type={props.type ?? 'text'}
-            value={props.value}
-            onInput={handleChange}
-            placeholder={props.placeholder ?? ''}
-            disabled={props.disabled}
-            style={inputStyle()}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
-          />
+          <div style={inputWrapperStyle}>
+            <input
+              id={props.name}
+              name={props.name}
+              type={props.type ?? 'text'}
+              value={props.value}
+              onInput={handleChange}
+              placeholder={props.placeholder ?? ''}
+              disabled={props.disabled}
+              style={inputStyle()}
+              onFocus={handleFocus}
+              onBlur={handleBlur}
+            />
+            <Show when={props.endAdornment}>
+              <div style={endAdornmentStyle}>{props.endAdornment}</div>
+            </Show>
+          </div>
         }
       >
         <textarea
