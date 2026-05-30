@@ -17,6 +17,7 @@ import {
   calculateCombinedRating,
   calculateTopNCombinedRating,
   isPlayerPaid,
+  isPlayerQualifiedForEvent,
 } from '../stores/eventParticipantEditStore'
 
 // ==================== Styles ====================
@@ -284,7 +285,7 @@ const EventParticipantEdit = () => {
       >
         {(event) => (
           <ParticipantDialog
-            nop={event().nop}
+            event={event()}
             players={playerState.data || []}
             editingParticipant={eventParticipantEditState.editingParticipant}
           />
@@ -549,7 +550,7 @@ const TeamParticipantRows = (props: {
 // ==================== Participant Dialog ====================
 
 const ParticipantDialog = (props: {
-  nop: number
+  event: EventOption
   players: Player[]
   editingParticipant: Participant | null
 }) => {
@@ -559,7 +560,7 @@ const ParticipantDialog = (props: {
     if (props.editingParticipant) {
       return props.editingParticipant.players.map((p) => p._id)
     }
-    return Array(props.nop).fill('')
+    return Array(props.event.nop).fill('')
   }
 
   const [selectedPlayerIds, setSelectedPlayerIds] = createSignal<string[]>(
@@ -585,7 +586,8 @@ const ParticipantDialog = (props: {
   }
 
   const playerOptions = () =>
-    [...props.players]
+    props.players
+      .filter((p) => isPlayerQualifiedForEvent(props.event, p))
       .sort((a, b) => {
         const nameA = `${a.firstName} ${a.lastName}`.toLowerCase()
         const nameB = `${b.firstName} ${b.lastName}`.toLowerCase()
@@ -602,7 +604,7 @@ const ParticipantDialog = (props: {
         <h2 style={dialogTitleStyle}>
           {isEditMode() ? 'Edit Participant' : 'Add Participant'}
         </h2>
-        <For each={Array.from({ length: props.nop }, (_, i) => i)}>
+        <For each={Array.from({ length: props.event.nop }, (_, i) => i)}>
           {(index) => (
             <Select
               label={`Player ${index + 1}`}

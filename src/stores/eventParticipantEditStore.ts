@@ -1,8 +1,10 @@
 import { createStore } from 'solid-js/store'
 import type { Participant } from '../../shared/types/Tournament'
+import type { Player } from '../../shared/types/Player'
 import { apiPost } from '../utils/api'
 import { eventActions, type EventOption } from './eventStore'
 import { playerActions } from './playerStore'
+import { parseLocalDate } from '../utils/date'
 
 interface ToastMessage {
   type: 'success' | 'error'
@@ -308,11 +310,20 @@ export const eventParticipantEditActions = {
 export const canShowDeleteColumn = (event: EventOption): boolean =>
   !event.hasSchedule
 
+const countPaidParticipants = (event: EventOption): number => {
+  const paidIds = event.paidPlayerIds || []
+  return event.participants.filter(
+    (p) =>
+      p.players.length > 0 &&
+      p.players.every((pl) => paidIds.includes(pl._id.toString())),
+  ).length
+}
+
 export const isAddDisabled = (event: EventOption | undefined): boolean => {
   if (!event) return true
   return (
     event.maxParticipants > 0 &&
-    event.participants.length >= event.maxParticipants
+    countPaidParticipants(event) >= event.maxParticipants
   )
 }
 
@@ -346,3 +357,59 @@ export const isPlayerPaid = (
   const paidIds = event.paidPlayerIds || []
   return paidIds.includes(playerId)
 }
+
+const normalizedSex = (sex: string | undefined): 'male' | 'female' | '' => {
+  const v = (sex ?? '').trim().toLowerCase()
+  if (v === 'm' || v === 'male') return 'male'
+  if (v === 'f' || v === 'female') return 'female'
+  return ''
+}
+
+const calculatePlayerAge = (dateOfBirth: string, referenceDate: string): number => {
+  const dob = parseLocalDate(dateOfBirth.slice(0, 10))
+  const ref = parseLocalDate(referenceDate.slice(0, 10))
+  let age = ref.getFullYear() - dob.getFullYear()
+  const monthDiff = ref.getMonth() - dob.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && ref.getDate() < dob.getDate())) age--
+  return age
+}
+
+const meetsEventSexRequirement = (
+  event: EventOption,
+  player: Player,
+): boolean => {
+  if (!event.sex || event.sex === 'All' || event.sex === 'Mixed') return true
+  const sex = normalizedSex(player.sex)
+  if (event.sex === 'Man') return sex === 'male'
+  if (event.sex === 'Woman') return sex === 'female'
+  return true
+}
+
+const meetsEventAgeRequirement = (
+  event: EventOption,
+  player: Player,
+): boolean => {
+  if (event.restriction !== 'Age' || !event.ageLimitType || !event.ageLimit) {
+    return true
+  }
+  if (!player.dateOfBirth) return false
+  const age = calculatePlayerAge(player.dateOfBirth, event.date)
+  if (event.ageLimitType === 'U') return age <= event.ageLimit
+  return age >= event.ageLimit
+}
+
+const meetsEventRatingRequirement = (
+  event: EventOption,
+  player: Player,
+): boolean => {
+  if (event.restriction !== 'Rated' || !event.ratingLimit) return true
+  return (player.rating ?? 0) <= event.ratingLimit
+}
+
+export const isPlayerQualifiedForEvent = (
+  event: EventOption,
+  player: Player,
+): boolean =>
+  meetsEventSexRequirement(event, player) &&
+  meetsEventAgeRequirement(event, player) &&
+  meetsEventRatingRequirement(event, player)

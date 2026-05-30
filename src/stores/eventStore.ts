@@ -3,6 +3,7 @@ import type {
   TournamentType,
   TournamentRestriction,
   AgeLimitType,
+  ParticipantSex,
   Participant,
   Stage,
 } from '../../shared/types/Tournament'
@@ -27,6 +28,7 @@ export interface EventOption {
   ratingLimit?: number
   ageLimitType?: AgeLimitType
   ageLimit?: number
+  sex?: ParticipantSex
   stages?: ('group' | 'knockout')[]
   eventStages?: Stage[]
 }

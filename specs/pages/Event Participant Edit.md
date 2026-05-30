@@ -30,7 +30,7 @@ Vertical
 ## interaction
 
 - on load: call get players API to populate the players dropdown
-- Add Participant button should be disabled if number of participants reach max participants
+- Add Participant button should be disabled if number of paid participants reach max participants
 - on Add Participant button click: show the Add Participant Dialog
 - delete column should be hidden if event has schedule
 - on delete icon click
@@ -48,7 +48,7 @@ Vertical
 
 - title
 - list of (number of rows = nop):
-  - "Player {n}: " + dropdown (all players ("{name} - {rating}"), order by name)
+  - "Player {n}: " + dropdown (all players ("{name} - {rating}", filter out players not qualified for the event), order by name)
 - button "Cancel" (red)
 - button "Save" (green)
 
