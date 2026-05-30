@@ -334,6 +334,63 @@ const validateAddParticipantRules = (event, players) => {
   return errors
 }
 
+const isMaleSex = (sex) => {
+  const s = (sex || '').trim().toLowerCase()
+  return s === 'm' || s === 'male'
+}
+
+const isFemaleSex = (sex) => {
+  const s = (sex || '').trim().toLowerCase()
+  return s === 'f' || s === 'female'
+}
+
+const meetsSexRequirement = (event, players) => {
+  const required = event.sex
+  if (!required || required === 'All') return true
+  if (required === 'Man') return players.every((p) => isMaleSex(p.sex))
+  if (required === 'Woman') return players.every((p) => isFemaleSex(p.sex))
+  if (required === 'Mixed') {
+    if (event.type === 'Single') return true
+    if (event.type === 'Double') {
+      const men = players.filter((p) => isMaleSex(p.sex)).length
+      const women = players.filter((p) => isFemaleSex(p.sex)).length
+      return men === 1 && women === 1
+    }
+    if (event.type === 'Team') {
+      return players.some((p) => isFemaleSex(p.sex))
+    }
+  }
+  return true
+}
+
+const allPlayersPaid = (event, players) => {
+  const paidIds = event.paidPlayerIds || []
+  return players.every((p) => paidIds.includes(p._id.toString()))
+}
+
+const isQualifiedParticipant = (event, participant) => {
+  const players = participant.players || []
+  if (event.nop > 1 && players.length !== event.nop) return false
+  if (!meetsSexRequirement(event, players)) return false
+  if (event.restriction === 'Age' && event.ageLimitType && event.ageLimit) {
+    for (const p of players) {
+      if (
+        !meetsAgeRequirement(p, event.ageLimitType, event.ageLimit, event.date)
+      ) {
+        return false
+      }
+    }
+  }
+  if (event.restriction === 'Rated' && event.ratingLimit) {
+    if (validateRatingRequirement(event, players).length > 0) return false
+  }
+  if (!allPlayersPaid(event, players)) return false
+  return true
+}
+
+const getQualifiedParticipants = (event) =>
+  event.participants.filter((p) => isQualifiedParticipant(event, p))
+
 /**
  * Validate rating requirement based on event type
  * - Single: player rating must meet the limit
@@ -533,8 +590,11 @@ export const generateGroups = async (body) => {
   const errors = validateGenerateGroupsRules(event)
   throwErrors(errors)
 
-  // Form groups with snake seeding
-  const groupArrays = formGroupsWithSnakeSeeding(event.participants, event.nop)
+  // Form groups with snake seeding using qualified participants only
+  const groupArrays = formGroupsWithSnakeSeeding(
+    getQualifiedParticipants(event),
+    event.nop,
+  )
 
   // Get number of games for group stage
   const numberOfGames = getBestOfNumber(event.groupGames)
@@ -605,8 +665,8 @@ const validateGenerateGroupsRules = (event) => {
     errors.push('Event does not have a group stage as first stage')
   }
 
-  if (event.participants.length < 4) {
-    errors.push('Minimum 4 participants required')
+  if (getQualifiedParticipants(event).length < 4) {
+    errors.push('Minimum 4 qualified participants required')
   }
 
   const groupStage = event.eventStages.find((s) => s.type === 'group')
@@ -729,8 +789,8 @@ export const generateKnockout = async (body) => {
         ranking: ap.ranking,
       }))
     } else {
-      // Knockout-only event - use all participants
-      participants = event.participants.map((p, i) => ({
+      // Knockout-only event - use qualified participants only
+      participants = getQualifiedParticipants(event).map((p, i) => ({
         participant: p,
         groupIndex: 0,
         ranking: i + 1,
@@ -764,8 +824,8 @@ const validateGenerateKnockoutRules = (event) => {
   const groupStage = event.eventStages.find((s) => s.type === 'group')
 
   if (event.stages[0] === 'knockout') {
-    if (event.participants.length < 4) {
-      errors.push('Minimum 4 participants required')
+    if (getQualifiedParticipants(event).length < 4) {
+      errors.push('Minimum 4 qualified participants required')
     }
   }
 

@@ -18,6 +18,7 @@ Vertical
 ## Group Stage Tab
 
 - Generate Groups button (if no groups, only for admin)
+  - exlude participants that are not qualified
 - list of groups
 - if no groups, list of players (sort by rating desc)
 
@@ -60,6 +61,7 @@ The Total column is the total matches played so far.
 ## Knockout Stage Tab
 
 - Generate Next Round button (if previous round/groups already complete, and current round is still not generated, only for admin)
+  - if the knockout stage is the first stage in an event, when generating the first round, exlude participants that are not qualified
 - list of rounds
 
 ### Round

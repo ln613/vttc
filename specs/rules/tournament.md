@@ -164,3 +164,12 @@ In the previous example, if John beat Tony and Glen beat Frank in the first roun
     must be under (<=) the rating limit (RL)
   2. for team tournament with nop > 2, the combined rating of the top N (default 2) players in any team must be under (<=) the top players rating limit (TPRL)
 - Age: the age of any participant must be under (<=) or over (>=) the age limit, e.g., U19, under 19-year old, O40, over 40-year old
+
+## Participant Qualification
+
+A participant is considered qualified if:
+- meet the sex, age, rating requirement of the event
+- for singles, paid the fee
+- for doubles/teams
+  - the number of players in a team = nop
+  - all team members have paid the fee
