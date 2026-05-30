@@ -5,6 +5,8 @@ import { signUpState, signUpActions } from '../stores/signUpStore'
 import Input from './Input'
 import Button from './Button'
 import Select from './Select'
+import DatePicker from './DatePicker'
+import { parseLocalDate, formatLocalDate } from '../utils/date'
 
 export const Header = () => (
   <header>
@@ -291,6 +293,7 @@ const SignUpFormFields = () => (
       onChange={signUpActions.setPhone}
       type="tel"
     />
+    <DateOfBirthSection />
     <PasswordSection />
   </>
 )
@@ -362,6 +365,27 @@ const VerificationCodeInput = () => {
     </div>
   )
 }
+
+const DateOfBirthSection = () => (
+  <div>
+    <DatePicker
+      label="Date of Birth"
+      value={
+        signUpState.dateOfBirth
+          ? parseLocalDate(signUpState.dateOfBirth)
+          : null
+      }
+      onChange={(date) =>
+        signUpActions.setDateOfBirth(date ? formatLocalDate(date) : '')
+      }
+      minYear={new Date().getFullYear() - 100}
+      maxYear={new Date().getFullYear()}
+    />
+    <div style={dateOfBirthNoteStyle}>
+      Date of birth is required if you want to register age-restricted events
+    </div>
+  </div>
+)
 
 const PasswordSection = () => (
   <div>
@@ -612,4 +636,12 @@ const passwordRuleStyle: JSX.CSSProperties = {
   display: 'flex',
   'align-items': 'center',
   gap: '6px',
+}
+
+const dateOfBirthNoteStyle: JSX.CSSProperties = {
+  'font-size': '12px',
+  color: '#666',
+  'margin-top': '-8px',
+  'margin-bottom': '8px',
+  'text-align': 'left',
 }

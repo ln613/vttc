@@ -447,6 +447,7 @@ const handleExistingPlayerSignUp = async (collection, body) => {
         email: body.email,
         phone: body.phone || player.phone || '',
         password: body.password,
+        dateOfBirth: body.dateOfBirth || player.dateOfBirth || '',
       },
     },
   )
@@ -456,6 +457,7 @@ const handleExistingPlayerSignUp = async (collection, body) => {
     email: body.email,
     phone: body.phone || player.phone || '',
     password: body.password,
+    dateOfBirth: body.dateOfBirth || player.dateOfBirth || '',
   }
 }
 
@@ -473,6 +475,7 @@ const handleNewPlayerSignUp = async (collection, body, existingByEmail) => {
           lastName: body.lastName.trim(),
           phone: body.phone || existingByEmail.phone || '',
           password: body.password,
+          dateOfBirth: body.dateOfBirth || existingByEmail.dateOfBirth || '',
         },
       },
     )
@@ -482,6 +485,7 @@ const handleNewPlayerSignUp = async (collection, body, existingByEmail) => {
       lastName: body.lastName.trim(),
       phone: body.phone || existingByEmail.phone || '',
       password: body.password,
+      dateOfBirth: body.dateOfBirth || existingByEmail.dateOfBirth || '',
     }
   }
 
@@ -491,6 +495,7 @@ const handleNewPlayerSignUp = async (collection, body, existingByEmail) => {
     lastName: body.lastName.trim(),
     email: body.email.trim(),
     phone: body.phone || '',
+    dateOfBirth: body.dateOfBirth || '',
     password: body.password,
     rating: 0,
   }

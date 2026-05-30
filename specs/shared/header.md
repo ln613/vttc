@@ -34,6 +34,8 @@
 - "Send verification code" link (60 seconds countdown before resend)
 - verification code input (verify button, align right)
 - phone input
+- date of birth: date picker
+  - optional, but show the notes "Date of birth is required if you want to register age-restricted events"
 - password input
 - "Sign up" button (green bg)
   - on click: call the Sign in API to sign the user in

@@ -16,6 +16,7 @@ interface SignUpState {
   verificationError: string | null
   verificationCountdown: number
   phone: string
+  dateOfBirth: string
   password: string
   loading: boolean
   error: string | null
@@ -34,6 +35,7 @@ const getInitialState = (): SignUpState => ({
   verificationError: null,
   verificationCountdown: 0,
   phone: '',
+  dateOfBirth: '',
   password: '',
   loading: false,
   error: null,
@@ -206,6 +208,10 @@ const setPhone = (value: string) => {
   setSignUpState('phone', value)
 }
 
+const setDateOfBirth = (value: string) => {
+  setSignUpState('dateOfBirth', value)
+}
+
 const setPassword = (value: string) => {
   setSignUpState('password', value)
 }
@@ -278,6 +284,9 @@ const signUp = async () => {
     if (signUpState.phone.trim()) {
       body.phone = signUpState.phone.trim()
     }
+    if (signUpState.dateOfBirth) {
+      body.dateOfBirth = signUpState.dateOfBirth
+    }
     if (signUpState.existingPlayer && signUpState.selectedPlayerId) {
       body.playerId = signUpState.selectedPlayerId
     }
@@ -314,6 +323,7 @@ export const signUpActions = {
   setEmail,
   setVerificationCode,
   setPhone,
+  setDateOfBirth,
   setPassword,
   sendVerificationCode,
   verifyCode,
