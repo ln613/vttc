@@ -308,9 +308,10 @@ const validateAddParticipantRules = (event, players) => {
     errors.push(...ratingErrors)
   }
 
-  // Check age requirement
+  // Check age requirement (ignore players without dateOfBirth on file)
   if (event.restriction === 'Age' && event.ageLimitType && event.ageLimit) {
     for (const player of players) {
+      if (!player.dateOfBirth) continue
       if (!meetsAgeRequirement(player, event.ageLimitType, event.ageLimit, event.date)) {
         const requirement =
           event.ageLimitType === 'U' ? `under ${event.ageLimit}` : `over ${event.ageLimit}`
@@ -2585,9 +2586,10 @@ const validateEditParticipantRules = (event, players, currentParticipantId) => {
     errors.push(...ratingErrors)
   }
 
-  // Check age requirement
+  // Check age requirement (ignore players without dateOfBirth on file)
   if (event.restriction === 'Age' && event.ageLimitType && event.ageLimit) {
     for (const player of players) {
+      if (!player.dateOfBirth) continue
       if (!meetsAgeRequirement(player, event.ageLimitType, event.ageLimit, event.date)) {
         const requirement =
           event.ageLimitType === 'U' ? `under ${event.ageLimit}` : `over ${event.ageLimit}`
@@ -2810,6 +2812,28 @@ const validateRegisterForEventRules = (event, player) => {
   )
   if (alreadyRegistered) {
     errors.push('You are already registered for this event')
+  }
+
+  // Age requirement is strict for self-registration (no DOB → blocked)
+  if (event.restriction === 'Age' && event.ageLimitType && event.ageLimit) {
+    if (!player.dateOfBirth) {
+      errors.push(
+        'Date of birth is required to register for age-restricted events',
+      )
+    } else if (
+      !meetsAgeRequirement(
+        player,
+        event.ageLimitType,
+        event.ageLimit,
+        event.date,
+      )
+    ) {
+      const requirement =
+        event.ageLimitType === 'U'
+          ? `under ${event.ageLimit}`
+          : `over ${event.ageLimit}`
+      errors.push(`Player does not meet age requirement (${requirement})`)
+    }
   }
 
   return errors

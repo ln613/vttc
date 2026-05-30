@@ -55,5 +55,6 @@ Vertical
 ### interaction
 
 - on save: call add participant API
+  - ignore the age restriction if player doesn't have dob on file
   - show result in toast notification, close on success, stay on fail
   - update and re-order the list
