@@ -63,9 +63,28 @@ const EventDetail = () => {
       <Show when={eventDetailState.showConfirmDialog}>
         <ConfirmMatchDialog />
       </Show>
+      <Show when={eventDetailState.toastMessage}>
+        {(toast) => (
+          <div style={toastStyle(toast().type)}>{toast().text}</div>
+        )}
+      </Show>
     </div>
   )
 }
+
+const toastStyle = (type: 'success' | 'error'): JSX.CSSProperties => ({
+  position: 'fixed',
+  top: '20px',
+  right: '20px',
+  padding: '16px 24px',
+  'border-radius': '8px',
+  color: '#fff',
+  'font-weight': 500,
+  'z-index': 1001,
+  'background-color': type === 'success' ? '#27ae60' : '#e74c3c',
+  'box-shadow': '0 4px 12px rgba(0, 0, 0, 0.15)',
+  'max-width': '480px',
+})
 
 const ConfirmMatchDialog = () => {
   const preview = () => eventDetailActions.getConfirmDialogPreview()
@@ -298,8 +317,12 @@ interface ParticipantRowProps {
 }
 
 const isParticipantUnpaid = (participant: Participant): boolean => {
-  const paidIds = eventDetailState.data?.paidPlayerIds || []
-  if (!participant.players?.length) return true
+  const event = eventDetailState.data
+  const paidIds = event?.paidPlayerIds || []
+  const nop = event?.nop ?? 1
+  if (!participant.players?.length || participant.players.length !== nop) {
+    return true
+  }
   return !participant.players.every((p) => paidIds.includes(p._id.toString()))
 }
 

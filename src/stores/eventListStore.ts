@@ -110,7 +110,7 @@ const isPlayerInEvent = (event: EventOption, playerId: string): boolean =>
 const isParticipantPaid = (event: EventOption, participant: Participant): boolean => {
   const paidIds = event.paidPlayerIds || []
   return (
-    participant.players.length > 0 &&
+    participant.players.length === event.nop &&
     participant.players.every((p) => paidIds.includes(p._id.toString()))
   )
 }

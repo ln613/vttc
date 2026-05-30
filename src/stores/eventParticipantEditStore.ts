@@ -313,7 +313,7 @@ const countPaidParticipants = (event: EventOption): number => {
   const paidIds = event.paidPlayerIds || []
   return event.participants.filter(
     (p) =>
-      p.players.length > 0 &&
+      p.players.length === event.nop &&
       p.players.every((pl) => paidIds.includes(pl._id.toString())),
   ).length
 }

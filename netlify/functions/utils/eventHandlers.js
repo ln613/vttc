@@ -371,7 +371,7 @@ const allPlayersPaid = (event, players) => {
 
 const countPaidParticipants = (event) =>
   event.participants.filter(
-    (p) => p.players.length > 0 && allPlayersPaid(event, p.players),
+    (p) => p.players.length === event.nop && allPlayersPaid(event, p.players),
   ).length
 
 const isQualifiedParticipant = (event, participant) => {

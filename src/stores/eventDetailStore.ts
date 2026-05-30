@@ -31,6 +31,12 @@ interface EventDetailState {
   confirmDialogMatchId: string | null
   resettingMatchId: string | null
   resettingEvent: boolean
+  toastMessage: ToastMessage | null
+}
+
+interface ToastMessage {
+  type: 'success' | 'error'
+  text: string
 }
 
 const getInitialState = (): EventDetailState => ({
@@ -47,6 +53,7 @@ const getInitialState = (): EventDetailState => ({
   showConfirmDialog: false,
   confirmDialogMatchId: null,
   resettingMatchId: null,
+  toastMessage: null,
   resettingEvent: false,
 })
 
@@ -54,6 +61,11 @@ const [eventDetailState, setEventDetailState] =
   createStore<EventDetailState>(getInitialState())
 
 export { eventDetailState }
+
+const showToast = (type: 'success' | 'error', text: string) => {
+  setEventDetailState({ toastMessage: { type, text } })
+  setTimeout(() => setEventDetailState({ toastMessage: null }), 3000)
+}
 
 const fetchEvent = async (eventId: string, silent: boolean) => {
   if (!silent) {
@@ -109,13 +121,17 @@ export const eventDetailActions = {
       await apiPost<Group[]>('generateGroups', { _id: eventId })
       await fetchEvent(eventId, false)
     } catch (err) {
-      setEventDetailState({
-        error:
-          err instanceof Error ? err.message : 'Failed to generate groups',
-      })
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Failed to generate groups',
+      )
     } finally {
       setEventDetailState({ generatingGroups: false })
     }
+  },
+
+  dismissToast: () => {
+    setEventDetailState({ toastMessage: null })
   },
 
   getEventStages: (): Stage[] => eventDetailState.data?.eventStages || [],
