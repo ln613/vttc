@@ -43,7 +43,13 @@ const ToolsSection = () => {
         value={eventListState.todayOnly}
         onChange={() => eventListActions.toggleTodayEvents()}
       />
-      <Show when={authActions.isSignedIn()}>
+      <Show
+        when={
+          authActions.isSignedIn() &&
+          !authState.isAdmin &&
+          !authState.isSuperAdmin
+        }
+      >
         <ToggleButton
           label="My Events"
           value={eventListState.myEventsOnly}

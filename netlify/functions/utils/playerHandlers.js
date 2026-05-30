@@ -1,7 +1,7 @@
 import { get } from './db.js'
 
 export const getPlayers = async () => {
-  return get(
+  const players = await get(
     'players',
     {},
     {
@@ -11,7 +11,12 @@ export const getPlayers = async () => {
       rating: 1,
       email: 1,
       phone: 1,
+      password: 1,
       _id: 1,
     },
   )
+  return players.map(({ password, ...rest }) => ({
+    ...rest,
+    hasAccount: !!password,
+  }))
 }

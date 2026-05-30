@@ -8,4 +8,5 @@ export interface Player {
   email?: string
   phone?: string
   password?: string
+  hasAccount?: boolean
 }

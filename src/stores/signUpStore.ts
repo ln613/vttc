@@ -88,7 +88,7 @@ const selectedPlayer = (): Player | null => {
 
 const playerAlreadySignedUp = (): boolean => {
   const player = selectedPlayer()
-  return !!player?.password
+  return !!player?.hasAccount
 }
 
 const isEmailDisabled = (): boolean => signUpState.emailVerified
@@ -112,10 +112,13 @@ const sortByName = (a: Player, b: Player): number => {
 
 const playerOptions = (): { value: string; label: string }[] => {
   if (!playerState.data) return []
-  return [...playerState.data].sort(sortByName).map((p) => ({
-    value: p._id.toString(),
-    label: `${p.firstName} ${p.lastName} (${p.rating})`,
-  }))
+  return playerState.data
+    .filter((p) => !p.hasAccount)
+    .sort(sortByName)
+    .map((p) => ({
+      value: p._id.toString(),
+      label: `${p.firstName} ${p.lastName} (${p.rating})`,
+    }))
 }
 
 // Actions

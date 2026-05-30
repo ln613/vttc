@@ -24,7 +24,10 @@
 
 - header "Sign up", (h1)
 - checkbox "Existing Player"
-- if checked, show players dropdown (name and rating, sorted by name)
+- if checked, show players dropdown
+  - name and rating
+  - sorted by name
+  - filter out players already registered
 - first name input
 - last name input
 - email input

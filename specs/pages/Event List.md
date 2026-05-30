@@ -9,7 +9,7 @@ Vertical
   - title "Events" (h1, align left)
   - tools section, align right
     - "Today's Events" toggle button (green bg/white text when on, white bg/black text when off), when checked, show today's events only
-    - if logged in, show "My Events" toggle button
+    - if logged in (player only), show "My Events" toggle button
     - for admin, "+" button (new event), green bg
 - the list of events
   - name on top
