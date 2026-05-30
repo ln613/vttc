@@ -1,4 +1,4 @@
-import { Show, Switch, Match, createSignal, type JSX } from 'solid-js'
+import { Show, Switch, Match, For, createSignal, type JSX } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { authState, authActions } from '../stores/authStore'
 import { signUpState, signUpActions } from '../stores/signUpStore'
@@ -196,34 +196,156 @@ const SignUpDialogContent = () => {
   return (
     <>
       <h1 style={dialogTitleStyle}>Sign up</h1>
-      <ExistingPlayerCheckbox />
-      <Show when={signUpState.existingPlayer}>
-        <PlayerDropdown />
+      <Switch>
+        <Match when={signUpState.showNewPlayerSuccess}>
+          <NewPlayerSuccessSection />
+        </Match>
+        <Match when={signUpState.showMatchDialog}>
+          <MatchedPlayersSection />
+        </Match>
+        <Match when={true}>
+          <ExistingPlayerCheckbox />
+          <Show when={signUpState.existingPlayer}>
+            <PlayerDropdown />
+          </Show>
+          <Show when={signUpActions.playerAlreadySignedUp()}>
+            <div style={infoMsgStyle}>
+              You already signed up, please sign in.
+            </div>
+          </Show>
+          <Show when={!signUpActions.playerAlreadySignedUp()}>
+            <SignUpFormFields />
+            <Show when={signUpState.error}>
+              <div style={errorStyle}>{signUpState.error}</div>
+            </Show>
+            <div style={buttonContainerStyle}>
+              <Button
+                onClick={signUpActions.signUp}
+                color="#27ae60"
+                disabled={
+                  !signUpActions.isSignUpEnabled() || signUpState.loading
+                }
+              >
+                {signUpState.loading ? 'Signing up...' : 'Sign up'}
+              </Button>
+            </div>
+          </Show>
+          <div style={linkContainerStyle}>
+            <span style={linkStyle} onClick={handleGoToSignIn}>
+              Sign in
+            </span>
+          </div>
+        </Match>
+      </Switch>
+    </>
+  )
+}
+
+const NewPlayerSuccessSection = () => (
+  <>
+    <div style={infoMsgStyle}>
+      Contact VTTC to get an initial rating before you can register for
+      rating-restricted events.
+    </div>
+    <div style={buttonContainerStyle}>
+      <Button onClick={signUpActions.dismissNewPlayerSuccess} color="#27ae60">
+        OK
+      </Button>
+    </div>
+  </>
+)
+
+const MatchedPlayersSection = () => {
+  const players = () => signUpState.matchedPlayers
+  const showCol = (key: 'sex' | 'email' | 'phone' | 'rating'): boolean =>
+    players().some((p) => !!p[key])
+
+  return (
+    <>
+      <div style={infoMsgStyle}>
+        Player(s) with the same name already exist. Select one to sign up as,
+        or create a new player.
+      </div>
+      <div style={matchTableWrapperStyle}>
+      <table style={matchTableStyle}>
+        <thead>
+          <tr>
+            <th style={matchThStyle}></th>
+            <th style={matchThStyle}>First Name</th>
+            <th style={matchThStyle}>Last Name</th>
+            <Show when={showCol('sex')}>
+              <th style={matchThStyle}>Sex</th>
+            </Show>
+            <Show when={showCol('email')}>
+              <th style={matchThStyle}>Email</th>
+            </Show>
+            <Show when={showCol('phone')}>
+              <th style={matchThStyle}>Phone</th>
+            </Show>
+            <Show when={showCol('rating')}>
+              <th style={matchThStyle}>Rating</th>
+            </Show>
+          </tr>
+        </thead>
+        <tbody>
+          <For each={players()}>
+            {(player) => {
+              const id = player._id.toString()
+              const selected = () =>
+                signUpState.selectedMatchedPlayerId === id
+              return (
+                <tr
+                  style={selected() ? matchRowSelectedStyle : matchRowStyle}
+                  onClick={() => signUpActions.selectMatchedPlayer(id)}
+                >
+                  <td style={matchTdStyle}>
+                    <input
+                      type="radio"
+                      checked={selected()}
+                      onChange={() => signUpActions.selectMatchedPlayer(id)}
+                    />
+                  </td>
+                  <td style={matchTdStyle}>{player.firstName}</td>
+                  <td style={matchTdStyle}>{player.lastName}</td>
+                  <Show when={showCol('sex')}>
+                    <td style={matchTdStyle}>{player.sex ?? ''}</td>
+                  </Show>
+                  <Show when={showCol('email')}>
+                    <td style={matchTdStyle}>{player.email ?? ''}</td>
+                  </Show>
+                  <Show when={showCol('phone')}>
+                    <td style={matchTdStyle}>{player.phone ?? ''}</td>
+                  </Show>
+                  <Show when={showCol('rating')}>
+                    <td style={matchTdStyle}>{player.rating || ''}</td>
+                  </Show>
+                </tr>
+              )
+            }}
+          </For>
+        </tbody>
+      </table>
+      </div>
+      <Show when={signUpState.error}>
+        <div style={errorStyle}>{signUpState.error}</div>
       </Show>
-      <Show when={signUpActions.playerAlreadySignedUp()}>
-        <div style={infoMsgStyle}>
-          You already signed up, please sign in.
-        </div>
-      </Show>
-      <Show when={!signUpActions.playerAlreadySignedUp()}>
-        <SignUpFormFields />
-        <Show when={signUpState.error}>
-          <div style={errorStyle}>{signUpState.error}</div>
-        </Show>
-        <div style={buttonContainerStyle}>
-          <Button
-            onClick={signUpActions.signUp}
-            color="#27ae60"
-            disabled={!signUpActions.isSignUpEnabled() || signUpState.loading}
-          >
-            {signUpState.loading ? 'Signing up...' : 'Sign up'}
-          </Button>
-        </div>
-      </Show>
-      <div style={linkContainerStyle}>
-        <span style={linkStyle} onClick={handleGoToSignIn}>
-          Sign in
-        </span>
+      <div style={buttonContainerStyle}>
+        <Button
+          onClick={signUpActions.chooseNewPlayer}
+          color="#888"
+          disabled={signUpState.loading}
+        >
+          New Player
+        </Button>
+        <Button
+          onClick={signUpActions.confirmMatchedPlayer}
+          color="#27ae60"
+          disabled={
+            !signUpState.selectedMatchedPlayerId || signUpState.loading
+          }
+        >
+          Confirm
+        </Button>
       </div>
     </>
   )
@@ -296,12 +418,7 @@ const SignUpFormFields = () => (
       value={signUpState.email}
       onChange={signUpActions.setEmail}
       type="email"
-      disabled={signUpActions.isEmailDisabled()}
-      endAdornment={
-        signUpState.emailVerified ? <EmailVerifiedCheckmark /> : undefined
-      }
     />
-    <EmailVerificationSection />
     <Input
       label="Phone"
       name="signUpPhone"
@@ -581,6 +698,7 @@ const buttonContainerStyle: JSX.CSSProperties = {
   'margin-top': '20px',
   display: 'flex',
   'justify-content': 'center',
+  gap: '12px',
 }
 
 const linkContainerStyle: JSX.CSSProperties = {
@@ -676,4 +794,40 @@ const dateOfBirthNoteStyle: JSX.CSSProperties = {
   'margin-top': '-8px',
   'margin-bottom': '8px',
   'text-align': 'left',
+}
+
+const matchTableWrapperStyle: JSX.CSSProperties = {
+  'overflow-x': 'auto',
+  'margin-bottom': '12px',
+}
+
+const matchTableStyle: JSX.CSSProperties = {
+  width: '100%',
+  'border-collapse': 'collapse',
+}
+
+const matchThStyle: JSX.CSSProperties = {
+  padding: '8px',
+  'text-align': 'left',
+  'font-size': '13px',
+  'font-weight': 600,
+  'border-bottom': '2px solid #ddd',
+  color: '#333',
+}
+
+const matchTdStyle: JSX.CSSProperties = {
+  padding: '8px',
+  'text-align': 'left',
+  'font-size': '13px',
+  color: '#333',
+  'border-bottom': '1px solid #f0f0f0',
+}
+
+const matchRowStyle: JSX.CSSProperties = {
+  cursor: 'pointer',
+}
+
+const matchRowSelectedStyle: JSX.CSSProperties = {
+  cursor: 'pointer',
+  'background-color': '#e8f5e9',
 }

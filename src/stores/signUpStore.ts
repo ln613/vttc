@@ -23,6 +23,10 @@ interface SignUpState {
   loading: boolean
   error: string | null
   message: string | null
+  showMatchDialog: boolean
+  matchedPlayers: Player[]
+  selectedMatchedPlayerId: string
+  showNewPlayerSuccess: boolean
 }
 
 const getInitialState = (): SignUpState => ({
@@ -43,6 +47,10 @@ const getInitialState = (): SignUpState => ({
   loading: false,
   error: null,
   message: null,
+  showMatchDialog: false,
+  matchedPlayers: [],
+  selectedMatchedPlayerId: '',
+  showNewPlayerSuccess: false,
 })
 
 const [signUpState, setSignUpState] = createStore<SignUpState>(getInitialState())
@@ -104,10 +112,25 @@ const isVerificationDisabled = (): boolean =>
 const isSignUpEnabled = (): boolean =>
   signUpState.firstName.trim() !== '' &&
   signUpState.lastName.trim() !== '' &&
+  signUpState.sex !== '' &&
   isValidEmail(signUpState.email) &&
-  signUpState.emailVerified &&
   (signUpState.phone === '' || isValidPhone(signUpState.phone)) &&
   isValidPassword(signUpState.password)
+
+const toTitleCase = (s: string): string =>
+  s.toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase())
+
+const findNameMatches = (firstName: string, lastName: string): Player[] => {
+  if (!playerState.data) return []
+  const fn = firstName.trim().toLowerCase()
+  const ln = lastName.trim().toLowerCase()
+  if (!fn || !ln) return []
+  return playerState.data.filter(
+    (p) =>
+      (p.firstName ?? '').trim().toLowerCase() === fn &&
+      (p.lastName ?? '').trim().toLowerCase() === ln,
+  )
+}
 
 const sortByName = (a: Player, b: Player): number => {
   const nameA = `${a.firstName} ${a.lastName}`.toLowerCase()
@@ -275,48 +298,118 @@ interface SignUpResponse {
   }
 }
 
-const signUp = async () => {
-  if (!isSignUpEnabled()) return
+const buildSignUpBody = (): Record<string, string> => {
+  const body: Record<string, string> = {
+    firstName: toTitleCase(signUpState.firstName.trim()),
+    lastName: toTitleCase(signUpState.lastName.trim()),
+    email: signUpState.email.trim(),
+    password: signUpState.password,
+  }
+  if (signUpState.phone.trim()) body.phone = signUpState.phone.trim()
+  if (signUpState.dateOfBirth) body.dateOfBirth = signUpState.dateOfBirth
+  const dbSex = toDbSex(signUpState.sex)
+  if (dbSex) body.sex = dbSex
+  if (signUpState.existingPlayer && signUpState.selectedPlayerId) {
+    body.playerId = signUpState.selectedPlayerId
+  }
+  return body
+}
 
+const isBrandNewPlayerSignUp = (): boolean =>
+  !signUpState.existingPlayer && !signUpState.selectedPlayerId
+
+const doSignUp = async () => {
   setSignUpState({ loading: true, error: null })
   try {
-    const body: Record<string, string> = {
-      firstName: signUpState.firstName.trim(),
-      lastName: signUpState.lastName.trim(),
-      email: signUpState.email.trim(),
-      password: signUpState.password,
-    }
-    if (signUpState.phone.trim()) {
-      body.phone = signUpState.phone.trim()
-    }
-    if (signUpState.dateOfBirth) {
-      body.dateOfBirth = signUpState.dateOfBirth
-    }
-    const dbSex = toDbSex(signUpState.sex)
-    if (dbSex) {
-      body.sex = dbSex
-    }
-    if (signUpState.existingPlayer && signUpState.selectedPlayerId) {
-      body.playerId = signUpState.selectedPlayerId
-    }
+    const wasBrandNew = isBrandNewPlayerSignUp()
+    const result = await apiPost<SignUpResponse>('signUp', buildSignUpBody())
 
-    const result = await apiPost<SignUpResponse>('signUp', body)
-
-    // Save auth info and close dialog
     localStorage.setItem('vttc_token', result.token)
     localStorage.setItem('vttc_user', JSON.stringify(result.player))
     localStorage.setItem('vttc_isAdmin', String(result.isAdmin))
     localStorage.setItem('vttc_isSuperAdmin', String(result.isSuperAdmin))
 
-    authActions.hideDialog()
-    // Reload the page to pick up new auth state
-    window.location.reload()
+    if (wasBrandNew) {
+      setSignUpState({ loading: false, showNewPlayerSuccess: true })
+    } else {
+      authActions.hideDialog()
+      window.location.reload()
+    }
   } catch (err) {
     setSignUpState({
       loading: false,
       error: err instanceof Error ? err.message : 'Sign up failed',
     })
   }
+}
+
+const isEmailTakenByAccount = (email: string): boolean => {
+  if (!playerState.data) return false
+  const target = email.trim().toLowerCase()
+  return playerState.data.some(
+    (p) => p.hasAccount && (p.email ?? '').trim().toLowerCase() === target,
+  )
+}
+
+const signUp = async () => {
+  if (!isSignUpEnabled()) return
+
+  if (!signUpState.existingPlayer) {
+    if (!playerState.data) await playerActions.fetchPlayers()
+    if (isEmailTakenByAccount(signUpState.email)) {
+      setSignUpState({
+        error: 'An account with this email already exists. Please sign in.',
+      })
+      return
+    }
+    const matches = findNameMatches(
+      signUpState.firstName,
+      signUpState.lastName,
+    )
+    if (matches.length > 0) {
+      setSignUpState({
+        error: null,
+        showMatchDialog: true,
+        matchedPlayers: matches,
+        selectedMatchedPlayerId:
+          matches.length === 1 ? matches[0]._id.toString() : '',
+      })
+      return
+    }
+  }
+
+  await doSignUp()
+}
+
+const selectMatchedPlayer = (id: string) => {
+  setSignUpState('selectedMatchedPlayerId', id)
+}
+
+const confirmMatchedPlayer = async () => {
+  const id = signUpState.selectedMatchedPlayerId
+  if (!id) return
+  setSignUpState({
+    existingPlayer: true,
+    selectedPlayerId: id,
+    showMatchDialog: false,
+    matchedPlayers: [],
+    selectedMatchedPlayerId: '',
+  })
+  await doSignUp()
+}
+
+const chooseNewPlayer = async () => {
+  setSignUpState({
+    showMatchDialog: false,
+    matchedPlayers: [],
+    selectedMatchedPlayerId: '',
+  })
+  await doSignUp()
+}
+
+const dismissNewPlayerSuccess = () => {
+  authActions.hideDialog()
+  window.location.reload()
 }
 
 const reset = () => {
@@ -338,6 +431,10 @@ export const signUpActions = {
   sendVerificationCode,
   verifyCode,
   signUp,
+  selectMatchedPlayer,
+  confirmMatchedPlayer,
+  chooseNewPlayer,
+  dismissNewPlayerSuccess,
   reset,
   selectedPlayer,
   playerAlreadySignedUp,

@@ -59,6 +59,13 @@
 - Sign up button only enabled when
   - first name not empty
   - last name not empty
+  - sex not empty
   - email valid and verified
   - phone empty or valid
   - password valid
+- when save, first name and last name should be title case 
+- if user doesn't select existing user, but sign up with the same first name and last name (case insensitive) as 1 or more existing players, then show a dialog:
+  - a table with the all existing players' first name, last name, sex, email, phone and rating (hide empty columns)
+  - ask user to select one from the list or to create a new player
+  - "Confirm" and "New Player" buttons (Confirm enabled when an existing player selected, if only 1 existing player, then pre-select it)
+- after a new player is saved, show the msg: "Contact VTTC to get an initial rating before you can register for rating-restricted events."
