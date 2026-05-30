@@ -6,6 +6,7 @@ import MatchConfirmDialog from '../components/MatchConfirmDialog'
 import { eventDetailState, eventDetailActions } from '../stores/eventDetailStore'
 import type { StageTab } from '../stores/eventDetailStore'
 import { authState } from '../stores/authStore'
+import { liveScoreActions } from '../stores/liveScoreStore'
 import type { Group, GroupParticipant, Participant, KnockoutRound, KnockoutMatch as KnockoutMatchType } from '../../shared/types/Tournament'
 import type { Player } from '../../shared/types/Player'
 import type { Match, Game } from '../../shared/types/Match'
@@ -19,6 +20,9 @@ const EventDetail = () => {
   onMount(() => {
     if (params.id) {
       eventDetailActions.loadEvent(params.id)
+    }
+    if (authState.isAdmin && isSimulationEnabled()) {
+      liveScoreActions.fetchLiveScore()
     }
     restoreScrollPosition()
   })
@@ -51,6 +55,7 @@ const EventDetail = () => {
     isUnmounting = true
     window.removeEventListener('scroll', handleScroll)
     eventDetailActions.saveScrollPosition(lastScrollY)
+    liveScoreActions.stopPolling()
   })
 
   return (
@@ -132,6 +137,7 @@ const EventHeader = () => {
           <Button
             onClick={handleResetEvent}
             color="#e74c3c"
+            size="small"
             disabled={eventDetailState.resettingEvent}
           >
             {eventDetailState.resettingEvent ? 'Resetting...' : 'Reset Event'}
@@ -473,6 +479,10 @@ const MatchRow = (props: MatchRowProps) => {
     }
   }
 
+  const handleSimulateClick = () => {
+    eventDetailActions.simulateMatch(props.match._id, props.match)
+  }
+
   return (
     <div style={matchRowStyle}>
       <div style={matchContentContainerStyle}>
@@ -515,9 +525,24 @@ const MatchRow = (props: MatchRowProps) => {
           {isResetting() ? 'Resetting...' : 'Reset'}
         </Button>
       </Show>
+      <Show
+        when={
+          authState.isAdmin &&
+          isSimulationEnabled() &&
+          !hasResult() &&
+          liveScoreActions.getAssignedMatchIds().has(props.match._id)
+        }
+      >
+        <Button onClick={handleSimulateClick} color="#9b59b6" size="small">
+          Simulate
+        </Button>
+      </Show>
     </div>
   )
 }
+
+const isSimulationEnabled = (): boolean =>
+  import.meta.env.VITE_SIMULATION === '1'
 
 interface SidePlayer {
   firstName: string

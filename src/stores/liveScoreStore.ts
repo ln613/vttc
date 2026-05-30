@@ -117,6 +117,15 @@ export const liveScoreActions = {
   getAvailableTables: (): TableAssignment[] =>
     liveScoreState.tables.filter((t) => t.status === 'available'),
 
+  getAssignedMatchIds: (): Set<string> => {
+    const ids = new Set<string>()
+    for (const table of liveScoreState.tables) {
+      if (table.status !== 'assigned' || !table.match) continue
+      if (table.match.matchId) ids.add(table.match.matchId.toString())
+    }
+    return ids
+  },
+
   isMatchPlayable: (item: MatchQueueItem): boolean => {
     const playersOnTables = getPlayerIdsOnTables()
     return !hasPlayerConflict(item, playersOnTables)

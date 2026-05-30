@@ -67,6 +67,28 @@ const showToast = (type: 'success' | 'error', text: string) => {
   setTimeout(() => setEventDetailState({ toastMessage: null }), 3000)
 }
 
+const simulateGames = (
+  numberOfGames: number,
+  targetPoints: number,
+): { score1: number; score2: number }[] => {
+  const needed = Math.ceil(numberOfGames / 2)
+  const games: { score1: number; score2: number }[] = []
+  let won1 = 0
+  let won2 = 0
+  while (won1 < needed && won2 < needed) {
+    const side1Wins = Math.random() < 0.5
+    const loserScore = Math.floor(Math.random() * (targetPoints - 1))
+    if (side1Wins) {
+      games.push({ score1: targetPoints, score2: loserScore })
+      won1++
+    } else {
+      games.push({ score1: loserScore, score2: targetPoints })
+      won2++
+    }
+  }
+  return games
+}
+
 const fetchEvent = async (eventId: string, silent: boolean) => {
   if (!silent) {
     setEventDetailState({ loading: true, error: null })
@@ -132,6 +154,36 @@ export const eventDetailActions = {
 
   dismissToast: () => {
     setEventDetailState({ toastMessage: null })
+  },
+
+  simulateMatch: async (
+    matchId: string,
+    match: {
+      config?: {
+        numberOfGames?: number
+        gameConfig?: { targetPoints?: number }
+      }
+    },
+  ) => {
+    const eventId = eventDetailState.eventId
+    if (!eventId) return
+    const numberOfGames = match.config?.numberOfGames ?? 5
+    const targetPoints = match.config?.gameConfig?.targetPoints ?? 11
+    const games = simulateGames(numberOfGames, targetPoints)
+    try {
+      await apiPost('finishMatch', {
+        _id: eventId,
+        matchId,
+        confirmed: true,
+        result: games,
+      })
+      await fetchEvent(eventId, true)
+    } catch (err) {
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Failed to simulate match',
+      )
+    }
   },
 
   getEventStages: (): Stage[] => eventDetailState.data?.eventStages || [],
