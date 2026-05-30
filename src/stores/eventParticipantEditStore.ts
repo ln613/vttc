@@ -328,10 +328,10 @@ export const isAddDisabled = (event: EventOption | undefined): boolean => {
 
 export const getParticipantsCountText = (event: EventOption): string => {
   const count = event.participants.length
-  if (event.maxParticipants === 0) {
-    return `List of participants - ${count}`
-  }
-  return `List of participants - ${count} / ${event.maxParticipants}`
+  const paidCount = countPaidParticipants(event)
+  let text = `Registered: ${count}, Paid: ${paidCount}`
+  if (event.maxParticipants > 0) text += `, Max: ${event.maxParticipants}`
+  return text
 }
 
 export const calculateCombinedRating = (participant: Participant): number =>

@@ -297,8 +297,8 @@ const validateAddParticipantRules = (event, players) => {
     playerIds.add(playerId)
   }
 
-  // Check max participants
-  if (event.maxParticipants > 0 && event.participants.length >= event.maxParticipants) {
+  // Check max participants (based on paid participants/teams)
+  if (event.maxParticipants > 0 && countPaidParticipants(event) >= event.maxParticipants) {
     errors.push('Event has reached maximum participants')
   }
 
@@ -369,19 +369,15 @@ const allPlayersPaid = (event, players) => {
   return players.every((p) => paidIds.includes(p._id.toString()))
 }
 
+const countPaidParticipants = (event) =>
+  event.participants.filter(
+    (p) => p.players.length > 0 && allPlayersPaid(event, p.players),
+  ).length
+
 const isQualifiedParticipant = (event, participant) => {
   const players = participant.players || []
   if (event.nop > 1 && players.length !== event.nop) return false
   if (!meetsSexRequirement(event, players)) return false
-  if (event.restriction === 'Age' && event.ageLimitType && event.ageLimit) {
-    for (const p of players) {
-      if (
-        !meetsAgeRequirement(p, event.ageLimitType, event.ageLimit, event.date)
-      ) {
-        return false
-      }
-    }
-  }
   if (event.restriction === 'Rated' && event.ratingLimit) {
     if (validateRatingRequirement(event, players).length > 0) return false
   }
@@ -2796,8 +2792,8 @@ const validateRegisterForEventInput = (body) => {
 const validateRegisterForEventRules = (event, player) => {
   const errors = []
 
-  // Check event is not full (only for new participants, not joining existing team)
-  if (event.maxParticipants > 0 && event.participants.length >= event.maxParticipants) {
+  // Check event is not full (paid participants/teams reaching max)
+  if (event.maxParticipants > 0 && countPaidParticipants(event) >= event.maxParticipants) {
     errors.push('Event is full')
   }
 
