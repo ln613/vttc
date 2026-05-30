@@ -59,10 +59,19 @@ const findPlayerByEmailOrPhone = async (emailOrPhone) => {
 }
 
 /**
- * Verify password matches stored hash
+ * Hash a plain-text password for storage
  */
-const verifyPassword = (inputPassword, storedPassword) => {
-  return inputPassword === storedPassword
+const hashPassword = async (password) => argon2.hash(password)
+
+/**
+ * Verify a plain-text password against a stored argon2 hash.
+ */
+const verifyPassword = async (inputPassword, storedPassword) => {
+  try {
+    return await argon2.verify(storedPassword, inputPassword)
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -165,7 +174,7 @@ const authenticatePlayer = async (emailOrPhone, password) => {
 
   if (!player.password) throwError('No password set for this account')
 
-  if (!verifyPassword(password, player.password)) throwError('Invalid password')
+  if (!(await verifyPassword(password, player.password))) throwError('Invalid password')
 
   const token = generatePlayerToken(player)
   return {
@@ -296,13 +305,14 @@ export const changePassword = async (body) => {
   // If player already has a password, old password is required
   if (player.password) {
     if (!oldPassword) throwError('Current password is required')
-    if (!verifyPassword(oldPassword, player.password))
+    if (!(await verifyPassword(oldPassword, player.password)))
       throwError('Current password is incorrect')
   }
 
+  const hashedPassword = await hashPassword(newPassword)
   await collection.updateOne(
     { _id: toObjectId(_id) },
-    { $set: { password: newPassword } },
+    { $set: { password: hashedPassword } },
   )
 
   return { success: true }
@@ -382,6 +392,14 @@ export const signUp = async (body) => {
     throwError('An account with this email already exists. Please sign in.')
   }
 
+  // Check if phone already has an account with a password
+  if (body.phone) {
+    const existingByPhone = await collection.findOne({ phone: body.phone })
+    if (existingByPhone && existingByPhone.password) {
+      throwError('An account with this phone already exists. Please sign in.')
+    }
+  }
+
   const playerDoc = body.playerId
     ? await handleExistingPlayerSignUp(collection, body)
     : await handleNewPlayerSignUp(collection, body, existingByEmail)
@@ -440,13 +458,15 @@ const handleExistingPlayerSignUp = async (collection, body) => {
   if (!player) throwError('Player not found')
   if (player.password) throwError('This player already has an account. Please sign in.')
 
+  const hashedPassword = await hashPassword(body.password)
+
   await collection.updateOne(
     { _id: toObjectId(body.playerId) },
     {
       $set: {
         email: body.email,
         phone: body.phone || player.phone || '',
-        password: body.password,
+        password: hashedPassword,
         dateOfBirth: body.dateOfBirth || player.dateOfBirth || '',
         sex: body.sex || player.sex || '',
       },
@@ -457,7 +477,7 @@ const handleExistingPlayerSignUp = async (collection, body) => {
     ...player,
     email: body.email,
     phone: body.phone || player.phone || '',
-    password: body.password,
+    password: hashedPassword,
     dateOfBirth: body.dateOfBirth || player.dateOfBirth || '',
     sex: body.sex || player.sex || '',
   }
@@ -467,6 +487,8 @@ const handleExistingPlayerSignUp = async (collection, body) => {
  * Handle sign up for a new player (no existing player record)
  */
 const handleNewPlayerSignUp = async (collection, body, existingByEmail) => {
+  const hashedPassword = await hashPassword(body.password)
+
   if (existingByEmail) {
     // Player record exists (without password) - update it
     await collection.updateOne(
@@ -476,7 +498,7 @@ const handleNewPlayerSignUp = async (collection, body, existingByEmail) => {
           firstName: body.firstName.trim(),
           lastName: body.lastName.trim(),
           phone: body.phone || existingByEmail.phone || '',
-          password: body.password,
+          password: hashedPassword,
           dateOfBirth: body.dateOfBirth || existingByEmail.dateOfBirth || '',
           sex: body.sex || existingByEmail.sex || '',
         },
@@ -487,7 +509,7 @@ const handleNewPlayerSignUp = async (collection, body, existingByEmail) => {
       firstName: body.firstName.trim(),
       lastName: body.lastName.trim(),
       phone: body.phone || existingByEmail.phone || '',
-      password: body.password,
+      password: hashedPassword,
       dateOfBirth: body.dateOfBirth || existingByEmail.dateOfBirth || '',
       sex: body.sex || existingByEmail.sex || '',
     }
@@ -501,7 +523,7 @@ const handleNewPlayerSignUp = async (collection, body, existingByEmail) => {
     phone: body.phone || '',
     dateOfBirth: body.dateOfBirth || '',
     sex: body.sex || '',
-    password: body.password,
+    password: hashedPassword,
     rating: 0,
   }
 

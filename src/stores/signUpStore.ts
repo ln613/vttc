@@ -351,6 +351,17 @@ const isEmailTakenByAccount = (email: string): boolean => {
   )
 }
 
+const phoneDigits = (phone: string): string => phone.replace(/\D/g, '')
+
+const isPhoneTakenByAccount = (phone: string): boolean => {
+  if (!playerState.data) return false
+  const target = phoneDigits(phone)
+  if (!target) return false
+  return playerState.data.some(
+    (p) => p.hasAccount && phoneDigits(p.phone ?? '') === target,
+  )
+}
+
 const signUp = async () => {
   if (!isSignUpEnabled()) return
 
@@ -359,6 +370,15 @@ const signUp = async () => {
     if (isEmailTakenByAccount(signUpState.email)) {
       setSignUpState({
         error: 'An account with this email already exists. Please sign in.',
+      })
+      return
+    }
+    if (
+      signUpState.phone.trim() &&
+      isPhoneTakenByAccount(signUpState.phone)
+    ) {
+      setSignUpState({
+        error: 'An account with this phone already exists. Please sign in.',
       })
       return
     }
