@@ -58,6 +58,7 @@ The Total column is the total matches played so far.
 - on Generate Groups click: call generate groups API
 - on Start button click: go to Game Play page with the selected event, stage and match, start with Game 1
 - on Reset Event button click: delete all schedules, matches and groups, keep the participants. confirm before reset
+- the detail page should use websocket to receive update, such as grouping/schedule generated, score changed, and update the page
 
 ## Knockout Stage Tab
 

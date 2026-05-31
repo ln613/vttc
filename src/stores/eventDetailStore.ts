@@ -13,6 +13,7 @@ import type { Match } from '../../shared/types/Match'
 import type { MatchPreview } from '../components/MatchConfirmDialog'
 import { apiGet, apiPost } from '../utils/api'
 import { waitForPendingSave } from './gamePlayStore'
+import { subscribeToEventUpdates, type EventSubscription } from '../utils/pusher'
 
 export type StageTab = 'group' | 'knockout' | 'bracket'
 
@@ -61,6 +62,24 @@ const [eventDetailState, setEventDetailState] =
   createStore<EventDetailState>(getInitialState())
 
 export { eventDetailState }
+
+let currentSubscription: EventSubscription | null = null
+
+const unsubscribeCurrent = () => {
+  if (currentSubscription) {
+    currentSubscription.unsubscribe()
+    currentSubscription = null
+  }
+}
+
+const subscribeForEvent = (eventId: string) => {
+  unsubscribeCurrent()
+  currentSubscription = subscribeToEventUpdates(eventId, () => {
+    if (eventDetailState.eventId === eventId) {
+      void fetchEvent(eventId, true)
+    }
+  })
+}
 
 const showToast = (type: 'success' | 'error', text: string) => {
   setEventDetailState({ toastMessage: { type, text } })
@@ -112,6 +131,7 @@ export const eventDetailActions = {
         ...getInitialState(),
         eventId,
       })
+      subscribeForEvent(eventId)
     }
     // Wait for any in-flight game save to complete before fetching
     await waitForPendingSave()
@@ -425,7 +445,10 @@ export const eventDetailActions = {
     setEventDetailState({ data: null })
   },
 
-  reset: () => setEventDetailState(getInitialState()),
+  reset: () => {
+    unsubscribeCurrent()
+    setEventDetailState(getInitialState())
+  },
 }
 
 const canResetGroupMatch = (event: Event, matchId: string): boolean => {

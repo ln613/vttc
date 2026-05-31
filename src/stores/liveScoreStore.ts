@@ -6,6 +6,10 @@ import type {
 } from '../../shared/types/Table'
 import type { Player } from '../../shared/types/Player'
 import { apiGet } from '../utils/api'
+import {
+  subscribeToLiveScoreUpdates,
+  type EventSubscription,
+} from '../utils/pusher'
 
 interface LiveScoreState {
   tables: TableAssignment[]
@@ -24,8 +28,7 @@ const getInitialState = (): LiveScoreState => ({
 const [liveScoreState, setLiveScoreState] =
   createStore<LiveScoreState>(getInitialState())
 
-let pollingInterval: ReturnType<typeof setInterval> | null = null
-const POLL_INTERVAL_MS = 5000
+let subscription: EventSubscription | null = null
 
 export { liveScoreState }
 
@@ -46,15 +49,17 @@ const fetchLiveScore = async () => {
   }
 }
 
-const startPolling = () => {
-  stopPolling()
-  pollingInterval = setInterval(fetchLiveScore, POLL_INTERVAL_MS)
+const startSubscription = () => {
+  stopUpdates()
+  subscription = subscribeToLiveScoreUpdates(() => {
+    void fetchLiveScore()
+  })
 }
 
-const stopPolling = () => {
-  if (pollingInterval) {
-    clearInterval(pollingInterval)
-    pollingInterval = null
+const stopUpdates = () => {
+  if (subscription) {
+    subscription.unsubscribe()
+    subscription = null
   }
 }
 
@@ -103,10 +108,10 @@ export const liveScoreActions = {
   fetchLiveScore: async () => {
     setLiveScoreState({ loading: true, error: null })
     await fetchLiveScore()
-    startPolling()
+    startSubscription()
   },
 
-  stopPolling,
+  stopUpdates,
 
   getTable: (tableNumber: number): TableAssignment | undefined =>
     liveScoreState.tables.find((t) => t.tableNumber === tableNumber),
@@ -134,7 +139,7 @@ export const liveScoreActions = {
   isSideOnTable: (players: Player[]): boolean => isSideOnTable(players),
 
   reset: () => {
-    stopPolling()
+    stopUpdates()
     setLiveScoreState(getInitialState())
   },
 }

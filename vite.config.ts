@@ -7,4 +7,7 @@ export default defineConfig({
   server: {
     host: true,
   },
+  optimizeDeps: {
+    include: ['pusher-js'],
+  },
 })

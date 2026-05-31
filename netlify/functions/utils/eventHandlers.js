@@ -1,4 +1,5 @@
 import { getDB, toObjectId } from './db.js'
+import { notifyEventUpdate, notifyLiveScoreUpdate } from './pusher.js'
 
 const EVENTS_COLLECTION = 'events'
 const TOURNAMENTS_COLLECTION = 'tournaments'
@@ -2306,6 +2307,10 @@ export const autoGenerateForEvent = async (event) => {
     changed = true
   }
 
+  if (changed) {
+    await notifyEventUpdate(event._id?.toString())
+    await notifyLiveScoreUpdate()
+  }
   return changed
 }
 
@@ -2316,7 +2321,10 @@ const needsGroupGeneration = (event) => {
   if (!event.stages || !event.stages.includes('group')) return false
   const groupStage = event.eventStages?.find((s) => s.type === 'group')
   if (!groupStage) return false
-  return groupStage.groups.length === 0 && event.participants.length >= 4
+  return (
+    groupStage.groups.length === 0 &&
+    getQualifiedParticipants(event).length >= 4
+  )
 }
 
 /**
@@ -2334,7 +2342,7 @@ const needsScheduleGeneration = (event) => {
 
   if (event.stages[0] === 'knockout') {
     // Knockout-only event
-    return event.participants.length >= 4
+    return getQualifiedParticipants(event).length >= 4
   }
 
   // Group + Knockout event: knockout can only start if all groups complete
@@ -2352,7 +2360,10 @@ const needsScheduleGeneration = (event) => {
  * Auto-generate groups with match schedules for an event
  */
 const autoGenerateGroups = async (event) => {
-  const groupArrays = formGroupsWithSnakeSeeding(event.participants, event.nop)
+  const groupArrays = formGroupsWithSnakeSeeding(
+    getQualifiedParticipants(event),
+    event.nop,
+  )
   const numberOfGames = getBestOfNumber(event.groupGames)
   const groups = buildGroupsWithMatches(groupArrays, numberOfGames)
 
@@ -2444,7 +2455,7 @@ const buildKnockoutParticipants = (event, groupStage) => {
     }))
   }
 
-  return event.participants.map((p, i) => ({
+  return getQualifiedParticipants(event).map((p, i) => ({
     participant: p,
     groupIndex: 0,
     ranking: i + 1,

@@ -36,6 +36,15 @@ import {
   signUp,
 } from './accountHandlers.js'
 import { getLiveScore, rebuildMatchQueue } from './liveScoreHandlers.js'
+import { notifyEventUpdate, notifyLiveScoreUpdate } from './pusher.js'
+
+const withEventNotify = (fn) => async (body) => {
+  const result = await fn(body)
+  const eventId = body?._id || result?._id
+  await notifyEventUpdate(eventId)
+  await notifyLiveScoreUpdate()
+  return result
+}
 
 export const apiHandlers = {
   get: {
@@ -49,30 +58,34 @@ export const apiHandlers = {
   },
   post: {
     saveTournament: (body) => saveTournament(body),
-    saveEvent: (body) => saveEvent(body),
-    addParticipant: (body) => addParticipant(body),
-    deleteParticipant: (body) => deleteParticipant(body),
-    deletePlayerFromTeam: (body) => deletePlayerFromTeam(body),
-    editParticipant: (body) => editParticipant(body),
-    paymentReceived: (body) => paymentReceived(body),
-    generateGroups: (body) => generateGroups(body),
-    generateKnockout: (body) => generateKnockout(body),
-    finishMatch: (body) => finishMatch(body),
-    confirmMatch: (body) => confirmMatch(body),
-    updateGame: (body) => updateGame(body),
-    saveMatchSetup: (body) => saveMatchSetup(body),
-    resetMatch: (body) => resetMatch(body),
-    resetEvent: (body) => resetEvent(body),
-    registerForEvent: (body) => registerForEvent(body),
+    saveEvent: withEventNotify(saveEvent),
+    addParticipant: withEventNotify(addParticipant),
+    deleteParticipant: withEventNotify(deleteParticipant),
+    deletePlayerFromTeam: withEventNotify(deletePlayerFromTeam),
+    editParticipant: withEventNotify(editParticipant),
+    paymentReceived: withEventNotify(paymentReceived),
+    generateGroups: withEventNotify(generateGroups),
+    generateKnockout: withEventNotify(generateKnockout),
+    finishMatch: withEventNotify(finishMatch),
+    confirmMatch: withEventNotify(confirmMatch),
+    updateGame: withEventNotify(updateGame),
+    saveMatchSetup: withEventNotify(saveMatchSetup),
+    resetMatch: withEventNotify(resetMatch),
+    resetEvent: withEventNotify(resetEvent),
+    registerForEvent: withEventNotify(registerForEvent),
     getPartialTeams: (body) => getPartialTeams(body),
     getPlayerUnpaidFees: (body) => getPlayerUnpaidFees(body),
-    changeTeam: (body) => changeTeam(body),
+    changeTeam: withEventNotify(changeTeam),
     signIn: (body) => signIn(body),
     signUp: (body) => signUp(body),
     sendVerificationCode: (body) => sendVerificationCode(body),
     verifyCode: (body) => verifyCode(body),
     updateProfile: (body) => updateProfile(body),
     changePassword: (body) => changePassword(body),
-    rebuildMatchQueue: () => rebuildMatchQueue(),
+    rebuildMatchQueue: async () => {
+      const result = await rebuildMatchQueue()
+      await notifyLiveScoreUpdate()
+      return result
+    },
   },
 }

@@ -55,7 +55,7 @@ const EventDetail = () => {
     isUnmounting = true
     window.removeEventListener('scroll', handleScroll)
     eventDetailActions.saveScrollPosition(lastScrollY)
-    liveScoreActions.stopPolling()
+    liveScoreActions.stopUpdates()
   })
 
   return (
