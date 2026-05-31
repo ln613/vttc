@@ -60,20 +60,125 @@ const DesktopLayout = () => (
   </div>
 )
 
-const MobileLayout = () => (
-  <div style={mobileLayoutStyle}>
-    <div style={tablesScrollContainerStyle}>
-      <div style={tablesGridMobileStyle}>
-        <TableRow tables={[5, 6]} />
-        <TableRow tables={[1, 2]} />
+const MobileLayout = () => {
+  const [queueExpanded, setQueueExpanded] = createSignal(false)
+  const [canScrollLeft, setCanScrollLeft] = createSignal(false)
+  const [canScrollRight, setCanScrollRight] = createSignal(false)
+  let scrollRef: HTMLDivElement | undefined
+  let touchStartX = 0
+  let touchStartY = 0
+
+  const updateScrollState = () => {
+    if (!scrollRef) return
+    setCanScrollLeft(scrollRef.scrollLeft > 0)
+    setCanScrollRight(
+      scrollRef.scrollLeft + scrollRef.clientWidth < scrollRef.scrollWidth - 1,
+    )
+  }
+
+  const isInsideQueueBody = (target: EventTarget | null): boolean =>
+    target instanceof Element && !!target.closest('[data-queue-body]')
+
+  const scrollToEdge = (dir: 1 | -1) => {
+    if (!scrollRef) return
+    scrollRef.scrollTo({
+      left: dir === -1 ? 0 : scrollRef.scrollWidth,
+      behavior: 'smooth',
+    })
+  }
+
+  const handleTouchStart = (e: TouchEvent) => {
+    const t = e.touches[0]
+    if (!t) return
+    touchStartX = t.clientX
+    touchStartY = t.clientY
+  }
+
+  const handleTouchEnd = (e: TouchEvent) => {
+    const t = e.changedTouches[0]
+    if (!t) return
+    if (isInsideQueueBody(e.target)) return
+    const dy = touchStartY - t.clientY
+    const dx = Math.abs(t.clientX - touchStartX)
+    const SWIPE_THRESHOLD = 60
+    if (Math.abs(dy) < SWIPE_THRESHOLD || dx > Math.abs(dy)) return
+    if (dy > 0 && !queueExpanded()) setQueueExpanded(true)
+    else if (dy < 0 && queueExpanded()) setQueueExpanded(false)
+  }
+
+  onMount(() => {
+    updateScrollState()
+    window.addEventListener('resize', updateScrollState)
+  })
+
+  onCleanup(() => {
+    window.removeEventListener('resize', updateScrollState)
+  })
+
+  return (
+    <div
+      style={mobileLayoutStyle}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
+      <div style={tablesScrollWrapperStyle}>
+        <div
+          ref={scrollRef}
+          class="hide-scrollbar"
+          style={tablesScrollContainerStyle}
+          onScroll={updateScrollState}
+        >
+          <div style={tablesGridMobileStyle}>
+            <TableRow tables={[5, 6]} />
+            <TableRow tables={[1, 2]} />
+          </div>
+          <div style={tablesGridMobileStyle}>
+            <TableRow tables={[7, 8]} />
+            <TableRow tables={[3, 4]} />
+          </div>
+        </div>
+        <Show when={canScrollLeft()}>
+          <div
+            style={scrollIndicatorLeftStyle}
+            onClick={() => scrollToEdge(-1)}
+          >
+            ‹
+          </div>
+        </Show>
+        <Show when={canScrollRight()}>
+          <div
+            style={scrollIndicatorRightStyle}
+            onClick={() => scrollToEdge(1)}
+          >
+            ›
+          </div>
+        </Show>
       </div>
-      <div style={tablesGridMobileStyle}>
-        <TableRow tables={[7, 8]} />
-        <TableRow tables={[3, 4]} />
-      </div>
+      <MatchQueueSheet
+        expanded={queueExpanded()}
+        onToggle={() => setQueueExpanded(!queueExpanded())}
+      />
     </div>
-    <div class="hide-scrollbar" style={matchQueueMobileStyle}>
-      <MatchQueue />
+  )
+}
+
+const MatchQueueSheet = (props: {
+  expanded: boolean
+  onToggle: () => void
+}) => (
+  <div style={matchQueueSheetStyle(props.expanded)}>
+    <div style={matchQueueSheetHandleStyle} onClick={props.onToggle}>
+      <span>Match Queue</span>
+      <span style={matchQueueChevronStyle}>
+        {props.expanded ? '▾' : '▴'}
+      </span>
+    </div>
+    <div
+      class="hide-scrollbar"
+      style={matchQueueSheetBodyStyle}
+      data-queue-body
+    >
+      <MatchQueue isMobile />
     </div>
   </div>
 )
@@ -283,11 +388,13 @@ const useAutoScroll = (ref: () => HTMLDivElement | undefined) => {
   })
 }
 
-const MatchQueue = () => {
+const MatchQueue = (props: { isMobile?: boolean }) => {
   let listRef: HTMLDivElement | undefined
   const queue = () => liveScoreState.matchQueue
 
-  useAutoScroll(() => listRef)
+  if (!props.isMobile) {
+    useAutoScroll(() => listRef)
+  }
 
   return (
     <div style={matchQueueContainerStyle}>
@@ -298,7 +405,7 @@ const MatchQueue = () => {
       >
         <div ref={listRef} class="hide-scrollbar" style={matchQueueListStyle}>
           <For each={queue()}>
-            {(item) => <MatchQueueRow item={item} />}
+            {(item) => <MatchQueueRow item={item} isMobile={props.isMobile} />}
           </For>
         </div>
       </Show>
@@ -308,6 +415,7 @@ const MatchQueue = () => {
 
 interface MatchQueueRowProps {
   item: MatchQueueItem
+  isMobile?: boolean
 }
 
 const MatchQueueRow = (props: MatchQueueRowProps) => {
@@ -316,15 +424,25 @@ const MatchQueueRow = (props: MatchQueueRowProps) => {
   const side2Name = () => formatPlayersShort(match()?.side2 || [])
   const side1OnTable = () => liveScoreActions.isSideOnTable(match()?.side1 || [])
   const side2OnTable = () => liveScoreActions.isSideOnTable(match()?.side2 || [])
+  const m = (mobileStyle: JSX.CSSProperties): JSX.CSSProperties =>
+    props.isMobile ? mobileStyle : {}
 
   return (
-    <div style={queueRowStyle}>
-      <div style={queueEventNameStyle}>{props.item.eventName}</div>
-      <div style={queueStageStyle}>{props.item.stageName}</div>
-      <div style={queueMatchStyle}>
-        <span style={side1OnTable() ? queuePlayerOnTableStyle : queuePlayerStyle}>{side1Name()}</span>
-        <span style={queueVsStyle}> vs </span>
-        <span style={side2OnTable() ? queuePlayerOnTableStyle : queuePlayerStyle}>{side2Name()}</span>
+    <div style={{ ...queueRowStyle, ...m(queueRowMobileStyle) }}>
+      <div style={{ ...queueEventNameStyle, ...m(queueEventNameMobileStyle) }}>
+        {props.item.eventName}
+      </div>
+      <div style={{ ...queueStageStyle, ...m(queueStageMobileStyle) }}>
+        {props.item.stageName}
+      </div>
+      <div style={{ ...queueMatchStyle, ...m(queueMatchMobileStyle) }}>
+        <span style={side1OnTable() ? queuePlayerOnTableStyle : queuePlayerStyle}>
+          {side1Name()}
+        </span>
+        <span style={{ ...queueVsStyle, ...m(queueVsMobileStyle) }}> vs </span>
+        <span style={side2OnTable() ? queuePlayerOnTableStyle : queuePlayerStyle}>
+          {side2Name()}
+        </span>
       </div>
     </div>
   )
@@ -396,22 +514,59 @@ const matchQueueDesktopStyle: JSX.CSSProperties = {
 
 // Mobile layout
 const mobileLayoutStyle: JSX.CSSProperties = {
+  position: 'relative',
   display: 'flex',
   'flex-direction': 'column',
   flex: 1,
   padding: '8px',
+  'padding-bottom': '64px',
   gap: '8px',
   'min-height': 0,
 }
 
+const tablesScrollWrapperStyle: JSX.CSSProperties = {
+  position: 'relative',
+  flex: 1,
+  'min-height': 0,
+}
+
 const tablesScrollContainerStyle: JSX.CSSProperties = {
-  flex: 2,
+  height: '100%',
   display: 'flex',
   'overflow-x': 'auto',
   '-webkit-overflow-scrolling': 'touch',
   'scroll-snap-type': 'x mandatory',
   gap: '8px',
   'min-height': 0,
+}
+
+const scrollIndicatorBaseStyle: JSX.CSSProperties = {
+  position: 'absolute',
+  top: '50%',
+  transform: 'translateY(-50%)',
+  width: '32px',
+  height: '32px',
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'center',
+  'background-color': 'rgba(0, 0, 0, 0.18)',
+  color: '#fff',
+  'font-size': '24px',
+  'font-weight': 700,
+  'border-radius': '50%',
+  cursor: 'pointer',
+  'user-select': 'none',
+  'z-index': 2,
+}
+
+const scrollIndicatorLeftStyle: JSX.CSSProperties = {
+  ...scrollIndicatorBaseStyle,
+  left: '4px',
+}
+
+const scrollIndicatorRightStyle: JSX.CSSProperties = {
+  ...scrollIndicatorBaseStyle,
+  right: '4px',
 }
 
 const tablesGridMobileStyle: JSX.CSSProperties = {
@@ -424,9 +579,45 @@ const tablesGridMobileStyle: JSX.CSSProperties = {
   'min-height': 0,
 }
 
-const matchQueueMobileStyle: JSX.CSSProperties = {
+const matchQueueSheetStyle = (expanded: boolean): JSX.CSSProperties => ({
+  position: 'absolute',
+  left: 0,
+  right: 0,
+  bottom: 0,
+  display: 'flex',
+  'flex-direction': 'column',
+  height: expanded ? '90vh' : '56px',
+  'background-color': '#fff',
+  'box-shadow': '0 -4px 12px rgba(0, 0, 0, 0.15)',
+  'border-top-left-radius': '12px',
+  'border-top-right-radius': '12px',
+  transition: 'height 0.3s ease',
+  'z-index': 5,
+  overflow: 'hidden',
+})
+
+const matchQueueSheetHandleStyle: JSX.CSSProperties = {
+  flex: '0 0 56px',
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'space-between',
+  padding: '0 20px',
+  cursor: 'pointer',
+  'font-size': '18px',
+  'font-weight': 700,
+  'background-color': '#f8f9fa',
+  'border-bottom': '1px solid #eee',
+  'user-select': 'none',
+}
+
+const matchQueueChevronStyle: JSX.CSSProperties = {
+  'font-size': '36px',
+  'line-height': 1,
+}
+
+const matchQueueSheetBodyStyle: JSX.CSSProperties = {
   flex: 1,
-  'min-height': '120px',
+  'min-height': 0,
   'overflow-y': 'auto',
 }
 
@@ -609,6 +800,7 @@ const matchQueueListStyle: JSX.CSSProperties = {
   'flex-direction': 'column',
   gap: '8px',
   'overflow-y': 'auto',
+  '-webkit-overflow-scrolling': 'touch',
   flex: 1,
   'min-height': 0,
 }
@@ -619,11 +811,20 @@ const queueRowStyle: JSX.CSSProperties = {
   padding: '10px 12px',
 }
 
+const queueRowMobileStyle: JSX.CSSProperties = {
+  padding: '12px 14px',
+}
+
 const queueEventNameStyle: JSX.CSSProperties = {
   'font-size': '12px',
   'font-weight': 600,
   color: '#3498db',
   'margin-bottom': '2px',
+}
+
+const queueEventNameMobileStyle: JSX.CSSProperties = {
+  'font-size': '15px',
+  'margin-bottom': '4px',
 }
 
 const queueStageStyle: JSX.CSSProperties = {
@@ -632,9 +833,18 @@ const queueStageStyle: JSX.CSSProperties = {
   'margin-bottom': '4px',
 }
 
+const queueStageMobileStyle: JSX.CSSProperties = {
+  'font-size': '13px',
+  'margin-bottom': '6px',
+}
+
 const queueMatchStyle: JSX.CSSProperties = {
   'font-size': '13px',
   color: '#fff',
+}
+
+const queueMatchMobileStyle: JSX.CSSProperties = {
+  'font-size': '16px',
 }
 
 const queuePlayerStyle: JSX.CSSProperties = {
@@ -650,6 +860,10 @@ const queueVsStyle: JSX.CSSProperties = {
   color: 'rgba(255,255,255,0.5)',
   margin: '0 4px',
   'font-size': '11px',
+}
+
+const queueVsMobileStyle: JSX.CSSProperties = {
+  'font-size': '13px',
 }
 
 export default LiveScore

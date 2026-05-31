@@ -27,13 +27,11 @@ mobile:
 | 1 | 2 |
 |   |   |
 |-------|
-|       |
-|       |
 ---------
 
-The bottom column is the Match Queue.
+The bottom row is the Match Queue, which can be expanded or collapsed, when expanded, open up from bottom with animation, stops when taking 90% of the screen height.
 
-The tables section can be scrolled/swiped horizontally to show other tables.
+The tables section can be scrolled/swiped horizontally to show other tables. Show an indicator (transparent) to let user know it can be scrolled left/right. Swipe up anywhere to expand the match queue, swipe down to collapse.
 
 ## Table section
 
