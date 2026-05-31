@@ -2270,11 +2270,7 @@ const buildResetEventStages = (event) =>
       return {
         ...stage,
         seedingList: [],
-        rounds: stage.rounds.map((r) => ({
-          ...r,
-          matches: [],
-          isComplete: false,
-        })),
+        rounds: [],
       }
     }
     return stage

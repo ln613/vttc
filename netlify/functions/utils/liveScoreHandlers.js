@@ -475,7 +475,16 @@ const assignTablesToMatches = (tables, queue, allItems) => {
  * Get live score data (tables + match queue)
  */
 export const getLiveScore = async () => {
-  const events = await getStartedEvents()
+  let events = await getStartedEvents()
+
+  // Always attempt auto-generation for any started event that needs it,
+  // even if other events are mid-play. autoGenerateForEvent is a no-op
+  // when the event already has its groups/schedule generated.
+  const anyChanged = await autoGenerateForStartedEvents(events)
+  if (anyChanged) {
+    events = await getStartedEvents()
+  }
+
   const allMatchItems = extractAllRemainingMatches(events)
   const matchQueue = buildMatchQueue(allMatchItems)
 
@@ -490,25 +499,6 @@ export const getLiveScore = async () => {
   const assignedMatchIds = getAssignedMatchIds(tables)
   const unassignedQueue = filterOutAssignedMatches(matchQueue, assignedMatchIds)
 
-  // Check auto-start conditions
-  const hasStartedEvent = events.length > 0
-  const allAvailable = tables.every((t) => t.status === 'available')
-  const queueEmpty = unassignedQueue.length === 0
-
-  if (queueEmpty && allAvailable && hasStartedEvent) {
-    // Auto-generate groups and/or schedules for started events that need them
-    await autoGenerateForStartedEvents(events)
-
-    // Re-fetch events to get fresh data after auto-generation
-    const freshEvents = await getStartedEvents()
-    const freshItems = extractAllRemainingMatches(freshEvents)
-    const freshQueue = buildMatchQueue(freshItems)
-    const result = assignTablesToMatches(tables, freshQueue, freshItems)
-    tables = result.tables
-    await saveTableState(tables, result.remainingQueue)
-    return { tables, matchQueue: result.remainingQueue }
-  }
-
   // Assign tables to matches
   const result = assignTablesToMatches(tables, unassignedQueue, allMatchItems)
   await saveTableState(result.tables, result.remainingQueue)
@@ -517,12 +507,16 @@ export const getLiveScore = async () => {
 }
 
 /**
- * Auto-generate groups and/or schedules for all started events that need them
+ * Auto-generate groups and/or schedules for all started events that need them.
+ * Returns true if any event was modified.
  */
 const autoGenerateForStartedEvents = async (events) => {
+  let anyChanged = false
   for (const event of events) {
-    await autoGenerateForEvent(event)
+    const changed = await autoGenerateForEvent(event)
+    if (changed) anyChanged = true
   }
+  return anyChanged
 }
 
 const extractAllRemainingMatches = (events) => {

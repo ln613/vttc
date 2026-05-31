@@ -476,7 +476,7 @@ const getAssignedTableStyle = (isNotStarted: boolean): JSX.CSSProperties => ({
 })
 
 const tableNumberAssignedStyle: JSX.CSSProperties = {
-  'font-size': '36px',
+  'font-size': '64px',
   'font-weight': 900,
   color: '#f1c40f',
   'line-height': 1,
