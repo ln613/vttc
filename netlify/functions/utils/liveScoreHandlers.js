@@ -1,5 +1,9 @@
 import { getDB, toObjectId } from './db.js'
-import { autoGenerateForEvent } from './eventHandlers.js'
+import {
+  autoGenerateForEvent,
+  updateMatchInStages,
+  createResetMatch,
+} from './eventHandlers.js'
 
 const EVENTS_COLLECTION = 'events'
 const TABLE_STATE_COLLECTION = 'tableState'
@@ -17,23 +21,43 @@ const throwError = (message) => {
 /**
  * Get all events that have started today
  */
+const CLUB_TIMEZONE = process.env.CLUB_TIMEZONE || 'America/Vancouver'
+
+const getClubDate = () =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: CLUB_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
+
+const getClubMinutesOfDay = () => {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: CLUB_TIMEZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date())
+  const h = parseInt(parts.find((p) => p.type === 'hour').value, 10)
+  const m = parseInt(parts.find((p) => p.type === 'minute').value, 10)
+  return h * 60 + m
+}
+
 const getStartedEvents = async () => {
   const db = getDB()
-  const today = new Date().toISOString().split('T')[0]
+  const today = getClubDate()
   const events = await db
     .collection(EVENTS_COLLECTION)
     .find({ date: today })
     .toArray()
 
-  const now = new Date()
-  return events.filter((e) => hasEventStarted(e, now))
+  return events.filter(hasEventStarted)
 }
 
-const hasEventStarted = (event, now) => {
+const hasEventStarted = (event) => {
   if (!event.time) return true // no time means started
   const eventTime = parseEventTime(event.time)
-  const currentMinutes = now.getHours() * 60 + now.getMinutes()
-  return currentMinutes >= eventTime
+  return getClubMinutesOfDay() >= eventTime
 }
 
 const parseEventTime = (time) => {
@@ -95,6 +119,7 @@ const extractGroupMatches = (event, eventSummary, items) => {
 
     for (const match of group.matches || []) {
       if (isMatchFinishedAndConfirmed(match)) continue
+      if (isMatchPostponed(match)) continue
 
       items.push({
         matchId: match._id,
@@ -107,6 +132,7 @@ const extractGroupMatches = (event, eventSummary, items) => {
         groupSize,
         groupKey,
         matchStatus: getMatchStatus(match),
+        cancelledAt: match.cancelledAt,
         event: eventSummary,
       })
     }
@@ -124,6 +150,7 @@ const extractKnockoutMatches = (event, eventSummary, items) => {
       if (km.isBye1 || km.isBye2) continue
       if (!km.match) continue
       if (isMatchFinishedAndConfirmed(km.match)) continue
+      if (isMatchPostponed(km.match)) continue
 
       items.push({
         matchId: km.match._id,
@@ -134,6 +161,7 @@ const extractKnockoutMatches = (event, eventSummary, items) => {
         stageName: round.name,
         roundName: round.name,
         matchStatus: getMatchStatus(km.match),
+        cancelledAt: km.match.cancelledAt,
         event: eventSummary,
       })
     }
@@ -142,6 +170,11 @@ const extractKnockoutMatches = (event, eventSummary, items) => {
 
 const isMatchFinishedAndConfirmed = (match) =>
   match.winningSide != null && match.confirmed === true
+
+const isMatchPostponed = (match) => {
+  if (!match.postponedUntil) return false
+  return new Date(match.postponedUntil).getTime() > Date.now()
+}
 
 const getMatchStatus = (match) => {
   if (match.winningSide != null) return 'not_started' // finished but not confirmed, treat as not started for table display
@@ -357,7 +390,14 @@ const buildMatchQueue = (matchItems) => {
     return a.eventTime - b.eventTime
   })
 
-  return entries.flatMap((e) => e.matches)
+  return entries.flatMap((e) =>
+    [...e.matches].sort((m1, m2) => {
+      const c1 = m1.cancelledAt ? 1 : 0
+      const c2 = m2.cancelledAt ? 1 : 0
+      if (c1 !== c2) return c1 - c2
+      return 0
+    }),
+  )
 }
 
 /**
@@ -577,6 +617,91 @@ const filterOutAssignedMatches = (queue, assignedMatchIds) =>
 /**
  * Rebuild match queue (triggered after match confirm/reset)
  */
+/**
+ * Postpone a match for N minutes.
+ * Sets postponedUntil on the match and frees any table it occupies.
+ */
+export const postponeMatch = async (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body._id) throwError('Event ID is required')
+  if (!body.matchId) throwError('Match ID is required')
+  if (!body.minutes || body.minutes <= 0) throwError('Minutes is required')
+
+  const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
+  const event = await collection.findOne({ _id: toObjectId(body._id) })
+  if (!event) throwError('Event not found')
+
+  const postponedUntil = new Date(Date.now() + body.minutes * 60_000).toISOString()
+  const updatedStages = updateMatchInStages(
+    event.eventStages,
+    body.matchId,
+    (match) => ({ ...match, postponedUntil, cancelledAt: undefined }),
+  )
+
+  await collection.updateOne(
+    { _id: toObjectId(body._id) },
+    { $set: { eventStages: updatedStages } },
+  )
+
+  await freeTableForMatch(body.matchId)
+
+  return { success: true }
+}
+
+/**
+ * Cancel an in-progress match: clear its games/result, mark cancelledAt
+ * (so the queue pushes it to the end), and free its table.
+ */
+export const cancelMatch = async (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body._id) throwError('Event ID is required')
+  if (!body.matchId) throwError('Match ID is required')
+
+  const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
+  const event = await collection.findOne({ _id: toObjectId(body._id) })
+  if (!event) throwError('Event not found')
+
+  const cancelledAt = new Date().toISOString()
+  const updatedStages = updateMatchInStages(
+    event.eventStages,
+    body.matchId,
+    (match) => ({
+      ...createResetMatch(match),
+      cancelledAt,
+      postponedUntil: undefined,
+    }),
+  )
+
+  await collection.updateOne(
+    { _id: toObjectId(body._id) },
+    { $set: { eventStages: updatedStages } },
+  )
+
+  await freeTableForMatch(body.matchId)
+
+  return { success: true }
+}
+
+const freeTableForMatch = async (matchId) => {
+  const state = await loadTableState()
+  if (!state?.tables) return
+  let changed = false
+  const tables = state.tables.map((t) => {
+    if (
+      t.status === 'assigned' &&
+      t.match?.matchId &&
+      t.match.matchId.toString() === matchId.toString()
+    ) {
+      changed = true
+      return { tableNumber: t.tableNumber, status: 'available' }
+    }
+    return t
+  })
+  if (changed) await saveTableState(tables, state.matchQueue || [])
+}
+
 export const rebuildMatchQueue = async () => {
   const events = await getStartedEvents()
   const allMatchItems = extractAllRemainingMatches(events)

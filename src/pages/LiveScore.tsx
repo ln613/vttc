@@ -7,6 +7,7 @@ import {
   type JSX,
 } from 'solid-js'
 import { liveScoreState, liveScoreActions } from '../stores/liveScoreStore'
+import { authState } from '../stores/authStore'
 import type { TableAssignment, MatchQueueItem } from '../../shared/types/Table'
 import type { Player } from '../../shared/types/Player'
 import type { Game } from '../../shared/types/Match'
@@ -129,12 +130,12 @@ const MobileLayout = () => {
           onScroll={updateScrollState}
         >
           <div style={tablesGridMobileStyle}>
-            <TableRow tables={[5, 6]} />
-            <TableRow tables={[1, 2]} />
+            <TableRow tables={[5, 6]} isMobile />
+            <TableRow tables={[1, 2]} isMobile />
           </div>
           <div style={tablesGridMobileStyle}>
-            <TableRow tables={[7, 8]} />
-            <TableRow tables={[3, 4]} />
+            <TableRow tables={[7, 8]} isMobile />
+            <TableRow tables={[3, 4]} isMobile />
           </div>
         </div>
         <Show when={canScrollLeft()}>
@@ -187,6 +188,7 @@ const MatchQueueSheet = (props: {
 
 interface TableRowProps {
   tables: number[]
+  isMobile?: boolean
 }
 
 const TableRow = (props: TableRowProps) => (
@@ -194,7 +196,13 @@ const TableRow = (props: TableRowProps) => (
     <For each={props.tables}>
       {(tableNum) => {
         const table = () => liveScoreActions.getTable(tableNum)
-        return <TableCell table={table()} tableNumber={tableNum} />
+        return (
+          <TableCell
+            table={table()}
+            tableNumber={tableNum}
+            isMobile={props.isMobile}
+          />
+        )
       }}
     </For>
   </div>
@@ -203,6 +211,7 @@ const TableRow = (props: TableRowProps) => (
 interface TableCellProps {
   table?: TableAssignment
   tableNumber: number
+  isMobile?: boolean
 }
 
 const TableCell = (props: TableCellProps) => {
@@ -216,6 +225,7 @@ const TableCell = (props: TableCellProps) => {
         tableNumber={props.tableNumber}
         matchItem={matchItem()!}
         matchStatus={matchStatus()!}
+        isMobile={props.isMobile}
       />
     </Show>
   )
@@ -231,10 +241,49 @@ const AvailableTable = (props: AvailableTableProps) => (
   </div>
 )
 
+const POSTPONE_OPTIONS: { label: string; minutes: number }[] = [
+  { label: '5 Minutes', minutes: 5 },
+  { label: '10 Minutes', minutes: 10 },
+  { label: '30 Minutes', minutes: 30 },
+  { label: '1 Hour', minutes: 60 },
+]
+
+const PostponeDialog = (props: {
+  onSelect: (minutes: number) => void
+  onClose: () => void
+}) => (
+  <div style={postponeDialogOverlayStyle} onClick={props.onClose}>
+    <div style={postponeDialogStyle} onClick={(e) => e.stopPropagation()}>
+      <h3 style={postponeDialogTitleStyle}>Postpone Match</h3>
+      <div style={postponeButtonsStyle}>
+        <For each={POSTPONE_OPTIONS}>
+          {(opt) => (
+            <button
+              type="button"
+              style={postponeButtonStyle}
+              onClick={() => props.onSelect(opt.minutes)}
+            >
+              {opt.label}
+            </button>
+          )}
+        </For>
+      </div>
+      <button
+        type="button"
+        style={postponeCancelButtonStyle}
+        onClick={props.onClose}
+      >
+        Cancel
+      </button>
+    </div>
+  </div>
+)
+
 interface AssignedTableProps {
   tableNumber: number
   matchItem: MatchQueueItem
   matchStatus: string
+  isMobile?: boolean
 }
 
 const AssignedTable = (props: AssignedTableProps) => {
@@ -246,6 +295,27 @@ const AssignedTable = (props: AssignedTableProps) => {
   const isInProgress = () => !isNotStarted()
   const gamesWon1 = () => match()?.gamesWon1 ?? 0
   const gamesWon2 = () => match()?.gamesWon2 ?? 0
+  const [showPostpone, setShowPostpone] = createSignal(false)
+  const showActionButton = () => !!props.isMobile && authState.isAdmin
+
+  const handleCancel = async () => {
+    if (!confirm('Cancel this match and put it back at the end of the queue?')) {
+      return
+    }
+    await liveScoreActions.cancelMatch(
+      props.matchItem.eventId,
+      props.matchItem.matchId,
+    )
+  }
+
+  const handlePostpone = async (minutes: number) => {
+    setShowPostpone(false)
+    await liveScoreActions.postponeMatch(
+      props.matchItem.eventId,
+      props.matchItem.matchId,
+      minutes,
+    )
+  }
 
   return (
     <div style={getAssignedTableStyle(isNotStarted())}>
@@ -262,6 +332,29 @@ const AssignedTable = (props: AssignedTableProps) => {
         isNotStarted={isNotStarted()}
       />
       <TablePlayerDisplay players={side2Players()} gamesWon={gamesWon2()} showScore={isInProgress()} />
+      <Show when={showActionButton()}>
+        <Show
+          when={isNotStarted()}
+          fallback={
+            <button style={tableCancelButtonStyle} onClick={handleCancel}>
+              Cancel
+            </button>
+          }
+        >
+          <button
+            style={tablePostponeButtonStyle}
+            onClick={() => setShowPostpone(true)}
+          >
+            Postpone
+          </button>
+        </Show>
+      </Show>
+      <Show when={showPostpone()}>
+        <PostponeDialog
+          onSelect={handlePostpone}
+          onClose={() => setShowPostpone(false)}
+        />
+      </Show>
     </div>
   )
 }
@@ -671,6 +764,89 @@ const tableNumberAssignedStyle: JSX.CSSProperties = {
   'font-weight': 900,
   color: '#f1c40f',
   'line-height': 1,
+}
+
+const tableActionButtonBaseStyle: JSX.CSSProperties = {
+  'margin-top': '6px',
+  padding: '6px 14px',
+  'font-size': '13px',
+  'font-weight': 700,
+  border: 'none',
+  'border-radius': '6px',
+  color: '#fff',
+  cursor: 'pointer',
+}
+
+const tablePostponeButtonStyle: JSX.CSSProperties = {
+  ...tableActionButtonBaseStyle,
+  'background-color': '#f39c12',
+}
+
+const tableCancelButtonStyle: JSX.CSSProperties = {
+  ...tableActionButtonBaseStyle,
+  'background-color': '#e74c3c',
+}
+
+const postponeDialogOverlayStyle: JSX.CSSProperties = {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  'background-color': 'rgba(0, 0, 0, 0.5)',
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'center',
+  'z-index': 1000,
+  padding: '16px',
+}
+
+const postponeDialogStyle: JSX.CSSProperties = {
+  'background-color': '#fff',
+  'border-radius': '12px',
+  padding: '20px',
+  width: '100%',
+  'max-width': '320px',
+  'box-shadow': '0 4px 20px rgba(0, 0, 0, 0.15)',
+}
+
+const postponeDialogTitleStyle: JSX.CSSProperties = {
+  'font-size': '1.2rem',
+  'font-weight': 700,
+  'margin-top': 0,
+  'margin-bottom': '12px',
+  color: '#333',
+  'text-align': 'center',
+}
+
+const postponeButtonsStyle: JSX.CSSProperties = {
+  display: 'grid',
+  'grid-template-columns': '1fr 1fr',
+  gap: '8px',
+  'margin-bottom': '12px',
+}
+
+const postponeButtonStyle: JSX.CSSProperties = {
+  padding: '12px',
+  'font-size': '14px',
+  'font-weight': 600,
+  border: '1px solid #f39c12',
+  'border-radius': '8px',
+  'background-color': '#f39c12',
+  color: '#fff',
+  cursor: 'pointer',
+}
+
+const postponeCancelButtonStyle: JSX.CSSProperties = {
+  width: '100%',
+  padding: '10px',
+  'font-size': '14px',
+  'font-weight': 600,
+  border: '1px solid #ddd',
+  'border-radius': '8px',
+  'background-color': '#fff',
+  color: '#333',
+  cursor: 'pointer',
 }
 
 const eventNameTableStyle: JSX.CSSProperties = {

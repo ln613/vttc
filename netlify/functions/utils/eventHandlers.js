@@ -1805,7 +1805,7 @@ const validateNoNextKnockoutRoundStarted = (knockoutStage, currentRoundIndex) =>
   }
 }
 
-const createResetMatch = (match) => ({
+export const createResetMatch = (match) => ({
   ...match,
   games: [],
   gamesWon1: 0,
@@ -1877,7 +1877,7 @@ const validateSaveMatchSetupInput = (body) => {
   if (!body.leftSide) throwError('Left side is required')
 }
 
-const updateMatchInStages = (eventStages, matchId, updateFn) => {
+export const updateMatchInStages = (eventStages, matchId, updateFn) => {
   const updatedStages = [...eventStages]
 
   // Try group stage

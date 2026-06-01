@@ -5,7 +5,7 @@ import type {
   LiveScoreData,
 } from '../../shared/types/Table'
 import type { Player } from '../../shared/types/Player'
-import { apiGet } from '../utils/api'
+import { apiGet, apiPost } from '../utils/api'
 import {
   subscribeToLiveScoreUpdates,
   type EventSubscription,
@@ -121,6 +121,14 @@ export const liveScoreActions = {
 
   getAvailableTables: (): TableAssignment[] =>
     liveScoreState.tables.filter((t) => t.status === 'available'),
+
+  postponeMatch: async (eventId: string, matchId: string, minutes: number) => {
+    await apiPost('postponeMatch', { _id: eventId, matchId, minutes })
+  },
+
+  cancelMatch: async (eventId: string, matchId: string) => {
+    await apiPost('cancelMatch', { _id: eventId, matchId })
+  },
 
   getAssignedMatchIds: (): Set<string> => {
     const ids = new Set<string>()

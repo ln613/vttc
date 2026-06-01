@@ -54,6 +54,9 @@ Each table will show:
     - match in progress: scores of each game, current game on right most, "11:7, 4:8...", highlight the winning number and flash the most recent point    
   - player2 of the match (or for team, player3/player4), followed by the game score
   - table number (yellow, big, top-center)
+  - action button, admin on mobile only
+    - match not started: "Postpone" button
+    - match in progress: "Cancel" button
 
 ## Match Queue section
 
@@ -64,3 +67,8 @@ Each table will show:
 
 - on page load, retrieve the Match Queue and table assignment
 - use websocket to get real-time update
+- on match postpone
+  - show a dialog with a list of buttons, 5 Minutes, 10 Minutes, 30 Minutes, 1 Hour
+  - on select, remove the match from the table and the queue, and set the time selected on the match to mark it not available for queuing. when the time is reached, it becomes available for queuing again.
+- on match cancel: confirm and reset the match and put it back to the end of the queue
+

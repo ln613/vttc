@@ -36,7 +36,12 @@ import {
   verifyCode,
   signUp,
 } from './accountHandlers.js'
-import { getLiveScore, rebuildMatchQueue } from './liveScoreHandlers.js'
+import {
+  getLiveScore,
+  rebuildMatchQueue,
+  postponeMatch,
+  cancelMatch,
+} from './liveScoreHandlers.js'
 import { notifyEventUpdate, notifyLiveScoreUpdate } from './pusher.js'
 
 const withEventNotify = (fn) => async (body) => {
@@ -89,5 +94,7 @@ export const apiHandlers = {
       await notifyLiveScoreUpdate()
       return result
     },
+    postponeMatch: withEventNotify(postponeMatch),
+    cancelMatch: withEventNotify(cancelMatch),
   },
 }
