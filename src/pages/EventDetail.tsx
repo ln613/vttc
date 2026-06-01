@@ -7,7 +7,7 @@ import { eventDetailState, eventDetailActions } from '../stores/eventDetailStore
 import type { StageTab } from '../stores/eventDetailStore'
 import { authState } from '../stores/authStore'
 import { liveScoreActions } from '../stores/liveScoreStore'
-import type { Group, GroupParticipant, Participant, KnockoutRound, KnockoutMatch as KnockoutMatchType } from '../../shared/types/Tournament'
+import type { Group, GroupParticipant, Participant, KnockoutRound, KnockoutMatch as KnockoutMatchType, Stage } from '../../shared/types/Tournament'
 import type { Player } from '../../shared/types/Player'
 import type { Match, Game } from '../../shared/types/Match'
 import { parseLocalDate } from '../utils/date'
@@ -21,9 +21,7 @@ const EventDetail = () => {
     if (params.id) {
       eventDetailActions.loadEvent(params.id)
     }
-    if (authState.isAdmin && isSimulationEnabled()) {
-      liveScoreActions.fetchLiveScore()
-    }
+    liveScoreActions.fetchLiveScore()
     restoreScrollPosition()
   })
 
@@ -442,6 +440,38 @@ interface MatchRowProps {
   stage: 'group' | 'knockout'
 }
 
+const collectPlayerIds = (entity: unknown, ids: Set<string>) => {
+  const obj = entity as { _id?: unknown; players?: unknown }
+  if (obj?._id != null) ids.add(String(obj._id))
+  if (Array.isArray(obj?.players)) {
+    for (const p of obj.players as { _id?: unknown }[]) {
+      if (p?._id != null) ids.add(String(p._id))
+    }
+  }
+}
+
+const isUserInMatch = (match: { side1?: unknown[]; side2?: unknown[] }): boolean => {
+  const uid = authState.user?._id?.toString()
+  if (!uid) return false
+  const ids = new Set<string>()
+  for (const p of match.side1 || []) collectPlayerIds(p, ids)
+  for (const p of match.side2 || []) collectPlayerIds(p, ids)
+  return ids.has(uid)
+}
+
+const isUserInGroup = (groupIndex: number): boolean => {
+  const uid = authState.user?._id?.toString()
+  if (!uid) return false
+  const groupStage = eventDetailState.data?.eventStages?.find(
+    (s): s is Extract<Stage, { type: 'group' }> => s.type === 'group',
+  )
+  const group = groupStage?.groups[groupIndex]
+  if (!group) return false
+  const ids = new Set<string>()
+  for (const gp of group.participants) collectPlayerIds(gp.participant, ids)
+  return ids.has(uid)
+}
+
 const MatchRow = (props: MatchRowProps) => {
   const navigate = useNavigate()
   const side1Players = () => getMatchSidePlayers(props.match.side1)
@@ -459,6 +489,17 @@ const MatchRow = (props: MatchRowProps) => {
     authState.isAdmin &&
     isConfirmed() &&
     eventDetailActions.canResetMatch(props.match._id, props.stage, props.groupIndex)
+  const assignedTable = () =>
+    liveScoreActions.getTableForMatch(props.match._id)
+  const phase = (): 'not_started' | 'in_progress' | 'finished' => {
+    if (hasResult()) return 'finished'
+    if (hasStarted()) return 'in_progress'
+    return 'not_started'
+  }
+  const canStartOrContinue = () =>
+    authState.isAdmin ||
+    isUserInMatch(props.match) ||
+    (props.stage === 'group' && isUserInGroup(props.groupIndex))
 
   const handleStartClick = () => {
     const eventId = eventDetailState.eventId
@@ -484,7 +525,10 @@ const MatchRow = (props: MatchRowProps) => {
   }
 
   return (
-    <div style={matchRowStyle}>
+    <div style={getMatchRowStyle(phase(), assignedTable() !== undefined)}>
+      <Show when={assignedTable() !== undefined}>
+        <div style={matchRowTableNumberStyle}>{assignedTable()}</div>
+      </Show>
       <div style={matchContentContainerStyle}>
         <MatchResultDisplay
           side1Players={side1Players()}
@@ -495,17 +539,17 @@ const MatchRow = (props: MatchRowProps) => {
         />
         <GameScoresDisplay games={props.match.games} />
       </div>
-      <Show when={!hasStarted()}>
+      <Show when={!hasStarted() && canStartOrContinue()}>
         <Button onClick={handleStartClick} color="#27ae60" size="small">
           Start
         </Button>
       </Show>
-      <Show when={hasStarted() && !hasResult()}>
+      <Show when={hasStarted() && !hasResult() && canStartOrContinue()}>
         <Button onClick={handleStartClick} color="#e67e22" size="small">
           Continue
         </Button>
       </Show>
-      <Show when={hasResult() && !isConfirmed()}>
+      <Show when={hasResult() && !isConfirmed() && authState.isAdmin}>
         <Button
           onClick={handleConfirmClick}
           color="#e74c3c"
@@ -1370,15 +1414,36 @@ const matchScheduleContentStyle: JSX.CSSProperties = {
   'border-radius': '8px',
 }
 
-const matchRowStyle: JSX.CSSProperties = {
+const getMatchRowStyle = (
+  phase: 'not_started' | 'in_progress' | 'finished',
+  hasTable: boolean,
+): JSX.CSSProperties => ({
+  position: 'relative',
   display: 'flex',
   'flex-direction': 'column',
   'align-items': 'center',
   gap: '10px',
   padding: '14px 16px',
-  'background-color': '#fff',
+  'background-color':
+    hasTable && phase === 'not_started'
+      ? '#fdecea'
+      : phase === 'in_progress'
+        ? '#e3f2fd'
+        : '#fff',
   'border-radius': '10px',
   'box-shadow': '0 1px 4px rgba(0, 0, 0, 0.08)',
+})
+
+const matchRowTableNumberStyle: JSX.CSSProperties = {
+  position: 'absolute',
+  left: '16px',
+  top: '50%',
+  transform: 'translateY(-50%)',
+  'font-size': '48px',
+  'font-weight': 900,
+  color: '#f1c40f',
+  'line-height': 1,
+  'pointer-events': 'none',
 }
 
 const matchContentContainerStyle: JSX.CSSProperties = {

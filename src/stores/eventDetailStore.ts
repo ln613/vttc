@@ -470,10 +470,10 @@ const canResetGroupMatch = (event: Event, matchId: string): boolean => {
     if (!knockoutStage || knockoutStage.rounds.length === 0) return true
 
     const firstRound = knockoutStage.rounds[0]
-    const anyStarted = firstRound.matches.some(
-      (m) => m.match && ((m.match.games?.length ?? 0) > 0 || m.match.winningSide != null),
+    const anyFinished = firstRound.matches.some(
+      (m) => m.match && m.match.winningSide != null,
     )
-    return !anyStarted
+    return !anyFinished
   }
 
   return false
@@ -498,10 +498,10 @@ const canResetKnockoutMatch = (event: Event, matchId: string, roundIndex: number
     const nextRound = knockoutStage.rounds[nextRoundIndex]
     if (!nextRound.matches || nextRound.matches.length === 0) return true
 
-    const anyStarted = nextRound.matches.some(
-      (m) => m.match && ((m.match.games?.length ?? 0) > 0 || m.match.winningSide != null),
+    const anyFinished = nextRound.matches.some(
+      (m) => m.match && m.match.winningSide != null,
     )
-    return !anyStarted
+    return !anyFinished
   }
 
   return false

@@ -130,6 +130,16 @@ export const liveScoreActions = {
     await apiPost('cancelMatch', { _id: eventId, matchId })
   },
 
+  getTableForMatch: (matchId: string): number | undefined => {
+    for (const table of liveScoreState.tables) {
+      if (table.status !== 'assigned' || !table.match) continue
+      if (table.match.matchId?.toString() === matchId.toString()) {
+        return table.tableNumber
+      }
+    }
+    return undefined
+  },
+
   getAssignedMatchIds: (): Set<string> => {
     const ids = new Set<string>()
     for (const table of liveScoreState.tables) {

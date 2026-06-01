@@ -41,16 +41,36 @@ The Total column is the total matches played so far.
 - match schedule table (collapsible), where each match row:
   - names and result, like "Eric Huang 2 : 1 Nan Li", the winning participant and number (Eric Huang and 2 in this case) are bold. when no result, show 0 : 0, no bold. The row should be center aligned with ":" right in the middle.
   - results of each game: "11 : 6, 10 : 12, ...", left side represents the left participant (Eric in this case), the winning numbers are bold.
-  - Start button (if not started yet, align right, green, small)
-  - Continue button (if already started but not finished, orange, small)
-  - Confirm button (if finished but not confirmed, red, small)
-  - Reset button (if finished and confirmed, red, small, only for admin)
-    - only visible if no match in the next round has started/finished
-    - confirm with the user before reset
-    - delete all games and info related to the match
-    - reset the complete flag on the group if needed
-    - delete the next round schedule if exist
-    - after reset, show the start button
+  - match not started, but table assigned
+    - light red bg
+    - big table number (left aligned)
+    - Start button
+      - green bg
+      - visible to
+        - admin
+        - any player in the match
+        - if group stage, any player in the group
+  - match in progress
+    - light blue bg
+    - big table number (left aligned)
+    - Continue button
+      - orange bg
+      - if already started but not finished
+      - same visibility as Start button
+  - match finished
+    - Confirm button
+      - if finished but not confirmed
+      - red bg
+      - admin only
+    - Reset button
+      - if finished and confirmed
+      - red bg
+      - admin only
+      - only visible if no match in the next round has finished
+      - confirm with the user before reset
+      - delete all games and info related to the match
+      - reset the complete flag on the group if needed
+      - delete the next round schedule if exist
   - if admin and SIMULATION=1, show "Simulate" button (only for matches already assigned a table), which will simulate the match and submit the results
 
 ### interaction

@@ -1782,11 +1782,11 @@ const validateNoNextRoundStartedForGroup = (updatedStages, groupStage) => {
   if (!knockoutStage || !knockoutStage.rounds || knockoutStage.rounds.length === 0) return
 
   const firstRound = knockoutStage.rounds[0]
-  const anyStarted = firstRound.matches.some(
-    (m) => m.match && (m.match.games?.length > 0 || m.match.winningSide != null),
+  const anyFinished = firstRound.matches.some(
+    (m) => m.match && m.match.winningSide != null,
   )
-  if (anyStarted) {
-    throwError('Cannot reset match: next round has already started')
+  if (anyFinished) {
+    throwError('Cannot reset match: next round has already finished')
   }
 }
 
@@ -1797,11 +1797,11 @@ const validateNoNextKnockoutRoundStarted = (knockoutStage, currentRoundIndex) =>
   const nextRound = knockoutStage.rounds[nextRoundIndex]
   if (!nextRound.matches || nextRound.matches.length === 0) return
 
-  const anyStarted = nextRound.matches.some(
-    (m) => m.match && (m.match.games?.length > 0 || m.match.winningSide != null),
+  const anyFinished = nextRound.matches.some(
+    (m) => m.match && m.match.winningSide != null,
   )
-  if (anyStarted) {
-    throwError('Cannot reset match: next round has already started')
+  if (anyFinished) {
+    throwError('Cannot reset match: next round has already finished')
   }
 }
 
