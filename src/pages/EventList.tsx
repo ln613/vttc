@@ -1,13 +1,21 @@
-import { Show, For, onMount } from 'solid-js'
+import { Show, For, createSignal, onMount } from 'solid-js'
 import type { JSX } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { Header } from '../components/Header'
 import ToggleButton from '../components/ToggleButton'
+import Select from '../components/Select'
+import Button from '../components/Button'
 import FeeInfoDialog from '../components/FeeInfoDialog'
 import TeammateSelectDialog from '../components/TeammateSelectDialog'
 import { eventListState, eventListActions } from '../stores/eventListStore'
-import { parseLocalDate } from '../utils/date'
+import { parseLocalDate, formatLocalDate } from '../utils/date'
 import { authState, authActions } from '../stores/authStore'
+import {
+  tournamentState,
+  tournamentActions,
+  type Tournament,
+} from '../stores/tournamentStore'
+import { apiGet, apiPost } from '../utils/api'
 import type { EventOption } from '../stores/eventStore'
 
 const EventList = () => {
@@ -61,9 +69,205 @@ const ToolsSection = () => {
           +
         </button>
       </Show>
+      <Show when={authState.isAdmin && isSimulationEnabled()}>
+        <SimulateEventButton />
+      </Show>
     </div>
   )
 }
+
+const isSimulationEnabled = (): boolean =>
+  import.meta.env.VITE_SIMULATION === '1'
+
+const SimulateEventButton = () => {
+  const [open, setOpen] = createSignal(false)
+  return (
+    <>
+      <button style={simulateAddButtonStyle} onClick={() => setOpen(true)}>
+        +
+      </button>
+      <Show when={open()}>
+        <SimulateEventDialog onClose={() => setOpen(false)} />
+      </Show>
+    </>
+  )
+}
+
+const MAX_PARTICIPANTS_OPTIONS = (() => {
+  const options = [{ value: 'Unlimited', label: 'Unlimited' }]
+  for (let i = 4; i <= 128; i++) {
+    options.push({ value: String(i), label: String(i) })
+  }
+  return options
+})()
+
+const groupTournaments = (tournaments: Tournament[]) => ({
+  openSingles: tournaments.filter(
+    (t) => t.type === 'Single' && t.restriction === 'Open',
+  ),
+  ratedSingles: tournaments.filter(
+    (t) => t.type === 'Single' && t.restriction === 'Rated',
+  ),
+  agedSingles: tournaments.filter(
+    (t) => t.type === 'Single' && t.restriction === 'Age',
+  ),
+  teams: tournaments.filter((t) => t.type !== 'Single'),
+})
+
+const formatTimeNowPlus1Min = (): string => {
+  const d = new Date(Date.now() + 60_000)
+  let hours = d.getHours()
+  const minutes = d.getMinutes()
+  const period = hours >= 12 ? 'PM' : 'AM'
+  hours = hours % 12 || 12
+  return `${hours}:${String(minutes).padStart(2, '0')} ${period}`
+}
+
+const SimulateEventDialog = (props: { onClose: () => void }) => {
+  const [seriesList, setSeriesList] = createSignal<string[]>([])
+  const [selectedSeries, setSelectedSeries] = createSignal('')
+  const [selectedTournamentId, setSelectedTournamentId] = createSignal('')
+  const [maxParticipants, setMaxParticipants] = createSignal('16')
+  const [saving, setSaving] = createSignal(false)
+  const [error, setError] = createSignal<string | null>(null)
+
+  onMount(async () => {
+    tournamentActions.fetchTournaments()
+    try {
+      const series = await apiGet<string[]>('eventSeries')
+      setSeriesList(series)
+      if (series.length > 0) setSelectedSeries(series[0])
+    } catch {
+      setSeriesList([])
+    }
+  })
+
+  const groups = () => groupTournaments(tournamentState.data ?? [])
+
+  const seriesOptions = () =>
+    seriesList().map((s) => ({ value: s, label: s }))
+
+  const handleSave = async () => {
+    const tournamentId = selectedTournamentId()
+    if (!tournamentId) {
+      setError('Please select a tournament')
+      return
+    }
+    const tournament = tournamentActions.getTournamentById(tournamentId)
+    if (!tournament) {
+      setError('Tournament not found')
+      return
+    }
+    setSaving(true)
+    setError(null)
+    try {
+      await apiPost('simulateEvent', {
+        tournamentId,
+        eventSeries: selectedSeries() || undefined,
+        maxParticipants:
+          maxParticipants() === 'Unlimited' ? 0 : parseInt(maxParticipants(), 10),
+        name: `${tournament.name} - test`,
+        date: formatLocalDate(new Date()),
+        time: formatTimeNowPlus1Min(),
+        registrationFee: 30,
+      })
+      await eventListActions.fetchEvents()
+      props.onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to simulate event')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div style={dialogOverlayStyle} onClick={props.onClose}>
+      <div style={dialogStyle} onClick={(e) => e.stopPropagation()}>
+        <h2 style={dialogTitleStyle}>Simulate Event</h2>
+        <Select
+          label="Event Series"
+          name="simSeries"
+          value={selectedSeries()}
+          onChange={setSelectedSeries}
+          options={seriesOptions()}
+        />
+        <div style={tournamentGroupsContainerStyle}>
+          <TournamentGroup
+            title="Open Singles"
+            tournaments={groups().openSingles}
+            selectedId={selectedTournamentId()}
+            onSelect={setSelectedTournamentId}
+          />
+          <TournamentGroup
+            title="Rated Singles"
+            tournaments={groups().ratedSingles}
+            selectedId={selectedTournamentId()}
+            onSelect={setSelectedTournamentId}
+          />
+          <TournamentGroup
+            title="Aged Singles"
+            tournaments={groups().agedSingles}
+            selectedId={selectedTournamentId()}
+            onSelect={setSelectedTournamentId}
+          />
+          <TournamentGroup
+            title="Teams"
+            tournaments={groups().teams}
+            selectedId={selectedTournamentId()}
+            onSelect={setSelectedTournamentId}
+          />
+        </div>
+        <Select
+          label="Max Participants"
+          name="simMax"
+          value={maxParticipants()}
+          onChange={setMaxParticipants}
+          options={MAX_PARTICIPANTS_OPTIONS}
+        />
+        <Show when={error()}>
+          <div style={dialogErrorStyle}>{error()}</div>
+        </Show>
+        <div style={dialogButtonContainerStyle}>
+          <Button color="#e74c3c" onClick={props.onClose} disabled={saving()}>
+            Cancel
+          </Button>
+          <Button color="#27ae60" onClick={handleSave} disabled={saving()}>
+            {saving() ? 'Saving...' : 'Save'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const TournamentGroup = (props: {
+  title: string
+  tournaments: Tournament[]
+  selectedId: string
+  onSelect: (id: string) => void
+}) => (
+  <Show when={props.tournaments.length > 0}>
+    <div style={tournamentGroupStyle}>
+      <div style={tournamentGroupHeaderStyle}>{props.title}</div>
+      <div style={tournamentButtonsStyle}>
+        <For each={props.tournaments}>
+          {(t) => (
+            <button
+              type="button"
+              style={
+                t._id === props.selectedId
+                  ? tournamentButtonSelectedStyle
+                  : tournamentButtonStyle
+              }
+              onClick={() => props.onSelect(t._id)}
+            >
+              {t.name}
+            </button>
+          )}
+        </For>
+      </div>
+    </div>
+  </Show>
+)
 
 const EventListContent = () => (
   <Show when={!eventListState.loading} fallback={<div>Loading...</div>}>
@@ -447,6 +651,104 @@ const addButtonStyle: JSX.CSSProperties = {
   'align-items': 'center',
   'justify-content': 'center',
   padding: '0 0 3px 0',
+}
+
+const simulateAddButtonStyle: JSX.CSSProperties = {
+  ...addButtonStyle,
+  'background-color': '#9b59b6',
+}
+
+const dialogOverlayStyle: JSX.CSSProperties = {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  'background-color': 'rgba(0, 0, 0, 0.5)',
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'center',
+  'z-index': 1000,
+  padding: '16px',
+}
+
+const dialogStyle: JSX.CSSProperties = {
+  'background-color': '#fff',
+  'border-radius': '12px',
+  padding: '24px',
+  width: '100%',
+  'max-width': '560px',
+  'max-height': '90vh',
+  'overflow-y': 'auto',
+  'box-shadow': '0 4px 20px rgba(0, 0, 0, 0.15)',
+}
+
+const dialogTitleStyle: JSX.CSSProperties = {
+  'font-size': '1.4rem',
+  'font-weight': 700,
+  'margin-top': 0,
+  'margin-bottom': '16px',
+  color: '#333',
+  'text-align': 'left',
+}
+
+const tournamentGroupsContainerStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '12px',
+  'margin-bottom': '16px',
+}
+
+const tournamentGroupStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '6px',
+}
+
+const tournamentGroupHeaderStyle: JSX.CSSProperties = {
+  'font-size': '13px',
+  'font-weight': 700,
+  color: '#666',
+  'text-transform': 'uppercase',
+  'letter-spacing': '0.5px',
+}
+
+const tournamentButtonsStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-wrap': 'wrap',
+  gap: '6px',
+}
+
+const tournamentButtonStyle: JSX.CSSProperties = {
+  padding: '6px 12px',
+  'font-size': '13px',
+  'font-weight': 600,
+  border: '1px solid #ddd',
+  'border-radius': '6px',
+  'background-color': '#fff',
+  color: '#333',
+  cursor: 'pointer',
+}
+
+const tournamentButtonSelectedStyle: JSX.CSSProperties = {
+  ...tournamentButtonStyle,
+  'background-color': '#27ae60',
+  'border-color': '#27ae60',
+  color: '#fff',
+}
+
+const dialogErrorStyle: JSX.CSSProperties = {
+  color: '#e74c3c',
+  'font-size': '14px',
+  'margin-top': '8px',
+  'text-align': 'left',
+}
+
+const dialogButtonContainerStyle: JSX.CSSProperties = {
+  display: 'flex',
+  gap: '12px',
+  'margin-top': '20px',
+  'justify-content': 'flex-end',
 }
 
 export default EventList

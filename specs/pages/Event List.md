@@ -11,6 +11,19 @@ Vertical
     - "Today's Events" toggle button (green bg/white text when on, white bg/black text when off), when checked, show today's events only
     - if logged in (player only), show "My Events" toggle button
     - for admin, "+" button (new event), green bg
+    - if admin and simulation, "+" button (purple bg), on click show a dialog with:
+      - all available event series, dropdown, select the most recent one by default
+      - show all available tournaments, grouped by open singles, rated singles, aged singles and teams, each group with group header, each tournament is a button
+      - max participants: dropdown, unlimited, 4 to 128, default 16
+      - Save and Cancel button
+      - on save
+        - create an event:
+          - name: "{tournament name} - test"
+          - date: today
+          - time: now + 1 min
+          - fee: 30
+        - auto register randomly selected qualified players (age ignored)
+
 - the list of events
   - name on top
   - Event Series (if available), 2nd row

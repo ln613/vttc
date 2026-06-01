@@ -168,6 +168,90 @@ const validateSaveEventInput = (body) => {
   if (!body.date) throwError('Event date is required')
 }
 
+/**
+ * Simulate an event: create the event, then auto-register randomly selected
+ * qualified players (sex + rating; age ignored) and mark them all paid.
+ */
+export const simulateEvent = async (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body.tournamentId) throwError('Tournament ID is required')
+  if (!body.date) throwError('Event date is required')
+  if (!body.name) throwError('Event name is required')
+
+  const db = getDB()
+  const tournament = await db
+    .collection(TOURNAMENTS_COLLECTION)
+    .findOne({ _id: toObjectId(body.tournamentId) })
+  if (!tournament) throwError('Tournament not found')
+
+  const created = await saveEvent({
+    tournamentId: body.tournamentId,
+    eventSeries: body.eventSeries,
+    date: body.date,
+    time: body.time || '',
+    maxParticipants: body.maxParticipants ?? 0,
+    name: body.name,
+    registrationFee: body.registrationFee,
+  })
+
+  const allPlayers = await db.collection('players').find({}).toArray()
+  const qualified = allPlayers.filter((p) =>
+    meetsSimulationQualification(tournament, p),
+  )
+  const shuffled = shuffleArray(qualified)
+
+  const nop = tournament.nop
+  const maxParticipants = body.maxParticipants ?? 0
+  const teamCap =
+    maxParticipants > 0 ? maxParticipants : Math.floor(shuffled.length / nop)
+  const playerCount = Math.min(teamCap * nop, shuffled.length)
+  const usable = Math.floor(playerCount / nop) * nop
+  const picked = shuffled.slice(0, usable)
+
+  const participants = []
+  const paidPlayerIds = []
+  for (let i = 0; i < picked.length; i += nop) {
+    const players = picked.slice(i, i + nop)
+    participants.push({
+      _id: generateId(),
+      players,
+      rating: calculateParticipantRating(players, nop),
+    })
+    for (const p of players) paidPlayerIds.push(p._id.toString())
+  }
+
+  await db
+    .collection(EVENTS_COLLECTION)
+    .updateOne(
+      { _id: toObjectId(created._id) },
+      { $set: { participants, paidPlayerIds } },
+    )
+
+  return { ...created, participants, paidPlayerIds }
+}
+
+const meetsSimulationQualification = (tournament, player) => {
+  const required = tournament.sex
+  if (required && required !== 'All' && required !== 'Mixed') {
+    const s = (player.sex || '').trim().toLowerCase()
+    if (required === 'Man' && s !== 'm' && s !== 'male') return false
+    if (required === 'Woman' && s !== 'f' && s !== 'female') return false
+  }
+  if (tournament.restriction === 'Rated' && tournament.ratingLimit) {
+    if ((player.rating ?? 0) > tournament.ratingLimit) return false
+  }
+  return true
+}
+
+const shuffleArray = (arr) => {
+  const copy = [...arr]
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[copy[i], copy[j]] = [copy[j], copy[i]]
+  }
+  return copy
+}
+
 const getQualifiersCount = (qualifiers) => {
   switch (qualifiers) {
     case 'Top 1':

@@ -1,5 +1,9 @@
 import { createStore } from 'solid-js/store'
-import type { StagesType, TournamentType } from '../../shared/types'
+import type {
+  StagesType,
+  TournamentType,
+  TournamentRestriction,
+} from '../../shared/types'
 import { apiGet } from '../utils/api'
 
 export interface Tournament {
@@ -8,6 +12,8 @@ export interface Tournament {
   type: TournamentType
   stages: ('group' | 'knockout')[]
   stagesType: StagesType
+  restriction?: TournamentRestriction
+  ratingLimit?: number
 }
 
 interface TournamentState {

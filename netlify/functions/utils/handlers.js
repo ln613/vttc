@@ -6,6 +6,7 @@ import {
 } from './tournamentHandlers.js'
 import {
   saveEvent,
+  simulateEvent,
   getEvents,
   getEvent,
   getEventSeries,
@@ -59,6 +60,7 @@ export const apiHandlers = {
   post: {
     saveTournament: (body) => saveTournament(body),
     saveEvent: withEventNotify(saveEvent),
+    simulateEvent: withEventNotify(simulateEvent),
     addParticipant: withEventNotify(addParticipant),
     deleteParticipant: withEventNotify(deleteParticipant),
     deletePlayerFromTeam: withEventNotify(deletePlayerFromTeam),
