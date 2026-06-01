@@ -41,6 +41,9 @@ The Total column is the total matches played so far.
 - match schedule table (collapsible), where each match row:
   - names and result, like "Eric Huang 2 : 1 Nan Li", the winning participant and number (Eric Huang and 2 in this case) are bold. when no result, show 0 : 0, no bold. The row should be center aligned with ":" right in the middle.
   - results of each game: "11 : 6, 10 : 12, ...", left side represents the left participant (Eric in this case), the winning numbers are bold.
+  - match not started, no table assigned, but in queue
+    - light green bg
+    - big "Q" (left aligned)
   - match not started, but table assigned
     - light red bg
     - big table number (left aligned)
@@ -58,6 +61,7 @@ The Total column is the total matches played so far.
       - if already started but not finished
       - same visibility as Start button
   - match finished
+    - light yellow bg
     - Confirm button
       - if finished but not confirmed
       - red bg

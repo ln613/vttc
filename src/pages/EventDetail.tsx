@@ -491,6 +491,7 @@ const MatchRow = (props: MatchRowProps) => {
     eventDetailActions.canResetMatch(props.match._id, props.stage, props.groupIndex)
   const assignedTable = () =>
     liveScoreActions.getTableForMatch(props.match._id)
+  const inQueue = () => liveScoreActions.isMatchInQueue(props.match._id)
   const phase = (): 'not_started' | 'in_progress' | 'finished' => {
     if (hasResult()) return 'finished'
     if (hasStarted()) return 'in_progress'
@@ -525,9 +526,18 @@ const MatchRow = (props: MatchRowProps) => {
   }
 
   return (
-    <div style={getMatchRowStyle(phase(), assignedTable() !== undefined)}>
+    <div
+      style={getMatchRowStyle(
+        phase(),
+        assignedTable() !== undefined,
+        inQueue(),
+      )}
+    >
       <Show when={assignedTable() !== undefined}>
         <div style={matchRowTableNumberStyle}>{assignedTable()}</div>
+      </Show>
+      <Show when={assignedTable() === undefined && inQueue() && phase() === 'not_started'}>
+        <div style={matchRowTableNumberStyle}>Q</div>
       </Show>
       <div style={matchContentContainerStyle}>
         <MatchResultDisplay
@@ -539,12 +549,25 @@ const MatchRow = (props: MatchRowProps) => {
         />
         <GameScoresDisplay games={props.match.games} />
       </div>
-      <Show when={!hasStarted() && canStartOrContinue()}>
+      <Show
+        when={
+          !hasStarted() &&
+          assignedTable() !== undefined &&
+          canStartOrContinue()
+        }
+      >
         <Button onClick={handleStartClick} color="#27ae60" size="small">
           Start
         </Button>
       </Show>
-      <Show when={hasStarted() && !hasResult() && canStartOrContinue()}>
+      <Show
+        when={
+          hasStarted() &&
+          !hasResult() &&
+          assignedTable() !== undefined &&
+          canStartOrContinue()
+        }
+      >
         <Button onClick={handleStartClick} color="#e67e22" size="small">
           Continue
         </Button>
@@ -1417,6 +1440,7 @@ const matchScheduleContentStyle: JSX.CSSProperties = {
 const getMatchRowStyle = (
   phase: 'not_started' | 'in_progress' | 'finished',
   hasTable: boolean,
+  inQueue: boolean,
 ): JSX.CSSProperties => ({
   position: 'relative',
   display: 'flex',
@@ -1425,11 +1449,15 @@ const getMatchRowStyle = (
   gap: '10px',
   padding: '14px 16px',
   'background-color':
-    hasTable && phase === 'not_started'
-      ? '#fdecea'
+    phase === 'finished'
+      ? '#fff9c4'
       : phase === 'in_progress'
         ? '#e3f2fd'
-        : '#fff',
+        : hasTable
+          ? '#fdecea'
+          : inQueue
+            ? '#e8f5e9'
+            : '#fff',
   'border-radius': '10px',
   'box-shadow': '0 1px 4px rgba(0, 0, 0, 0.08)',
 })

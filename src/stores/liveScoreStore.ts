@@ -130,6 +130,11 @@ export const liveScoreActions = {
     await apiPost('cancelMatch', { _id: eventId, matchId })
   },
 
+  isMatchInQueue: (matchId: string): boolean =>
+    liveScoreState.matchQueue.some(
+      (item) => item.matchId?.toString() === matchId.toString(),
+    ),
+
   getTableForMatch: (matchId: string): number | undefined => {
     for (const table of liveScoreState.tables) {
       if (table.status !== 'assigned' || !table.match) continue
