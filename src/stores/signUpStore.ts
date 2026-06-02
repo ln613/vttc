@@ -28,6 +28,8 @@ interface SignUpState {
   selectedMatchedPlayerId: string
   showNewPlayerSuccess: boolean
   fieldErrors: FieldErrors
+  adminRegisterMode: boolean
+  adminRegisterSent: boolean
 }
 
 interface FieldErrors {
@@ -62,6 +64,8 @@ const getInitialState = (): SignUpState => ({
   selectedMatchedPlayerId: '',
   showNewPlayerSuccess: false,
   fieldErrors: {},
+  adminRegisterMode: false,
+  adminRegisterSent: false,
 })
 
 const [signUpState, setSignUpState] = createStore<SignUpState>(getInitialState())
@@ -212,6 +216,37 @@ const setExistingPlayer = (value: boolean) => {
   })
   if (value && !playerState.data) {
     playerActions.fetchPlayers()
+  }
+}
+
+const openAdminRegister = (player: Player) => {
+  reset()
+  setSignUpState({
+    existingPlayer: true,
+    selectedPlayerId: player._id.toString(),
+    firstName: player.firstName,
+    lastName: player.lastName,
+    email: player.email ?? '',
+    adminRegisterMode: true,
+    adminRegisterSent: false,
+  })
+}
+
+const runAdminRegister = async () => {
+  if (!signUpState.selectedPlayerId) return
+  setSignUpState({ loading: true, error: null })
+  try {
+    await apiPost('registerPlayerByAdmin', {
+      playerId: signUpState.selectedPlayerId,
+    })
+    setSignUpState({ loading: false, adminRegisterSent: true })
+    if (playerState.data) await playerActions.fetchPlayers()
+  } catch (err) {
+    setSignUpState({
+      loading: false,
+      error:
+        err instanceof Error ? err.message : 'Failed to register player',
+    })
   }
 }
 
@@ -480,6 +515,8 @@ const reset = () => {
 
 export const signUpActions = {
   setExistingPlayer,
+  openAdminRegister,
+  runAdminRegister,
   selectPlayer,
   setFirstName,
   setLastName,

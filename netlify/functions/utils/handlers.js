@@ -35,6 +35,7 @@ import {
   sendVerificationCode,
   verifyCode,
   signUp,
+  registerPlayerByAdmin,
 } from './accountHandlers.js'
 import {
   getLiveScore,
@@ -94,6 +95,7 @@ export const apiHandlers = {
     verifyCode: (body) => verifyCode(body),
     updateProfile: (body) => updateProfile(body),
     changePassword: (body) => changePassword(body),
+    registerPlayerByAdmin: (body) => registerPlayerByAdmin(body),
     rebuildMatchQueue: async () => {
       const result = await rebuildMatchQueue()
       await notifyLiveScoreUpdate()

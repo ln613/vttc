@@ -70,3 +70,4 @@
   - ask user to select one from the list or to create a new player
   - "Confirm" and "New Player" buttons (Confirm enabled when an existing player selected, if only 1 existing player, then pre-select it)
 - after a new player is saved, show the msg: "Contact VTTC to get an initial rating before you can register for rating-restricted events."
+- after sign in, if the player account is pending, show a msg telling the player to change their password after initial sign in, and take them to the account page upon confirm

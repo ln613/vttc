@@ -10,6 +10,7 @@ interface AuthUser {
   sex?: string
   dateOfBirth?: string
   rating?: number
+  pending?: boolean
 }
 
 interface SignInResponse {
@@ -29,6 +30,7 @@ interface AuthState {
   loading: boolean
   error: string | null
   dialogView: DialogView
+  showPendingModal: boolean
 }
 
 const getInitialState = (): AuthState => ({
@@ -39,6 +41,7 @@ const getInitialState = (): AuthState => ({
   loading: false,
   error: null,
   dialogView: null,
+  showPendingModal: false,
 })
 
 const loadUserFromStorage = (): AuthUser | null => {
@@ -110,6 +113,10 @@ export const authActions = {
     setAuthState({ dialogView: null, error: null })
   },
 
+  dismissPendingModal: () => {
+    setAuthState({ showPendingModal: false })
+  },
+
   signIn: async (emailOrPhone: string, password: string) => {
     validateSignInInput(emailOrPhone, password)
 
@@ -133,6 +140,7 @@ export const authActions = {
         loading: false,
         error: null,
         dialogView: null,
+        showPendingModal: !!result.player?.pending,
       })
     } catch (err) {
       setAuthState({

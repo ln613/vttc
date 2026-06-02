@@ -17,8 +17,35 @@ export const Header = () => (
     />
     <TopBar />
     <AuthDialog />
+    <PendingPasswordModal />
   </header>
 )
+
+const PendingPasswordModal = () => {
+  const navigate = useNavigate()
+  const handleConfirm = () => {
+    authActions.dismissPendingModal()
+    navigate('/account')
+  }
+  return (
+    <Show when={authState.showPendingModal}>
+      <div style={overlayStyle}>
+        <div style={dialogStyle}>
+          <h3 style={dialogTitleStyle}>Change your password</h3>
+          <div style={infoMsgStyle}>
+            This account was created on your behalf. Please change your
+            password on the Account page.
+          </div>
+          <div style={buttonContainerStyle}>
+            <Button color="#27ae60" onClick={handleConfirm}>
+              Confirm
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Show>
+  )
+}
 
 const TopBar = () => {
   const navigate = useNavigate()
@@ -195,8 +222,13 @@ const SignUpDialogContent = () => {
 
   return (
     <>
-      <h1 style={dialogTitleStyle}>Sign up</h1>
+      <h1 style={dialogTitleStyle}>
+        {signUpState.adminRegisterMode ? 'Register Player' : 'Sign up'}
+      </h1>
       <Switch>
+        <Match when={signUpState.adminRegisterMode}>
+          <AdminRegisterSection />
+        </Match>
         <Match when={signUpState.showNewPlayerSuccess}>
           <NewPlayerSuccessSection />
         </Match>
@@ -240,6 +272,49 @@ const SignUpDialogContent = () => {
     </>
   )
 }
+
+const AdminRegisterSection = () => (
+  <Show
+    when={!signUpState.adminRegisterSent}
+    fallback={
+      <>
+        <div style={infoMsgStyle}>
+          Sign up email sent to {signUpState.email}.
+        </div>
+        <div style={buttonContainerStyle}>
+          <Button onClick={authActions.hideDialog} color="#27ae60">
+            OK
+          </Button>
+        </div>
+      </>
+    }
+  >
+    <div style={infoMsgStyle}>
+      Send a sign up email to <strong>{signUpState.firstName} {signUpState.lastName}</strong> ({signUpState.email}).
+      A temporary password will be auto-generated; they'll be asked to change
+      it on first sign in.
+    </div>
+    <Show when={signUpState.error}>
+      <div style={errorStyle}>{signUpState.error}</div>
+    </Show>
+    <div style={buttonContainerStyle}>
+      <Button
+        onClick={authActions.hideDialog}
+        color="#e74c3c"
+        disabled={signUpState.loading}
+      >
+        Cancel
+      </Button>
+      <Button
+        onClick={signUpActions.runAdminRegister}
+        color="#27ae60"
+        disabled={signUpState.loading}
+      >
+        {signUpState.loading ? 'Sending...' : 'Sign up'}
+      </Button>
+    </div>
+  </Show>
+)
 
 const NewPlayerSuccessSection = () => (
   <>

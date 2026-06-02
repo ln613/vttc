@@ -19,6 +19,15 @@ Vertical
   - payment icon
     - if the player has unpaid events
     - show the payment confirm dialog
+  - register icon
+    - if the player has email but not registered yet
+    - on click
+      - open the sign up dialog with this player selected
+      - no need to verify email
+      - auto-generate a password
+      - when click sign up
+        - send the password to the email, ask the player to log in
+        - mark the player account as pending 
 - sort by rating desc
 
 ## Payment Confirm Dialog

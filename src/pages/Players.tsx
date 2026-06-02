@@ -4,7 +4,8 @@ import { Header } from '../components/Header'
 import Button from '../components/Button'
 import type { Player } from '../../shared/types/Player'
 import { playerState, playerActions, getPerPlayerFee } from '../stores/playerStore'
-import { authState } from '../stores/authStore'
+import { authState, authActions } from '../stores/authStore'
+import { signUpActions } from '../stores/signUpStore'
 
 const Players = () => {
   onMount(() => {
@@ -108,7 +109,7 @@ const AdminPlayerTable = () => (
           <th style={adminThStyle}>Rating</th>
           <th style={adminThStyle}>Email</th>
           <th style={adminThStyle}>Phone</th>
-          <th style={adminThStyle}>Payment</th>
+          <th style={adminThStyle}>Action</th>
         </tr>
       </thead>
       <tbody>
@@ -122,11 +123,18 @@ const AdminPlayerTable = () => (
               <td style={adminTdStyle}>{player.email || ''}</td>
               <td style={adminTdStyle}>{player.phone || ''}</td>
               <td style={adminTdStyle}>
-                <Show when={playerActions.hasUnpaidEvents(player._id)}>
-                  <PaymentIcon
-                    onClick={() => playerActions.openPaymentDialog(player)}
-                  />
-                </Show>
+                <div style={actionCellStyle}>
+                  <Show when={playerActions.hasUnpaidEvents(player._id)}>
+                    <PaymentIcon
+                      onClick={() => playerActions.openPaymentDialog(player)}
+                    />
+                  </Show>
+                  <Show when={needsRegistration(player)}>
+                    <RegisterIcon
+                      onClick={() => handleRegisterClick(player)}
+                    />
+                  </Show>
+                </div>
               </td>
             </tr>
           )}
@@ -134,6 +142,32 @@ const AdminPlayerTable = () => (
       </tbody>
     </table>
   </div>
+)
+
+const needsRegistration = (player: Player): boolean =>
+  !!player.email && !player.hasAccount
+
+const handleRegisterClick = (player: Player) => {
+  signUpActions.openAdminRegister(player)
+  authActions.showSignUpDialog()
+}
+
+const RegisterIcon = (props: { onClick: () => void }) => (
+  <svg
+    style={registerIconStyle}
+    onClick={props.onClick}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="8.5" cy="7" r="4" />
+    <line x1="20" y1="8" x2="20" y2="14" />
+    <line x1="23" y1="11" x2="17" y2="11" />
+  </svg>
 )
 
 const PaymentIcon = (props: { onClick: () => void }) => (
@@ -323,6 +357,19 @@ const paymentIconStyle: JSX.CSSProperties = {
   width: '20px',
   height: '20px',
   color: '#e74c3c',
+}
+
+const registerIconStyle: JSX.CSSProperties = {
+  cursor: 'pointer',
+  width: '20px',
+  height: '20px',
+  color: '#27ae60',
+}
+
+const actionCellStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  gap: '12px',
 }
 
 const dialogOverlayStyle: JSX.CSSProperties = {

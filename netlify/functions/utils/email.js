@@ -58,6 +58,32 @@ export const sendVerificationEmail = async (to, code) => {
 }
 
 /**
+ * Send a new-account password email when an admin registers a player.
+ */
+export const sendPendingPasswordEmail = async (to, password) => {
+  if (!to) throw new Error('Recipient email is required')
+  if (!password) throw new Error('Password is required')
+
+  const subject = 'VTTC - Your account is ready'
+  const html = buildPendingPasswordEmailHtml(password)
+
+  await sendEmail({ to, subject, html })
+}
+
+const buildPendingPasswordEmailHtml = (password) => `
+  <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+    <h2 style="color: #2185d0; text-align: center;">Vancouver Table Tennis Club</h2>
+    <p style="font-size: 16px; color: #333;">An account has been created for you at VTTC. Please sign in with the password below and change it on your first sign in.</p>
+    <div style="text-align: center; margin: 24px 0;">
+      <span style="font-size: 24px; font-weight: bold; letter-spacing: 2px; color: #2c3e50; background: #f0f4f8; padding: 12px 24px; border-radius: 8px;">
+        ${password}
+      </span>
+    </div>
+    <p style="font-size: 14px; color: #666;">If you did not expect this email, please ignore it.</p>
+  </div>
+`
+
+/**
  * Build the HTML body for verification code email
  */
 const buildVerificationEmailHtml = (code) => `

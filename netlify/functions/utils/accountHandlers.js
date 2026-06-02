@@ -1,7 +1,7 @@
 import { getDB, save, toObjectId } from './db.js'
 import crypto from 'crypto'
 import argon2 from 'argon2'
-import { sendVerificationEmail } from './email.js'
+import { sendVerificationEmail, sendPendingPasswordEmail } from './email.js'
 
 // In-memory store for verification codes (per email)
 const verificationCodes = new Map()
@@ -190,6 +190,7 @@ const authenticatePlayer = async (emailOrPhone, password) => {
       sex: player.sex,
       dateOfBirth: player.dateOfBirth,
       rating: player.rating,
+      pending: !!player.pending,
     },
   }
 }
@@ -312,10 +313,61 @@ export const changePassword = async (body) => {
   const hashedPassword = await hashPassword(newPassword)
   await collection.updateOne(
     { _id: toObjectId(_id) },
-    { $set: { password: hashedPassword } },
+    { $set: { password: hashedPassword, pending: false } },
   )
 
   return { success: true }
+}
+
+/**
+ * Register a player on their behalf (admin action). Generates a random
+ * password that meets the validation rules, marks the account as pending,
+ * and emails the password to the player so they can sign in and change it.
+ */
+export const registerPlayerByAdmin = async (body) => {
+  if (!body?.playerId) throwError('Player ID is required')
+
+  const db = getDB()
+  const collection = db.collection(PLAYERS_COLLECTION)
+  const player = await collection.findOne({ _id: toObjectId(body.playerId) })
+  if (!player) throwError('Player not found')
+  if (player.password) {
+    throwError('This player already has an account')
+  }
+  if (!player.email) {
+    throwError('Player does not have an email on file')
+  }
+
+  const password = generateRandomPassword()
+  const hashedPassword = await hashPassword(password)
+
+  await collection.updateOne(
+    { _id: toObjectId(body.playerId) },
+    { $set: { password: hashedPassword, pending: true } },
+  )
+
+  await sendPendingPasswordEmail(player.email, password)
+  return { success: true }
+}
+
+/**
+ * Generate a random password that satisfies isValidPasswordFormat:
+ * 8+ chars, at least one digit, one lowercase, one uppercase.
+ */
+const generateRandomPassword = () => {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
+  const lower = 'abcdefghijkmnpqrstuvwxyz'
+  const digits = '23456789'
+  const pick = (s) => s[crypto.randomInt(s.length)]
+  const required = [pick(upper), pick(lower), pick(digits)]
+  const all = upper + lower + digits
+  for (let i = 0; i < 9; i++) required.push(pick(all))
+  // Shuffle so the required chars are not in fixed positions
+  for (let i = required.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(i + 1)
+    ;[required[i], required[j]] = [required[j], required[i]]
+  }
+  return required.join('')
 }
 
 /**
