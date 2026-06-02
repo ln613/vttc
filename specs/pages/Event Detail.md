@@ -38,6 +38,10 @@ The player column title is "Players" for double event and "Team" for team event,
 
 The Total column is the total matches played so far.
 
+"Player in match" definition: 
+- any player in the match
+- if group stage, any player in the group
+
 - match schedule table (collapsible), where each match row:
   - names and result, like "Eric Huang 2 : 1 Nan Li", the winning participant and number (Eric Huang and 2 in this case) are bold. when no result, show 0 : 0, no bold. The row should be center aligned with ":" right in the middle.
   - results of each game: "11 : 6, 10 : 12, ...", left side represents the left participant (Eric in this case), the winning numbers are bold.
@@ -49,23 +53,20 @@ The Total column is the total matches played so far.
     - big table number (left aligned)
     - Start button
       - green bg
-      - visible to
-        - admin
-        - any player in the match
-        - if group stage, any player in the group
+      - visible to admin and Player in match
   - match in progress
     - light blue bg
     - big table number (left aligned)
     - Continue button
       - orange bg
       - if already started but not finished
-      - same visibility as Start button
+      - visible to admin and Player in match
   - match finished
     - light yellow bg
     - Confirm button
       - if finished but not confirmed
       - red bg
-      - admin only
+      - visible to admin and Player in match
     - Reset button
       - if finished and confirmed
       - red bg
@@ -81,6 +82,10 @@ The Total column is the total matches played so far.
 
 - on Generate Groups click: call generate groups API
 - on Start button click: go to Game Play page with the selected event, stage and match, start with Game 1
+- only 1 game play page per match can be opened at the same time
+  - for player, if game play page for that match already opened somewhere, then Start or Continue button disabled
+  - if the opened game play page has no activity for over 5 mins, mark it as closed
+  - for admin, if click Start or Continue, the currently opened game play page will show msg that admin took over and close (go back, disable the whole game play page as well in case go back doesn't work)
 - on Reset Event button click: delete all schedules, matches and groups, keep the participants. confirm before reset
 - the detail page should use websocket to receive update, such as grouping/schedule generated, score changed, and update the page
 

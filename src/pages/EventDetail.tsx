@@ -492,6 +492,10 @@ const MatchRow = (props: MatchRowProps) => {
   const assignedTable = () =>
     liveScoreActions.getTableForMatch(props.match._id)
   const inQueue = () => liveScoreActions.isMatchInQueue(props.match._id)
+  const sessionActive = () =>
+    liveScoreActions.isMatchSessionActive(props.match._id)
+  const startContinueDisabled = () =>
+    !authState.isAdmin && sessionActive()
   const phase = (): 'not_started' | 'in_progress' | 'finished' => {
     if (hasResult()) return 'finished'
     if (hasStarted()) return 'in_progress'
@@ -556,7 +560,12 @@ const MatchRow = (props: MatchRowProps) => {
           canStartOrContinue()
         }
       >
-        <Button onClick={handleStartClick} color="#27ae60" size="small">
+        <Button
+          onClick={handleStartClick}
+          color="#27ae60"
+          size="small"
+          disabled={startContinueDisabled()}
+        >
           Start
         </Button>
       </Show>
@@ -568,11 +577,16 @@ const MatchRow = (props: MatchRowProps) => {
           canStartOrContinue()
         }
       >
-        <Button onClick={handleStartClick} color="#e67e22" size="small">
+        <Button
+          onClick={handleStartClick}
+          color="#e67e22"
+          size="small"
+          disabled={startContinueDisabled()}
+        >
           Continue
         </Button>
       </Show>
-      <Show when={hasResult() && !isConfirmed() && authState.isAdmin}>
+      <Show when={hasResult() && !isConfirmed() && canStartOrContinue()}>
         <Button
           onClick={handleConfirmClick}
           color="#e74c3c"

@@ -4,6 +4,11 @@ import type { Match, GameConfig, HandicapParams } from '../../shared/types/Match
 import { DEFAULT_GAME_CONFIG } from '../../shared/types/Match'
 import type { Player } from '../../shared/types/Player'
 import { apiGet, apiPost } from '../utils/api'
+import { authState } from './authStore'
+import {
+  subscribeToLiveScoreUpdates,
+  type EventSubscription,
+} from '../utils/pusher'
 import {
   validateGameScore,
   determineGameWinner,
@@ -44,6 +49,9 @@ interface GamePlayState {
   showFinishDialog: boolean
   gameHistory: GameResult[]
   lastScoredSide: 1 | 2 | null
+  sessionId: string | null
+  sessionTakenOver: boolean
+  sessionError: string | null
 }
 
 const getInitialState = (): GamePlayState => ({
@@ -72,6 +80,9 @@ const getInitialState = (): GamePlayState => ({
   showFinishDialog: false,
   gameHistory: [],
   lastScoredSide: null,
+  sessionId: null,
+  sessionTakenOver: false,
+  sessionError: null,
 })
 
 const [gamePlayState, setGamePlayState] =
@@ -79,7 +90,101 @@ const [gamePlayState, setGamePlayState] =
 
 // Debounce timer reference
 let saveDebounceTimer: ReturnType<typeof setTimeout> | null = null
-const SAVE_DEBOUNCE_MS = 3000
+const SAVE_DEBOUNCE_MS = 1000
+
+// Session heartbeat (1 minute; backend treats sessions idle > 5 min as closed)
+const HEARTBEAT_INTERVAL_MS = 60_000
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null
+let liveScoreSubscription: EventSubscription | null = null
+
+const generateSessionId = (): string => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID()
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+const stopHeartbeat = () => {
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer)
+    heartbeatTimer = null
+  }
+}
+
+const checkSessionOnce = async () => {
+  const matchId = gamePlayState.matchId
+  const sessionId = gamePlayState.sessionId
+  if (!matchId || !sessionId) return
+  try {
+    const result = await apiPost<{ takenOver: boolean }>(
+      'heartbeatMatchSession',
+      { matchId, sessionId },
+    )
+    if (result.takenOver) {
+      setGamePlayState({ sessionTakenOver: true })
+      stopHeartbeat()
+      unsubscribeLiveScore()
+    }
+  } catch {
+    // Network errors are non-fatal; next heartbeat will retry.
+  }
+}
+
+const startHeartbeat = () => {
+  stopHeartbeat()
+  heartbeatTimer = setInterval(checkSessionOnce, HEARTBEAT_INTERVAL_MS)
+}
+
+const unsubscribeLiveScore = () => {
+  if (liveScoreSubscription) {
+    liveScoreSubscription.unsubscribe()
+    liveScoreSubscription = null
+  }
+}
+
+const subscribeLiveScore = () => {
+  unsubscribeLiveScore()
+  liveScoreSubscription = subscribeToLiveScoreUpdates(() => {
+    void checkSessionOnce()
+  })
+}
+
+const acquireSession = async (matchId: string) => {
+  const userId = authState.user?._id
+  if (!userId) {
+    setGamePlayState({ sessionError: 'You must be signed in to play.' })
+    return false
+  }
+  const sessionId = generateSessionId()
+  try {
+    await apiPost('acquireMatchSession', {
+      matchId,
+      userId,
+      sessionId,
+      asAdmin: authState.isAdmin,
+    })
+    setGamePlayState({ sessionId, sessionTakenOver: false, sessionError: null })
+    startHeartbeat()
+    subscribeLiveScore()
+    return true
+  } catch (err) {
+    setGamePlayState({
+      sessionError:
+        err instanceof Error ? err.message : 'Failed to acquire match session',
+    })
+    return false
+  }
+}
+
+const releaseSession = () => {
+  stopHeartbeat()
+  unsubscribeLiveScore()
+  const { matchId, sessionId } = gamePlayState
+  if (!matchId || !sessionId) return
+  // Fire-and-forget; never block teardown on the release call.
+  apiPost('releaseMatchSession', { matchId, sessionId }).catch(() => {})
+  setGamePlayState({ sessionId: null })
+}
 
 // Track in-flight save promise so other stores can wait for it
 let pendingSavePromise: Promise<void> | null = null
@@ -311,10 +416,16 @@ export const gamePlayActions = {
       saveError: null,
       menuOpen: false,
       matchSubmitted: false,
+      sessionId: null,
+      sessionTakenOver: false,
+      sessionError: null,
     })
 
+    if (matchId) await acquireSession(matchId)
     await fetchEvent(eventId!)
   },
+
+  releaseSession,
 
   setInitialServingSide: (side: 1 | 2) => {
     setGamePlayState({
@@ -708,6 +819,7 @@ export const gamePlayActions = {
 
   reset: () => {
     flushPendingSave()
+    releaseSession()
     setGamePlayState(getInitialState())
   },
 }

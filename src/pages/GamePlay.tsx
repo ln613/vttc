@@ -32,20 +32,97 @@ const GamePlay = () => {
     navigate(-1)
   }
 
+  const sessionBlocked = () =>
+    gamePlayState.sessionTakenOver || !!gamePlayState.sessionError
+
   return (
     <div ref={containerRef} style={containerStyle}>
-      <div style={contentStyle}>
+      <div style={{ ...contentStyle, ...(sessionBlocked() ? blockedStyle : {}) }}>
         <Header onExit={handleExit} />
         <ScoreBoxes />
       </div>
-      <Show when={gamePlayState.showInitDialog && !gamePlayState.loading}>
+      <Show when={gamePlayState.showInitDialog && !gamePlayState.loading && !sessionBlocked()}>
         <InitDialog />
       </Show>
-      <Show when={gamePlayState.showFinishDialog}>
+      <Show when={gamePlayState.showFinishDialog && !sessionBlocked()}>
         <FinishConfirmDialog />
+      </Show>
+      <Show when={sessionBlocked()}>
+        <SessionBlockedOverlay onExit={() => navigate(-1)} />
       </Show>
     </div>
   )
+}
+
+const SessionBlockedOverlay = (props: { onExit: () => void }) => {
+  const message = () =>
+    gamePlayState.sessionTakenOver
+      ? 'An admin has taken over this match.'
+      : gamePlayState.sessionError ?? 'This match is unavailable.'
+  return (
+    <div style={overlayStyle}>
+      <div style={overlayCardStyle}>
+        <div style={overlayTitleStyle}>Session Closed</div>
+        <div style={overlayMessageStyle}>{message()}</div>
+        <button style={overlayButtonStyle} onClick={props.onExit}>
+          Go Back
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const blockedStyle: JSX.CSSProperties = {
+  'pointer-events': 'none',
+  opacity: 0.4,
+}
+
+const overlayStyle: JSX.CSSProperties = {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  'background-color': 'rgba(0, 0, 0, 0.6)',
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'center',
+  'z-index': 2000,
+  padding: '16px',
+}
+
+const overlayCardStyle: JSX.CSSProperties = {
+  'background-color': '#fff',
+  'border-radius': '12px',
+  padding: '24px',
+  width: '100%',
+  'max-width': '360px',
+  'text-align': 'center',
+  'box-shadow': '0 8px 32px rgba(0, 0, 0, 0.25)',
+}
+
+const overlayTitleStyle: JSX.CSSProperties = {
+  'font-size': '20px',
+  'font-weight': 700,
+  color: '#e74c3c',
+  'margin-bottom': '8px',
+}
+
+const overlayMessageStyle: JSX.CSSProperties = {
+  'font-size': '15px',
+  color: '#333',
+  'margin-bottom': '20px',
+}
+
+const overlayButtonStyle: JSX.CSSProperties = {
+  padding: '10px 24px',
+  'font-size': '14px',
+  'font-weight': 600,
+  border: 'none',
+  'border-radius': '8px',
+  'background-color': '#e74c3c',
+  color: '#fff',
+  cursor: 'pointer',
 }
 
 const preventDoubleTapZoom = (element: HTMLElement) => {

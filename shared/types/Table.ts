@@ -93,4 +93,5 @@ export interface TableLiveScore {
 export interface LiveScoreData {
   tables: TableAssignment[]
   matchQueue: MatchQueueItem[]
+  activeSessionMatchIds?: string[]
 }

@@ -4,6 +4,7 @@ import {
   updateMatchInStages,
   createResetMatch,
 } from './eventHandlers.js'
+import { getActiveSessionMatchIds } from './matchSessionHandlers.js'
 
 const EVENTS_COLLECTION = 'events'
 const TABLE_STATE_COLLECTION = 'tableState'
@@ -46,16 +47,35 @@ const getClubMinutesOfDay = () => {
 const getStartedEvents = async () => {
   const db = getDB()
   const today = getClubDate()
+  const yesterday = shiftClubDate(today, -1)
   const events = await db
     .collection(EVENTS_COLLECTION)
-    .find({ date: today })
+    .find({ date: { $gte: yesterday, $lte: today } })
     .toArray()
 
-  return events.filter(hasEventStarted)
+  return events.filter((e) => {
+    if (!hasEventStarted(e)) return false
+    if (e.date === today) return true
+    // Past dates: keep only events that still have unfinished matches.
+    return extractRemainingMatches(e).length > 0
+  })
+}
+
+const shiftClubDate = (yyyyMmDd, days) => {
+  const [y, m, d] = yyyyMmDd.split('-').map(Number)
+  const dt = new Date(y, m - 1, d + days)
+  const yy = dt.getFullYear()
+  const mm = String(dt.getMonth() + 1).padStart(2, '0')
+  const dd = String(dt.getDate()).padStart(2, '0')
+  return `${yy}-${mm}-${dd}`
 }
 
 const hasEventStarted = (event) => {
-  if (!event.time) return true // no time means started
+  if (!event.date) return true
+  const today = getClubDate()
+  if (event.date < today) return true
+  if (event.date > today) return false
+  if (!event.time) return true
   const eventTime = parseEventTime(event.time)
   return getClubMinutesOfDay() >= eventTime
 }
@@ -543,7 +563,13 @@ export const getLiveScore = async () => {
   const result = assignTablesToMatches(tables, unassignedQueue, allMatchItems)
   await saveTableState(result.tables, result.remainingQueue)
 
-  return { tables: result.tables, matchQueue: result.remainingQueue }
+  const activeSessionMatchIds = await getActiveSessionMatchIds()
+
+  return {
+    tables: result.tables,
+    matchQueue: result.remainingQueue,
+    activeSessionMatchIds,
+  }
 }
 
 /**

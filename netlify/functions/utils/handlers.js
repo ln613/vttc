@@ -42,6 +42,11 @@ import {
   postponeMatch,
   cancelMatch,
 } from './liveScoreHandlers.js'
+import {
+  acquireMatchSession,
+  heartbeatMatchSession,
+  releaseMatchSession,
+} from './matchSessionHandlers.js'
 import { notifyEventUpdate, notifyLiveScoreUpdate } from './pusher.js'
 
 const withEventNotify = (fn) => async (body) => {
@@ -96,5 +101,16 @@ export const apiHandlers = {
     },
     postponeMatch: withEventNotify(postponeMatch),
     cancelMatch: withEventNotify(cancelMatch),
+    acquireMatchSession: async (body) => {
+      const result = await acquireMatchSession(body)
+      await notifyLiveScoreUpdate()
+      return result
+    },
+    heartbeatMatchSession: (body) => heartbeatMatchSession(body),
+    releaseMatchSession: async (body) => {
+      const result = await releaseMatchSession(body)
+      await notifyLiveScoreUpdate()
+      return result
+    },
   },
 }

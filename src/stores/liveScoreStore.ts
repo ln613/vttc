@@ -14,6 +14,7 @@ import {
 interface LiveScoreState {
   tables: TableAssignment[]
   matchQueue: MatchQueueItem[]
+  activeSessionMatchIds: string[]
   loading: boolean
   error: string | null
 }
@@ -21,6 +22,7 @@ interface LiveScoreState {
 const getInitialState = (): LiveScoreState => ({
   tables: [],
   matchQueue: [],
+  activeSessionMatchIds: [],
   loading: false,
   error: null,
 })
@@ -38,6 +40,7 @@ const fetchLiveScore = async () => {
     setLiveScoreState({
       tables: data.tables || [],
       matchQueue: data.matchQueue || [],
+      activeSessionMatchIds: data.activeSessionMatchIds || [],
       loading: false,
       error: null,
     })
@@ -133,6 +136,11 @@ export const liveScoreActions = {
   isMatchInQueue: (matchId: string): boolean =>
     liveScoreState.matchQueue.some(
       (item) => item.matchId?.toString() === matchId.toString(),
+    ),
+
+  isMatchSessionActive: (matchId: string): boolean =>
+    liveScoreState.activeSessionMatchIds.some(
+      (id) => id.toString() === matchId.toString(),
     ),
 
   getTableForMatch: (matchId: string): number | undefined => {
