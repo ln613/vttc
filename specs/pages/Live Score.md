@@ -43,6 +43,7 @@ Each table will show:
   - bg color
     - match not started: red bg, flashing yellow border
     - match in progress: blue (#2980b9) bg
+    - match finished but not confirmed: blue (#2980b9) bg, flashing yellow border
   - table number (yellow, big, top-center)
   - event name
   - stage ("Group {n}", "Semifinal"...)

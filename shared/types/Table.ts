@@ -21,7 +21,10 @@ export const TABLE_ORDER: TableNumber[] = [6, 7, 2, 3, 5, 4, 1, 8]
 /**
  * Match status on a table
  */
-export type TableMatchStatus = 'not_started' | 'in_progress'
+export type TableMatchStatus =
+  | 'not_started'
+  | 'in_progress'
+  | 'finished_unconfirmed'
 
 /**
  * A table with its current match assignment

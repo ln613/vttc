@@ -197,7 +197,7 @@ const isMatchPostponed = (match) => {
 }
 
 const getMatchStatus = (match) => {
-  if (match.winningSide != null) return 'not_started' // finished but not confirmed, treat as not started for table display
+  if (match.winningSide != null) return 'finished_unconfirmed'
   if (match.initialServingSide != null && match.leftSide != null) return 'in_progress' // match setup done = started
   if (match.games && match.games.length > 0) return 'in_progress'
   return 'not_started'

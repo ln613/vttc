@@ -288,6 +288,8 @@ interface AssignedTableProps {
 
 const AssignedTable = (props: AssignedTableProps) => {
   const isNotStarted = () => props.matchStatus === 'not_started'
+  const isFinishedUnconfirmed = () =>
+    props.matchStatus === 'finished_unconfirmed'
   const match = () => props.matchItem.match
   const side1Players = () => match()?.side1 || []
   const side2Players = () => match()?.side2 || []
@@ -318,7 +320,12 @@ const AssignedTable = (props: AssignedTableProps) => {
   }
 
   return (
-    <div style={getAssignedTableStyle(isNotStarted())}>
+    <div
+      style={getAssignedTableStyle(
+        isNotStarted(),
+        isFinishedUnconfirmed(),
+      )}
+    >
       <div style={tableNumberAssignedStyle}>{props.tableNumber}</div>
       <div style={eventNameTableStyle}>{props.matchItem.eventName}</div>
       <div style={stageNameTableStyle}>{props.matchItem.stageName}</div>
@@ -743,21 +750,27 @@ const availableTableNumberStyle: JSX.CSSProperties = {
 }
 
 // Assigned table
-const getAssignedTableStyle = (isNotStarted: boolean): JSX.CSSProperties => ({
-  'min-width': 0,
-  display: 'flex',
-  'flex-direction': 'column',
-  'align-items': 'center',
-  'justify-content': 'center',
-  gap: '2px',
-  padding: '8px',
-  'border-radius': '12px',
-  'background-color': isNotStarted ? '#c0392b' : '#2980b9',
-  border: isNotStarted ? '3px solid #f1c40f' : '3px solid transparent',
-  'min-height': 0,
-  overflow: 'hidden',
-  animation: isNotStarted ? 'flashBorder 1s ease-in-out infinite' : 'none',
-})
+const getAssignedTableStyle = (
+  isNotStarted: boolean,
+  isFinishedUnconfirmed: boolean,
+): JSX.CSSProperties => {
+  const flashes = isNotStarted || isFinishedUnconfirmed
+  return {
+    'min-width': 0,
+    display: 'flex',
+    'flex-direction': 'column',
+    'align-items': 'center',
+    'justify-content': 'center',
+    gap: '2px',
+    padding: '8px',
+    'border-radius': '12px',
+    'background-color': isNotStarted ? '#c0392b' : '#2980b9',
+    border: flashes ? '3px solid #f1c40f' : '3px solid transparent',
+    'min-height': 0,
+    overflow: 'hidden',
+    animation: flashes ? 'flashBorder 1s ease-in-out infinite' : 'none',
+  }
+}
 
 const tableNumberAssignedStyle: JSX.CSSProperties = {
   'font-size': '64px',
