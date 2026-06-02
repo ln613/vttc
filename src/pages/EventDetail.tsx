@@ -480,7 +480,9 @@ const MatchRow = (props: MatchRowProps) => {
     props.match.winningSide !== undefined && props.match.winningSide !== null
   const isConfirmed = () => props.match.confirmed === true
   const hasStarted = () =>
-    hasResult() || (props.match.games && props.match.games.length > 0)
+    hasResult() ||
+    (props.match.games && props.match.games.length > 0) ||
+    (props.match.initialServingSide != null && props.match.leftSide != null)
   const isConfirming = () =>
     eventDetailState.confirmingMatchId === props.match._id
   const isResetting = () =>

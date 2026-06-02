@@ -716,6 +716,7 @@ const scoreBoxesOuterStyle: JSX.CSSProperties = {
 
 const scoreBoxesContainerStyle: JSX.CSSProperties = {
   display: 'flex',
+  'flex-direction': 'row-reverse',
   gap: '8px',
   flex: 1,
 }
