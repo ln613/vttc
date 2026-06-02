@@ -16,6 +16,7 @@ const App = () => (
     <Route path="/events" component={EventList} />
     <Route path="/players" component={Players} />
     <Route path="/account" component={Account} />
+    <Route path="/account/:playerId" component={Account} />
     <Route path="/tournament/new" component={TournamentEdit} />
     <Route path="/tournament/:id/edit" component={() => <TournamentEdit isEdit />} />
     <Route path="/event/new" component={EventEdit} />

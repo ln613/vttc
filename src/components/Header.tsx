@@ -6,6 +6,7 @@ import Input from './Input'
 import Button from './Button'
 import Select from './Select'
 import DatePicker from './DatePicker'
+import PasswordRules from './PasswordRules'
 import { parseLocalDate, formatLocalDate } from '../utils/date'
 
 export const Header = () => (
@@ -640,38 +641,7 @@ const PasswordSection = () => (
       onChange={signUpActions.setPassword}
       type="password"
     />
-    <Show when={signUpState.password.length > 0}>
-      <div style={passwordRulesStyle}>
-        <PasswordRule
-          met={signUpActions.passwordHasMinLength(signUpState.password)}
-          label="At least 8 characters"
-        />
-        <PasswordRule
-          met={signUpActions.passwordHasNumber(signUpState.password)}
-          label="Contains at least 1 number"
-        />
-        <PasswordRule
-          met={signUpActions.passwordHasUppercase(signUpState.password)}
-          label="Contains at least 1 uppercase"
-        />
-        <PasswordRule
-          met={signUpActions.passwordHasLowercase(signUpState.password)}
-          label="Contains at least 1 lowercase"
-        />
-      </div>
-    </Show>
-  </div>
-)
-
-const PasswordRule = (props: { met: boolean; label: string }) => (
-  <div
-    style={{
-      ...passwordRuleStyle,
-      color: props.met ? '#27ae60' : '#e74c3c',
-    }}
-  >
-    <span>{props.met ? '✓' : '✗'}</span>
-    <span>{props.label}</span>
+    <PasswordRules password={signUpState.password} />
   </div>
 )
 
@@ -900,20 +870,6 @@ const verificationErrorStyle: JSX.CSSProperties = {
   'margin-top': '4px',
 }
 
-const passwordRulesStyle: JSX.CSSProperties = {
-  display: 'flex',
-  'flex-direction': 'column',
-  gap: '2px',
-  'margin-top': '-8px',
-  'margin-bottom': '8px',
-}
-
-const passwordRuleStyle: JSX.CSSProperties = {
-  'font-size': '12px',
-  display: 'flex',
-  'align-items': 'center',
-  gap: '6px',
-}
 
 const dateOfBirthNoteStyle: JSX.CSSProperties = {
   'font-size': '12px',

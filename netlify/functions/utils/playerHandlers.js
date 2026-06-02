@@ -11,6 +11,7 @@ export const getPlayers = async () => {
       rating: 1,
       email: 1,
       phone: 1,
+      dateOfBirth: 1,
       password: 1,
       _id: 1,
     },

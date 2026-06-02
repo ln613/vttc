@@ -1,5 +1,6 @@
 import { Show, For, onMount } from 'solid-js'
 import type { JSX } from 'solid-js'
+import { useNavigate } from '@solidjs/router'
 import { Header } from '../components/Header'
 import Button from '../components/Button'
 import type { Player } from '../../shared/types/Player'
@@ -98,51 +99,57 @@ const PublicPlayerTable = () => (
   </div>
 )
 
-const AdminPlayerTable = () => (
-  <div style={adminTableContainerStyle}>
-    <table style={tableStyle}>
-      <thead>
-        <tr>
-          <th style={adminThStyle}>First Name</th>
-          <th style={adminThStyle}>Last Name</th>
-          <th style={adminThStyle}>Sex</th>
-          <th style={adminThStyle}>Rating</th>
-          <th style={adminThStyle}>Email</th>
-          <th style={adminThStyle}>Phone</th>
-          <th style={adminThStyle}>Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        <For each={playerActions.filteredPlayers()}>
-          {(player) => (
-            <tr style={trStyle}>
-              <td style={adminTdStyle}>{player.firstName}</td>
-              <td style={adminTdStyle}>{player.lastName}</td>
-              <td style={adminTdStyle}>{formatSex(player.sex)}</td>
-              <td style={adminTdStyle}>{player.rating}</td>
-              <td style={adminTdStyle}>{player.email || ''}</td>
-              <td style={adminTdStyle}>{player.phone || ''}</td>
-              <td style={adminTdStyle}>
-                <div style={actionCellStyle}>
-                  <Show when={playerActions.hasUnpaidEvents(player._id)}>
-                    <PaymentIcon
-                      onClick={() => playerActions.openPaymentDialog(player)}
-                    />
-                  </Show>
-                  <Show when={needsRegistration(player)}>
-                    <RegisterIcon
-                      onClick={() => handleRegisterClick(player)}
-                    />
-                  </Show>
-                </div>
-              </td>
-            </tr>
-          )}
-        </For>
-      </tbody>
-    </table>
-  </div>
-)
+const AdminPlayerTable = () => {
+  const navigate = useNavigate()
+  return (
+    <div style={adminTableContainerStyle}>
+      <table style={tableStyle}>
+        <thead>
+          <tr>
+            <th style={adminThStyle}>First Name</th>
+            <th style={adminThStyle}>Last Name</th>
+            <th style={adminThStyle}>Sex</th>
+            <th style={adminThStyle}>Rating</th>
+            <th style={adminThStyle}>Email</th>
+            <th style={adminThStyle}>Phone</th>
+            <th style={adminThStyle}>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <For each={playerActions.filteredPlayers()}>
+            {(player) => (
+              <tr
+                style={trClickableStyle}
+                onClick={() => navigate(`/account/${player._id}`)}
+              >
+                <td style={adminTdStyle}>{player.firstName}</td>
+                <td style={adminTdStyle}>{player.lastName}</td>
+                <td style={adminTdStyle}>{formatSex(player.sex)}</td>
+                <td style={adminTdStyle}>{player.rating}</td>
+                <td style={adminTdStyle}>{player.email || ''}</td>
+                <td style={adminTdStyle}>{player.phone || ''}</td>
+                <td style={adminTdStyle} onClick={(e) => e.stopPropagation()}>
+                  <div style={actionCellStyle}>
+                    <Show when={playerActions.hasUnpaidEvents(player._id)}>
+                      <PaymentIcon
+                        onClick={() => playerActions.openPaymentDialog(player)}
+                      />
+                    </Show>
+                    <Show when={needsRegistration(player)}>
+                      <RegisterIcon
+                        onClick={() => handleRegisterClick(player)}
+                      />
+                    </Show>
+                  </div>
+                </td>
+              </tr>
+            )}
+          </For>
+        </tbody>
+      </table>
+    </div>
+  )
+}
 
 const needsRegistration = (player: Player): boolean =>
   !!player.email && !player.hasAccount
@@ -350,6 +357,11 @@ const adminTdStyle: JSX.CSSProperties = {
 
 const trStyle: JSX.CSSProperties = {
   transition: 'background-color 0.15s ease',
+}
+
+const trClickableStyle: JSX.CSSProperties = {
+  ...trStyle,
+  cursor: 'pointer',
 }
 
 const paymentIconStyle: JSX.CSSProperties = {

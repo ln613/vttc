@@ -2,6 +2,8 @@ import { createStore } from 'solid-js/store'
 import { authState, authActions } from './authStore'
 import { apiPost } from '../utils/api'
 import { normalizeSex, toDbSex } from '../../shared/rules/sex'
+import { playerState, playerActions } from './playerStore'
+import type { Player } from '../../shared/types/Player'
 
 interface AccountProfileData {
   firstName: string
@@ -29,6 +31,8 @@ interface AccountPageState {
   changePasswordData: ChangePasswordData
   changingPassword: boolean
   changePasswordError: string | null
+  targetPlayerId: string | null
+  targetDisplayName: string
 }
 
 const getInitialChangePasswordData = (): ChangePasswordData => ({
@@ -62,6 +66,8 @@ const getInitialState = (): AccountPageState => ({
   changePasswordData: getInitialChangePasswordData(),
   changingPassword: false,
   changePasswordError: null,
+  targetPlayerId: null,
+  targetDisplayName: '',
 })
 
 const [accountPageState, setAccountPageState] =
@@ -70,7 +76,27 @@ const [accountPageState, setAccountPageState] =
 export { accountPageState }
 
 export const accountPageActions = {
-  init: () => {
+  init: async (playerId?: string) => {
+    if (playerId) {
+      if (!playerState.data) await playerActions.fetchPlayers()
+      const player = playerState.data?.find(
+        (p) => p._id.toString() === playerId,
+      )
+      const profile = buildProfileFromPlayer(player)
+      setAccountPageState({
+        formData: { ...profile },
+        initialFormData: { ...profile },
+        editing: false,
+        saving: false,
+        saved: false,
+        error: null,
+        targetPlayerId: playerId,
+        targetDisplayName: player
+          ? `${player.firstName} ${player.lastName}`
+          : '',
+      })
+      return
+    }
     const profile = buildProfileFromAuth()
     setAccountPageState({
       formData: { ...profile },
@@ -79,6 +105,8 @@ export const accountPageActions = {
       saving: false,
       saved: false,
       error: null,
+      targetPlayerId: null,
+      targetDisplayName: '',
     })
   },
 
@@ -123,14 +151,20 @@ export const accountPageActions = {
 
     try {
       await apiPost('updateProfile', buildSavePayload(formData))
-      authActions.updateUser({
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        sex: toDbSex(formData.sex),
-        dateOfBirth: formData.dateOfBirth || undefined,
-        email: formData.email,
-        phone: formData.phone,
-      })
+      // Only mirror updates back to the signed-in user when editing self.
+      if (!accountPageState.targetPlayerId) {
+        authActions.updateUser({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          sex: toDbSex(formData.sex),
+          dateOfBirth: formData.dateOfBirth || undefined,
+          email: formData.email,
+          phone: formData.phone,
+        })
+      } else if (playerState.data) {
+        // Refresh the players list so the Players page reflects edits.
+        playerActions.fetchPlayers()
+      }
       setAccountPageState({
         initialFormData: { ...formData },
         saving: false,
@@ -185,6 +219,9 @@ export const accountPageActions = {
         newPassword: changePasswordData.newPassword,
         confirmPassword: changePasswordData.confirmPassword,
       })
+      if (authState.user?.pending) {
+        authActions.updateUser({ pending: false })
+      }
       setAccountPageState({
         changingPassword: false,
         showChangePasswordDialog: false,
@@ -254,8 +291,19 @@ const buildProfileFromAuth = (): AccountProfileData => ({
   phone: authState.user?.phone ?? '',
 })
 
+const buildProfileFromPlayer = (
+  player: Player | undefined,
+): AccountProfileData => ({
+  firstName: player?.firstName ?? '',
+  lastName: player?.lastName ?? '',
+  sex: normalizeSex(player?.sex),
+  dateOfBirth: (player?.dateOfBirth ?? '').slice(0, 10),
+  email: player?.email ?? '',
+  phone: player?.phone ?? '',
+})
+
 const buildSavePayload = (formData: AccountProfileData) => ({
-  _id: authState.user?._id,
+  _id: accountPageState.targetPlayerId ?? authState.user?._id,
   firstName: formData.firstName,
   lastName: formData.lastName,
   sex: toDbSex(formData.sex),

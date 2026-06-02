@@ -1,9 +1,10 @@
 import { Show, onMount, onCleanup, type JSX } from 'solid-js'
-import { useNavigate } from '@solidjs/router'
+import { useNavigate, useParams } from '@solidjs/router'
 import { Header } from '../components/Header'
 import Input from '../components/Input'
 import Select from '../components/Select'
 import DatePicker from '../components/DatePicker'
+import PasswordRules from '../components/PasswordRules'
 import Button from '../components/Button'
 import { parseLocalDate, formatLocalDate } from '../utils/date'
 import { accountPageState, accountPageActions } from '../stores/accountPageStore'
@@ -152,9 +153,10 @@ const changePasswordButtonContainerStyle: JSX.CSSProperties = {
 
 const Account = () => {
   const navigate = useNavigate()
+  const params = useParams()
 
   onMount(() => {
-    accountPageActions.init()
+    accountPageActions.init(params.playerId)
   })
 
   onCleanup(() => {
@@ -172,9 +174,13 @@ const Account = () => {
       <SavingOverlay />
       <SavedOverlay />
       <div style={contentStyle}>
-        <h1 style={titleStyle}>Account</h1>
+        <h1 style={titleStyle}>
+          {accountPageState.targetDisplayName || 'Account'}
+        </h1>
         <ProfileSection />
-        <Show when={!accountPageState.editing}>
+        <Show
+          when={!accountPageState.editing && !accountPageState.targetPlayerId}
+        >
           <div style={signOutContainerStyle}>
             <Button color="#e74c3c" onClick={handleSignOut}>
               Sign Out
@@ -264,7 +270,7 @@ const SaveIcon = () => (
 const isAdminOrSuperAdmin = () => authState.isAdmin || authState.isSuperAdmin
 
 const ProfileActionIcons = () => (
-  <Show when={!isAdminOrSuperAdmin()}>
+  <Show when={!isAdminOrSuperAdmin() || accountPageState.targetPlayerId}>
     <div style={actionIconsStyle}>
       <Show when={accountPageState.saving}>
         <div style={spinnerStyle} />
@@ -369,7 +375,13 @@ const ProfileSection = () => (
     <Show when={accountPageState.error}>
       <div style={errorMessageStyle}>{accountPageState.error}</div>
     </Show>
-    <Show when={!isAdminOrSuperAdmin() && !accountPageState.editing}>
+    <Show
+      when={
+        !isAdminOrSuperAdmin() &&
+        !accountPageState.editing &&
+        !accountPageState.targetPlayerId
+      }
+    >
       <div style={changePasswordButtonContainerStyle}>
         <Button color="#3498db" onClick={accountPageActions.showChangePassword}>
           Change Password
@@ -383,15 +395,17 @@ const ChangePasswordDialog = () => (
   <div style={overlayStyle}>
     <div style={dialogStyle}>
       <h3 style={dialogTitleStyle}>Change Password</h3>
-      <Input
-        label="Current Password"
-        name="oldPassword"
-        type="password"
-        value={accountPageState.changePasswordData.oldPassword}
-        onChange={(value) =>
-          accountPageActions.setChangePasswordField('oldPassword', value)
-        }
-      />
+      <Show when={!authState.user?.pending}>
+        <Input
+          label="Current Password"
+          name="oldPassword"
+          type="password"
+          value={accountPageState.changePasswordData.oldPassword}
+          onChange={(value) =>
+            accountPageActions.setChangePasswordField('oldPassword', value)
+          }
+        />
+      </Show>
       <Input
         label="New Password"
         name="newPassword"
@@ -400,6 +414,9 @@ const ChangePasswordDialog = () => (
         onChange={(value) =>
           accountPageActions.setChangePasswordField('newPassword', value)
         }
+      />
+      <PasswordRules
+        password={accountPageState.changePasswordData.newPassword}
       />
       <Input
         label="Confirm Password"

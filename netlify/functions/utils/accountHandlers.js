@@ -303,8 +303,9 @@ export const changePassword = async (body) => {
   const player = await collection.findOne({ _id: toObjectId(_id) })
   if (!player) throwError('Player not found')
 
-  // If player already has a password, old password is required
-  if (player.password) {
+  // Pending accounts (admin-registered) don't require the auto-generated
+  // password when the user first changes it.
+  if (player.password && !player.pending) {
     if (!oldPassword) throwError('Current password is required')
     if (!(await verifyPassword(oldPassword, player.password)))
       throwError('Current password is incorrect')

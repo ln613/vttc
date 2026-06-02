@@ -29,7 +29,8 @@ Vertical
         - send the password to the email, ask the player to log in
         - mark the player account as pending 
 - sort by rating desc
-
+- for admin, on player row click, go to player account page
+ 
 ## Payment Confirm Dialog
 
 - list all events (with fees) the player registered but not paid, each with a confirm button
