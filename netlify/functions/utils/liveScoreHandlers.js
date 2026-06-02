@@ -411,13 +411,23 @@ const buildMatchQueue = (matchItems) => {
   })
 
   return entries.flatMap((e) =>
-    [...e.matches].sort((m1, m2) => {
-      const c1 = m1.cancelledAt ? 1 : 0
-      const c2 = m2.cancelledAt ? 1 : 0
-      if (c1 !== c2) return c1 - c2
-      return 0
-    }),
+    [...e.matches].sort((m1, m2) => matchPriority(m1) - matchPriority(m2)),
   )
+}
+
+// Lower value = earlier in the queue. In-progress / finished-but-unconfirmed
+// matches always come first so they reclaim tables before not-started matches
+// (avoids losing the table on a cold rebuild of tableState). Cancelled matches
+// go last, per the cancel spec.
+const matchPriority = (item) => {
+  if (item.cancelledAt) return 2
+  if (
+    item.matchStatus === 'in_progress' ||
+    item.matchStatus === 'finished_unconfirmed'
+  ) {
+    return 0
+  }
+  return 1
 }
 
 /**
