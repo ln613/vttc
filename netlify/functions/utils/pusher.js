@@ -34,6 +34,17 @@ export const notifyEventUpdate = async (eventId) => {
   }
 }
 
+export const notifyMatchReset = async (eventId, matchId) => {
+  if (!eventId || !matchId) return
+  const client = getClient()
+  if (!client) return
+  try {
+    await client.trigger(`event-${eventId}`, 'match-reset', { matchId })
+  } catch {
+    // Realtime is best-effort; never fail the request because of it.
+  }
+}
+
 export const notifyLiveScoreUpdate = async () => {
   const client = getClient()
   if (!client) return

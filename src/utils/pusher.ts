@@ -34,6 +34,26 @@ export const subscribeToEventUpdates = (
   }
 }
 
+export const subscribeToMatchReset = (
+  eventId: string,
+  onReset: (matchId: string) => void,
+): EventSubscription => {
+  const client = getClient()
+  if (!client) {
+    return { unsubscribe: () => {} }
+  }
+  const channelName = `event-${eventId}`
+  const channel = client.subscribe(channelName)
+  const handler = (data: { matchId: string }) => onReset(data.matchId)
+  channel.bind('match-reset', handler)
+  return {
+    unsubscribe: () => {
+      channel.unbind('match-reset', handler)
+      client.unsubscribe(channelName)
+    },
+  }
+}
+
 export const subscribeToLiveScoreUpdates = (
   onUpdate: () => void,
 ): EventSubscription => {

@@ -52,6 +52,7 @@ interface GamePlayState {
   sessionId: string | null
   sessionTakenOver: boolean
   sessionError: string | null
+  matchReset: boolean
 }
 
 const getInitialState = (): GamePlayState => ({
@@ -82,6 +83,7 @@ const getInitialState = (): GamePlayState => ({
   lastScoredSide: null,
   sessionId: null,
   sessionTakenOver: false,
+  matchReset: false,
   sessionError: null,
 })
 
@@ -419,10 +421,17 @@ export const gamePlayActions = {
       sessionId: null,
       sessionTakenOver: false,
       sessionError: null,
+      matchReset: false,
     })
 
     if (matchId) await acquireSession(matchId)
     await fetchEvent(eventId!)
+  },
+
+  notifyMatchReset: (matchId: string) => {
+    if (!gamePlayState.matchId || gamePlayState.matchId !== matchId) return
+    cancelPendingSave()
+    setGamePlayState({ matchReset: true })
   },
 
   releaseSession,

@@ -37,7 +37,7 @@ export const acquireMatchSession = async (body) => {
     (current.userId !== body.userId || current.sessionId !== body.sessionId)
   ) {
     if (!body.asAdmin) {
-      throwError('Another user is currently playing this match')
+      throwError('Another user is currently umpiring this match')
     }
     // Admin takes over: mark the existing session as taken over.
     await collection.updateOne(

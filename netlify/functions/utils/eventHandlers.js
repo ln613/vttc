@@ -1,5 +1,5 @@
 import { getDB, toObjectId } from './db.js'
-import { notifyEventUpdate, notifyLiveScoreUpdate } from './pusher.js'
+import { notifyEventUpdate, notifyLiveScoreUpdate, notifyMatchReset } from './pusher.js'
 
 const EVENTS_COLLECTION = 'events'
 const TOURNAMENTS_COLLECTION = 'tournaments'
@@ -1691,6 +1691,8 @@ export const resetMatch = async (body) => {
     { _id: toObjectId(_id) },
     { $set: { eventStages: updatedStages } },
   )
+
+  await notifyMatchReset(_id, matchId)
 
   return { success: true }
 }

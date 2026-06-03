@@ -1,10 +1,11 @@
-import { onMount, onCleanup, createSignal, Show, type JSX } from 'solid-js'
+import { onMount, onCleanup, createEffect, createSignal, Show, type JSX } from 'solid-js'
 import { useSearchParams, useNavigate } from '@solidjs/router'
 import {
   gamePlayState,
   gamePlayActions,
 } from '../stores/gamePlayStore'
 import { eventDetailActions } from '../stores/eventDetailStore'
+import { subscribeToMatchReset, type EventSubscription } from '../utils/pusher'
 import type { Player } from '../../shared/types/Player'
 import SingleSelectTags from '../components/SingleSelectTags'
 import Button from '../components/Button'
@@ -14,6 +15,8 @@ const GamePlay = () => {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   let containerRef: HTMLDivElement | undefined
+  let resetSub: EventSubscription | null = null
+  let subscribedEventId: string | null = null
 
   onMount(() => {
     gamePlayActions.initializeFromUrl(searchParams)
@@ -22,18 +25,38 @@ const GamePlay = () => {
     }
   })
 
+  createEffect(() => {
+    const eventId = gamePlayState.eventId
+    if (eventId && eventId !== subscribedEventId) {
+      resetSub?.unsubscribe()
+      resetSub = subscribeToMatchReset(eventId, (matchId) => {
+        gamePlayActions.notifyMatchReset(matchId)
+      })
+      subscribedEventId = eventId
+    }
+  })
+
   onCleanup(() => {
+    resetSub?.unsubscribe()
+    resetSub = null
+    subscribedEventId = null
     gamePlayActions.reset()
   })
 
   const handleExit = async () => {
     gamePlayActions.closeMenu()
     await gamePlayActions.exitAndFlush()
-    navigate(-1)
+    goBackOrSchedule(navigate)
+  }
+
+  const handleResetExit = () => {
+    goBackOrSchedule(navigate)
   }
 
   const sessionBlocked = () =>
-    gamePlayState.sessionTakenOver || !!gamePlayState.sessionError
+    gamePlayState.sessionTakenOver ||
+    !!gamePlayState.sessionError ||
+    gamePlayState.matchReset
 
   return (
     <div ref={containerRef} style={containerStyle}>
@@ -48,21 +71,29 @@ const GamePlay = () => {
         <FinishConfirmDialog />
       </Show>
       <Show when={sessionBlocked()}>
-        <SessionBlockedOverlay onExit={() => navigate(-1)} />
+        <SessionBlockedOverlay onExit={handleResetExit} />
       </Show>
     </div>
   )
 }
 
+const goBackOrSchedule = (navigate: ReturnType<typeof useNavigate>) => {
+  if (window.history.length > 1) {
+    navigate(-1)
+  } else {
+    navigate('/schedule')
+  }
+}
+
 const SessionBlockedOverlay = (props: { onExit: () => void }) => {
-  const message = () =>
-    gamePlayState.sessionTakenOver
-      ? 'An admin has taken over this match.'
-      : gamePlayState.sessionError ?? 'This match is unavailable.'
+  const message = () => {
+    if (gamePlayState.matchReset) return 'The match has been reset.'
+    if (gamePlayState.sessionTakenOver) return 'An admin has taken over this match.'
+    return gamePlayState.sessionError ?? 'This match is unavailable.'
+  }
   return (
     <div style={overlayStyle}>
       <div style={overlayCardStyle}>
-        <div style={overlayTitleStyle}>Session Closed</div>
         <div style={overlayMessageStyle}>{message()}</div>
         <button style={overlayButtonStyle} onClick={props.onExit}>
           Go Back
@@ -99,13 +130,6 @@ const overlayCardStyle: JSX.CSSProperties = {
   'max-width': '360px',
   'text-align': 'center',
   'box-shadow': '0 8px 32px rgba(0, 0, 0, 0.25)',
-}
-
-const overlayTitleStyle: JSX.CSSProperties = {
-  'font-size': '20px',
-  'font-weight': 700,
-  color: '#e74c3c',
-  'margin-bottom': '8px',
 }
 
 const overlayMessageStyle: JSX.CSSProperties = {
