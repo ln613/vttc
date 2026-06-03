@@ -31,6 +31,11 @@ const [liveScoreState, setLiveScoreState] =
   createStore<LiveScoreState>(getInitialState())
 
 let subscription: EventSubscription | null = null
+// Periodic refetch ensures auto-start (group/schedule generation + queue
+// rebuild) fires once an event's start time passes, even when no pusher
+// event has been emitted by a write in the meantime.
+const LIVE_SCORE_HEARTBEAT_MS = 60_000
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null
 
 export { liveScoreState }
 
@@ -57,12 +62,19 @@ const startSubscription = () => {
   subscription = subscribeToLiveScoreUpdates(() => {
     void fetchLiveScore()
   })
+  heartbeatTimer = setInterval(() => {
+    void fetchLiveScore()
+  }, LIVE_SCORE_HEARTBEAT_MS)
 }
 
 const stopUpdates = () => {
   if (subscription) {
     subscription.unsubscribe()
     subscription = null
+  }
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer)
+    heartbeatTimer = null
   }
 }
 
