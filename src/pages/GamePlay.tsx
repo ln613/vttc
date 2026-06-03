@@ -1,10 +1,19 @@
-import { onMount, onCleanup, createEffect, createSignal, Show, type JSX } from 'solid-js'
+import {
+  onMount,
+  onCleanup,
+  createEffect,
+  createSignal,
+  Show,
+  For,
+  type JSX,
+} from 'solid-js'
 import { useSearchParams, useNavigate } from '@solidjs/router'
 import {
   gamePlayState,
   gamePlayActions,
 } from '../stores/gamePlayStore'
 import { eventDetailActions } from '../stores/eventDetailStore'
+import { authState } from '../stores/authStore'
 import { subscribeToMatchReset, type EventSubscription } from '../utils/pusher'
 import type { Player } from '../../shared/types/Player'
 import SingleSelectTags from '../components/SingleSelectTags'
@@ -36,6 +45,31 @@ const GamePlay = () => {
     }
   })
 
+  // Once both team-match orders are saved, sub-matches exist. Hop the
+  // page to the next live sub-match so the players can keep playing.
+  createEffect(() => {
+    if (!gamePlayActions.isTeamMatch()) return
+    if (!gamePlayActions.bothSidesAssigned()) return
+    const parent = gamePlayActions.getCurrentMatch()
+    if (!parent || !Array.isArray(parent.subMatches)) return
+    const nextSub = parent.subMatches.find(
+      (s) =>
+        !s.cancelledAt &&
+        !(s.winningSide != null && s.confirmed === true),
+    )
+    const eventId = gamePlayState.eventId
+    if (!eventId) return
+    if (nextSub) {
+      navigate(
+        `/game-play?eventId=${eventId}&stage=${gamePlayState.stage}&groupIndex=${gamePlayState.groupIndex}&matchId=${nextSub._id}`,
+        { replace: true },
+      )
+    } else {
+      // No live sub-match left (team match finalised); leave the page.
+      goBackOrSchedule(navigate)
+    }
+  })
+
   onCleanup(() => {
     resetSub?.unsubscribe()
     resetSub = null
@@ -64,7 +98,35 @@ const GamePlay = () => {
         <Header onExit={handleExit} />
         <ScoreBoxes />
       </div>
-      <Show when={gamePlayState.showInitDialog && !gamePlayState.loading && !sessionBlocked()}>
+      <Show
+        when={
+          gamePlayActions.isTeamMatch() &&
+          !gamePlayActions.bothSidesStarted() &&
+          !gamePlayState.loading &&
+          !sessionBlocked()
+        }
+      >
+        <TeamStartDialog />
+      </Show>
+      <Show
+        when={
+          gamePlayActions.isTeamMatch() &&
+          gamePlayActions.bothSidesStarted() &&
+          !gamePlayActions.bothSidesAssigned() &&
+          !gamePlayState.loading &&
+          !sessionBlocked()
+        }
+      >
+        <TeamOrderDialog />
+      </Show>
+      <Show
+        when={
+          !gamePlayActions.isTeamMatch() &&
+          gamePlayState.showInitDialog &&
+          !gamePlayState.loading &&
+          !sessionBlocked()
+        }
+      >
         <InitDialog />
       </Show>
       <Show when={gamePlayState.showFinishDialog && !sessionBlocked()}>
@@ -523,6 +585,226 @@ const FinishConfirmDialog = () => {
   )
 }
 
+// Team Match Start Dialog — shown for team-event matches until both
+// home and away sides click "Start". Once both have started, the next
+// step (order-of-play picker) takes over.
+const TeamStartDialog = () => {
+  const match = () => gamePlayActions.getCurrentMatch()
+  const userSide = () => gamePlayActions.getUserSideInMatch()
+  const isAdmin = () => authState.isAdmin
+  const homeSide = () => match()?.homeSide
+  const side1Started = () => !!match()?.side1Started
+  const side2Started = () => !!match()?.side2Started
+  const side1Label = () =>
+    `${gamePlayActions.getParticipantName(1)}${homeSide() === 1 ? ' (Home)' : ''}`
+  const side2Label = () =>
+    `${gamePlayActions.getParticipantName(2)}${homeSide() === 2 ? ' (Home)' : ''}`
+
+  const canStart = (side: 1 | 2): boolean => {
+    if (side === 1 && side1Started()) return false
+    if (side === 2 && side2Started()) return false
+    return isAdmin() || userSide() === side
+  }
+
+  const handleStart = (side: 1 | 2) => {
+    void gamePlayActions.startTeamSide(side)
+  }
+
+  return (
+    <div style={dialogOverlayStyle}>
+      <div style={dialogContentStyle}>
+        <div style={teamStartTitleStyle}>Team Match — Start</div>
+        <div style={teamStartHintStyle}>
+          Each team must press Start before the order-of-play picker opens.
+        </div>
+        <TeamStartRow
+          label={side1Label()}
+          started={side1Started()}
+          canStart={canStart(1)}
+          onStart={() => handleStart(1)}
+        />
+        <TeamStartRow
+          label={side2Label()}
+          started={side2Started()}
+          canStart={canStart(2)}
+          onStart={() => handleStart(2)}
+        />
+        <Show when={side1Started() && side2Started()}>
+          <div style={teamStartReadyStyle}>
+            Both teams started. Order-of-play picker is coming next.
+          </div>
+        </Show>
+      </div>
+    </div>
+  )
+}
+
+const TeamStartRow = (props: {
+  label: string
+  started: boolean
+  canStart: boolean
+  onStart: () => void
+}) => (
+  <div style={teamStartRowStyle}>
+    <div style={teamStartRowLabelStyle}>{props.label}</div>
+    <Show
+      when={!props.started}
+      fallback={<div style={teamStartedBadgeStyle}>Started ✓</div>}
+    >
+      <Button onClick={props.onStart} disabled={!props.canStart}>
+        Start
+      </Button>
+    </Show>
+  </div>
+)
+
+// Order-of-play picker shown after both sides have pressed Start. Each
+// side names its A, B, C order; the trailing slot is auto-derived from
+// whoever's left.
+const TeamOrderDialog = () => {
+  const match = () => gamePlayActions.getCurrentMatch()
+  const userSide = () => gamePlayActions.getUserSideInMatch()
+  const isAdmin = () => authState.isAdmin
+  const homeSide = () => match()?.homeSide
+  const side1Done = () => gamePlayActions.hasSideAssignment(1)
+  const side2Done = () => gamePlayActions.hasSideAssignment(2)
+  const showSide = (side: 1 | 2): boolean => {
+    if (side === 1 && side1Done()) return false
+    if (side === 2 && side2Done()) return false
+    return isAdmin() || userSide() === side
+  }
+
+  return (
+    <div style={dialogOverlayStyle}>
+      <div style={dialogContentStyle}>
+        <div style={teamStartTitleStyle}>Pick your order of play</div>
+        <Show when={showSide(1)}>
+          <TeamOrderForm
+            side={1}
+            players={match()?.side1 || []}
+            isHome={homeSide() === 1}
+          />
+        </Show>
+        <Show when={showSide(2)}>
+          <TeamOrderForm
+            side={2}
+            players={match()?.side2 || []}
+            isHome={homeSide() === 2}
+          />
+        </Show>
+        <Show when={side1Done() && !showSide(1)}>
+          <div style={teamOrderWaitingStyle}>
+            {gamePlayActions.getParticipantName(1)} order locked in.
+          </div>
+        </Show>
+        <Show when={side2Done() && !showSide(2)}>
+          <div style={teamOrderWaitingStyle}>
+            {gamePlayActions.getParticipantName(2)} order locked in.
+          </div>
+        </Show>
+        <Show when={!showSide(1) && !showSide(2) && !(side1Done() && side2Done())}>
+          <div style={teamOrderWaitingStyle}>
+            Waiting for the other team to pick their order…
+          </div>
+        </Show>
+        <Show when={side1Done() && side2Done()}>
+          <div style={teamStartReadyStyle}>
+            Both orders saved. Sub-matches will be generated next.
+          </div>
+        </Show>
+      </div>
+    </div>
+  )
+}
+
+const TeamOrderForm = (props: {
+  side: 1 | 2
+  players: Player[]
+  isHome: boolean
+}) => {
+  const slotLabels = () => (props.isHome ? ['A', 'B', 'C', 'D'] : ['X', 'Y', 'Z', 'W'])
+  const picksCount = () => Math.max(0, props.players.length - 1)
+  const [picks, setPicks] = createSignal<string[]>(
+    Array.from({ length: picksCount() }, () => ''),
+  )
+
+  const optionsForSlot = (slotIndex: number) => {
+    const chosen = new Set(
+      picks().filter((_, i) => i !== slotIndex && picks()[i]),
+    )
+    return props.players
+      .filter((p) => !chosen.has(p._id))
+      .map((p) => ({
+        value: p._id,
+        label: `${p.firstName} ${p.lastName}`,
+      }))
+  }
+
+  const handlePick = (slotIndex: number, playerId: string) => {
+    const next = [...picks()]
+    next[slotIndex] = playerId
+    setPicks(next)
+  }
+
+  const remainingPlayer = (): Player | undefined => {
+    const chosen = new Set(picks().filter(Boolean))
+    return props.players.find((p) => !chosen.has(p._id))
+  }
+
+  const allPicked = () => picks().every(Boolean)
+
+  const handleSave = () => {
+    void gamePlayActions.saveTeamSideAssignment(props.side, picks())
+  }
+
+  return (
+    <div style={teamOrderFormStyle}>
+      <div style={teamOrderHeadingStyle}>
+        {gamePlayActions.getParticipantName(props.side)}
+        {props.isHome ? ' (Home)' : ''}
+      </div>
+      <For each={Array.from({ length: picksCount() }, (_, i) => i)}>
+        {(slotIndex) => (
+          <div style={teamOrderSlotStyle}>
+            <span style={teamOrderSlotLabelStyle}>
+              {slotLabels()[slotIndex]}
+            </span>
+            <select
+              style={teamOrderSelectStyle}
+              value={picks()[slotIndex]}
+              onChange={(e) =>
+                handlePick(slotIndex, (e.target as HTMLSelectElement).value)
+              }
+            >
+              <option value="" disabled>
+                -- Select --
+              </option>
+              <For each={optionsForSlot(slotIndex)}>
+                {(opt) => <option value={opt.value}>{opt.label}</option>}
+              </For>
+            </select>
+          </div>
+        )}
+      </For>
+      <Show when={allPicked() && remainingPlayer()}>
+        <div style={teamOrderSlotStyle}>
+          <span style={teamOrderSlotLabelStyle}>
+            {slotLabels()[picksCount()]}
+          </span>
+          <span style={teamOrderAutoStyle}>
+            {remainingPlayer()!.firstName} {remainingPlayer()!.lastName} (auto)
+          </span>
+        </div>
+      </Show>
+      <div style={dialogButtonContainerStyle}>
+        <Button onClick={handleSave} disabled={!allPicked()}>
+          Save Order
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 // Init Dialog Component
 const InitDialog = () => {
   const initialServingSide = () => gamePlayState.initialServingSide
@@ -901,6 +1183,108 @@ const dialogButtonContainerStyle: JSX.CSSProperties = {
   display: 'flex',
   'justify-content': 'center',
   'margin-top': '24px',
+}
+
+const teamStartTitleStyle: JSX.CSSProperties = {
+  'font-size': '20px',
+  'font-weight': 700,
+  color: '#2c3e50',
+  'margin-bottom': '8px',
+  'text-align': 'center',
+}
+
+const teamStartHintStyle: JSX.CSSProperties = {
+  'font-size': '13px',
+  color: '#666',
+  'margin-bottom': '16px',
+  'text-align': 'center',
+}
+
+const teamStartRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'space-between',
+  gap: '12px',
+  padding: '12px 0',
+  'border-bottom': '1px solid #eee',
+}
+
+const teamStartRowLabelStyle: JSX.CSSProperties = {
+  'font-size': '15px',
+  'font-weight': 600,
+  color: '#333',
+  flex: 1,
+  'text-align': 'left',
+}
+
+const teamStartedBadgeStyle: JSX.CSSProperties = {
+  color: '#27ae60',
+  'font-weight': 600,
+  'font-size': '14px',
+}
+
+const teamOrderWaitingStyle: JSX.CSSProperties = {
+  'margin-top': '12px',
+  padding: '10px',
+  'background-color': '#f5f5f5',
+  'border-radius': '6px',
+  color: '#666',
+  'text-align': 'center',
+  'font-size': '13px',
+}
+
+const teamOrderFormStyle: JSX.CSSProperties = {
+  'margin-bottom': '16px',
+  padding: '12px',
+  border: '1px solid #ddd',
+  'border-radius': '8px',
+}
+
+const teamOrderHeadingStyle: JSX.CSSProperties = {
+  'font-size': '15px',
+  'font-weight': 700,
+  color: '#2c3e50',
+  'margin-bottom': '12px',
+}
+
+const teamOrderSlotStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  gap: '12px',
+  'margin-bottom': '8px',
+}
+
+const teamOrderSlotLabelStyle: JSX.CSSProperties = {
+  'font-size': '15px',
+  'font-weight': 700,
+  color: '#3498db',
+  'min-width': '24px',
+}
+
+const teamOrderSelectStyle: JSX.CSSProperties = {
+  flex: 1,
+  padding: '8px 12px',
+  'font-size': '14px',
+  border: '1px solid #ccc',
+  'border-radius': '6px',
+}
+
+const teamOrderAutoStyle: JSX.CSSProperties = {
+  flex: 1,
+  'font-size': '14px',
+  color: '#888',
+  'font-style': 'italic',
+}
+
+const teamStartReadyStyle: JSX.CSSProperties = {
+  'margin-top': '16px',
+  padding: '12px',
+  'background-color': '#f0faf4',
+  'border-radius': '8px',
+  color: '#27ae60',
+  'text-align': 'center',
+  'font-weight': 600,
+  'font-size': '14px',
 }
 
 export default GamePlay

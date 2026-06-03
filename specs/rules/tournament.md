@@ -38,17 +38,19 @@ s7    s8    s9
 #### Match schedule
 
 Group of 3:
-- the 1st match is between seed 2 and seed 3
-- the 2nd match is between seed 1 and seed 3
-- the 3rd match is between seed 1 and seed 2
+- the 1st match is between seed 2* and seed 3
+- the 2nd match is between seed 1 and seed 3*
+- the 3rd match is between seed 1* and seed 2
 
 Group of 4:
-- the 1st match is between seed 1 and seed 4
-- the 2nd match is between seed 2 and seed 3
-- the 3rd match is between seed 1 and seed 3
-- the 4th match is between seed 2 and seed 4
-- the 5th match is between seed 3 and seed 4
-- the 6th match is between seed 1 and seed 2
+- the 1st match is between seed 1* and seed 4
+- the 2nd match is between seed 2* and seed 3
+- the 3rd match is between seed 1 and seed 3*
+- the 4th match is between seed 2* and seed 4
+- the 5th match is between seed 3 and seed 4*
+- the 6th match is between seed 1* and seed 2
+
+For team events, the one with * is the home team in that team match.
 
 #### Ranking
 

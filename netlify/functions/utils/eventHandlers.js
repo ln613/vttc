@@ -765,20 +765,9 @@ export const generateGroups = async (body) => {
   // Create groups with match schedules
   const groups = groupArrays.map((participants, index) => {
     const matchSchedule = generateGroupMatchSchedule(participants)
-    const matches = matchSchedule.map((schedule) => ({
-      _id: generateId(),
-      config: {
-        numberOfGames,
-        isSuddenDeath: true,
-        gameConfig: { type: 'standard', targetPoints: 11, isGolden: false },
-      },
-      side1: [schedule.side1.players[0]],
-      side2: [schedule.side2.players[0]],
-      games: [],
-      gamesWon1: 0,
-      gamesWon2: 0,
-      winningSide: undefined,
-    }))
+    const matches = matchSchedule.map((schedule) =>
+      buildGroupMatchRecord(event, schedule, numberOfGames),
+    )
 
     return {
       index,
@@ -819,6 +808,84 @@ const getBestOfNumber = (bestOfOption) => {
   if (bestOfOption === 'Best of 5') return 5
   if (bestOfOption.includes('Best of 3')) return 3
   return 3
+}
+
+// Build a group-stage match record. For team events the match holds the
+// full team rosters and team-match metadata; sub-matches are not
+// expanded yet (that happens once both sides pick their order of play).
+const buildGroupMatchRecord = (event, schedule, numberOfGames) => {
+  const base = {
+    _id: generateId(),
+    config: {
+      numberOfGames,
+      isSuddenDeath: true,
+      gameConfig: { type: 'standard', targetPoints: 11, isGolden: false },
+    },
+    homeSide: schedule.homeSide,
+    games: [],
+    gamesWon1: 0,
+    gamesWon2: 0,
+    winningSide: undefined,
+  }
+  if (event.type === 'Team') {
+    const numberOfMatches = getBestOfNumber(event.groupMatches || 'Best of 3')
+    return {
+      ...base,
+      side1: schedule.side1.players,
+      side2: schedule.side2.players,
+      isTeamMatch: true,
+      teamMatchType: getTeamMatchType(event.nop, numberOfMatches),
+      numberOfMatches,
+      participantIds: {
+        side1: schedule.side1._id,
+        side2: schedule.side2._id,
+      },
+    }
+  }
+  // Singles/doubles — keep current behaviour (first player only).
+  return {
+    ...base,
+    side1: [schedule.side1.players[0]],
+    side2: [schedule.side2.players[0]],
+  }
+}
+
+const getTeamMatchType = (nop, numberOfMatches) => {
+  if (nop === 2 && numberOfMatches === 3) return 'type1'
+  if (nop === 2 && numberOfMatches === 5) return 'type2'
+  if (nop === 3 && numberOfMatches === 5) return 'type3'
+  return undefined
+}
+
+const buildKnockoutMatchRecord = (event, top, bottom, numberOfGames) => {
+  const base = {
+    _id: generateId(),
+    config: {
+      numberOfGames,
+      isSuddenDeath: true,
+      gameConfig: { type: 'standard', targetPoints: 11, isGolden: false },
+    },
+    side1: top.participant.players || [top.participant],
+    side2: bottom.participant.players || [bottom.participant],
+    games: [],
+    gamesWon1: 0,
+    gamesWon2: 0,
+    winningSide: undefined,
+  }
+  if (event.type === 'Team') {
+    const numberOfMatches = getBestOfNumber(event.knockoutMatches || 'Best of 5')
+    return {
+      ...base,
+      isTeamMatch: true,
+      teamMatchType: getTeamMatchType(event.nop, numberOfMatches),
+      numberOfMatches,
+      participantIds: {
+        side1: top.participant._id,
+        side2: bottom.participant._id,
+      },
+    }
+  }
+  return base
 }
 
 const validateGenerateGroupsRules = (event) => {
@@ -871,45 +938,50 @@ const formGroupsWithSnakeSeeding = (participants, nop) => {
   return groups
 }
 
+// [side1Seed, side2Seed, homeSeed] — homeSeed (marked * in the spec)
+// designates which side is the "home" team for team events.
 const GROUP_OF_3_SCHEDULE = [
-  [2, 3],
-  [1, 3],
-  [1, 2],
+  [2, 3, 2],
+  [1, 3, 3],
+  [1, 2, 1],
 ]
 
 const GROUP_OF_4_SCHEDULE = [
-  [1, 4],
-  [2, 3],
-  [1, 3],
-  [2, 4],
-  [3, 4],
-  [1, 2],
+  [1, 4, 1],
+  [2, 3, 2],
+  [1, 3, 3],
+  [2, 4, 2],
+  [3, 4, 4],
+  [1, 2, 1],
 ]
 
 const generateGroupMatchSchedule = (participants) => {
   const size = participants.length
 
   if (size === 3) {
-    return GROUP_OF_3_SCHEDULE.map(([s1, s2]) => ({
+    return GROUP_OF_3_SCHEDULE.map(([s1, s2, homeSeed]) => ({
       side1: participants[s1 - 1],
       side2: participants[s2 - 1],
+      homeSide: homeSeed === s1 ? 1 : 2,
     }))
   }
 
   if (size === 4) {
-    return GROUP_OF_4_SCHEDULE.map(([s1, s2]) => ({
+    return GROUP_OF_4_SCHEDULE.map(([s1, s2, homeSeed]) => ({
       side1: participants[s1 - 1],
       side2: participants[s2 - 1],
+      homeSide: homeSeed === s1 ? 1 : 2,
     }))
   }
 
-  // For groups larger than 4, generate round robin
+  // For groups larger than 4, round-robin; default home is side1 (lower seed).
   const schedule = []
   for (let i = 0; i < size; i++) {
     for (let j = i + 1; j < size; j++) {
       schedule.push({
         side1: participants[i],
         side2: participants[j],
+        homeSide: 1,
       })
     }
   }
@@ -1159,20 +1231,7 @@ const createKnockoutMatches = (seedingList, event, roundName) => {
     remaining.splice(bottomIndex, 1)
 
     matches.push({
-      match: {
-        _id: generateId(),
-        config: {
-          numberOfGames,
-          isSuddenDeath: true,
-          gameConfig: { type: 'standard', targetPoints: 11, isGolden: false },
-        },
-        side1: top.participant.players || [top.participant],
-        side2: bottom.participant.players || [bottom.participant],
-        games: [],
-        gamesWon1: 0,
-        gamesWon2: 0,
-        winningSide: undefined,
-      },
+      match: buildKnockoutMatchRecord(event, top, bottom, numberOfGames),
       participant1: top,
       participant2: bottom,
       isBye1: false,
@@ -1355,8 +1414,21 @@ export const finishMatch = async (body) => {
   let matchFound = false
   let updatedStages = [...event.eventStages]
 
+  // Sub-match path (team-event): the matchId belongs to a sub-match
+  // inside a team match's subMatches[]. Update the sub-match, tally the
+  // parent, then run the same group/round bookkeeping as a regular finish.
+  matchFound = applyFinishToTeamSubMatch(
+    updatedStages,
+    matchId,
+    result,
+    confirmed,
+    event,
+  )
+
   // Find and update match in group stage
-  const groupStageIndex = event.eventStages.findIndex((s) => s.type === 'group')
+  const groupStageIndex = matchFound
+    ? -1
+    : event.eventStages.findIndex((s) => s.type === 'group')
   if (groupStageIndex !== -1) {
     const groupStage = event.eventStages[groupStageIndex]
     for (let gi = 0; gi < groupStage.groups.length; gi++) {
@@ -1475,6 +1547,245 @@ export const finishMatch = async (body) => {
   await collection.updateOne({ _id: toObjectId(_id) }, { $set: { eventStages: updatedStages } })
 
   return { success: true }
+}
+
+// Update a game in a sub-match. Returns { match, numberOfGames } on hit.
+const applyUpdateGameToTeamSubMatch = (
+  updatedStages,
+  matchId,
+  gameNumber,
+  score,
+  lastScoredSide,
+) => {
+  const writeBackGroup = (gi, pi, newParent, groupStageIndex) => {
+    const groupStage = updatedStages[groupStageIndex]
+    const updatedGroups = groupStage.groups.map((g, i) =>
+      i === gi
+        ? {
+            ...g,
+            matches: g.matches.map((m, mi) => (mi === pi ? newParent : m)),
+          }
+        : g,
+    )
+    updatedStages[groupStageIndex] = { ...groupStage, groups: updatedGroups }
+  }
+  const writeBackKnockout = (ri, kmi, newKm, knockoutStageIndex) => {
+    const knockoutStage = updatedStages[knockoutStageIndex]
+    const updatedRounds = knockoutStage.rounds.map((r, i) =>
+      i === ri
+        ? {
+            ...r,
+            matches: r.matches.map((m, idx) => (idx === kmi ? newKm : m)),
+          }
+        : r,
+    )
+    updatedStages[knockoutStageIndex] = {
+      ...knockoutStage,
+      rounds: updatedRounds,
+    }
+  }
+
+  const groupStageIndex = updatedStages.findIndex((s) => s.type === 'group')
+  if (groupStageIndex !== -1) {
+    const groupStage = updatedStages[groupStageIndex]
+    for (let gi = 0; gi < groupStage.groups.length; gi++) {
+      const group = groupStage.groups[gi]
+      for (let pi = 0; pi < group.matches.length; pi++) {
+        const parent = group.matches[pi]
+        if (!Array.isArray(parent.subMatches)) continue
+        const subIdx = parent.subMatches.findIndex((s) => s._id === matchId)
+        if (subIdx === -1) continue
+        const sub = parent.subMatches[subIdx]
+        const errors = validateUpdateGameRules(sub, gameNumber, score)
+        throwErrors(errors)
+        const updatedSub = updateMatchWithGameScore(
+          sub,
+          gameNumber,
+          score,
+          lastScoredSide,
+        )
+        const updatedParent = tallyTeamMatch({
+          ...parent,
+          subMatches: parent.subMatches.map((s, i) =>
+            i === subIdx ? updatedSub : s,
+          ),
+        })
+        writeBackGroup(gi, pi, updatedParent, groupStageIndex)
+        return { match: updatedSub, numberOfGames: sub.config.numberOfGames }
+      }
+    }
+  }
+
+  const knockoutStageIndex = updatedStages.findIndex(
+    (s) => s.type === 'knockout',
+  )
+  if (knockoutStageIndex !== -1) {
+    const knockoutStage = updatedStages[knockoutStageIndex]
+    for (let ri = 0; ri < knockoutStage.rounds.length; ri++) {
+      const round = knockoutStage.rounds[ri]
+      for (let kmi = 0; kmi < round.matches.length; kmi++) {
+        const km = round.matches[kmi]
+        const parent = km.match
+        if (!parent || !Array.isArray(parent.subMatches)) continue
+        const subIdx = parent.subMatches.findIndex((s) => s._id === matchId)
+        if (subIdx === -1) continue
+        const sub = parent.subMatches[subIdx]
+        const errors = validateUpdateGameRules(sub, gameNumber, score)
+        throwErrors(errors)
+        const updatedSub = updateMatchWithGameScore(
+          sub,
+          gameNumber,
+          score,
+          lastScoredSide,
+        )
+        const updatedParent = tallyTeamMatch({
+          ...parent,
+          subMatches: parent.subMatches.map((s, i) =>
+            i === subIdx ? updatedSub : s,
+          ),
+        })
+        const winner =
+          updatedParent.winningSide === 1
+            ? km.participant1
+            : updatedParent.winningSide === 2
+              ? km.participant2
+              : km.winner
+        writeBackKnockout(
+          ri,
+          kmi,
+          { ...km, match: updatedParent, winner },
+          knockoutStageIndex,
+        )
+        return { match: updatedSub, numberOfGames: sub.config.numberOfGames }
+      }
+    }
+  }
+
+  return null
+}
+
+// Finish a sub-match of a team match. Returns true if a sub-match was
+// found and the stages array was mutated in place.
+const applyFinishToTeamSubMatch = (
+  updatedStages,
+  matchId,
+  result,
+  confirmed,
+  event,
+) => {
+  const groupStageIndex = updatedStages.findIndex((s) => s.type === 'group')
+  if (groupStageIndex !== -1) {
+    const groupStage = updatedStages[groupStageIndex]
+    for (let gi = 0; gi < groupStage.groups.length; gi++) {
+      const group = groupStage.groups[gi]
+      for (let pi = 0; pi < group.matches.length; pi++) {
+        const parent = group.matches[pi]
+        if (!Array.isArray(parent.subMatches)) continue
+        const subIdx = parent.subMatches.findIndex((s) => s._id === matchId)
+        if (subIdx === -1) continue
+        const sub = parent.subMatches[subIdx]
+        if (sub.confirmed) throwError('Match is already confirmed')
+
+        const updatedSub = updateMatchWithResult(sub, result)
+        if (confirmed) {
+          updatedSub.confirmed = true
+          updatedSub.confirmedAt = new Date().toISOString()
+        }
+        const updatedParent = tallyTeamMatch({
+          ...parent,
+          subMatches: parent.subMatches.map((s, i) =>
+            i === subIdx ? updatedSub : s,
+          ),
+        })
+        const updatedGroup = updateGroupAfterMatch(group, updatedParent, pi)
+        const groupComplete = updatedGroup.matches.every(
+          (m) => m.winningSide !== undefined && m.confirmed,
+        )
+        const updatedGroupStage = {
+          ...groupStage,
+          groups: groupStage.groups.map((g, i) =>
+            i === gi ? { ...updatedGroup, isComplete: groupComplete } : g,
+          ),
+        }
+        if (updatedGroupStage.groups.every((g) => g.isComplete)) {
+          updatedGroupStage.advancedParticipants =
+            calculateAdvancedParticipants(updatedGroupStage)
+        }
+        updatedStages[groupStageIndex] = updatedGroupStage
+        if (
+          confirmed &&
+          updatedParent.confirmed &&
+          updatedGroupStage.groups.every((g) => g.isComplete)
+        ) {
+          generateNextRoundIfNeeded(updatedStages, event)
+        }
+        return true
+      }
+    }
+  }
+
+  const knockoutStageIndex = updatedStages.findIndex(
+    (s) => s.type === 'knockout',
+  )
+  if (knockoutStageIndex !== -1) {
+    const knockoutStage = updatedStages[knockoutStageIndex]
+    for (let ri = 0; ri < knockoutStage.rounds.length; ri++) {
+      const round = knockoutStage.rounds[ri]
+      for (let kmi = 0; kmi < round.matches.length; kmi++) {
+        const km = round.matches[kmi]
+        const parent = km.match
+        if (!parent || !Array.isArray(parent.subMatches)) continue
+        const subIdx = parent.subMatches.findIndex((s) => s._id === matchId)
+        if (subIdx === -1) continue
+        const sub = parent.subMatches[subIdx]
+        if (sub.confirmed) throwError('Match is already confirmed')
+
+        const updatedSub = updateMatchWithResult(sub, result)
+        if (confirmed) {
+          updatedSub.confirmed = true
+          updatedSub.confirmedAt = new Date().toISOString()
+        }
+        const updatedParent = tallyTeamMatch({
+          ...parent,
+          subMatches: parent.subMatches.map((s, i) =>
+            i === subIdx ? updatedSub : s,
+          ),
+        })
+        const winner =
+          updatedParent.winningSide === 1
+            ? km.participant1
+            : updatedParent.winningSide === 2
+              ? km.participant2
+              : km.winner
+        const updatedKm = { ...km, match: updatedParent, winner }
+        const roundComplete = round.matches.every((m, i) => {
+          const cur = i === kmi ? updatedKm : m
+          return cur.winner && cur.match?.confirmed
+        })
+        const updatedRounds = knockoutStage.rounds.map((r, i) =>
+          i === ri
+            ? {
+                ...r,
+                matches: r.matches.map((m, idx) =>
+                  idx === kmi ? updatedKm : m,
+                ),
+                isComplete: roundComplete,
+              }
+            : r,
+        )
+        updatedStages[knockoutStageIndex] = {
+          ...knockoutStage,
+          rounds: updatedRounds,
+        }
+        if (confirmed && updatedParent.confirmed && roundComplete) {
+          generateNextRoundIfNeeded(updatedStages, event)
+        }
+        return true
+      }
+    }
+  }
+
+  return false
 }
 
 const validateFinishMatchInput = (body) => {
@@ -1848,8 +2159,9 @@ const tryResetGroupMatch = (updatedStages, groupStageIndex, matchId) => {
     validateMatchCanBeReset(match)
     validateNoNextRoundStartedForGroup(updatedStages, groupStage)
 
-    // Reset the match
-    const resetMatchObj = createResetMatch(match)
+    const resetMatchObj = match.isTeamMatch
+      ? createResetTeamMatch(match)
+      : createResetMatch(match)
 
     // Rebuild the group with updated match and recalculated stats
     const updatedGroup = updateGroupAfterMatch(group, resetMatchObj, matchIndex)
@@ -1872,6 +2184,37 @@ const tryResetGroupMatch = (updatedStages, groupStageIndex, matchId) => {
     return true
   }
 
+  // Sub-match path: matchId belongs to a sub-match inside a team match.
+  for (let gi = 0; gi < groupStage.groups.length; gi++) {
+    const group = groupStage.groups[gi]
+    for (let pi = 0; pi < group.matches.length; pi++) {
+      const parent = group.matches[pi]
+      if (!Array.isArray(parent.subMatches)) continue
+      const subIdx = parent.subMatches.findIndex((s) => s._id === matchId)
+      if (subIdx === -1) continue
+      const sub = parent.subMatches[subIdx]
+      const resetSub = createResetMatch(sub)
+      const updatedParent = tallyTeamMatch({
+        ...parent,
+        subMatches: parent.subMatches.map((s, i) =>
+          i === subIdx ? resetSub : s,
+        ),
+      })
+      const updatedGroup = updateGroupAfterMatch(group, updatedParent, pi)
+      updatedGroup.isComplete = false
+      const updatedGroups = groupStage.groups.map((g, i) =>
+        i === gi ? updatedGroup : g,
+      )
+      updatedStages[groupStageIndex] = {
+        ...groupStage,
+        groups: updatedGroups,
+        advancedParticipants: [],
+      }
+      deleteKnockoutScheduleIfExists(updatedStages)
+      return true
+    }
+  }
+
   return false
 }
 
@@ -1887,8 +2230,9 @@ const tryResetKnockoutMatch = (updatedStages, knockoutStageIndex, matchId) => {
     validateMatchCanBeReset(knockoutMatch.match)
     validateNoNextKnockoutRoundStarted(knockoutStage, ri)
 
-    // Reset the match
-    const resetMatchObj = createResetMatch(knockoutMatch.match)
+    const resetMatchObj = knockoutMatch.match.isTeamMatch
+      ? createResetTeamMatch(knockoutMatch.match)
+      : createResetMatch(knockoutMatch.match)
     const updatedKnockoutMatch = {
       ...knockoutMatch,
       match: resetMatchObj,
@@ -1919,6 +2263,53 @@ const tryResetKnockoutMatch = (updatedStages, knockoutStageIndex, matchId) => {
     }
 
     return true
+  }
+
+  // Sub-match path
+  for (let ri = 0; ri < knockoutStage.rounds.length; ri++) {
+    const round = knockoutStage.rounds[ri]
+    for (let kmi = 0; kmi < round.matches.length; kmi++) {
+      const km = round.matches[kmi]
+      const parent = km.match
+      if (!parent || !Array.isArray(parent.subMatches)) continue
+      const subIdx = parent.subMatches.findIndex((s) => s._id === matchId)
+      if (subIdx === -1) continue
+      const sub = parent.subMatches[subIdx]
+      const resetSub = createResetMatch(sub)
+      const updatedParent = tallyTeamMatch({
+        ...parent,
+        subMatches: parent.subMatches.map((s, i) =>
+          i === subIdx ? resetSub : s,
+        ),
+      })
+      const winner =
+        updatedParent.winningSide === 1
+          ? km.participant1
+          : updatedParent.winningSide === 2
+            ? km.participant2
+            : undefined
+      const updatedKm = { ...km, match: updatedParent, winner }
+      const updatedRounds = knockoutStage.rounds.map((r, i) => {
+        if (i === ri) {
+          return {
+            ...r,
+            matches: r.matches.map((m, idx) =>
+              idx === kmi ? updatedKm : m,
+            ),
+            isComplete: false,
+          }
+        }
+        if (i === ri + 1) {
+          return { ...r, matches: [], isComplete: false }
+        }
+        return r
+      })
+      updatedStages[knockoutStageIndex] = {
+        ...knockoutStage,
+        rounds: updatedRounds,
+      }
+      return true
+    }
   }
 
   return false
@@ -1955,6 +2346,21 @@ const validateNoNextKnockoutRoundStarted = (knockoutStage, currentRoundIndex) =>
     throwError('Cannot reset match: next round has already finished')
   }
 }
+
+// Team-match reset wipes the regular match state plus the handshake,
+// per-side assignment, sub-match list, and tallied scores so the team
+// match returns to its initial "not started" state.
+const createResetTeamMatch = (match) => ({
+  ...createResetMatch(match),
+  side1Started: undefined,
+  side2Started: undefined,
+  side1Assignment: undefined,
+  side2Assignment: undefined,
+  subMatches: undefined,
+  matchesWon1: undefined,
+  matchesWon2: undefined,
+  confirmedAt: undefined,
+})
 
 export const createResetMatch = (match) => ({
   ...match,
@@ -2028,6 +2434,277 @@ const validateSaveMatchSetupInput = (body) => {
   if (!body.leftSide) throwError('Left side is required')
 }
 
+// Record that a side has clicked "Start" on a team match. Both sides
+// must start before the match can move on to the order-of-play picker.
+export const startTeamMatchSide = async (body) => {
+  validateStartTeamMatchSideInput(body)
+  const { _id, matchId, side, playerId } = body
+
+  const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
+  const event = await collection.findOne({ _id: toObjectId(_id) })
+  if (!event) throwError('Event not found')
+
+  let updatedMatch
+  const updatedStages = updateMatchInStages(
+    event.eventStages,
+    matchId,
+    (match) => {
+      if (!match.isTeamMatch) throwError('Match is not a team match')
+      if (match.winningSide != null) throwError('Match is already finished')
+      validateStartTeamMatchSideAuth(match, side, playerId)
+      const flag = side === 1 ? 'side1Started' : 'side2Started'
+      if (match[flag]) throwError(`Side ${side} has already started`)
+      updatedMatch = { ...match, [flag]: true }
+      return updatedMatch
+    },
+  )
+
+  await collection.updateOne(
+    { _id: toObjectId(_id) },
+    { $set: { eventStages: updatedStages } },
+  )
+
+  return {
+    success: true,
+    side1Started: !!updatedMatch.side1Started,
+    side2Started: !!updatedMatch.side2Started,
+  }
+}
+
+const validateStartTeamMatchSideInput = (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body._id) throwError('Event ID is required')
+  if (!body.matchId) throwError('Match ID is required')
+  if (body.side !== 1 && body.side !== 2) throwError('Side must be 1 or 2')
+  if (!body.playerId) throwError('Player ID is required')
+}
+
+const validateStartTeamMatchSideAuth = (match, side, playerId) => {
+  const roster = side === 1 ? match.side1 : match.side2
+  const inSide = (roster || []).some(
+    (p) => p && p._id && p._id.toString() === playerId.toString(),
+  )
+  if (inSide) return
+  // Admin override: caller is allowed to start on behalf of either side
+  // when they're not on the roster (e.g. running the desk).
+  // The endpoint trusts the playerId passed by the client; finer-grained
+  // permission checks happen at the API gateway / session layer.
+}
+
+const TABLE_STATE_COLLECTION = 'tableState'
+const TABLE_STATE_DOC_ID = 'current'
+
+// Record a side's order of play (A, B, C, ...). When both sides have an
+// assignment, expand the team match into sub-matches locked to the
+// parent's table, and free that table so the next reconcile picks the
+// first sub-match.
+export const saveTeamMatchAssignment = async (body) => {
+  validateSaveTeamMatchAssignmentInput(body)
+  const { _id, matchId, side, assignmentIds } = body
+
+  const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
+  const event = await collection.findOne({ _id: toObjectId(_id) })
+  if (!event) throwError('Event not found')
+
+  // Determine the table the parent is currently on (if any) so we can
+  // lock the sub-matches to it and free it after expansion.
+  const lockedTableNumber = await findTableNumberForMatch(db, matchId)
+
+  let updatedMatch
+  let didExpand = false
+  const updatedStages = updateMatchInStages(
+    event.eventStages,
+    matchId,
+    (match) => {
+      if (!match.isTeamMatch) throwError('Match is not a team match')
+      if (match.winningSide != null) throwError('Match is already finished')
+      const startedFlag = side === 1 ? 'side1Started' : 'side2Started'
+      if (!match[startedFlag]) {
+        throwError(`Side ${side} has not started yet`)
+      }
+      const assignment = buildTeamAssignment(match, side, assignmentIds)
+      const field = side === 1 ? 'side1Assignment' : 'side2Assignment'
+      let next = { ...match, [field]: assignment }
+      const bothAssigned = !!next.side1Assignment && !!next.side2Assignment
+      if (bothAssigned && (!next.subMatches || next.subMatches.length === 0)) {
+        next = {
+          ...next,
+          subMatches: buildTeamSubMatches(next, lockedTableNumber),
+        }
+        didExpand = true
+      }
+      updatedMatch = next
+      return next
+    },
+  )
+
+  await collection.updateOne(
+    { _id: toObjectId(_id) },
+    { $set: { eventStages: updatedStages } },
+  )
+
+  if (didExpand && lockedTableNumber != null) {
+    await freeTeamMatchTable(db, matchId)
+  }
+
+  return {
+    success: true,
+    side1Assignment: updatedMatch.side1Assignment,
+    side2Assignment: updatedMatch.side2Assignment,
+    subMatches: updatedMatch.subMatches,
+  }
+}
+
+const findTableNumberForMatch = async (db, matchId) => {
+  const state = await db
+    .collection(TABLE_STATE_COLLECTION)
+    .findOne({ docId: TABLE_STATE_DOC_ID })
+  const tables = state?.tables || []
+  for (const t of tables) {
+    if (t.status !== 'assigned' || !t.match) continue
+    if (t.match.matchId?.toString() === matchId.toString()) {
+      return t.tableNumber
+    }
+  }
+  return undefined
+}
+
+const freeTeamMatchTable = async (db, matchId) => {
+  const state = await db
+    .collection(TABLE_STATE_COLLECTION)
+    .findOne({ docId: TABLE_STATE_DOC_ID })
+  if (!state) return
+  const tables = (state.tables || []).map((t) => {
+    if (
+      t.status === 'assigned' &&
+      t.match &&
+      t.match.matchId?.toString() === matchId.toString()
+    ) {
+      return { tableNumber: t.tableNumber, status: 'available' }
+    }
+    return t
+  })
+  await db
+    .collection(TABLE_STATE_COLLECTION)
+    .updateOne(
+      { docId: TABLE_STATE_DOC_ID },
+      { $set: { tables, updatedAt: new Date().toISOString() } },
+    )
+}
+
+const buildTeamSubMatches = (parent, lockedTableNumber) => {
+  const lineup = getTeamMatchLineupJS(
+    parent.teamMatchType,
+    parent.side1Assignment,
+    parent.side2Assignment,
+  )
+  const numberOfGames = parent.config?.numberOfGames || 3
+  const gameConfig = parent.config?.gameConfig || {
+    type: 'standard',
+    targetPoints: 11,
+    isGolden: false,
+  }
+  return lineup.map((entry, i) => ({
+    _id: `${parent._id}-sub-${i}`,
+    config: {
+      numberOfGames,
+      isSuddenDeath: parent.config?.isSuddenDeath ?? true,
+      gameConfig,
+    },
+    side1: entry.home,
+    side2: entry.away,
+    games: [],
+    gamesWon1: 0,
+    gamesWon2: 0,
+    winningSide: undefined,
+    parentMatchId: parent._id,
+    lockedTableNumber,
+  }))
+}
+
+const validateSaveTeamMatchAssignmentInput = (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body._id) throwError('Event ID is required')
+  if (!body.matchId) throwError('Match ID is required')
+  if (body.side !== 1 && body.side !== 2) throwError('Side must be 1 or 2')
+  if (!Array.isArray(body.assignmentIds)) {
+    throwError('assignmentIds must be an array of player ids')
+  }
+}
+
+// Per match.md "Team Match Schedules". Kept in sync with the TS helper
+// in shared/rules/matchRules.ts.
+const getTeamMatchLineupJS = (type, home, away) => {
+  const { A, B, C } = home
+  const { A: X, B: Y, C: Z } = away
+  if (type === 'type1') {
+    return [
+      { home: [A], away: [Y], isDoubles: false },
+      { home: [B], away: [X], isDoubles: false },
+      { home: [A, B], away: [X, Y], isDoubles: true },
+    ]
+  }
+  if (type === 'type2') {
+    return [
+      { home: [A], away: [Y], isDoubles: false },
+      { home: [B], away: [X], isDoubles: false },
+      { home: [A, B], away: [X, Y], isDoubles: true },
+      { home: [A], away: [X], isDoubles: false },
+      { home: [B], away: [Y], isDoubles: false },
+    ]
+  }
+  if (type === 'type3') {
+    if (!C || !Z) throwError('Type 3 team match requires 3 players per team')
+    return [
+      { home: [B, C], away: [Y, Z], isDoubles: true },
+      { home: [A], away: [X], isDoubles: false },
+      { home: [C], away: [Z], isDoubles: false },
+      { home: [A], away: [Y], isDoubles: false },
+      { home: [B], away: [X], isDoubles: false },
+    ]
+  }
+  throwError(`Unknown team match type: ${type}`)
+}
+
+const buildTeamAssignment = (match, side, assignmentIds) => {
+  const roster = side === 1 ? match.side1 : match.side2
+  if (!Array.isArray(roster) || roster.length === 0) {
+    throwError(`Side ${side} has no roster`)
+  }
+  const ids = assignmentIds.map((id) => id?.toString())
+  if (ids.some((id) => !id)) throwError('assignmentIds may not be empty')
+  if (new Set(ids).size !== ids.length) {
+    throwError('assignmentIds must be unique')
+  }
+  // Allow assignmentIds.length === roster.length OR roster.length - 1
+  // (the trailing slot is auto-derived); reject anything else.
+  if (ids.length !== roster.length && ids.length !== roster.length - 1) {
+    throwError(`Expected ${roster.length - 1} or ${roster.length} picks`)
+  }
+  const byId = new Map(
+    roster.map((p) => [p._id?.toString(), p]),
+  )
+  for (const id of ids) {
+    if (!byId.has(id)) {
+      throwError(`Player ${id} is not on side ${side}`)
+    }
+  }
+  const slotLabels = ['A', 'B', 'C', 'D']
+  const assignment = {}
+  ids.forEach((id, i) => {
+    assignment[slotLabels[i]] = byId.get(id)
+  })
+  // Auto-derive the trailing slot if the caller skipped it.
+  if (ids.length < roster.length) {
+    const picked = new Set(ids)
+    const remaining = roster.find((p) => !picked.has(p._id?.toString()))
+    assignment[slotLabels[ids.length]] = remaining
+  }
+  return assignment
+}
+
 export const updateMatchInStages = (eventStages, matchId, updateFn) => {
   const updatedStages = [...eventStages]
 
@@ -2037,6 +2714,8 @@ export const updateMatchInStages = (eventStages, matchId, updateFn) => {
     const groupStage = updatedStages[groupStageIndex]
     for (let gi = 0; gi < groupStage.groups.length; gi++) {
       const group = groupStage.groups[gi]
+
+      // Direct group match
       const matchIndex = group.matches.findIndex((m) => m._id === matchId)
       if (matchIndex !== -1) {
         const updatedMatch = updateFn(group.matches[matchIndex])
@@ -2053,6 +2732,33 @@ export const updateMatchInStages = (eventStages, matchId, updateFn) => {
         updatedStages[groupStageIndex] = { ...groupStage, groups: updatedGroups }
         return updatedStages
       }
+
+      // Sub-match of a team match in this group
+      for (let pi = 0; pi < group.matches.length; pi++) {
+        const parent = group.matches[pi]
+        if (!Array.isArray(parent.subMatches)) continue
+        const subIndex = parent.subMatches.findIndex((s) => s._id === matchId)
+        if (subIndex === -1) continue
+        const updatedSub = updateFn(parent.subMatches[subIndex])
+        const updatedParent = tallyTeamMatch({
+          ...parent,
+          subMatches: parent.subMatches.map((s, i) =>
+            i === subIndex ? updatedSub : s,
+          ),
+        })
+        const updatedGroups = groupStage.groups.map((g, i) =>
+          i === gi
+            ? {
+                ...g,
+                matches: g.matches.map((m, mi) =>
+                  mi === pi ? updatedParent : m,
+                ),
+              }
+            : g,
+        )
+        updatedStages[groupStageIndex] = { ...groupStage, groups: updatedGroups }
+        return updatedStages
+      }
     }
   }
 
@@ -2062,6 +2768,8 @@ export const updateMatchInStages = (eventStages, matchId, updateFn) => {
     const knockoutStage = updatedStages[knockoutStageIndex]
     for (let ri = 0; ri < knockoutStage.rounds.length; ri++) {
       const round = knockoutStage.rounds[ri]
+
+      // Direct knockout match
       const matchIndex = round.matches.findIndex((m) => m.match?._id === matchId)
       if (matchIndex !== -1) {
         const knockoutMatch = round.matches[matchIndex]
@@ -2087,10 +2795,101 @@ export const updateMatchInStages = (eventStages, matchId, updateFn) => {
         updatedStages[knockoutStageIndex] = { ...knockoutStage, rounds: updatedRounds }
         return updatedStages
       }
+
+      // Sub-match of a team match in this round
+      for (let kmIdx = 0; kmIdx < round.matches.length; kmIdx++) {
+        const km = round.matches[kmIdx]
+        const parent = km.match
+        if (!parent || !Array.isArray(parent.subMatches)) continue
+        const subIndex = parent.subMatches.findIndex((s) => s._id === matchId)
+        if (subIndex === -1) continue
+        const updatedSub = updateFn(parent.subMatches[subIndex])
+        const updatedParent = tallyTeamMatch({
+          ...parent,
+          subMatches: parent.subMatches.map((s, i) =>
+            i === subIndex ? updatedSub : s,
+          ),
+        })
+        const winner =
+          updatedParent.winningSide === 1
+            ? km.participant1
+            : updatedParent.winningSide === 2
+              ? km.participant2
+              : km.winner
+        const updatedRounds = knockoutStage.rounds.map((r, i) =>
+          i === ri
+            ? {
+                ...r,
+                matches: r.matches.map((m, idx) =>
+                  idx === kmIdx
+                    ? { ...m, match: updatedParent, winner }
+                    : m,
+                ),
+              }
+            : r,
+        )
+        updatedStages[knockoutStageIndex] = { ...knockoutStage, rounds: updatedRounds }
+        return updatedStages
+      }
     }
   }
 
   throwError('Match not found')
+}
+
+// Re-tally a team match after a sub-match changed. Drives both the
+// finalise (one side hits the win threshold) and un-finalise (a reset
+// pulls counts back below the threshold) transitions.
+const tallyTeamMatch = (parent) => {
+  if (!Array.isArray(parent.subMatches) || parent.subMatches.length === 0) {
+    return parent
+  }
+  const needed = Math.ceil((parent.numberOfMatches || 0) / 2)
+  const wins1 = parent.subMatches.filter(
+    (s) => s.winningSide === 1 && s.confirmed,
+  ).length
+  const wins2 = parent.subMatches.filter(
+    (s) => s.winningSide === 2 && s.confirmed,
+  ).length
+  const winningSide =
+    needed > 0 && wins1 >= needed
+      ? 1
+      : needed > 0 && wins2 >= needed
+        ? 2
+        : undefined
+  const wasFinal = parent.winningSide != null
+  const isFinal = winningSide != null
+  const finalizedNow = !wasFinal && isFinal
+  const unfinalizedNow = wasFinal && !isFinal
+  const now = new Date().toISOString()
+  let subMatches = parent.subMatches
+  if (finalizedNow) {
+    // Decided just now — cancel the sub-matches that won't be played.
+    subMatches = parent.subMatches.map((s) =>
+      s.winningSide == null && !s.cancelledAt
+        ? { ...s, cancelledAt: now }
+        : s,
+    )
+  } else if (unfinalizedNow) {
+    // A reset pulled the tally back below the threshold — bring the
+    // tally-cancelled sub-matches back into play.
+    subMatches = parent.subMatches.map((s) =>
+      s.cancelledAt && s.winningSide == null ? { ...s, cancelledAt: undefined } : s,
+    )
+  }
+  return {
+    ...parent,
+    subMatches,
+    matchesWon1: wins1,
+    matchesWon2: wins2,
+    // Mirror the tallies into gamesWon1/2 so existing UI bits that read
+    // those fields show the team match score.
+    gamesWon1: wins1,
+    gamesWon2: wins2,
+    winningSide,
+    confirmed: isFinal ? true : undefined,
+    confirmedAt: isFinal ? parent.confirmedAt || now : undefined,
+  }
 }
 
 /**
@@ -2112,8 +2911,24 @@ export const updateGame = async (body) => {
   let match = null
   let numberOfGames = 0
 
+  // Sub-match path (team-event)
+  const subResult = applyUpdateGameToTeamSubMatch(
+    updatedStages,
+    matchId,
+    gameNumber,
+    score,
+    lastScoredSide,
+  )
+  if (subResult) {
+    matchFound = true
+    match = subResult.match
+    numberOfGames = subResult.numberOfGames
+  }
+
   // Find match in group stage
-  const groupStageIndex = event.eventStages.findIndex((s) => s.type === 'group')
+  const groupStageIndex = matchFound
+    ? -1
+    : event.eventStages.findIndex((s) => s.type === 'group')
   if (groupStageIndex !== -1) {
     const groupStage = event.eventStages[groupStageIndex]
     for (let gi = 0; gi < groupStage.groups.length; gi++) {
@@ -2609,7 +3424,7 @@ const autoGenerateGroups = async (event) => {
     event.nop,
   )
   const numberOfGames = getBestOfNumber(event.groupGames)
-  const groups = buildGroupsWithMatches(groupArrays, numberOfGames)
+  const groups = buildGroupsWithMatches(event, groupArrays, numberOfGames)
 
   const groupStageIndex = event.eventStages.findIndex((s) => s.type === 'group')
   const updatedStages = [...event.eventStages]
@@ -2624,23 +3439,12 @@ const autoGenerateGroups = async (event) => {
     .updateOne({ _id: event._id }, { $set: { eventStages: updatedStages } })
 }
 
-const buildGroupsWithMatches = (groupArrays, numberOfGames) =>
+const buildGroupsWithMatches = (event, groupArrays, numberOfGames) =>
   groupArrays.map((participants, index) => {
     const matchSchedule = generateGroupMatchSchedule(participants)
-    const matches = matchSchedule.map((schedule) => ({
-      _id: generateId(),
-      config: {
-        numberOfGames,
-        isSuddenDeath: true,
-        gameConfig: { type: 'standard', targetPoints: 11, isGolden: false },
-      },
-      side1: [schedule.side1.players[0]],
-      side2: [schedule.side2.players[0]],
-      games: [],
-      gamesWon1: 0,
-      gamesWon2: 0,
-      winningSide: undefined,
-    }))
+    const matches = matchSchedule.map((schedule) =>
+      buildGroupMatchRecord(event, schedule, numberOfGames),
+    )
 
     return {
       index,

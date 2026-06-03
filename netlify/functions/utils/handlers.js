@@ -25,6 +25,8 @@ import {
   confirmMatch,
   updateGame,
   saveMatchSetup,
+  startTeamMatchSide,
+  saveTeamMatchAssignment,
   resetMatch,
   resetEvent,
 } from './eventHandlers.js'
@@ -83,6 +85,8 @@ export const apiHandlers = {
     confirmMatch: withEventNotify(confirmMatch),
     updateGame: withEventNotify(updateGame),
     saveMatchSetup: withEventNotify(saveMatchSetup),
+    startTeamMatchSide: withEventNotify(startTeamMatchSide),
+    saveTeamMatchAssignment: withEventNotify(saveTeamMatchAssignment),
     resetMatch: withEventNotify(resetMatch),
     resetEvent: withEventNotify(resetEvent),
     registerForEvent: withEventNotify(registerForEvent),

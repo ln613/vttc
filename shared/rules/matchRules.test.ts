@@ -594,14 +594,14 @@ describe('Team Match Rules', () => {
       const lineup = getTeamMatchLineup('type1', homeAssignment, awayAssignment)
 
       expect(lineup.length).toBe(3)
-      // Match 1: A vs X (singles)
+      // Match 1: A vs Y (singles)
       expect(lineup[0].home).toEqual([homeAssignment.A])
-      expect(lineup[0].away).toEqual([awayAssignment.A])
+      expect(lineup[0].away).toEqual([awayAssignment.B])
       expect(lineup[0].isDoubles).toBe(false)
 
-      // Match 2: B vs Y (singles)
+      // Match 2: B vs X (singles)
       expect(lineup[1].home).toEqual([homeAssignment.B])
-      expect(lineup[1].away).toEqual([awayAssignment.B])
+      expect(lineup[1].away).toEqual([awayAssignment.A])
       expect(lineup[1].isDoubles).toBe(false)
 
       // Match 3: AB vs XY (doubles)
@@ -614,24 +614,24 @@ describe('Team Match Rules', () => {
       const lineup = getTeamMatchLineup('type2', homeAssignment, awayAssignment)
 
       expect(lineup.length).toBe(5)
-      // Match 1: A vs X
+      // Match 1: A vs Y
       expect(lineup[0].home).toEqual([homeAssignment.A])
-      expect(lineup[0].away).toEqual([awayAssignment.A])
+      expect(lineup[0].away).toEqual([awayAssignment.B])
 
-      // Match 2: B vs Y
+      // Match 2: B vs X
       expect(lineup[1].home).toEqual([homeAssignment.B])
-      expect(lineup[1].away).toEqual([awayAssignment.B])
+      expect(lineup[1].away).toEqual([awayAssignment.A])
 
       // Match 3: AB vs XY
       expect(lineup[2].isDoubles).toBe(true)
 
-      // Match 4: A vs Y
+      // Match 4: A vs X
       expect(lineup[3].home).toEqual([homeAssignment.A])
-      expect(lineup[3].away).toEqual([awayAssignment.B])
+      expect(lineup[3].away).toEqual([awayAssignment.A])
 
-      // Match 5: B vs X
+      // Match 5: B vs Y
       expect(lineup[4].home).toEqual([homeAssignment.B])
-      expect(lineup[4].away).toEqual([awayAssignment.A])
+      expect(lineup[4].away).toEqual([awayAssignment.B])
     })
 
     it('should return correct lineup for type3 (team of 3, 5 matches)', () => {

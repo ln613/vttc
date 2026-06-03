@@ -240,8 +240,7 @@ const extractFromGroup = (
 ) => {
   for (const group of stage.groups || []) {
     for (const match of group.matches || []) {
-      entries.push({
-        match,
+      pushTeamAwareEntries(entries, match, {
         groupIndex: group.index,
         stage: 'group',
         eventId: event._id,
@@ -260,8 +259,7 @@ const extractFromKnockout = (
   for (const round of stage.rounds || []) {
     for (const km of round.matches || []) {
       if (km.isBye1 || km.isBye2 || !km.match) continue
-      entries.push({
-        match: km.match,
+      pushTeamAwareEntries(entries, km.match, {
         groupIndex: round.index,
         stage: 'knockout',
         eventId: event._id,
@@ -270,6 +268,30 @@ const extractFromKnockout = (
       })
     }
   }
+}
+
+// For team matches: emit the parent when the team match is finalized
+// (so finished views show the team-level score) and emit the live
+// sub-matches otherwise (so queue/onTables views show who's actually
+// playing). Plain matches pass through unchanged.
+const pushTeamAwareEntries = (
+  entries: MatchEntry[],
+  match: Match,
+  ctx: Omit<MatchEntry, 'match'>,
+) => {
+  const isTeam = !!match.isTeamMatch
+  const hasSubs =
+    Array.isArray(match.subMatches) && match.subMatches.length > 0
+  const finalised = match.winningSide != null && match.confirmed === true
+
+  if (isTeam && hasSubs && !finalised) {
+    for (const sub of match.subMatches!) {
+      if (sub.cancelledAt) continue
+      entries.push({ ...ctx, match: sub })
+    }
+    return
+  }
+  entries.push({ ...ctx, match })
 }
 
 const isUserInEntry = (entry: MatchEntry): boolean => {

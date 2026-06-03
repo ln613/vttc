@@ -499,7 +499,11 @@ export const MatchRow = (props: MatchRowProps) => {
   const hasStarted = () =>
     hasResult() ||
     (props.match.games && props.match.games.length > 0) ||
-    (props.match.initialServingSide != null && props.match.leftSide != null)
+    (props.match.initialServingSide != null && props.match.leftSide != null) ||
+    // Team match handshake / sub-match generation also counts as started.
+    !!props.match.side1Started ||
+    !!props.match.side2Started ||
+    (Array.isArray(props.match.subMatches) && props.match.subMatches.length > 0)
   const isConfirming = () =>
     eventDetailState.confirmingMatchId === props.match._id
   const isResetting = () =>
@@ -560,6 +564,39 @@ export const MatchRow = (props: MatchRowProps) => {
     eventDetailActions.simulateMatch(props.match._id, props.match, eventId)
   }
 
+  const showStart = () =>
+    !hasStarted() &&
+    assignedTable() !== undefined &&
+    canStartOrContinue()
+  const showContinue = () =>
+    hasStarted() &&
+    !hasResult() &&
+    !provisional().winningSide &&
+    assignedTable() !== undefined &&
+    canStartOrContinue()
+  const showConfirm = () =>
+    (hasResult() || !!provisional().winningSide) &&
+    !isConfirmed() &&
+    canStartOrContinue()
+  const showSimulate = () =>
+    authState.isAdmin &&
+    isSimulationEnabled() &&
+    !hasResult() &&
+    !provisional().winningSide &&
+    liveScoreActions.getAssignedMatchIds().has(props.match._id)
+  const hasAnyAction = () =>
+    showStart() ||
+    showContinue() ||
+    showConfirm() ||
+    canReset() ||
+    showSimulate()
+
+  const showQueueBadge = () =>
+    !props.hideQueueBadge &&
+    assignedTable() === undefined &&
+    inQueue() &&
+    phase() === 'not_started'
+  const hasBadge = () => assignedTable() !== undefined || showQueueBadge()
   return (
     <div
       style={getMatchRowStyle(
@@ -571,17 +608,15 @@ export const MatchRow = (props: MatchRowProps) => {
       <Show when={assignedTable() !== undefined}>
         <div style={matchRowTableNumberStyle}>{assignedTable()}</div>
       </Show>
-      <Show
-        when={
-          !props.hideQueueBadge &&
-          assignedTable() === undefined &&
-          inQueue() &&
-          phase() === 'not_started'
-        }
-      >
+      <Show when={showQueueBadge()}>
         <div style={matchRowTableNumberStyle}>Q</div>
       </Show>
-      <div style={matchContentContainerStyle}>
+      <div
+        style={{
+          ...matchContentContainerStyle,
+          ...(hasBadge() ? matchContentWithBadgeStyle : {}),
+        }}
+      >
         <Show
           when={props.displayStyle === 'compact'}
           fallback={
@@ -605,81 +640,55 @@ export const MatchRow = (props: MatchRowProps) => {
           <GameScoresDisplay games={props.match.games} />
         </Show>
       </div>
-      <div style={matchRowActionsStyle}>
-        <Show
-          when={
-            !hasStarted() &&
-            assignedTable() !== undefined &&
-            canStartOrContinue()
-          }
-        >
-          <Button
-            onClick={handleStartClick}
-            color="#27ae60"
-            size="small"
-            disabled={startContinueDisabled()}
-          >
-            {isUserInMatch(props.match) ? 'Start' : 'Umpire'}
-          </Button>
-        </Show>
-        <Show
-          when={
-            hasStarted() &&
-            !hasResult() &&
-            !provisional().winningSide &&
-            assignedTable() !== undefined &&
-            canStartOrContinue()
-          }
-        >
-          <Button
-            onClick={handleStartClick}
-            color="#e67e22"
-            size="small"
-            disabled={startContinueDisabled()}
-          >
-            {isUserInMatch(props.match) ? 'Continue' : 'Umpire'}
-          </Button>
-        </Show>
-        <Show
-          when={
-            (hasResult() || provisional().winningSide) &&
-            !isConfirmed() &&
-            canStartOrContinue()
-          }
-        >
-          <Button
-            onClick={handleConfirmClick}
-            color="#e74c3c"
-            size="small"
-            disabled={isConfirming()}
-          >
-            {isConfirming() ? 'Confirming...' : 'Confirm'}
-          </Button>
-        </Show>
-        <Show when={canReset()}>
-          <Button
-            onClick={handleResetClick}
-            color="#e74c3c"
-            size="small"
-            disabled={isResetting()}
-          >
-            {isResetting() ? 'Resetting...' : 'Reset'}
-          </Button>
-        </Show>
-        <Show
-          when={
-            authState.isAdmin &&
-            isSimulationEnabled() &&
-            !hasResult() &&
-            !provisional().winningSide &&
-            liveScoreActions.getAssignedMatchIds().has(props.match._id)
-          }
-        >
-          <Button onClick={handleSimulateClick} color="#9b59b6" size="small">
-            Simulate
-          </Button>
-        </Show>
-      </div>
+      <Show when={hasAnyAction()}>
+        <div style={matchRowActionsStyle}>
+          <Show when={showStart()}>
+            <Button
+              onClick={handleStartClick}
+              color="#27ae60"
+              size="small"
+              disabled={startContinueDisabled()}
+            >
+              {isUserInMatch(props.match) ? 'Start' : 'Umpire'}
+            </Button>
+          </Show>
+          <Show when={showContinue()}>
+            <Button
+              onClick={handleStartClick}
+              color="#e67e22"
+              size="small"
+              disabled={startContinueDisabled()}
+            >
+              {isUserInMatch(props.match) ? 'Continue' : 'Umpire'}
+            </Button>
+          </Show>
+          <Show when={showConfirm()}>
+            <Button
+              onClick={handleConfirmClick}
+              color="#e74c3c"
+              size="small"
+              disabled={isConfirming()}
+            >
+              {isConfirming() ? 'Confirming...' : 'Confirm'}
+            </Button>
+          </Show>
+          <Show when={canReset()}>
+            <Button
+              onClick={handleResetClick}
+              color="#e74c3c"
+              size="small"
+              disabled={isResetting()}
+            >
+              {isResetting() ? 'Resetting...' : 'Reset'}
+            </Button>
+          </Show>
+          <Show when={showSimulate()}>
+            <Button onClick={handleSimulateClick} color="#9b59b6" size="small">
+              Simulate
+            </Button>
+          </Show>
+        </div>
+      </Show>
     </div>
   )
 }
@@ -809,6 +818,7 @@ const MatchRowsTable = (props: MatchRowsTableProps) => {
         side={1}
         isWinner={side1IsWinner()}
       />
+      <div style={matchSidesSeparatorStyle} />
       <MatchSideRow
         players={props.side2Players}
         games={games()}
@@ -1651,6 +1661,14 @@ const matchContentContainerStyle: JSX.CSSProperties = {
   'align-items': 'center',
   gap: '6px',
   width: '100%',
+  'min-width': 0,
+  'box-sizing': 'border-box',
+}
+
+// Push the score/buttons content right when a Q or table-number badge
+// is rendered on the left so long team rosters don't slide under it.
+const matchContentWithBadgeStyle: JSX.CSSProperties = {
+  'padding-left': '64px',
 }
 
 const matchRowActionsStyle: JSX.CSSProperties = {
@@ -1664,26 +1682,31 @@ const matchRowActionsStyle: JSX.CSSProperties = {
 }
 
 const matchRowsTableStyle: JSX.CSSProperties = {
-  display: 'inline-grid',
-  'grid-template-columns': 'auto auto auto',
-  'column-gap': '16px',
+  display: 'grid',
+  'grid-template-columns': 'minmax(0, 1fr) auto auto',
+  'column-gap': '12px',
   'row-gap': '4px',
-  'align-self': 'flex-end',
   'align-items': 'center',
-  'justify-items': 'center',
+  width: '100%',
+  'min-width': 0,
 }
 
 const matchSideRowStyle: JSX.CSSProperties = {
   display: 'contents',
 }
 
+const matchSidesSeparatorStyle: JSX.CSSProperties = {
+  'grid-column': '1 / -1',
+  height: '1px',
+  'background-color': '#e0e0e0',
+}
+
 const matchSideNameStyle: JSX.CSSProperties = {
   'font-size': '14px',
   'text-align': 'right',
-  'justify-self': 'end',
-  overflow: 'hidden',
-  'text-overflow': 'ellipsis',
-  'white-space': 'nowrap',
+  'justify-self': 'stretch',
+  'word-break': 'break-word',
+  'min-width': 0,
 }
 
 const matchSideScoresStyle: JSX.CSSProperties = {

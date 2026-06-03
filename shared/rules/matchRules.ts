@@ -282,7 +282,28 @@ export const getProvisionalMatchResult = (match: {
   games?: { winningSide?: number }[]
   config?: { numberOfGames?: number }
   winningSide?: number | null
+  isTeamMatch?: boolean
+  subMatches?: { winningSide?: 1 | 2 }[]
+  numberOfMatches?: number
 }): { gamesWon1: number; gamesWon2: number; winningSide: 1 | 2 | undefined } => {
+  // Team match: count by sub-matches, not games.
+  if (match.isTeamMatch && Array.isArray(match.subMatches)) {
+    const subs = match.subMatches
+    const wins1 = subs.filter((s) => s.winningSide === 1).length
+    const wins2 = subs.filter((s) => s.winningSide === 2).length
+    const needed = match.numberOfMatches
+      ? Math.ceil(match.numberOfMatches / 2)
+      : undefined
+    const winningSide: 1 | 2 | undefined =
+      match.winningSide === 1 || match.winningSide === 2
+        ? match.winningSide
+        : needed && wins1 >= needed
+          ? 1
+          : needed && wins2 >= needed
+            ? 2
+            : undefined
+    return { gamesWon1: wins1, gamesWon2: wins2, winningSide }
+  }
   if (match.winningSide === 1 || match.winningSide === 2) {
     const games = match.games || []
     return {
@@ -451,19 +472,19 @@ export const getTeamMatchLineup = (
     case 'type1':
       // Team of 2, 3 matches
       return [
-        { home: [A], away: [X], isDoubles: false }, // A vs X
-        { home: [B], away: [Y], isDoubles: false }, // B vs Y
+        { home: [A], away: [Y], isDoubles: false }, // A vs Y
+        { home: [B], away: [X], isDoubles: false }, // B vs X
         { home: [A, B], away: [X, Y], isDoubles: true }, // AB vs XY
       ]
 
     case 'type2':
       // Team of 2, 5 matches
       return [
-        { home: [A], away: [X], isDoubles: false }, // A vs X
-        { home: [B], away: [Y], isDoubles: false }, // B vs Y
-        { home: [A, B], away: [X, Y], isDoubles: true }, // AB vs XY
         { home: [A], away: [Y], isDoubles: false }, // A vs Y
         { home: [B], away: [X], isDoubles: false }, // B vs X
+        { home: [A, B], away: [X, Y], isDoubles: true }, // AB vs XY
+        { home: [A], away: [X], isDoubles: false }, // A vs X
+        { home: [B], away: [Y], isDoubles: false }, // B vs Y
       ]
 
     case 'type3':

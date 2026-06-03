@@ -69,3 +69,16 @@ This process will be triggered when
   - all tables are available, and
   - there is an event already started (today's event, the current time passed the event's start time)
   then start the assigning process (if an already started event doesn't have groups, generate the groups, if it doesn't have schedule for the current stage/round, generate the schedule)
+
+## Team Events
+
+for team events
+- generate team match schedule, add to queue and assign tables for each team match just like singles, e.g., nan/bill vs tom/jack on table 6
+- a team match needs to start by both sides/teams, e.g., nan or bill needs to start, and tom or jack also needs to start
+- when start, each team needs to select the order of play
+  - for home team, who is A, B, C...
+  - for away team, who is X, Y, Z...
+- after both sides select the order, generate the sub-matches of the current team match (refer to #### Team Match Schedules in match.md), e.g., A vs Y, B vs X, AB vs XY...
+- put the sub-matches into the queue, and mark them current table only, and have the highest priority on that table
+- delete the current team match on the table
+- if one side/team reaches the "Team Match" winning score, e.g., reaches 2 for best of 3, reaches 3 for best of 5, finish the team match and delete the remaining sub-matches in queue

@@ -52,6 +52,31 @@ export interface Match {
   confirmed?: boolean // Whether the match result has been confirmed by both sides
   initialServingSide?: 1 | 2 // Which side serves first (set by umpire)
   leftSide?: 1 | 2 // Which side is on umpire's left (set by umpire)
+  homeSide?: 1 | 2 // Which side is the "home" team (team-event group matches)
+  // Team-event extensions: when this Match represents a team-vs-team
+  // contest, side1/side2 carry the full team rosters and the fields
+  // below identify the match as a team match. Sub-matches are not yet
+  // expanded; that happens after both sides pick their order of play.
+  isTeamMatch?: boolean
+  teamMatchType?: TeamMatchType
+  numberOfMatches?: 3 | 5 // Best-of-N team sub-matches
+  participantIds?: { side1: string; side2: string }
+  // Handshake: which sides have clicked "Start" (team events only).
+  side1Started?: boolean
+  side2Started?: boolean
+  // Order of play picked by each side after the start handshake.
+  side1Assignment?: TeamAssignment
+  side2Assignment?: TeamAssignment
+  // Sub-matches generated once both orders are saved. Each sub-match is a
+  // regular singles/doubles Match locked to the parent's table.
+  subMatches?: Match[]
+  // For sub-matches: pointer back to the parent team match and the table
+  // they must run on.
+  parentMatchId?: string
+  lockedTableNumber?: number
+  cancelledAt?: string
+  postponedUntil?: string
+  confirmedAt?: string
 }
 
 /**

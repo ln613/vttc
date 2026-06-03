@@ -141,6 +141,25 @@ const extractGroupMatches = (event, eventSummary, items) => {
       if (isMatchFinishedAndConfirmed(match)) continue
       if (isMatchPostponed(match)) continue
 
+      // Expanded team match: emit its sub-matches instead of the parent.
+      if (
+        match.isTeamMatch &&
+        Array.isArray(match.subMatches) &&
+        match.subMatches.length > 0
+      ) {
+        pushTeamSubMatchItems(match, items, {
+          eventId: event._id.toString(),
+          eventName: event.eventName,
+          stageType: 'group',
+          stageName: `Group ${group.index + 1}`,
+          groupIndex: group.index,
+          groupSize,
+          groupKey,
+          event: eventSummary,
+        })
+        continue
+      }
+
       items.push({
         matchId: match._id,
         eventId: event._id.toString(),
@@ -159,6 +178,33 @@ const extractGroupMatches = (event, eventSummary, items) => {
   }
 }
 
+const pushTeamSubMatchItems = (parent, items, ctx) => {
+  for (const sub of parent.subMatches) {
+    if (isMatchFinishedAndConfirmed(sub)) continue
+    if (isMatchPostponed(sub)) continue
+    // Sub-matches cancelled because the team match has already been
+    // decided are removed from the queue entirely.
+    if (sub.cancelledAt) continue
+    items.push({
+      matchId: sub._id,
+      eventId: ctx.eventId,
+      eventName: ctx.eventName,
+      match: sub,
+      stageType: ctx.stageType,
+      stageName: ctx.stageName,
+      ...(ctx.groupIndex != null ? { groupIndex: ctx.groupIndex } : {}),
+      ...(ctx.groupSize != null ? { groupSize: ctx.groupSize } : {}),
+      ...(ctx.groupKey ? { groupKey: ctx.groupKey } : {}),
+      ...(ctx.roundName ? { roundName: ctx.roundName } : {}),
+      matchStatus: getMatchStatus(sub),
+      cancelledAt: sub.cancelledAt,
+      event: ctx.event,
+      lockedTableNumber: sub.lockedTableNumber,
+      parentMatchId: parent._id,
+    })
+  }
+}
+
 const extractKnockoutMatches = (event, eventSummary, items) => {
   const knockoutStage = event.eventStages?.find((s) => s.type === 'knockout')
   if (!knockoutStage || !knockoutStage.rounds) return
@@ -171,6 +217,22 @@ const extractKnockoutMatches = (event, eventSummary, items) => {
       if (!km.match) continue
       if (isMatchFinishedAndConfirmed(km.match)) continue
       if (isMatchPostponed(km.match)) continue
+
+      if (
+        km.match.isTeamMatch &&
+        Array.isArray(km.match.subMatches) &&
+        km.match.subMatches.length > 0
+      ) {
+        pushTeamSubMatchItems(km.match, items, {
+          eventId: event._id.toString(),
+          eventName: event.eventName,
+          stageType: 'knockout',
+          stageName: round.name,
+          roundName: round.name,
+          event: eventSummary,
+        })
+        continue
+      }
 
       items.push({
         matchId: km.match._id,
@@ -421,6 +483,16 @@ const buildMatchQueue = (matchItems) => {
 // matches always come first so they reclaim tables before not-started matches
 // (avoids losing the table on a cold rebuild of tableState). Cancelled matches
 // go last, per the cancel spec.
+const collectLockedSubMatchTables = (queue, myLocked) => {
+  const tables = new Set()
+  for (const it of queue) {
+    if (it.lockedTableNumber != null && it.lockedTableNumber !== myLocked) {
+      tables.add(it.lockedTableNumber)
+    }
+  }
+  return tables
+}
+
 const matchPriority = (item) => {
   if (item.cancelledAt) return 2
   if (
@@ -429,6 +501,9 @@ const matchPriority = (item) => {
   ) {
     return 0
   }
+  // Sub-matches of an expanded team match are locked to their table and
+  // should run ahead of any other not-yet-started work on that table.
+  if (item.lockedTableNumber != null) return 0
   return 1
 }
 
@@ -513,14 +588,47 @@ const assignTablesToMatches = (tables, queue, allItems, groupTableMap) => {
         .map(([, table]) => table),
     )
 
+    // Tables locked by sub-matches of an expanded team match are
+    // off-limits to anyone whose lockedTableNumber doesn't match.
+    const lockedSubMatchTables = collectLockedSubMatchTables(
+      queue,
+      item.lockedTableNumber,
+    )
+
     const availableTables = updatedTables
       .filter(
-        (t) => t.status === 'available' && !reservedForOthers.has(t.tableNumber),
+        (t) =>
+          t.status === 'available' &&
+          !reservedForOthers.has(t.tableNumber) &&
+          !lockedSubMatchTables.has(t.tableNumber),
       )
       .map((t) => t.tableNumber)
 
     if (availableTables.length === 0) {
       remainingQueue.push(item)
+      continue
+    }
+
+    // Items locked to a specific table only accept that table.
+    if (item.lockedTableNumber != null) {
+      if (!availableTables.includes(item.lockedTableNumber)) {
+        remainingQueue.push(item)
+        continue
+      }
+      const tableNumber = item.lockedTableNumber
+      const tableIndex = updatedTables.findIndex(
+        (t) => t.tableNumber === tableNumber,
+      )
+      updatedTables[tableIndex] = {
+        ...updatedTables[tableIndex],
+        match: { ...item, tableNumber },
+        status: 'assigned',
+      }
+      const match = item.match
+      if (match) {
+        for (const p of match.side1 || []) playersOnTables.add(p._id?.toString())
+        for (const p of match.side2 || []) playersOnTables.add(p._id?.toString())
+      }
       continue
     }
 

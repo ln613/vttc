@@ -89,19 +89,19 @@ A team match is a series of matches (MS) between 2 teams with 2 or more players 
 
 - team of 2
 - 3 matches:
-  - 1st: single match A vs X
-  - 2nd: single match B vs Y
+  - 1st: single match A vs Y
+  - 2nd: single match B vs X
   - 3rd: double match AB vs XY
 
 #### Team of 2, Best of 5 Matches
 
 - team of 2
 - 5 matches:
-  - 1st: single match A vs X
-  - 2nd: single match B vs Y
+  - 1st: single match A vs Y
+  - 2nd: single match B vs X
   - 3rd: double match AB vs XY
-  - 4th: single match A vs Y
-  - 5th: single match B vs X
+  - 4th: single match A vs X
+  - 5th: single match B vs Y
 
 #### Team of 3, Best of 5 Matches
 

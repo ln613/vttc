@@ -460,6 +460,76 @@ export const gamePlayActions = {
     saveMatchSetup()
   },
 
+  isTeamMatch: (): boolean => {
+    const match = gamePlayActions.getCurrentMatch()
+    return !!match?.isTeamMatch
+  },
+
+  bothSidesStarted: (): boolean => {
+    const match = gamePlayActions.getCurrentMatch()
+    return !!(match?.side1Started && match?.side2Started)
+  },
+
+  getUserSideInMatch: (): 1 | 2 | undefined => {
+    const uid = authState.user?._id?.toString()
+    if (!uid) return undefined
+    const match = gamePlayActions.getCurrentMatch()
+    if (!match) return undefined
+    if ((match.side1 || []).some((p) => p._id?.toString() === uid)) return 1
+    if ((match.side2 || []).some((p) => p._id?.toString() === uid)) return 2
+    return undefined
+  },
+
+  startTeamSide: async (side: 1 | 2) => {
+    const { eventId, matchId } = gamePlayState
+    const uid = authState.user?._id?.toString()
+    if (!eventId || !matchId || !uid) return
+    try {
+      await apiPost('startTeamMatchSide', {
+        _id: eventId,
+        matchId,
+        side,
+        playerId: uid,
+      })
+      await fetchEvent(eventId)
+    } catch (err) {
+      setGamePlayState({
+        sessionError:
+          err instanceof Error ? err.message : 'Failed to start team match',
+      })
+    }
+  },
+
+  hasSideAssignment: (side: 1 | 2): boolean => {
+    const match = gamePlayActions.getCurrentMatch()
+    return !!(side === 1 ? match?.side1Assignment : match?.side2Assignment)
+  },
+
+  bothSidesAssigned: (): boolean =>
+    gamePlayActions.hasSideAssignment(1) &&
+    gamePlayActions.hasSideAssignment(2),
+
+  saveTeamSideAssignment: async (side: 1 | 2, assignmentIds: string[]) => {
+    const { eventId, matchId } = gamePlayState
+    if (!eventId || !matchId) return
+    try {
+      await apiPost('saveTeamMatchAssignment', {
+        _id: eventId,
+        matchId,
+        side,
+        assignmentIds,
+      })
+      await fetchEvent(eventId)
+    } catch (err) {
+      setGamePlayState({
+        sessionError:
+          err instanceof Error
+            ? err.message
+            : 'Failed to save team match order',
+      })
+    }
+  },
+
   toggleMenu: () => {
     setGamePlayState({ menuOpen: !gamePlayState.menuOpen })
   },
@@ -584,14 +654,25 @@ export const gamePlayActions = {
     if (!gamePlayState.data || !gamePlayState.matchId) return undefined
 
     const stages = gamePlayState.data.eventStages || []
+    const targetId = gamePlayState.matchId
+
+    const findInMatches = (matches: Match[]): Match | undefined => {
+      for (const m of matches) {
+        if (m._id === targetId) return m
+        if (m.subMatches) {
+          const sub = m.subMatches.find((s) => s._id === targetId)
+          if (sub) return sub
+        }
+      }
+      return undefined
+    }
 
     // Check group stage
     const groupStage = stages.find((s) => s.type === 'group')
     if (groupStage && groupStage.type === 'group') {
-      const group = groupStage.groups.find((g) => g.index === gamePlayState.groupIndex)
-      if (group) {
-        const match = group.matches.find((m) => m._id === gamePlayState.matchId)
-        if (match) return match
+      for (const group of groupStage.groups) {
+        const found = findInMatches(group.matches)
+        if (found) return found
       }
     }
 
@@ -599,8 +680,11 @@ export const gamePlayActions = {
     const knockoutStage = stages.find((s) => s.type === 'knockout')
     if (knockoutStage && knockoutStage.type === 'knockout') {
       for (const round of knockoutStage.rounds) {
-        const knockoutMatch = round.matches.find((m) => m.match?._id === gamePlayState.matchId)
-        if (knockoutMatch?.match) return knockoutMatch.match
+        const flatMatches = round.matches
+          .map((m) => m.match)
+          .filter((m): m is Match => !!m)
+        const found = findInMatches(flatMatches)
+        if (found) return found
       }
     }
 
