@@ -14,6 +14,8 @@ import type { MatchPreview } from '../components/MatchConfirmDialog'
 import { apiGet, apiPost } from '../utils/api'
 import { waitForPendingSave } from './gamePlayStore'
 import { subscribeToEventUpdates, type EventSubscription } from '../utils/pusher'
+import { eventState } from './eventStore'
+import { getProvisionalMatchResult } from '../../shared/rules/matchRules'
 
 export type StageTab = 'group' | 'knockout' | 'bracket'
 
@@ -30,6 +32,7 @@ interface EventDetailState {
   confirmingMatchId: string | null
   showConfirmDialog: boolean
   confirmDialogMatchId: string | null
+  confirmDialogEventId: string | null
   resettingMatchId: string | null
   resettingEvent: boolean
   toastMessage: ToastMessage | null
@@ -53,6 +56,7 @@ const getInitialState = (): EventDetailState => ({
   confirmingMatchId: null,
   showConfirmDialog: false,
   confirmDialogMatchId: null,
+  confirmDialogEventId: null,
   resettingMatchId: null,
   toastMessage: null,
   resettingEvent: false,
@@ -322,10 +326,11 @@ export const eventDetailActions = {
     return 'Player'
   },
 
-  showConfirmDialog: (matchId: string) => {
+  showConfirmDialog: (matchId: string, eventId?: string) => {
     setEventDetailState({
       showConfirmDialog: true,
       confirmDialogMatchId: matchId,
+      confirmDialogEventId: eventId ?? eventDetailState.eventId,
     })
   },
 
@@ -333,13 +338,22 @@ export const eventDetailActions = {
     setEventDetailState({
       showConfirmDialog: false,
       confirmDialogMatchId: null,
+      confirmDialogEventId: null,
     })
   },
 
   getConfirmDialogMatch: (): Match | undefined => {
     const matchId = eventDetailState.confirmDialogMatchId
-    if (!matchId || !eventDetailState.data) return undefined
-    return findMatchById(eventDetailState.data, matchId)
+    if (!matchId) return undefined
+    if (eventDetailState.data) {
+      const m = findMatchById(eventDetailState.data, matchId)
+      if (m) return m
+    }
+    for (const event of eventState.data || []) {
+      const m = findMatchById(event, matchId)
+      if (m) return m
+    }
+    return undefined
   },
 
   getConfirmDialogPreview: (): MatchPreview | undefined => {
@@ -358,13 +372,16 @@ export const eventDetailActions = {
 
   confirmMatch: async () => {
     const matchId = eventDetailState.confirmDialogMatchId
-    const { eventId } = eventDetailState
+    const eventId =
+      eventDetailState.confirmDialogEventId ?? eventDetailState.eventId
     if (!eventId || !matchId) return
 
     setEventDetailState({ confirmingMatchId: matchId })
     try {
       await apiPost('confirmMatch', { _id: eventId, matchId })
-      await fetchEvent(eventId, true)
+      if (eventDetailState.eventId === eventId) {
+        await fetchEvent(eventId, true)
+      }
     } catch (err) {
       setEventDetailState({
         error:
@@ -375,6 +392,7 @@ export const eventDetailActions = {
         confirmingMatchId: null,
         showConfirmDialog: false,
         confirmDialogMatchId: null,
+        confirmDialogEventId: null,
       })
     }
   },
@@ -507,7 +525,10 @@ const canResetKnockoutMatch = (event: Event, matchId: string, roundIndex: number
   return false
 }
 
-const findMatchById = (event: Event, matchId: string): Match | undefined => {
+const findMatchById = (
+  event: { eventStages?: Event['eventStages'] },
+  matchId: string,
+): Match | undefined => {
   for (const stage of event.eventStages || []) {
     if (stage.type === 'group') {
       for (const group of stage.groups) {
@@ -525,15 +546,18 @@ const findMatchById = (event: Event, matchId: string): Match | undefined => {
   return undefined
 }
 
-const buildMatchPreview = (match: Match): MatchPreview => ({
-  gamesWon1: match.gamesWon1,
-  gamesWon2: match.gamesWon2,
-  games: match.games.map((g) => ({
-    score1: g.score1,
-    score2: g.score2,
-    winningSide: g.winningSide,
-  })),
-})
+const buildMatchPreview = (match: Match): MatchPreview => {
+  const provisional = getProvisionalMatchResult(match)
+  return {
+    gamesWon1: provisional.gamesWon1,
+    gamesWon2: provisional.gamesWon2,
+    games: match.games.map((g) => ({
+      score1: g.score1,
+      score2: g.score2,
+      winningSide: g.winningSide,
+    })),
+  }
+}
 
 const isKnockoutBestOf3Before = (knockoutGames: BestOfOption): boolean =>
   knockoutGames === 'Best of 3 before Semifinal' ||

@@ -1581,6 +1581,23 @@ const compareByStatsOnly = (p1, p2) => {
   return p2.stats.pointsWon - p1.stats.pointsWon
 }
 
+// If a match has a clear provisional winner from its games but
+// winningSide hasn't been persisted (score keeper never clicked Finish),
+// compute and apply the result so admins can confirm directly.
+const finalizeMatchIfWon = (match) => {
+  if (match.winningSide === 1 || match.winningSide === 2) return match
+  const games = match.games || []
+  const numberOfGames = match.config?.numberOfGames
+  if (!numberOfGames) return match
+  const gamesWon1 = games.filter((g) => g.winningSide === 1).length
+  const gamesWon2 = games.filter((g) => g.winningSide === 2).length
+  const needed = Math.ceil(numberOfGames / 2)
+  const winningSide =
+    gamesWon1 >= needed ? 1 : gamesWon2 >= needed ? 2 : undefined
+  if (!winningSide) return match
+  return { ...match, gamesWon1, gamesWon2, winningSide }
+}
+
 /**
  * Confirm a finished match result
  */
@@ -1600,14 +1617,15 @@ export const confirmMatch = async (body) => {
     event.eventStages,
     matchId,
     (match) => {
-      if (match.winningSide == null) {
-        throwError('Match is not finished yet')
-      }
       if (match.confirmed) {
         throwError('Match is already confirmed')
       }
+      const finalized = finalizeMatchIfWon(match)
+      if (finalized.winningSide == null) {
+        throwError('Match is not finished yet')
+      }
       return {
-        ...match,
+        ...finalized,
         confirmed: true,
       }
     },
@@ -1915,12 +1933,20 @@ export const updateMatchInStages = (eventStages, matchId, updateFn) => {
       if (matchIndex !== -1) {
         const knockoutMatch = round.matches[matchIndex]
         const updatedMatch = updateFn(knockoutMatch.match)
+        const winner =
+          updatedMatch.winningSide === 1
+            ? knockoutMatch.participant1
+            : updatedMatch.winningSide === 2
+              ? knockoutMatch.participant2
+              : knockoutMatch.winner
         const updatedRounds = knockoutStage.rounds.map((r, i) =>
           i === ri
             ? {
                 ...r,
                 matches: r.matches.map((m, mi) =>
-                  mi === matchIndex ? { ...m, match: updatedMatch } : m,
+                  mi === matchIndex
+                    ? { ...m, match: updatedMatch, winner }
+                    : m,
                 ),
               }
             : r,
@@ -2175,14 +2201,19 @@ const updateMatchWithGameScore = (match, gameNumber, score, lastScoredSide) => {
   }
   games[gameIndex] = newGame
 
-  // Recalculate games won
-  const gamesWon1 = games.filter((g) => g.winningSide === 1).length
-  const gamesWon2 = games.filter((g) => g.winningSide === 2).length
+  // Only games BEFORE the current in-progress game count toward match wins.
+  // The current game's score may reach the winning point, but the match score
+  // doesn't update until the user advances to the next game (or finishes the
+  // match), which sends a save with the new gameNumber.
+  const finalizedGames = games.slice(0, gameNumber - 1)
+  const gamesWon1 = finalizedGames.filter((g) => g.winningSide === 1).length
+  const gamesWon2 = finalizedGames.filter((g) => g.winningSide === 2).length
   const needed = Math.ceil(match.config.numberOfGames / 2)
 
   return {
     ...match,
     games,
+    currentGameNumber: gameNumber,
     gamesWon1,
     gamesWon2,
     winningSide: gamesWon1 >= needed ? 1 : gamesWon2 >= needed ? 2 : undefined,

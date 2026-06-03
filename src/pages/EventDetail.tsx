@@ -9,6 +9,7 @@ import { authState } from '../stores/authStore'
 import { liveScoreActions } from '../stores/liveScoreStore'
 import type { Group, GroupParticipant, Participant, KnockoutRound, KnockoutMatch as KnockoutMatchType, Stage } from '../../shared/types/Tournament'
 import type { Player } from '../../shared/types/Player'
+import { getProvisionalMatchResult } from '../../shared/rules/matchRules'
 import type { Match, Game } from '../../shared/types/Match'
 import { parseLocalDate } from '../utils/date'
 
@@ -89,7 +90,7 @@ const toastStyle = (type: 'success' | 'error'): JSX.CSSProperties => ({
   'max-width': '480px',
 })
 
-const ConfirmMatchDialog = () => {
+export const ConfirmMatchDialog = () => {
   const preview = () => eventDetailActions.getConfirmDialogPreview()
   const participant1Name = () =>
     eventDetailActions.getConfirmDialogParticipantName(1)
@@ -496,6 +497,7 @@ export const MatchRow = (props: MatchRowProps) => {
   const assignedTable = () =>
     liveScoreActions.getTableForMatch(props.match._id)
   const inQueue = () => liveScoreActions.isMatchInQueue(props.match._id)
+  const provisional = () => getProvisionalMatchResult(props.match)
   const sessionActive = () =>
     liveScoreActions.isMatchSessionActive(props.match._id)
   const startContinueDisabled = () =>
@@ -520,7 +522,8 @@ export const MatchRow = (props: MatchRowProps) => {
   }
 
   const handleConfirmClick = () => {
-    eventDetailActions.showConfirmDialog(props.match._id)
+    const eventId = props.eventId ?? eventDetailState.eventId ?? undefined
+    eventDetailActions.showConfirmDialog(props.match._id, eventId)
   }
 
   const handleResetClick = () => {
@@ -558,9 +561,9 @@ export const MatchRow = (props: MatchRowProps) => {
         <MatchResultDisplay
           side1Players={side1Players()}
           side2Players={side2Players()}
-          gamesWon1={props.match.gamesWon1}
-          gamesWon2={props.match.gamesWon2}
-          hasResult={hasResult()}
+          gamesWon1={provisional().gamesWon1}
+          gamesWon2={provisional().gamesWon2}
+          winningSide={provisional().winningSide}
         />
         <GameScoresDisplay games={props.match.games} />
       </div>
@@ -577,13 +580,14 @@ export const MatchRow = (props: MatchRowProps) => {
           size="small"
           disabled={startContinueDisabled()}
         >
-          Start
+          {isUserInMatch(props.match) ? 'Start' : 'Umpire'}
         </Button>
       </Show>
       <Show
         when={
           hasStarted() &&
           !hasResult() &&
+          !provisional().winningSide &&
           assignedTable() !== undefined &&
           canStartOrContinue()
         }
@@ -594,10 +598,16 @@ export const MatchRow = (props: MatchRowProps) => {
           size="small"
           disabled={startContinueDisabled()}
         >
-          Continue
+          {isUserInMatch(props.match) ? 'Continue' : 'Umpire'}
         </Button>
       </Show>
-      <Show when={hasResult() && !isConfirmed() && canStartOrContinue()}>
+      <Show
+        when={
+          (hasResult() || provisional().winningSide) &&
+          !isConfirmed() &&
+          canStartOrContinue()
+        }
+      >
         <Button
           onClick={handleConfirmClick}
           color="#e74c3c"
@@ -622,6 +632,7 @@ export const MatchRow = (props: MatchRowProps) => {
           authState.isAdmin &&
           isSimulationEnabled() &&
           !hasResult() &&
+          !provisional().winningSide &&
           liveScoreActions.getAssignedMatchIds().has(props.match._id)
         }
       >
@@ -651,14 +662,12 @@ interface MatchResultDisplayProps {
   side2Players: SidePlayer[]
   gamesWon1: number
   gamesWon2: number
-  hasResult: boolean
+  winningSide?: 1 | 2
 }
 
 const MatchResultDisplay = (props: MatchResultDisplayProps) => {
-  const side1IsWinner = () =>
-    props.hasResult && props.gamesWon1 > props.gamesWon2
-  const side2IsWinner = () =>
-    props.hasResult && props.gamesWon2 > props.gamesWon1
+  const side1IsWinner = () => props.winningSide === 1
+  const side2IsWinner = () => props.winningSide === 2
 
   return (
     <div style={matchResultStyle}>

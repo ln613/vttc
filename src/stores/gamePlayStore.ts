@@ -674,7 +674,7 @@ export const gamePlayActions = {
     return side === 1 ? gamePlayState.gamesWon1 : gamePlayState.gamesWon2
   },
 
-  nextGame: () => {
+  nextGame: async () => {
     cancelPendingSave()
     const numberOfGames = gamePlayActions.getNumberOfGames()
     const nextIndex = gamePlayState.currentGameIndex + 1
@@ -694,8 +694,8 @@ export const gamePlayActions = {
       },
     ]
 
-    // Save the current game score before moving to next game
-    gamePlayActions.saveGame()
+    // Save the current game's final score before moving on
+    await gamePlayActions.saveGame()
 
     // Alternate first serve side after each game
     const nextGameFirstServeSide = getGameFirstServeSide(
@@ -717,6 +717,10 @@ export const gamePlayActions = {
       gameHistory: newGameHistory,
       lastScoredSide: null,
     })
+
+    // Save the new game's starting state so the server advances its
+    // currentGameNumber and the match score (gamesWon) updates on live pages.
+    await gamePlayActions.saveGame()
   },
 
   finishMatch: () => {

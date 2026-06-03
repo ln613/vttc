@@ -18,3 +18,4 @@ Vertical
 - show finished matches
   - sort by finished time, desc
 - include events with the same series as the ones on table or in queue
+- live update

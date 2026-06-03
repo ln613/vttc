@@ -1,10 +1,12 @@
-import { Show, For, createSignal, onMount, type JSX } from 'solid-js'
+import { Show, For, createSignal, onMount, onCleanup, type JSX } from 'solid-js'
+import { subscribeToLiveScoreUpdates } from '../utils/pusher'
 import { Header } from '../components/Header'
 import ToggleButton from '../components/ToggleButton'
 import { eventState, eventActions, type EventOption } from '../stores/eventStore'
 import { liveScoreState, liveScoreActions } from '../stores/liveScoreStore'
 import { authState } from '../stores/authStore'
-import { MatchRow } from './EventDetail'
+import { MatchRow, ConfirmMatchDialog } from './EventDetail'
+import { eventDetailState } from '../stores/eventDetailStore'
 import type { Match } from '../../shared/types/Match'
 import type { Stage, GroupStage, KnockoutStage } from '../../shared/types/Tournament'
 
@@ -20,9 +22,20 @@ interface MatchEntry {
 const Schedule = () => {
   const [myMatchesOnly, setMyMatchesOnly] = createSignal(false)
 
+  let subscription: { unsubscribe: () => void } | null = null
+
   onMount(() => {
     eventActions.fetchEvents()
     liveScoreActions.fetchLiveScore()
+    // Refetch events whenever the live-score channel pings; liveScoreActions
+    // already maintains its own subscription that refreshes table/queue state.
+    subscription = subscribeToLiveScoreUpdates(() => {
+      void eventActions.fetchEvents()
+    })
+  })
+
+  onCleanup(() => {
+    subscription?.unsubscribe()
   })
 
   return (
@@ -39,6 +52,9 @@ const Schedule = () => {
         </div>
         <ScheduleContent myMatchesOnly={myMatchesOnly()} />
       </div>
+      <Show when={eventDetailState.showConfirmDialog}>
+        <ConfirmMatchDialog />
+      </Show>
     </div>
   )
 }

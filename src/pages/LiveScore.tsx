@@ -11,6 +11,7 @@ import { authState } from '../stores/authStore'
 import type { TableAssignment, MatchQueueItem } from '../../shared/types/Table'
 import type { Player } from '../../shared/types/Player'
 import type { Game } from '../../shared/types/Match'
+import { getProvisionalMatchResult } from '../../shared/rules/matchRules'
 
 const LiveScore = () => {
   onMount(() => {
@@ -295,8 +296,15 @@ const AssignedTable = (props: AssignedTableProps) => {
   const side2Players = () => match()?.side2 || []
   const bestOf = () => match()?.config?.numberOfGames
   const isInProgress = () => !isNotStarted()
-  const gamesWon1 = () => match()?.gamesWon1 ?? 0
-  const gamesWon2 = () => match()?.gamesWon2 ?? 0
+  const provisional = () => {
+    const m = match()
+    if (!m) return { gamesWon1: 0, gamesWon2: 0, winningSide: undefined }
+    return getProvisionalMatchResult(m)
+  }
+  const gamesWon1 = () => provisional().gamesWon1
+  const gamesWon2 = () => provisional().gamesWon2
+  const side1IsWinner = () => provisional().winningSide === 1
+  const side2IsWinner = () => provisional().winningSide === 2
   const [showPostpone, setShowPostpone] = createSignal(false)
   const showActionButton = () => !!props.isMobile && authState.isAdmin
 
@@ -333,12 +341,22 @@ const AssignedTable = (props: AssignedTableProps) => {
         <div style={bestOfTableStyle}>Best of {bestOf()}</div>
       </Show>
       <div style={tableSpacer} />
-      <TablePlayerDisplay players={side1Players()} gamesWon={gamesWon1()} showScore={isInProgress()} />
+      <TablePlayerDisplay
+        players={side1Players()}
+        gamesWon={gamesWon1()}
+        showScore={isInProgress()}
+        isWinner={side1IsWinner()}
+      />
       <TableScoreDisplay
         match={match()}
         isNotStarted={isNotStarted()}
       />
-      <TablePlayerDisplay players={side2Players()} gamesWon={gamesWon2()} showScore={isInProgress()} />
+      <TablePlayerDisplay
+        players={side2Players()}
+        gamesWon={gamesWon2()}
+        showScore={isInProgress()}
+        isWinner={side2IsWinner()}
+      />
       <Show when={showActionButton()}>
         <Show
           when={isNotStarted()}
@@ -370,15 +388,26 @@ interface TablePlayerDisplayProps {
   players: Player[]
   gamesWon: number
   showScore: boolean
+  isWinner?: boolean
 }
 
 const TablePlayerDisplay = (props: TablePlayerDisplayProps) => {
   const display = () => formatPlayersForTable(props.players)
   return (
     <div style={tablePlayerRowStyle}>
-      <span style={tablePlayerStyle}>{display()}</span>
+      <span
+        style={props.isWinner ? tablePlayerWinnerStyle : tablePlayerStyle}
+      >
+        {display()}
+      </span>
       <Show when={props.showScore}>
-        <span style={gameScoreBadgeStyle}>{props.gamesWon}</span>
+        <span
+          style={
+            props.isWinner ? gameScoreBadgeWinnerStyle : gameScoreBadgeStyle
+          }
+        >
+          {props.gamesWon}
+        </span>
       </Show>
     </div>
   )
@@ -915,6 +944,19 @@ const gameScoreBadgeStyle: JSX.CSSProperties = {
   color: '#f1c40f',
   'min-width': '20px',
   'text-align': 'center',
+}
+
+const tablePlayerWinnerStyle: JSX.CSSProperties = {
+  ...tablePlayerStyle,
+  'font-weight': 900,
+  color: '#f1c40f',
+}
+
+const gameScoreBadgeWinnerStyle: JSX.CSSProperties = {
+  ...gameScoreBadgeStyle,
+  'font-weight': 900,
+  color: '#fff14a',
+  'text-shadow': '0 0 8px rgba(241, 196, 15, 0.8)',
 }
 
 const vsStyle: JSX.CSSProperties = {

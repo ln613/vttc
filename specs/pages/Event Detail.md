@@ -51,16 +51,18 @@ The Total column is the total matches played so far.
   - match not started, but table assigned
     - light red bg
     - big table number (left aligned)
-    - Start button
+    - Start/Umpire button
       - green bg
       - visible to admin and Player in match
+      - Show "Start" for any play who's actually in the match, show "Umpire" otherwise
   - match in progress
     - light blue bg
     - big table number (left aligned)
-    - Continue button
+    - Continue/Umpire button
       - orange bg
       - if already started but not finished
       - visible to admin and Player in match
+      - Show "Continue" for any play who's actually in the match, show "Umpire" otherwise
   - match finished
     - white bg
     - Confirm button

@@ -272,6 +272,37 @@ export const gamesNeededToWin = (numberOfGames: number): number => {
 }
 
 /**
+ * Provisional match result for display: counts every game with a winningSide
+ * (including the current in-progress game once the score reaches the winning
+ * point), and projects the match winner if either side has enough wins.
+ * Used so live pages can highlight the winner before the score keeper taps
+ * "Finish Match" / "Confirm".
+ */
+export const getProvisionalMatchResult = (match: {
+  games?: { winningSide?: number }[]
+  config?: { numberOfGames?: number }
+  winningSide?: number | null
+}): { gamesWon1: number; gamesWon2: number; winningSide: 1 | 2 | undefined } => {
+  if (match.winningSide === 1 || match.winningSide === 2) {
+    const games = match.games || []
+    return {
+      gamesWon1: games.filter((g) => g.winningSide === 1).length,
+      gamesWon2: games.filter((g) => g.winningSide === 2).length,
+      winningSide: match.winningSide,
+    }
+  }
+  const games = match.games || []
+  const gamesWon1 = games.filter((g) => g.winningSide === 1).length
+  const gamesWon2 = games.filter((g) => g.winningSide === 2).length
+  const numberOfGames = match.config?.numberOfGames
+  if (!numberOfGames) return { gamesWon1, gamesWon2, winningSide: undefined }
+  const needed = gamesNeededToWin(numberOfGames)
+  const winningSide =
+    gamesWon1 >= needed ? 1 : gamesWon2 >= needed ? 2 : undefined
+  return { gamesWon1, gamesWon2, winningSide }
+}
+
+/**
  * Determine the winner of a match
  */
 export const determineMatchWinner = (
