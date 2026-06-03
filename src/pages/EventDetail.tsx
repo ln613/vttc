@@ -564,21 +564,33 @@ export const MatchRow = (props: MatchRowProps) => {
     eventDetailActions.simulateMatch(props.match._id, props.match, eventId)
   }
 
+  // Parent team match rows only expose the Start button — sub-match
+  // rows handle Continue/Confirm/Reset/Simulate via their own MatchRow.
+  const isTeamParent = () => !!props.match.isTeamMatch
   const showStart = () =>
     !hasStarted() &&
     assignedTable() !== undefined &&
-    canStartOrContinue()
+    // Team-parent rows: only a player on either team OR an admin can
+    // press Start — admins use it to set the order for both sides.
+    (isTeamParent()
+      ? isUserInMatch(props.match) || authState.isAdmin
+      : canStartOrContinue())
   const showContinue = () =>
+    !isTeamParent() &&
     hasStarted() &&
     !hasResult() &&
     !provisional().winningSide &&
     assignedTable() !== undefined &&
     canStartOrContinue()
   const showConfirm = () =>
+    !isTeamParent() &&
     (hasResult() || !!provisional().winningSide) &&
     !isConfirmed() &&
     canStartOrContinue()
+  // Reset is allowed on parent team matches too (admin-only via canReset).
+  const showReset = () => canReset()
   const showSimulate = () =>
+    !isTeamParent() &&
     authState.isAdmin &&
     isSimulationEnabled() &&
     !hasResult() &&
@@ -588,7 +600,7 @@ export const MatchRow = (props: MatchRowProps) => {
     showStart() ||
     showContinue() ||
     showConfirm() ||
-    canReset() ||
+    showReset() ||
     showSimulate()
 
   const showQueueBadge = () =>
@@ -649,7 +661,7 @@ export const MatchRow = (props: MatchRowProps) => {
               size="small"
               disabled={startContinueDisabled()}
             >
-              {isUserInMatch(props.match) ? 'Start' : 'Umpire'}
+              {isTeamParent() || isUserInMatch(props.match) ? 'Start' : 'Umpire'}
             </Button>
           </Show>
           <Show when={showContinue()}>
@@ -672,7 +684,7 @@ export const MatchRow = (props: MatchRowProps) => {
               {isConfirming() ? 'Confirming...' : 'Confirm'}
             </Button>
           </Show>
-          <Show when={canReset()}>
+          <Show when={showReset()}>
             <Button
               onClick={handleResetClick}
               color="#e74c3c"

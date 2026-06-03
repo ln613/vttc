@@ -854,6 +854,11 @@ const getTeamMatchType = (nop, numberOfMatches) => {
   if (nop === 2 && numberOfMatches === 3) return 'type1'
   if (nop === 2 && numberOfMatches === 5) return 'type2'
   if (nop === 3 && numberOfMatches === 5) return 'type3'
+  // Fallbacks for combinations the spec doesn't enumerate (e.g. a
+  // team-of-3 event left at Best of 3): pick the closest defined type
+  // so the team match still expands into playable sub-matches.
+  if (nop === 2) return 'type1'
+  if (nop === 3) return 'type3'
   return undefined
 }
 
@@ -2595,8 +2600,14 @@ const freeTeamMatchTable = async (db, matchId) => {
 }
 
 const buildTeamSubMatches = (parent, lockedTableNumber) => {
+  // Legacy team matches in the DB may not have teamMatchType set; derive
+  // one from the roster size + numberOfMatches when needed.
+  const nop = (parent.side1 || []).length
+  const teamMatchType =
+    parent.teamMatchType ||
+    getTeamMatchType(nop, parent.numberOfMatches || 5)
   const lineup = getTeamMatchLineupJS(
-    parent.teamMatchType,
+    teamMatchType,
     parent.side1Assignment,
     parent.side2Assignment,
   )

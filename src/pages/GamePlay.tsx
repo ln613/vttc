@@ -26,6 +26,7 @@ const GamePlay = () => {
   let containerRef: HTMLDivElement | undefined
   let resetSub: EventSubscription | null = null
   let subscribedEventId: string | null = null
+  let autoStartedMatchId: string | null = null
 
   onMount(() => {
     gamePlayActions.initializeFromUrl(searchParams)
@@ -43,6 +44,27 @@ const GamePlay = () => {
       })
       subscribedEventId = eventId
     }
+  })
+
+  // Auto-press Start for the user's own side on entry so the player who
+  // clicked Start in Schedule/EventDetail doesn't have to click again
+  // before the order-of-play picker opens.
+  createEffect(() => {
+    if (authState.isAdmin) return
+    if (!gamePlayActions.isTeamMatch()) return
+    const matchId = gamePlayState.matchId
+    if (!matchId || autoStartedMatchId === matchId) return
+    const side = gamePlayActions.getUserSideInMatch()
+    if (!side) return
+    const m = gamePlayActions.getCurrentMatch()
+    if (!m) return
+    const alreadyStarted = side === 1 ? m.side1Started : m.side2Started
+    if (alreadyStarted) {
+      autoStartedMatchId = matchId
+      return
+    }
+    autoStartedMatchId = matchId
+    void gamePlayActions.startTeamSide(side)
   })
 
   // Once both team-match orders are saved, sub-matches exist. Hop the
@@ -101,23 +123,12 @@ const GamePlay = () => {
       <Show
         when={
           gamePlayActions.isTeamMatch() &&
-          !gamePlayActions.bothSidesStarted() &&
-          !gamePlayState.loading &&
-          !sessionBlocked()
-        }
-      >
-        <TeamStartDialog />
-      </Show>
-      <Show
-        when={
-          gamePlayActions.isTeamMatch() &&
-          gamePlayActions.bothSidesStarted() &&
           !gamePlayActions.bothSidesAssigned() &&
           !gamePlayState.loading &&
           !sessionBlocked()
         }
       >
-        <TeamOrderDialog />
+        <TeamSetupDialog />
       </Show>
       <Show
         when={
@@ -585,53 +596,36 @@ const FinishConfirmDialog = () => {
   )
 }
 
-// Team Match Start Dialog — shown for team-event matches until both
-// home and away sides click "Start". Once both have started, the next
-// step (order-of-play picker) takes over.
-const TeamStartDialog = () => {
+// Unified team-match setup dialog. Each side independently moves
+// through "press Start" → "pick order" → "order locked in". The user
+// only sees the form for their own side (admins see both).
+const TeamSetupDialog = () => {
   const match = () => gamePlayActions.getCurrentMatch()
   const userSide = () => gamePlayActions.getUserSideInMatch()
-  const isAdmin = () => authState.isAdmin
   const homeSide = () => match()?.homeSide
-  const side1Started = () => !!match()?.side1Started
-  const side2Started = () => !!match()?.side2Started
-  const side1Label = () =>
-    `${gamePlayActions.getParticipantName(1)}${homeSide() === 1 ? ' (Home)' : ''}`
-  const side2Label = () =>
-    `${gamePlayActions.getParticipantName(2)}${homeSide() === 2 ? ' (Home)' : ''}`
-
-  const canStart = (side: 1 | 2): boolean => {
-    if (side === 1 && side1Started()) return false
-    if (side === 2 && side2Started()) return false
-    return isAdmin() || userSide() === side
-  }
-
-  const handleStart = (side: 1 | 2) => {
-    void gamePlayActions.startTeamSide(side)
-  }
 
   return (
     <div style={dialogOverlayStyle}>
       <div style={dialogContentStyle}>
-        <div style={teamStartTitleStyle}>Team Match — Start</div>
-        <div style={teamStartHintStyle}>
-          Each team must press Start before the order-of-play picker opens.
-        </div>
-        <TeamStartRow
-          label={side1Label()}
-          started={side1Started()}
-          canStart={canStart(1)}
-          onStart={() => handleStart(1)}
+        <div style={teamStartTitleStyle}>Team Match Setup</div>
+        <TeamSideSetupPanel
+          side={1}
+          isHome={homeSide() === 1}
+          userSide={userSide()}
         />
-        <TeamStartRow
-          label={side2Label()}
-          started={side2Started()}
-          canStart={canStart(2)}
-          onStart={() => handleStart(2)}
+        <TeamSideSetupPanel
+          side={2}
+          isHome={homeSide() === 2}
+          userSide={userSide()}
         />
-        <Show when={side1Started() && side2Started()}>
+        <Show
+          when={
+            gamePlayActions.hasSideAssignment(1) &&
+            gamePlayActions.hasSideAssignment(2)
+          }
+        >
           <div style={teamStartReadyStyle}>
-            Both teams started. Order-of-play picker is coming next.
+            Both orders saved. Sub-matches will be generated next.
           </div>
         </Show>
       </div>
@@ -639,80 +633,52 @@ const TeamStartDialog = () => {
   )
 }
 
-const TeamStartRow = (props: {
-  label: string
-  started: boolean
-  canStart: boolean
-  onStart: () => void
-}) => (
-  <div style={teamStartRowStyle}>
-    <div style={teamStartRowLabelStyle}>{props.label}</div>
-    <Show
-      when={!props.started}
-      fallback={<div style={teamStartedBadgeStyle}>Started ✓</div>}
-    >
-      <Button onClick={props.onStart} disabled={!props.canStart}>
-        Start
-      </Button>
-    </Show>
-  </div>
-)
-
-// Order-of-play picker shown after both sides have pressed Start. Each
-// side names its A, B, C order; the trailing slot is auto-derived from
-// whoever's left.
-const TeamOrderDialog = () => {
+const TeamSideSetupPanel = (props: {
+  side: 1 | 2
+  isHome: boolean
+  userSide: 1 | 2 | undefined
+}) => {
   const match = () => gamePlayActions.getCurrentMatch()
-  const userSide = () => gamePlayActions.getUserSideInMatch()
   const isAdmin = () => authState.isAdmin
-  const homeSide = () => match()?.homeSide
-  const side1Done = () => gamePlayActions.hasSideAssignment(1)
-  const side2Done = () => gamePlayActions.hasSideAssignment(2)
-  const showSide = (side: 1 | 2): boolean => {
-    if (side === 1 && side1Done()) return false
-    if (side === 2 && side2Done()) return false
-    return isAdmin() || userSide() === side
+  const started = () =>
+    props.side === 1
+      ? !!match()?.side1Started
+      : !!match()?.side2Started
+  const assigned = () => gamePlayActions.hasSideAssignment(props.side)
+  const canAct = () => isAdmin() || props.userSide === props.side
+  const label = () =>
+    `${gamePlayActions.getParticipantName(props.side)} (${props.isHome ? 'Home' : 'Away'})`
+  const players = () =>
+    (props.side === 1 ? match()?.side1 : match()?.side2) || []
+
+  const handleStart = () => {
+    void gamePlayActions.startTeamSide(props.side)
   }
 
   return (
-    <div style={dialogOverlayStyle}>
-      <div style={dialogContentStyle}>
-        <div style={teamStartTitleStyle}>Pick your order of play</div>
-        <Show when={showSide(1)}>
-          <TeamOrderForm
-            side={1}
-            players={match()?.side1 || []}
-            isHome={homeSide() === 1}
-          />
-        </Show>
-        <Show when={showSide(2)}>
-          <TeamOrderForm
-            side={2}
-            players={match()?.side2 || []}
-            isHome={homeSide() === 2}
-          />
-        </Show>
-        <Show when={side1Done() && !showSide(1)}>
-          <div style={teamOrderWaitingStyle}>
-            {gamePlayActions.getParticipantName(1)} order locked in.
-          </div>
-        </Show>
-        <Show when={side2Done() && !showSide(2)}>
-          <div style={teamOrderWaitingStyle}>
-            {gamePlayActions.getParticipantName(2)} order locked in.
-          </div>
-        </Show>
-        <Show when={!showSide(1) && !showSide(2) && !(side1Done() && side2Done())}>
-          <div style={teamOrderWaitingStyle}>
-            Waiting for the other team to pick their order…
-          </div>
-        </Show>
-        <Show when={side1Done() && side2Done()}>
-          <div style={teamStartReadyStyle}>
-            Both orders saved. Sub-matches will be generated next.
-          </div>
-        </Show>
-      </div>
+    <div style={teamSetupPanelStyle}>
+      <div style={teamSetupPanelLabelStyle}>{label()}</div>
+      <Show when={assigned()}>
+        <div style={teamSetupStatusOkStyle}>Order locked in ✓</div>
+      </Show>
+      <Show when={!assigned() && started() && canAct()}>
+        <TeamOrderForm
+          side={props.side}
+          players={players()}
+          isHome={props.isHome}
+        />
+      </Show>
+      <Show when={!assigned() && started() && !canAct()}>
+        <div style={teamSetupStatusMutedStyle}>
+          Started — waiting for their order…
+        </div>
+      </Show>
+      <Show when={!started() && canAct()}>
+        <Button onClick={handleStart}>Set Order</Button>
+      </Show>
+      <Show when={!started() && !canAct()}>
+        <div style={teamSetupStatusMutedStyle}>Waiting to start…</div>
+      </Show>
     </div>
   )
 }
@@ -757,12 +723,14 @@ const TeamOrderForm = (props: {
     void gamePlayActions.saveTeamSideAssignment(props.side, picks())
   }
 
+  const remainingLabel = () => {
+    if (!allPicked()) return '(auto)'
+    const r = remainingPlayer()
+    return r ? `${r.firstName} ${r.lastName} (auto)` : '(auto)'
+  }
+
   return (
     <div style={teamOrderFormStyle}>
-      <div style={teamOrderHeadingStyle}>
-        {gamePlayActions.getParticipantName(props.side)}
-        {props.isHome ? ' (Home)' : ''}
-      </div>
       <For each={Array.from({ length: picksCount() }, (_, i) => i)}>
         {(slotIndex) => (
           <div style={teamOrderSlotStyle}>
@@ -786,16 +754,12 @@ const TeamOrderForm = (props: {
           </div>
         )}
       </For>
-      <Show when={allPicked() && remainingPlayer()}>
-        <div style={teamOrderSlotStyle}>
-          <span style={teamOrderSlotLabelStyle}>
-            {slotLabels()[picksCount()]}
-          </span>
-          <span style={teamOrderAutoStyle}>
-            {remainingPlayer()!.firstName} {remainingPlayer()!.lastName} (auto)
-          </span>
-        </div>
-      </Show>
+      <div style={teamOrderSlotStyle}>
+        <span style={teamOrderSlotLabelStyle}>
+          {slotLabels()[picksCount()]}
+        </span>
+        <span style={teamOrderAutoStyle}>{remainingLabel()}</span>
+      </div>
       <div style={dialogButtonContainerStyle}>
         <Button onClick={handleSave} disabled={!allPicked()}>
           Save Order
@@ -1200,27 +1164,30 @@ const teamStartHintStyle: JSX.CSSProperties = {
   'text-align': 'center',
 }
 
-const teamStartRowStyle: JSX.CSSProperties = {
+const teamSetupPanelStyle: JSX.CSSProperties = {
   display: 'flex',
-  'align-items': 'center',
-  'justify-content': 'space-between',
-  gap: '12px',
+  'flex-direction': 'column',
+  gap: '8px',
   padding: '12px 0',
   'border-bottom': '1px solid #eee',
 }
 
-const teamStartRowLabelStyle: JSX.CSSProperties = {
+const teamSetupPanelLabelStyle: JSX.CSSProperties = {
   'font-size': '15px',
-  'font-weight': 600,
-  color: '#333',
-  flex: 1,
-  'text-align': 'left',
+  'font-weight': 700,
+  color: '#2c3e50',
 }
 
-const teamStartedBadgeStyle: JSX.CSSProperties = {
+const teamSetupStatusOkStyle: JSX.CSSProperties = {
   color: '#27ae60',
   'font-weight': 600,
   'font-size': '14px',
+}
+
+const teamSetupStatusMutedStyle: JSX.CSSProperties = {
+  color: '#888',
+  'font-size': '13px',
+  'font-style': 'italic',
 }
 
 const teamOrderWaitingStyle: JSX.CSSProperties = {

@@ -64,6 +64,7 @@ The Total column is the total matches played so far.
       - green bg
       - visible to admin and Player in match
       - Show "Start" for any play who's actually in the match, show "Umpire" otherwise
+      - for parent team match, admin sees "Start" button, which allows the admin to set order of play for both sides/teams
   - match in progress
     - light blue bg
     - big table number (left aligned)
@@ -88,6 +89,7 @@ The Total column is the total matches played so far.
       - reset the complete flag on the group if needed
       - delete the next round schedule if exist
       - if the game play page for that match is opened somewhere, pop up msg saying the match has been reset, then go back (if cannot go back, go to Schedule page)
+  - only Start and Reset buttons visible to parent team match
   - if admin and SIMULATION=1, show "Simulate" button (only for matches already assigned a table), which will simulate the match and submit the results
   - button row align right, if there are multiple buttons, place them in one row
 
