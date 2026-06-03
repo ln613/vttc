@@ -13,8 +13,14 @@ Vertical
 ## Match List
 
 - use the same match component as the Event Detail page
+- title for each match
+  - event name, stage name (Group 1, Semifinal...)
+  - for team sub-matches, "Team Match {n} - BC vs YZ"
 - show matches on all tables first (1,2,3...)
-- show matches in queue (hide the big "Q")
+- show matches in queue
+  - hide the big "Q"
+  - show players currently playing or assigned a table in red
+  - show table number if the match is fixed on a table
 - show finished matches
   - sort by finished time, desc
 - include events with the same series as the ones on table or in queue

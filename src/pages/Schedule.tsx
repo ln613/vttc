@@ -17,6 +17,10 @@ interface MatchEntry {
   eventId: string
   eventName: string
   stageLabel: string
+  // For team-event sub-matches: the parent team match and the
+  // sub-match's index within parent.subMatches[].
+  parent?: Match
+  subMatchIndex?: number
 }
 
 const Schedule = () => {
@@ -73,6 +77,7 @@ const ScheduleContent = (props: { myMatchesOnly: boolean }) => {
         empty="No matches in queue"
         entries={data().inQueue}
         hideQueueBadge
+        markUnavailablePlayers
       />
       <Section
         title="Finished"
@@ -88,6 +93,7 @@ const Section = (props: {
   empty: string
   entries: MatchEntry[]
   hideQueueBadge?: boolean
+  markUnavailablePlayers?: boolean
 }) => (
   <div style={sectionStyle}>
     <h2 style={sectionTitleStyle}>{props.title}</h2>
@@ -103,12 +109,18 @@ const Section = (props: {
                 <span style={eventNameStyle}>{e.eventName}</span>
                 <span style={stageLabelStyle}>{e.stageLabel}</span>
               </div>
+              <Show when={subMatchTitle(e)}>
+                {(label) => (
+                  <div style={subMatchTitleStyle}>{label()}</div>
+                )}
+              </Show>
               <MatchRow
                 match={e.match}
                 groupIndex={e.groupIndex}
                 stage={e.stage}
                 eventId={e.eventId}
                 hideQueueBadge={props.hideQueueBadge}
+                markUnavailablePlayers={props.markUnavailablePlayers}
               />
             </div>
           )}
@@ -285,13 +297,67 @@ const pushTeamAwareEntries = (
   const finalised = match.winningSide != null && match.confirmed === true
 
   if (isTeam && hasSubs && !finalised) {
-    for (const sub of match.subMatches!) {
-      if (sub.cancelledAt) continue
-      entries.push({ ...ctx, match: sub })
-    }
+    match.subMatches!.forEach((sub, idx) => {
+      if (sub.cancelledAt) return
+      entries.push({
+        ...ctx,
+        match: sub,
+        parent: match,
+        subMatchIndex: idx,
+      })
+    })
     return
   }
   entries.push({ ...ctx, match })
+}
+
+// Lineup position labels per team-match type. Kept in sync with the JS
+// helper in netlify/functions/utils/eventHandlers.js (getTeamMatchLineupJS).
+const TEAM_SUB_MATCH_LABELS: Record<string, { home: string; away: string }[]> = {
+  type1: [
+    { home: 'A', away: 'Y' },
+    { home: 'B', away: 'X' },
+    { home: 'AB', away: 'XY' },
+  ],
+  type2: [
+    { home: 'A', away: 'Y' },
+    { home: 'B', away: 'X' },
+    { home: 'AB', away: 'XY' },
+    { home: 'A', away: 'X' },
+    { home: 'B', away: 'Y' },
+  ],
+  type3: [
+    { home: 'BC', away: 'YZ' },
+    { home: 'A', away: 'X' },
+    { home: 'C', away: 'Z' },
+    { home: 'A', away: 'Y' },
+    { home: 'B', away: 'X' },
+  ],
+}
+
+const subMatchTitle = (entry: MatchEntry): string | undefined => {
+  const parent = entry.parent
+  const idx = entry.subMatchIndex
+  if (!parent || idx == null) return undefined
+  const type =
+    (parent.teamMatchType as keyof typeof TEAM_SUB_MATCH_LABELS | undefined) ||
+    deriveTeamMatchType(parent)
+  const pair = type ? TEAM_SUB_MATCH_LABELS[type]?.[idx] : undefined
+  if (!pair) return `Team Match ${idx + 1}`
+  return `Team Match ${idx + 1} - ${pair.home} vs ${pair.away}`
+}
+
+// Pre-existing team matches may not have teamMatchType set. Fall back
+// to the closest defined type based on the roster size.
+const deriveTeamMatchType = (
+  parent: Match,
+): keyof typeof TEAM_SUB_MATCH_LABELS | undefined => {
+  const nop = (parent.side1 || []).length
+  const matches = parent.numberOfMatches || 5
+  if (nop === 2 && matches === 3) return 'type1'
+  if (nop === 2) return 'type2'
+  if (nop === 3) return 'type3'
+  return undefined
 }
 
 const isUserInEntry = (entry: MatchEntry): boolean => {
@@ -391,6 +457,14 @@ const eventNameStyle: JSX.CSSProperties = {
 
 const stageLabelStyle: JSX.CSSProperties = {
   color: '#888',
+}
+
+const subMatchTitleStyle: JSX.CSSProperties = {
+  'font-size': '12px',
+  'font-weight': 600,
+  color: '#3498db',
+  'margin-top': '-6px',
+  'text-align': 'left',
 }
 
 export default Schedule

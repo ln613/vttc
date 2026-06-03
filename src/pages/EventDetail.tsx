@@ -443,6 +443,9 @@ export interface MatchRowProps {
   hideQueueBadge?: boolean
   eventId?: string
   displayStyle?: 'rows' | 'compact'
+  // If true, individual player names render in red when the player is
+  // currently on a table (used by the Schedule queue section).
+  markUnavailablePlayers?: boolean
 }
 
 const collectPlayerIds = (entity: unknown, ids: Set<string>) => {
@@ -603,12 +606,21 @@ export const MatchRow = (props: MatchRowProps) => {
     showReset() ||
     showSimulate()
 
+  // Sub-matches of a team match carry a lockedTableNumber so they can
+  // run on the same table sequentially. When the sub-match is waiting
+  // in the queue, surface that table number as its badge.
+  const lockedTable = () =>
+    assignedTable() === undefined ? props.match.lockedTableNumber : undefined
   const showQueueBadge = () =>
     !props.hideQueueBadge &&
     assignedTable() === undefined &&
+    lockedTable() === undefined &&
     inQueue() &&
     phase() === 'not_started'
-  const hasBadge = () => assignedTable() !== undefined || showQueueBadge()
+  const hasBadge = () =>
+    assignedTable() !== undefined ||
+    lockedTable() !== undefined ||
+    showQueueBadge()
   return (
     <div
       style={getMatchRowStyle(
@@ -619,6 +631,9 @@ export const MatchRow = (props: MatchRowProps) => {
     >
       <Show when={assignedTable() !== undefined}>
         <div style={matchRowTableNumberStyle}>{assignedTable()}</div>
+      </Show>
+      <Show when={lockedTable() !== undefined}>
+        <div style={matchRowTableNumberStyle}>{lockedTable()}</div>
       </Show>
       <Show when={showQueueBadge()}>
         <div style={matchRowTableNumberStyle}>Q</div>
@@ -639,6 +654,7 @@ export const MatchRow = (props: MatchRowProps) => {
               gamesWon1={provisional().gamesWon1}
               gamesWon2={provisional().gamesWon2}
               winningSide={provisional().winningSide}
+              markUnavailablePlayers={props.markUnavailablePlayers}
             />
           }
         >
@@ -709,13 +725,18 @@ const isSimulationEnabled = (): boolean =>
   import.meta.env.VITE_SIMULATION === '1'
 
 interface SidePlayer {
+  _id?: string
   firstName: string
   lastName: string
 }
 
 const getMatchSidePlayers = (side: Player[]): SidePlayer[] => {
   if (!side || side.length === 0) return [{ firstName: 'Unknown', lastName: '' }]
-  return side.map((p) => ({ firstName: p.firstName, lastName: p.lastName }))
+  return side.map((p) => ({
+    _id: p._id?.toString(),
+    firstName: p.firstName,
+    lastName: p.lastName,
+  }))
 }
 
 interface MatchResultDisplayProps {
@@ -814,6 +835,7 @@ interface MatchRowsTableProps {
   gamesWon1: number
   gamesWon2: number
   winningSide?: 1 | 2
+  markUnavailablePlayers?: boolean
 }
 
 const MatchRowsTable = (props: MatchRowsTableProps) => {
@@ -829,6 +851,7 @@ const MatchRowsTable = (props: MatchRowsTableProps) => {
         gamesWon={props.gamesWon1}
         side={1}
         isWinner={side1IsWinner()}
+        markUnavailablePlayers={props.markUnavailablePlayers}
       />
       <div style={matchSidesSeparatorStyle} />
       <MatchSideRow
@@ -837,6 +860,7 @@ const MatchRowsTable = (props: MatchRowsTableProps) => {
         gamesWon={props.gamesWon2}
         side={2}
         isWinner={side2IsWinner()}
+        markUnavailablePlayers={props.markUnavailablePlayers}
       />
     </div>
   )
@@ -848,6 +872,7 @@ interface MatchSideRowProps {
   gamesWon: number
   side: 1 | 2
   isWinner: boolean
+  markUnavailablePlayers?: boolean
 }
 
 const MatchSideRow = (props: MatchSideRowProps) => {
@@ -864,7 +889,31 @@ const MatchSideRow = (props: MatchSideRowProps) => {
   const scoresContainerStyle = (): JSX.CSSProperties => matchSideScoresStyle
   return (
     <div style={matchSideRowStyle}>
-      <span style={nameStyle()}>{formatSidePlayers(props.players)}</span>
+      <span style={nameStyle()}>
+        <Show
+          when={props.markUnavailablePlayers}
+          fallback={formatSidePlayers(props.players)}
+        >
+          <For each={props.players}>
+            {(p, i) => (
+              <>
+                <Show when={i() > 0}>
+                  <span> / </span>
+                </Show>
+                <span
+                  style={
+                    liveScoreActions.isPlayerOnTable(p._id)
+                      ? matchSidePlayerUnavailableStyle
+                      : {}
+                  }
+                >
+                  {p.firstName} {p.lastName}
+                </span>
+              </>
+            )}
+          </For>
+        </Show>
+      </span>
       <div style={scoresContainerStyle()}>
         <For each={props.games}>
           {(game, index) => {
@@ -1719,6 +1768,11 @@ const matchSideNameStyle: JSX.CSSProperties = {
   'justify-self': 'stretch',
   'word-break': 'break-word',
   'min-width': 0,
+}
+
+const matchSidePlayerUnavailableStyle: JSX.CSSProperties = {
+  color: '#e74c3c',
+  'font-weight': 600,
 }
 
 const matchSideScoresStyle: JSX.CSSProperties = {
