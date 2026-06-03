@@ -47,6 +47,7 @@ Each table will show:
   - table number (yellow, big, top-center)
   - event name
   - stage ("Group {n}", "Semifinal"...)
+  - for team sub-match, "Team Match {n} - BC vs YZ"
   - "Best of {n}"
   - space
   - player1 of the match (or for team, player1/player2), followed by the game score
@@ -54,6 +55,7 @@ Each table will show:
     - match not started: "vs"
     - match in progress: scores of each game, current game on right most, "11:7, 4:8...", highlight the winning number and flash the most recent point    
   - player2 of the match (or for team, player3/player4), followed by the game score
+  - for team sub-match, player name followed by " ({order})"
   - table number (yellow, big, top-center)
   - action button, admin on mobile only
     - match not started: "Postpone" button

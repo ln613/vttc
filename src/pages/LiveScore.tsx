@@ -11,8 +11,12 @@ import { authState } from '../stores/authStore'
 import ToggleButton from '../components/ToggleButton'
 import type { TableAssignment, MatchQueueItem } from '../../shared/types/Table'
 import type { Player } from '../../shared/types/Player'
-import type { Game } from '../../shared/types/Match'
+import type { Game, Match } from '../../shared/types/Match'
 import { getProvisionalMatchResult } from '../../shared/rules/matchRules'
+import {
+  getTeamSubMatchTitle,
+  getTeamPlayerOrderLabel,
+} from './EventDetail'
 
 const LiveScore = () => {
   onMount(() => {
@@ -308,6 +312,12 @@ const AssignedTable = (props: AssignedTableProps) => {
   const side2IsWinner = () => provisional().winningSide === 2
   const [showPostpone, setShowPostpone] = createSignal(false)
   const showActionButton = () => !!props.isMobile && authState.isAdmin
+  const subMatchLabel = (): string | undefined => {
+    const parent = props.matchItem.parent
+    const idx = props.matchItem.subMatchIndex
+    if (!parent || idx == null) return undefined
+    return getTeamSubMatchTitle(parent, idx)
+  }
 
   const handleCancel = async () => {
     if (!confirm('Cancel this match and put it back at the end of the queue?')) {
@@ -338,6 +348,9 @@ const AssignedTable = (props: AssignedTableProps) => {
       <div style={tableNumberAssignedStyle}>{props.tableNumber}</div>
       <div style={eventNameTableStyle}>{props.matchItem.eventName}</div>
       <div style={stageNameTableStyle}>{props.matchItem.stageName}</div>
+      <Show when={subMatchLabel()}>
+        {(label) => <div style={subMatchTableLabelStyle}>{label()}</div>}
+      </Show>
       <Show when={bestOf()}>
         <div style={bestOfTableStyle}>Best of {bestOf()}</div>
       </Show>
@@ -347,6 +360,7 @@ const AssignedTable = (props: AssignedTableProps) => {
         gamesWon={gamesWon1()}
         showScore={isInProgress()}
         isWinner={side1IsWinner()}
+        parent={props.matchItem.parent}
       />
       <TableScoreDisplay
         match={match()}
@@ -357,6 +371,7 @@ const AssignedTable = (props: AssignedTableProps) => {
         gamesWon={gamesWon2()}
         showScore={isInProgress()}
         isWinner={side2IsWinner()}
+        parent={props.matchItem.parent}
       />
       <Show when={showActionButton()}>
         <Show
@@ -390,10 +405,11 @@ interface TablePlayerDisplayProps {
   gamesWon: number
   showScore: boolean
   isWinner?: boolean
+  parent?: Match
 }
 
 const TablePlayerDisplay = (props: TablePlayerDisplayProps) => {
-  const display = () => formatPlayersForTable(props.players)
+  const display = () => formatPlayersForTable(props.players, props.parent)
   return (
     <div style={tablePlayerRowStyle}>
       <span
@@ -414,12 +430,20 @@ const TablePlayerDisplay = (props: TablePlayerDisplayProps) => {
   )
 }
 
-const formatPlayersForTable = (players: Player[]): string => {
+const labelSuffix = (parent: Match | undefined, playerId: string | undefined): string => {
+  const label = getTeamPlayerOrderLabel(parent, playerId)
+  return label ? ` (${label})` : ''
+}
+
+const formatPlayersForTable = (players: Player[], parent?: Match): string => {
   if (!players || players.length === 0) return 'TBD'
   if (players.length === 1) {
-    return `${players[0].firstName} ${players[0].lastName}`
+    const p = players[0]
+    return `${p.firstName} ${p.lastName}${labelSuffix(parent, p._id?.toString())}`
   }
-  return players.map((p) => `${p.firstName}`).join(' / ')
+  return players
+    .map((p) => `${p.firstName}${labelSuffix(parent, p._id?.toString())}`)
+    .join(' / ')
 }
 
 interface TableScoreDisplayProps {
@@ -983,6 +1007,13 @@ const eventNameTableStyle: JSX.CSSProperties = {
 }
 
 const stageNameTableStyle: JSX.CSSProperties = {
+  'font-size': '11px',
+  'font-weight': 500,
+  color: 'rgba(255,255,255,0.8)',
+  'text-align': 'center',
+}
+
+const subMatchTableLabelStyle: JSX.CSSProperties = {
   'font-size': '11px',
   'font-weight': 500,
   color: 'rgba(255,255,255,0.8)',

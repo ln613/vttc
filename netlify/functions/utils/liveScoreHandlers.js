@@ -179,12 +179,23 @@ const extractGroupMatches = (event, eventSummary, items) => {
 }
 
 const pushTeamSubMatchItems = (parent, items, ctx) => {
-  for (const sub of parent.subMatches) {
-    if (isMatchFinishedAndConfirmed(sub)) continue
-    if (isMatchPostponed(sub)) continue
+  const parentSummary = {
+    _id: parent._id,
+    side1: parent.side1,
+    side2: parent.side2,
+    isTeamMatch: parent.isTeamMatch,
+    teamMatchType: parent.teamMatchType,
+    numberOfMatches: parent.numberOfMatches,
+    homeSide: parent.homeSide,
+    side1Assignment: parent.side1Assignment,
+    side2Assignment: parent.side2Assignment,
+  }
+  parent.subMatches.forEach((sub, idx) => {
+    if (isMatchFinishedAndConfirmed(sub)) return
+    if (isMatchPostponed(sub)) return
     // Sub-matches cancelled because the team match has already been
     // decided are removed from the queue entirely.
-    if (sub.cancelledAt) continue
+    if (sub.cancelledAt) return
     items.push({
       matchId: sub._id,
       eventId: ctx.eventId,
@@ -201,8 +212,10 @@ const pushTeamSubMatchItems = (parent, items, ctx) => {
       event: ctx.event,
       lockedTableNumber: sub.lockedTableNumber,
       parentMatchId: parent._id,
+      subMatchIndex: idx,
+      parent: parentSummary,
     })
-  }
+  })
 }
 
 const extractKnockoutMatches = (event, eventSummary, items) => {

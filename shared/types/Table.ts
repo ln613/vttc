@@ -63,6 +63,13 @@ export interface MatchQueueItem {
   matchStatus: TableMatchStatus
   tableNumber?: TableNumber
   event: EventSummary
+  // For team sub-matches: pointer to the parent team match, the index of
+  // this sub-match within parent.subMatches[], and the table the parent
+  // is locked to.
+  parent?: Match
+  parentMatchId?: string
+  subMatchIndex?: number
+  lockedTableNumber?: TableNumber
 }
 
 /**
