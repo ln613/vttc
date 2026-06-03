@@ -151,9 +151,15 @@ const buildScheduleData = (myMatchesOnly: boolean) => {
       .sort((a, b) => {
         const ta = matchFinishedTime(a.match)
         const tb = matchFinishedTime(b.match)
-        return tb - ta
+        if (tb !== ta) return tb - ta
+        return finishedFallbackRank(b) - finishedFallbackRank(a)
       }),
   }
+}
+
+const finishedFallbackRank = (entry: MatchEntry): number => {
+  const stageRank = entry.stage === 'knockout' ? 1000 : 0
+  return stageRank + entry.groupIndex
 }
 
 const matchFinishedTime = (match: Match): number => {

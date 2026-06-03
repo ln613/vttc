@@ -51,6 +51,9 @@ The Total column is the total matches played so far.
     - each player/team is 1 row (name, game score, match score)
           Nan Li   7  11   3   1
       Eric Huang  11   9   6   2
+    - match score use bigger font and different color
+    - flash the latest score
+    - highlight the winning side
   - match not started, no table assigned, but in queue
     - light green bg
     - big "Q" (left aligned)

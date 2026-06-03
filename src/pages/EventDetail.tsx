@@ -801,6 +801,7 @@ const MatchRowsTable = (props: MatchRowsTableProps) => {
   const side2IsWinner = () => props.winningSide === 2
   return (
     <div style={matchRowsTableStyle}>
+      <MatchScoreKeyframes />
       <MatchSideRow
         players={props.side1Players}
         games={games()}
@@ -835,28 +836,35 @@ const MatchSideRow = (props: MatchSideRowProps) => {
   })
   const matchScoreStyle = (): JSX.CSSProperties => ({
     ...matchSideTotalStyle,
-    'font-weight': props.isWinner ? 800 : 500,
-    color: props.isWinner ? '#e74c3c' : '#888',
+    'font-weight': props.isWinner ? 900 : 800,
+    color: props.isWinner ? '#e6a700' : '#f1c40f',
   })
+  const scoresContainerStyle = (): JSX.CSSProperties => matchSideScoresStyle
   return (
     <div style={matchSideRowStyle}>
       <span style={nameStyle()}>{formatSidePlayers(props.players)}</span>
-      <div style={matchSideScoresStyle}>
+      <div style={scoresContainerStyle()}>
         <For each={props.games}>
-          {(game) => {
+          {(game, index) => {
             const score = props.side === 1 ? game.score1 : game.score2
             const isGameWinner = game.winningSide === props.side
-            return (
-              <span
-                style={
-                  isGameWinner
-                    ? matchSideGameWinnerStyle
-                    : matchSideGameLoserStyle
-                }
-              >
-                {score}
-              </span>
-            )
+            const isLatest = index() === props.games.length - 1
+            const isLatestScored =
+              isLatest &&
+              !game.winningSide &&
+              game.lastScoredSide === props.side
+            const base = isGameWinner
+              ? matchSideGameWinnerStyle
+              : isLatestScored
+                ? matchSideGameLatestScoredStyle
+                : matchSideGameLoserStyle
+            const cellStyle: JSX.CSSProperties = {
+              ...base,
+              ...(isLatestScored
+                ? { animation: 'scoreFlash 1s ease-in-out infinite alternate' }
+                : {}),
+            }
+            return <span style={cellStyle}>{score}</span>
           }}
         </For>
       </div>
@@ -864,6 +872,15 @@ const MatchSideRow = (props: MatchSideRowProps) => {
     </div>
   )
 }
+
+const MatchScoreKeyframes = () => (
+  <style>{`
+    @keyframes scoreFlash {
+      from { opacity: 0.35; }
+      to { opacity: 1; }
+    }
+  `}</style>
+)
 
 const formatSidePlayers = (players: SidePlayer[]): string =>
   players.map((p) => `${p.firstName} ${p.lastName}`).join(' / ')
@@ -1676,8 +1693,8 @@ const matchSideScoresStyle: JSX.CSSProperties = {
 
 const matchSideGameWinnerStyle: JSX.CSSProperties = {
   'font-size': '14px',
-  'font-weight': 700,
-  color: '#2c3e50',
+  'font-weight': 800,
+  color: '#f1c40f',
   'min-width': '20px',
   'text-align': 'center',
 }
@@ -1690,9 +1707,19 @@ const matchSideGameLoserStyle: JSX.CSSProperties = {
   'text-align': 'center',
 }
 
+const matchSideGameLatestScoredStyle: JSX.CSSProperties = {
+  'font-size': '14px',
+  'font-weight': 800,
+  color: '#00b8d4',
+  'min-width': '20px',
+  'text-align': 'center',
+}
+
 const matchSideTotalStyle: JSX.CSSProperties = {
-  'font-size': '16px',
-  'min-width': '24px',
+  'font-size': '22px',
+  'font-weight': 800,
+  color: '#f1c40f',
+  'min-width': '28px',
   'text-align': 'center',
   'justify-self': 'start',
 }

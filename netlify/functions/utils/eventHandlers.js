@@ -1246,7 +1246,10 @@ export const finishMatch = async (body) => {
 
         // Update match with result
         const updatedMatch = updateMatchWithResult(match, result)
-        if (confirmed) updatedMatch.confirmed = true
+        if (confirmed) {
+          updatedMatch.confirmed = true
+          updatedMatch.confirmedAt = new Date().toISOString()
+        }
 
         // Update group stats
         const updatedGroup = updateGroupAfterMatch(group, updatedMatch, matchIndex)
@@ -1297,7 +1300,10 @@ export const finishMatch = async (body) => {
           }
 
           const updatedMatch = updateMatchWithResult(knockoutMatch.match, result)
-          if (confirmed) updatedMatch.confirmed = true
+          if (confirmed) {
+          updatedMatch.confirmed = true
+          updatedMatch.confirmedAt = new Date().toISOString()
+        }
           const winner =
             updatedMatch.winningSide === 1 ? knockoutMatch.participant1 : knockoutMatch.participant2
 
@@ -1627,6 +1633,7 @@ export const confirmMatch = async (body) => {
       return {
         ...finalized,
         confirmed: true,
+        confirmedAt: new Date().toISOString(),
       }
     },
   )
