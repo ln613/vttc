@@ -6,6 +6,7 @@
 - Top bar (blue bg, white text)
   - Live score icon
   - Events: go to the Home/Events List page
+  - Schedule: go to the schedule page
   - Players: go to the Players page
   - Account Icon (align right)
     - if not signed in, show sign in dialog

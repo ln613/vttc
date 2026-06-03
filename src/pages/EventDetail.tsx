@@ -434,10 +434,12 @@ const CollapsibleHeader = (props: CollapsibleHeaderProps) => (
   </button>
 )
 
-interface MatchRowProps {
+export interface MatchRowProps {
   match: Match
   groupIndex: number
   stage: 'group' | 'knockout'
+  hideQueueBadge?: boolean
+  eventId?: string
 }
 
 const collectPlayerIds = (entity: unknown, ids: Set<string>) => {
@@ -472,7 +474,7 @@ const isUserInGroup = (groupIndex: number): boolean => {
   return ids.has(uid)
 }
 
-const MatchRow = (props: MatchRowProps) => {
+export const MatchRow = (props: MatchRowProps) => {
   const navigate = useNavigate()
   const side1Players = () => getMatchSidePlayers(props.match.side1)
   const side2Players = () => getMatchSidePlayers(props.match.side2)
@@ -509,7 +511,7 @@ const MatchRow = (props: MatchRowProps) => {
     (props.stage === 'group' && isUserInGroup(props.groupIndex))
 
   const handleStartClick = () => {
-    const eventId = eventDetailState.eventId
+    const eventId = props.eventId ?? eventDetailState.eventId
     if (eventId) {
       navigate(
         `/game-play?eventId=${eventId}&stage=${props.stage}&groupIndex=${props.groupIndex}&matchId=${props.match._id}`,
@@ -542,7 +544,14 @@ const MatchRow = (props: MatchRowProps) => {
       <Show when={assignedTable() !== undefined}>
         <div style={matchRowTableNumberStyle}>{assignedTable()}</div>
       </Show>
-      <Show when={assignedTable() === undefined && inQueue() && phase() === 'not_started'}>
+      <Show
+        when={
+          !props.hideQueueBadge &&
+          assignedTable() === undefined &&
+          inQueue() &&
+          phase() === 'not_started'
+        }
+      >
         <div style={matchRowTableNumberStyle}>Q</div>
       </Show>
       <div style={matchContentContainerStyle}>
@@ -1465,15 +1474,13 @@ const getMatchRowStyle = (
   gap: '10px',
   padding: '14px 16px',
   'background-color':
-    phase === 'finished'
-      ? '#fff9c4'
-      : phase === 'in_progress'
-        ? '#e3f2fd'
-        : hasTable
-          ? '#fdecea'
-          : inQueue
-            ? '#e8f5e9'
-            : '#fff',
+    phase === 'in_progress'
+      ? '#e3f2fd'
+      : hasTable && phase === 'not_started'
+        ? '#fdecea'
+        : inQueue && phase === 'not_started'
+          ? '#e8f5e9'
+          : '#fff',
   'border-radius': '10px',
   'box-shadow': '0 1px 4px rgba(0, 0, 0, 0.08)',
 })

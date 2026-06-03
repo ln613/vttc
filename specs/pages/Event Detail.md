@@ -62,7 +62,7 @@ The Total column is the total matches played so far.
       - if already started but not finished
       - visible to admin and Player in match
   - match finished
-    - light yellow bg
+    - white bg
     - Confirm button
       - if finished but not confirmed
       - red bg

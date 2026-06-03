@@ -63,6 +63,10 @@ const TopBar = () => {
     navigate('/players')
   }
 
+  const handleScheduleClick = () => {
+    navigate('/schedule')
+  }
+
   const handleAccountClick = () => {
     if (authActions.isSignedIn()) {
       navigate('/account')
@@ -80,6 +84,9 @@ const TopBar = () => {
           </button>
           <button style={navLinkStyle} onClick={handleEventsClick}>
             Events
+          </button>
+          <button style={navLinkStyle} onClick={handleScheduleClick}>
+            Schedule
           </button>
           <button style={navLinkStyle} onClick={handlePlayersClick}>
             Players
