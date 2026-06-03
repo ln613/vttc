@@ -79,6 +79,7 @@ The Total column is the total matches played so far.
       - reset the complete flag on the group if needed
       - delete the next round schedule if exist
   - if admin and SIMULATION=1, show "Simulate" button (only for matches already assigned a table), which will simulate the match and submit the results
+  - if there are multiple buttons, place them in one row
 
 ### interaction
 

@@ -567,79 +567,81 @@ export const MatchRow = (props: MatchRowProps) => {
         />
         <GameScoresDisplay games={props.match.games} />
       </div>
-      <Show
-        when={
-          !hasStarted() &&
-          assignedTable() !== undefined &&
-          canStartOrContinue()
-        }
-      >
-        <Button
-          onClick={handleStartClick}
-          color="#27ae60"
-          size="small"
-          disabled={startContinueDisabled()}
+      <div style={matchRowActionsStyle}>
+        <Show
+          when={
+            !hasStarted() &&
+            assignedTable() !== undefined &&
+            canStartOrContinue()
+          }
         >
-          {isUserInMatch(props.match) ? 'Start' : 'Umpire'}
-        </Button>
-      </Show>
-      <Show
-        when={
-          hasStarted() &&
-          !hasResult() &&
-          !provisional().winningSide &&
-          assignedTable() !== undefined &&
-          canStartOrContinue()
-        }
-      >
-        <Button
-          onClick={handleStartClick}
-          color="#e67e22"
-          size="small"
-          disabled={startContinueDisabled()}
+          <Button
+            onClick={handleStartClick}
+            color="#27ae60"
+            size="small"
+            disabled={startContinueDisabled()}
+          >
+            {isUserInMatch(props.match) ? 'Start' : 'Umpire'}
+          </Button>
+        </Show>
+        <Show
+          when={
+            hasStarted() &&
+            !hasResult() &&
+            !provisional().winningSide &&
+            assignedTable() !== undefined &&
+            canStartOrContinue()
+          }
         >
-          {isUserInMatch(props.match) ? 'Continue' : 'Umpire'}
-        </Button>
-      </Show>
-      <Show
-        when={
-          (hasResult() || provisional().winningSide) &&
-          !isConfirmed() &&
-          canStartOrContinue()
-        }
-      >
-        <Button
-          onClick={handleConfirmClick}
-          color="#e74c3c"
-          size="small"
-          disabled={isConfirming()}
+          <Button
+            onClick={handleStartClick}
+            color="#e67e22"
+            size="small"
+            disabled={startContinueDisabled()}
+          >
+            {isUserInMatch(props.match) ? 'Continue' : 'Umpire'}
+          </Button>
+        </Show>
+        <Show
+          when={
+            (hasResult() || provisional().winningSide) &&
+            !isConfirmed() &&
+            canStartOrContinue()
+          }
         >
-          {isConfirming() ? 'Confirming...' : 'Confirm'}
-        </Button>
-      </Show>
-      <Show when={canReset()}>
-        <Button
-          onClick={handleResetClick}
-          color="#e74c3c"
-          size="small"
-          disabled={isResetting()}
+          <Button
+            onClick={handleConfirmClick}
+            color="#e74c3c"
+            size="small"
+            disabled={isConfirming()}
+          >
+            {isConfirming() ? 'Confirming...' : 'Confirm'}
+          </Button>
+        </Show>
+        <Show when={canReset()}>
+          <Button
+            onClick={handleResetClick}
+            color="#e74c3c"
+            size="small"
+            disabled={isResetting()}
+          >
+            {isResetting() ? 'Resetting...' : 'Reset'}
+          </Button>
+        </Show>
+        <Show
+          when={
+            authState.isAdmin &&
+            isSimulationEnabled() &&
+            !hasResult() &&
+            !provisional().winningSide &&
+            liveScoreActions.getAssignedMatchIds().has(props.match._id)
+          }
         >
-          {isResetting() ? 'Resetting...' : 'Reset'}
-        </Button>
-      </Show>
-      <Show
-        when={
-          authState.isAdmin &&
-          isSimulationEnabled() &&
-          !hasResult() &&
-          !provisional().winningSide &&
-          liveScoreActions.getAssignedMatchIds().has(props.match._id)
-        }
-      >
-        <Button onClick={handleSimulateClick} color="#9b59b6" size="small">
-          Simulate
-        </Button>
-      </Show>
+          <Button onClick={handleSimulateClick} color="#9b59b6" size="small">
+            Simulate
+          </Button>
+        </Show>
+      </div>
     </div>
   )
 }
@@ -1512,6 +1514,15 @@ const matchContentContainerStyle: JSX.CSSProperties = {
   'align-items': 'center',
   gap: '6px',
   width: '100%',
+}
+
+const matchRowActionsStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'row',
+  'flex-wrap': 'wrap',
+  'align-items': 'center',
+  'justify-content': 'center',
+  gap: '8px',
 }
 
 const matchResultStyle: JSX.CSSProperties = {
