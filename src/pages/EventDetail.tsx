@@ -442,6 +442,7 @@ export interface MatchRowProps {
   stage: 'group' | 'knockout'
   hideQueueBadge?: boolean
   eventId?: string
+  displayStyle?: 'rows' | 'compact'
 }
 
 const collectPlayerIds = (entity: unknown, ids: Set<string>) => {
@@ -581,14 +582,28 @@ export const MatchRow = (props: MatchRowProps) => {
         <div style={matchRowTableNumberStyle}>Q</div>
       </Show>
       <div style={matchContentContainerStyle}>
-        <MatchResultDisplay
-          side1Players={side1Players()}
-          side2Players={side2Players()}
-          gamesWon1={provisional().gamesWon1}
-          gamesWon2={provisional().gamesWon2}
-          winningSide={provisional().winningSide}
-        />
-        <GameScoresDisplay games={props.match.games} />
+        <Show
+          when={props.displayStyle === 'compact'}
+          fallback={
+            <MatchRowsTable
+              side1Players={side1Players()}
+              side2Players={side2Players()}
+              games={props.match.games}
+              gamesWon1={provisional().gamesWon1}
+              gamesWon2={provisional().gamesWon2}
+              winningSide={provisional().winningSide}
+            />
+          }
+        >
+          <MatchResultDisplay
+            side1Players={side1Players()}
+            side2Players={side2Players()}
+            gamesWon1={provisional().gamesWon1}
+            gamesWon2={provisional().gamesWon2}
+            winningSide={provisional().winningSide}
+          />
+          <GameScoresDisplay games={props.match.games} />
+        </Show>
       </div>
       <div style={matchRowActionsStyle}>
         <Show
@@ -770,6 +785,88 @@ const PlayerNameDisplay = (props: PlayerNameDisplayProps) => (
     </For>
   </div>
 )
+
+interface MatchRowsTableProps {
+  side1Players: SidePlayer[]
+  side2Players: SidePlayer[]
+  games?: Game[]
+  gamesWon1: number
+  gamesWon2: number
+  winningSide?: 1 | 2
+}
+
+const MatchRowsTable = (props: MatchRowsTableProps) => {
+  const games = () => props.games || []
+  const side1IsWinner = () => props.winningSide === 1
+  const side2IsWinner = () => props.winningSide === 2
+  return (
+    <div style={matchRowsTableStyle}>
+      <MatchSideRow
+        players={props.side1Players}
+        games={games()}
+        gamesWon={props.gamesWon1}
+        side={1}
+        isWinner={side1IsWinner()}
+      />
+      <MatchSideRow
+        players={props.side2Players}
+        games={games()}
+        gamesWon={props.gamesWon2}
+        side={2}
+        isWinner={side2IsWinner()}
+      />
+    </div>
+  )
+}
+
+interface MatchSideRowProps {
+  players: SidePlayer[]
+  games: Game[]
+  gamesWon: number
+  side: 1 | 2
+  isWinner: boolean
+}
+
+const MatchSideRow = (props: MatchSideRowProps) => {
+  const nameStyle = (): JSX.CSSProperties => ({
+    ...matchSideNameStyle,
+    'font-weight': props.isWinner ? 700 : 500,
+    color: props.isWinner ? '#2c3e50' : '#555',
+  })
+  const matchScoreStyle = (): JSX.CSSProperties => ({
+    ...matchSideTotalStyle,
+    'font-weight': props.isWinner ? 800 : 500,
+    color: props.isWinner ? '#e74c3c' : '#888',
+  })
+  return (
+    <div style={matchSideRowStyle}>
+      <span style={nameStyle()}>{formatSidePlayers(props.players)}</span>
+      <div style={matchSideScoresStyle}>
+        <For each={props.games}>
+          {(game) => {
+            const score = props.side === 1 ? game.score1 : game.score2
+            const isGameWinner = game.winningSide === props.side
+            return (
+              <span
+                style={
+                  isGameWinner
+                    ? matchSideGameWinnerStyle
+                    : matchSideGameLoserStyle
+                }
+              >
+                {score}
+              </span>
+            )
+          }}
+        </For>
+      </div>
+      <span style={matchScoreStyle()}>{props.gamesWon}</span>
+    </div>
+  )
+}
+
+const formatSidePlayers = (players: SidePlayer[]): string =>
+  players.map((p) => `${p.firstName} ${p.lastName}`).join(' / ')
 
 interface GameScoresDisplayProps {
   games: Game[]
@@ -1546,6 +1643,58 @@ const matchRowActionsStyle: JSX.CSSProperties = {
   'align-items': 'center',
   'justify-content': 'center',
   gap: '8px',
+}
+
+const matchRowsTableStyle: JSX.CSSProperties = {
+  display: 'inline-grid',
+  'grid-template-columns': 'auto auto auto',
+  'column-gap': '16px',
+  'row-gap': '4px',
+  margin: '0 auto',
+  'align-items': 'center',
+  'justify-items': 'center',
+}
+
+const matchSideRowStyle: JSX.CSSProperties = {
+  display: 'contents',
+}
+
+const matchSideNameStyle: JSX.CSSProperties = {
+  'font-size': '14px',
+  'text-align': 'right',
+  'justify-self': 'end',
+  overflow: 'hidden',
+  'text-overflow': 'ellipsis',
+  'white-space': 'nowrap',
+}
+
+const matchSideScoresStyle: JSX.CSSProperties = {
+  display: 'flex',
+  gap: '6px',
+  'align-items': 'center',
+}
+
+const matchSideGameWinnerStyle: JSX.CSSProperties = {
+  'font-size': '14px',
+  'font-weight': 700,
+  color: '#2c3e50',
+  'min-width': '20px',
+  'text-align': 'center',
+}
+
+const matchSideGameLoserStyle: JSX.CSSProperties = {
+  'font-size': '14px',
+  'font-weight': 400,
+  color: '#888',
+  'min-width': '20px',
+  'text-align': 'center',
+}
+
+const matchSideTotalStyle: JSX.CSSProperties = {
+  'font-size': '16px',
+  'min-width': '24px',
+  'text-align': 'center',
+  'justify-self': 'start',
 }
 
 const matchResultStyle: JSX.CSSProperties = {

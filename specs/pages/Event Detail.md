@@ -42,9 +42,15 @@ The Total column is the total matches played so far.
 - any player in the match
 - if group stage, any player in the group
 
-- match schedule table (collapsible), where each match row:
-  - names and result, like "Eric Huang 2 : 1 Nan Li", the winning participant and number (Eric Huang and 2 in this case) are bold. when no result, show 0 : 0, no bold. The row should be center aligned with ":" right in the middle.
-  - results of each game: "11 : 6, 10 : 12, ...", left side represents the left participant (Eric in this case), the winning numbers are bold.
+- match schedule table (collapsible), where each match row (the Match Component):
+  - style 1:
+    - names and result, like "Eric Huang 2 : 1 Nan Li", the winning participant and number (Eric Huang and 2 in this case) are bold. when no result, show 0 : 0, no bold. The row should be center aligned with ":" right in the middle.
+    - results of each game: "11 : 6, 10 : 12, ...", left side represents the left participant (Eric in this case), the winning numbers are bold.
+  - style 2:
+    - default style
+    - each player/team is 1 row (name, game score, match score)
+          Nan Li   7  11   3   1
+      Eric Huang  11   9   6   2
   - match not started, no table assigned, but in queue
     - light green bg
     - big "Q" (left aligned)
