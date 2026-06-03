@@ -5,6 +5,7 @@ import { DEFAULT_GAME_CONFIG } from '../../shared/types/Match'
 import type { Player } from '../../shared/types/Player'
 import { apiGet, apiPost } from '../utils/api'
 import { authState } from './authStore'
+import { getTeamPlayerOrderLabel } from '../pages/EventDetail'
 import {
   subscribeToLiveScoreUpdates,
   type EventSubscription,
@@ -318,6 +319,48 @@ const getKnockoutRoundName = (): string | undefined => {
 const formatPlayerNames = (players: Player[]): string => {
   if (!players || players.length === 0) return 'Player'
   return players.map((p) => `${p.firstName} ${p.lastName}`).join(' / ')
+}
+
+// Find the team-match parent for the current sub-match by walking the
+// event's stages and looking for a parent.subMatches[] that contains us.
+const getCurrentParentMatch = (): Match | undefined => {
+  const match = gamePlayActions.getCurrentMatch()
+  if (!match?.parentMatchId) return undefined
+  const stages = gamePlayState.data?.eventStages || []
+  const targetId = match.parentMatchId
+  const searchInMatches = (matches: Match[] | undefined): Match | undefined => {
+    if (!matches) return undefined
+    for (const m of matches) {
+      if (m._id === targetId) return m
+    }
+    return undefined
+  }
+  for (const stage of stages) {
+    if (stage.type === 'group') {
+      for (const group of stage.groups) {
+        const found = searchInMatches(group.matches)
+        if (found) return found
+      }
+    }
+    if (stage.type === 'knockout') {
+      for (const round of stage.rounds) {
+        for (const km of round.matches) {
+          if (km.match?._id === targetId) return km.match
+        }
+      }
+    }
+  }
+  return undefined
+}
+
+const getSubMatchSuffix = (): string | undefined => {
+  const parent = getCurrentParentMatch()
+  if (!parent) return undefined
+  const subMatches = parent.subMatches || []
+  const cur = gamePlayState.matchId
+  const idx = subMatches.findIndex((s) => s._id === cur)
+  if (idx === -1) return undefined
+  return `Team Match ${idx + 1}`
 }
 
 const isHandicapEnabled = (): boolean => {
@@ -712,10 +755,12 @@ export const gamePlayActions = {
       : gamePlayActions.getSide1Players(),
 
   getStageName: (): string => {
-    if (gamePlayState.stage === 'group') {
-      return `Group ${gamePlayState.groupIndex + 1}`
-    }
-    return getKnockoutRoundName() ?? 'Knockout'
+    const base =
+      gamePlayState.stage === 'group'
+        ? `Group ${gamePlayState.groupIndex + 1}`
+        : (getKnockoutRoundName() ?? 'Knockout')
+    const sub = getSubMatchSuffix()
+    return sub ? `${base} - ${sub}` : base
   },
 
   getNumberOfGames: (): number => {
@@ -724,12 +769,20 @@ export const gamePlayActions = {
     return 5
   },
 
+  getCurrentParentMatch: (): Match | undefined => getCurrentParentMatch(),
+
   getParticipantName: (side: 1 | 2): string => {
     const players =
       side === 1
         ? gamePlayActions.getSide1Players()
         : gamePlayActions.getSide2Players()
-    return formatPlayerNames(players)
+    const parent = getCurrentParentMatch()
+    if (!parent) return formatPlayerNames(players)
+    const decorated = players.map((p) => {
+      const label = getTeamPlayerOrderLabel(parent, p._id?.toString())
+      return label ? { ...p, lastName: `${p.lastName} (${label})` } : p
+    })
+    return formatPlayerNames(decorated)
   },
 
   getCurrentGameConfig: (): GameConfig => {

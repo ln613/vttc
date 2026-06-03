@@ -419,10 +419,6 @@ const ScoreBox = (props: ScoreBoxProps) => {
   const score = () => (props.side === 1 ? gamePlayState.score1 : gamePlayState.score2)
   const gamesWon = () => gamePlayActions.getGamesWon(props.side)
   const timeout = () => (props.side === 1 ? gamePlayState.timeout1 : gamePlayState.timeout2)
-  const players = () =>
-    props.side === 1
-      ? gamePlayActions.getSide1Players()
-      : gamePlayActions.getSide2Players()
   const isServing = () => servingSide() === props.side
   const winningSide = () => gamePlayActions.getGameWinningSide()
   const isWinner = () => winningSide() === props.side
@@ -471,7 +467,7 @@ const ScoreBox = (props: ScoreBoxProps) => {
 
   return (
     <div style={scoreBoxWrapperStyle}>
-      <ParticipantNames players={players()} />
+      <ParticipantNames side={props.side} />
       <div style={scoreAreaContainerStyle}>
         <button
           style={getPlusButtonStyle(isServing(), isGameOver())}
@@ -531,17 +527,12 @@ const TimeoutBadge = (props: TimeoutBadgeProps) => (
 )
 
 interface ParticipantNamesProps {
-  players: Player[]
+  side: 1 | 2
 }
 
 const ParticipantNames = (props: ParticipantNamesProps) => {
-  const displayName = () => formatPlayerNames(props.players)
+  const displayName = () => gamePlayActions.getParticipantName(props.side)
   return <div style={participantNamesStyle}>{displayName()}</div>
-}
-
-const formatPlayerNames = (players: Player[]): string => {
-  if (!players || players.length === 0) return 'Player'
-  return players.map((p) => `${p.firstName} ${p.lastName}`).join(' / ')
 }
 
 // Game End Button Component (Next Game / Finish)
@@ -1049,6 +1040,14 @@ const participantNamesStyle: JSX.CSSProperties = {
   'word-break': 'break-word',
   'margin-bottom': '8px',
   width: '100%',
+  // Reserve up to three lines and bottom-anchor the name so the next
+  // element (the score box) starts at the same vertical position on
+  // both sides regardless of how the names wrap.
+  'min-height': '3.9em',
+  display: 'flex',
+  'align-items': 'flex-end',
+  'justify-content': 'center',
+  'line-height': 1.3,
 }
 
 const getPlusButtonStyle = (isServing: boolean, isGameOver: boolean): JSX.CSSProperties => ({

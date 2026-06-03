@@ -21,9 +21,10 @@
 
 ## Stage Name
 
+- align left
 - for group stage: "Group {n}"
 - for knockout stage: "Round of 16", "Quarterfinal", "Semifinal"...
-- align left
+- for team sub-match, followed by " - Team Match {n}"
 
 ## event name
 
@@ -37,6 +38,8 @@
 ## Score Box
 
 - participant names
+  - for team sub-match, name followed by " ({order})"
+  - same height on both sides
 - "+" button (above the box, full width, dark red for the serving side, dark blue for the other)
 - current point
   - huge white number

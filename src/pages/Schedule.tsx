@@ -121,6 +121,7 @@ const Section = (props: {
                 eventId={e.eventId}
                 hideQueueBadge={props.hideQueueBadge}
                 markUnavailablePlayers={props.markUnavailablePlayers}
+                parent={e.parent}
               />
             </div>
           )}

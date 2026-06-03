@@ -424,6 +424,7 @@ const MatchSchedule = (props: MatchScheduleProps) => {
                     match={item.match}
                     groupIndex={props.groupIndex}
                     stage={props.stage}
+                    parent={item.parent}
                   />
                 </div>
               )}
@@ -458,6 +459,9 @@ export interface MatchRowProps {
   // If true, individual player names render in red when the player is
   // currently on a table (used by the Schedule queue section).
   markUnavailablePlayers?: boolean
+  // For team sub-matches: the parent team match (needed to derive each
+  // player's order label A/B/C/X/Y/Z).
+  parent?: Match
 }
 
 // Lineup position labels per team-match type. Kept in sync with the JS
@@ -508,6 +512,41 @@ export const getTeamSubMatchTitle = (
   const pair = type ? TEAM_SUB_MATCH_LABELS[type]?.[subMatchIndex] : undefined
   if (!pair) return `Team Match ${subMatchIndex + 1}`
   return `Team Match ${subMatchIndex + 1} - ${pair.home} vs ${pair.away}`
+}
+
+const HOME_SLOT_LABELS = ['A', 'B', 'C', 'D'] as const
+const AWAY_SLOT_LABELS = ['X', 'Y', 'Z', 'W'] as const
+const ASSIGNMENT_KEYS: Array<'A' | 'B' | 'C' | 'D'> = ['A', 'B', 'C', 'D']
+
+// Look up the order label (A/B/C or X/Y/Z) for a given player in the
+// parent team match's assignment. Returns undefined when the player
+// isn't in either assignment or when assignments aren't set yet.
+export const getTeamPlayerOrderLabel = (
+  parent: Match | undefined,
+  playerId: string | undefined,
+): string | undefined => {
+  if (!parent || !playerId) return undefined
+  const homeSide = parent.homeSide
+  const sides: Array<{
+    assignment: Match['side1Assignment']
+    isHome: boolean
+  }> = [
+    { assignment: parent.side1Assignment, isHome: homeSide === 1 },
+    { assignment: parent.side2Assignment, isHome: homeSide === 2 },
+  ]
+  for (const { assignment, isHome } of sides) {
+    if (!assignment) continue
+    const labels = isHome ? HOME_SLOT_LABELS : AWAY_SLOT_LABELS
+    const lookup = assignment as unknown as Record<
+      string,
+      { _id?: unknown } | undefined
+    >
+    for (let i = 0; i < ASSIGNMENT_KEYS.length; i++) {
+      const p = lookup[ASSIGNMENT_KEYS[i]]
+      if (p && p._id?.toString() === playerId.toString()) return labels[i]
+    }
+  }
+  return undefined
 }
 
 export interface MatchScheduleItem {
@@ -745,6 +784,7 @@ export const MatchRow = (props: MatchRowProps) => {
               gamesWon2={provisional().gamesWon2}
               winningSide={provisional().winningSide}
               markUnavailablePlayers={props.markUnavailablePlayers}
+              parent={props.parent}
             />
           }
         >
@@ -926,6 +966,7 @@ interface MatchRowsTableProps {
   gamesWon2: number
   winningSide?: 1 | 2
   markUnavailablePlayers?: boolean
+  parent?: Match
 }
 
 const MatchRowsTable = (props: MatchRowsTableProps) => {
@@ -942,6 +983,7 @@ const MatchRowsTable = (props: MatchRowsTableProps) => {
         side={1}
         isWinner={side1IsWinner()}
         markUnavailablePlayers={props.markUnavailablePlayers}
+        parent={props.parent}
       />
       <div style={matchSidesSeparatorStyle} />
       <MatchSideRow
@@ -951,6 +993,7 @@ const MatchRowsTable = (props: MatchRowsTableProps) => {
         side={2}
         isWinner={side2IsWinner()}
         markUnavailablePlayers={props.markUnavailablePlayers}
+        parent={props.parent}
       />
     </div>
   )
@@ -963,6 +1006,7 @@ interface MatchSideRowProps {
   side: 1 | 2
   isWinner: boolean
   markUnavailablePlayers?: boolean
+  parent?: Match
 }
 
 const MatchSideRow = (props: MatchSideRowProps) => {
@@ -981,26 +1025,31 @@ const MatchSideRow = (props: MatchSideRowProps) => {
     <div style={matchSideRowStyle}>
       <span style={nameStyle()}>
         <Show
-          when={props.markUnavailablePlayers}
+          when={props.markUnavailablePlayers || !!props.parent}
           fallback={formatSidePlayers(props.players)}
         >
           <For each={props.players}>
-            {(p, i) => (
-              <>
-                <Show when={i() > 0}>
-                  <span> / </span>
-                </Show>
-                <span
-                  style={
-                    liveScoreActions.isPlayerOnTable(p._id)
-                      ? matchSidePlayerUnavailableStyle
-                      : {}
-                  }
-                >
-                  {p.firstName} {p.lastName}
-                </span>
-              </>
-            )}
+            {(p, i) => {
+              const label = getTeamPlayerOrderLabel(props.parent, p._id)
+              return (
+                <>
+                  <Show when={i() > 0}>
+                    <span> / </span>
+                  </Show>
+                  <span
+                    style={
+                      props.markUnavailablePlayers &&
+                      liveScoreActions.isPlayerOnTable(p._id)
+                        ? matchSidePlayerUnavailableStyle
+                        : {}
+                    }
+                  >
+                    {p.firstName} {p.lastName}
+                    {label ? ` (${label})` : ''}
+                  </span>
+                </>
+              )
+            }}
           </For>
         </Show>
       </span>
