@@ -63,6 +63,7 @@ The Total column is the total matches played so far.
       - if already started but not finished
       - visible to admin and Player in match
       - Show "Continue" for any play who's actually in the match, show "Umpire" otherwise
+    - Reset button, admin only
   - match finished
     - white bg
     - Confirm button
@@ -70,7 +71,6 @@ The Total column is the total matches played so far.
       - red bg
       - visible to admin and Player in match
     - Reset button
-      - if finished and confirmed
       - red bg
       - admin only
       - only visible if no match in the next round has finished

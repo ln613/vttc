@@ -1791,8 +1791,6 @@ const tryResetKnockoutMatch = (updatedStages, knockoutStageIndex, matchId) => {
 
 const validateMatchCanBeReset = (match) => {
   if (!match) throwError('Match not found')
-  if (match.winningSide == null) throwError('Match is not finished')
-  if (!match.confirmed) throwError('Match is not confirmed')
 }
 
 const validateNoNextRoundStartedForGroup = (updatedStages, groupStage) => {

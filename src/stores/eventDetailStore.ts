@@ -188,8 +188,9 @@ export const eventDetailActions = {
         gameConfig?: { targetPoints?: number }
       }
     },
+    sourceEventId?: string,
   ) => {
-    const eventId = eventDetailState.eventId
+    const eventId = sourceEventId ?? eventDetailState.eventId
     if (!eventId) return
     const numberOfGames = match.config?.numberOfGames ?? 5
     const targetPoints = match.config?.gameConfig?.targetPoints ?? 11
@@ -201,7 +202,9 @@ export const eventDetailActions = {
         confirmed: true,
         result: games,
       })
-      await fetchEvent(eventId, true)
+      if (eventDetailState.eventId === eventId) {
+        await fetchEvent(eventId, true)
+      }
     } catch (err) {
       showToast(
         'error',
@@ -412,14 +415,16 @@ export const eventDetailActions = {
     return canResetKnockoutMatch(event, matchId, groupIndex)
   },
 
-  resetMatch: async (matchId: string) => {
-    const { eventId } = eventDetailState
+  resetMatch: async (matchId: string, sourceEventId?: string) => {
+    const eventId = sourceEventId ?? eventDetailState.eventId
     if (!eventId || !matchId) return
 
     setEventDetailState({ resettingMatchId: matchId })
     try {
       await apiPost('resetMatch', { _id: eventId, matchId })
-      await fetchEvent(eventId, true)
+      if (eventDetailState.eventId === eventId) {
+        await fetchEvent(eventId, true)
+      }
     } catch (err) {
       setEventDetailState({
         error:

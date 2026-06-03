@@ -5,6 +5,7 @@ import Button from '../components/Button'
 import MatchConfirmDialog from '../components/MatchConfirmDialog'
 import { eventDetailState, eventDetailActions } from '../stores/eventDetailStore'
 import type { StageTab } from '../stores/eventDetailStore'
+import { eventState } from '../stores/eventStore'
 import { authState } from '../stores/authStore'
 import { liveScoreActions } from '../stores/liveScoreStore'
 import type { Group, GroupParticipant, Participant, KnockoutRound, KnockoutMatch as KnockoutMatchType, Stage } from '../../shared/types/Tournament'
@@ -462,10 +463,11 @@ const isUserInMatch = (match: { side1?: unknown[]; side2?: unknown[] }): boolean
   return ids.has(uid)
 }
 
-const isUserInGroup = (groupIndex: number): boolean => {
+const isUserInGroup = (groupIndex: number, eventId?: string): boolean => {
   const uid = authState.user?._id?.toString()
   if (!uid) return false
-  const groupStage = eventDetailState.data?.eventStages?.find(
+  const stages = resolveEventStages(eventId)
+  const groupStage = stages?.find(
     (s): s is Extract<Stage, { type: 'group' }> => s.type === 'group',
   )
   const group = groupStage?.groups[groupIndex]
@@ -473,6 +475,17 @@ const isUserInGroup = (groupIndex: number): boolean => {
   const ids = new Set<string>()
   for (const gp of group.participants) collectPlayerIds(gp.participant, ids)
   return ids.has(uid)
+}
+
+const resolveEventStages = (eventId?: string): Stage[] | undefined => {
+  if (eventId && eventDetailState.data?._id === eventId) {
+    return eventDetailState.data.eventStages
+  }
+  if (eventId) {
+    const evt = (eventState.data || []).find((e) => e._id === eventId)
+    if (evt) return evt.eventStages
+  }
+  return eventDetailState.data?.eventStages
 }
 
 export const MatchRow = (props: MatchRowProps) => {
@@ -490,10 +503,18 @@ export const MatchRow = (props: MatchRowProps) => {
     eventDetailState.confirmingMatchId === props.match._id
   const isResetting = () =>
     eventDetailState.resettingMatchId === props.match._id
-  const canReset = () =>
-    authState.isAdmin &&
-    isConfirmed() &&
-    eventDetailActions.canResetMatch(props.match._id, props.stage, props.groupIndex)
+  const canReset = () => {
+    if (!authState.isAdmin) return false
+    if (phase() === 'in_progress') return true
+    return (
+      isConfirmed() &&
+      eventDetailActions.canResetMatch(
+        props.match._id,
+        props.stage,
+        props.groupIndex,
+      )
+    )
+  }
   const assignedTable = () =>
     liveScoreActions.getTableForMatch(props.match._id)
   const inQueue = () => liveScoreActions.isMatchInQueue(props.match._id)
@@ -510,7 +531,7 @@ export const MatchRow = (props: MatchRowProps) => {
   const canStartOrContinue = () =>
     authState.isAdmin ||
     isUserInMatch(props.match) ||
-    (props.stage === 'group' && isUserInGroup(props.groupIndex))
+    (props.stage === 'group' && isUserInGroup(props.groupIndex, props.eventId))
 
   const handleStartClick = () => {
     const eventId = props.eventId ?? eventDetailState.eventId
@@ -528,12 +549,14 @@ export const MatchRow = (props: MatchRowProps) => {
 
   const handleResetClick = () => {
     if (confirm('Are you sure you want to reset this match? All game data will be deleted.')) {
-      eventDetailActions.resetMatch(props.match._id)
+      const eventId = props.eventId ?? eventDetailState.eventId ?? undefined
+      eventDetailActions.resetMatch(props.match._id, eventId)
     }
   }
 
   const handleSimulateClick = () => {
-    eventDetailActions.simulateMatch(props.match._id, props.match)
+    const eventId = props.eventId ?? eventDetailState.eventId ?? undefined
+    eventDetailActions.simulateMatch(props.match._id, props.match, eventId)
   }
 
   return (
