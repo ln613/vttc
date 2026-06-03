@@ -169,6 +169,11 @@ export const liveScoreActions = {
 
   isSideOnTable: (players: Player[]): boolean => isSideOnTable(players),
 
+  isPlayerOnTable: (playerId: string | undefined): boolean => {
+    if (!playerId) return false
+    return getPlayerIdsOnTables().has(playerId.toString())
+  },
+
   reset: () => {
     stopUpdates()
     setLiveScoreState(getInitialState())

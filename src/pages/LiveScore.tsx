@@ -8,6 +8,7 @@ import {
 } from 'solid-js'
 import { liveScoreState, liveScoreActions } from '../stores/liveScoreStore'
 import { authState } from '../stores/authStore'
+import ToggleButton from '../components/ToggleButton'
 import type { TableAssignment, MatchQueueItem } from '../../shared/types/Table'
 import type { Player } from '../../shared/types/Player'
 import type { Game } from '../../shared/types/Match'
@@ -519,7 +520,14 @@ const useAutoScroll = (ref: () => HTMLDivElement | undefined) => {
 
 const MatchQueue = (props: { isMobile?: boolean }) => {
   let listRef: HTMLDivElement | undefined
-  const queue = () => liveScoreState.matchQueue
+  const [myMatchesOnly, setMyMatchesOnly] = createSignal(false)
+  const showMyMatches = () => !!authState.user?._id && !authState.isAdmin
+  const queue = () => {
+    const all = liveScoreState.matchQueue
+    if (!myMatchesOnly() || !showMyMatches()) return all
+    const uid = authState.user!._id!.toString()
+    return all.filter((it) => matchIncludesPlayer(it, uid))
+  }
 
   if (!props.isMobile) {
     useAutoScroll(() => listRef)
@@ -527,7 +535,21 @@ const MatchQueue = (props: { isMobile?: boolean }) => {
 
   return (
     <div style={matchQueueContainerStyle}>
-      <div style={matchQueueTitleStyle}>Match Queue</div>
+      <div
+        style={{
+          ...matchQueueTitleRowStyle,
+          'justify-content': showMyMatches() ? 'space-between' : 'center',
+        }}
+      >
+        <div style={matchQueueTitleStyle}>Match Queue</div>
+        <Show when={showMyMatches()}>
+          <ToggleButton
+            label="My Matches"
+            value={myMatchesOnly()}
+            onChange={setMyMatchesOnly}
+          />
+        </Show>
+      </div>
       <Show
         when={queue().length > 0}
         fallback={<div style={emptyQueueStyle}>No matches in queue</div>}
@@ -542,6 +564,18 @@ const MatchQueue = (props: { isMobile?: boolean }) => {
   )
 }
 
+const matchIncludesPlayer = (item: MatchQueueItem, uid: string): boolean => {
+  const m = item.match
+  if (!m) return false
+  for (const p of m.side1 || []) {
+    if (p._id?.toString() === uid) return true
+  }
+  for (const p of m.side2 || []) {
+    if (p._id?.toString() === uid) return true
+  }
+  return false
+}
+
 interface MatchQueueRowProps {
   item: MatchQueueItem
   isMobile?: boolean
@@ -549,10 +583,6 @@ interface MatchQueueRowProps {
 
 const MatchQueueRow = (props: MatchQueueRowProps) => {
   const match = () => props.item.match
-  const side1Name = () => formatPlayersShort(match()?.side1 || [])
-  const side2Name = () => formatPlayersShort(match()?.side2 || [])
-  const side1OnTable = () => liveScoreActions.isSideOnTable(match()?.side1 || [])
-  const side2OnTable = () => liveScoreActions.isSideOnTable(match()?.side2 || [])
   const m = (mobileStyle: JSX.CSSProperties): JSX.CSSProperties =>
     props.isMobile ? mobileStyle : {}
 
@@ -565,22 +595,72 @@ const MatchQueueRow = (props: MatchQueueRowProps) => {
         {props.item.stageName}
       </div>
       <div style={{ ...queueMatchStyle, ...m(queueMatchMobileStyle) }}>
-        <span style={side1OnTable() ? queuePlayerOnTableStyle : queuePlayerStyle}>
-          {side1Name()}
-        </span>
+        <SidePlayersDisplay players={match()?.side1 || []} />
         <span style={{ ...queueVsStyle, ...m(queueVsMobileStyle) }}> vs </span>
-        <span style={side2OnTable() ? queuePlayerOnTableStyle : queuePlayerStyle}>
-          {side2Name()}
-        </span>
+        <SidePlayersDisplay players={match()?.side2 || []} />
       </div>
     </div>
   )
 }
 
-const formatPlayersShort = (players: Player[]): string => {
-  if (!players || players.length === 0) return 'TBD'
-  if (players.length === 1) return `${players[0].firstName} ${players[0].lastName}`
-  return players.map((p) => p.firstName).join('/')
+const SidePlayersDisplay = (props: { players: Player[] }) => {
+  const tokens = () => formatPlayersTokens(props.players)
+  return (
+    <span>
+      <For each={tokens()}>
+        {(tok) => (
+          <Show
+            when={tok.isSeparator}
+            fallback={
+              <span
+                style={
+                  liveScoreActions.isPlayerOnTable(tok.playerId)
+                    ? queuePlayerOnTableStyle
+                    : queuePlayerStyle
+                }
+              >
+                {tok.text}
+              </span>
+            }
+          >
+            <span style={queuePlayerStyle}>{tok.text}</span>
+          </Show>
+        )}
+      </For>
+    </span>
+  )
+}
+
+interface PlayerToken {
+  text: string
+  isSeparator: boolean
+  playerId?: string
+}
+
+const formatPlayersTokens = (players: Player[]): PlayerToken[] => {
+  if (!players || players.length === 0) {
+    return [{ text: 'TBD', isSeparator: false }]
+  }
+  if (players.length === 1) {
+    const p = players[0]
+    return [
+      {
+        text: `${p.firstName} ${p.lastName}`,
+        isSeparator: false,
+        playerId: p._id?.toString(),
+      },
+    ]
+  }
+  const out: PlayerToken[] = []
+  players.forEach((p, i) => {
+    if (i > 0) out.push({ text: '/', isSeparator: true })
+    out.push({
+      text: p.firstName,
+      isSeparator: false,
+      playerId: p._id?.toString(),
+    })
+  })
+  return out
 }
 
 // ==================== HELPERS ====================
@@ -1011,12 +1091,18 @@ const matchQueueContainerStyle: JSX.CSSProperties = {
   'min-height': 0,
 }
 
+const matchQueueTitleRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'space-between',
+  gap: '8px',
+  'margin-bottom': '12px',
+}
+
 const matchQueueTitleStyle: JSX.CSSProperties = {
   'font-size': '18px',
   'font-weight': 700,
   color: '#f1c40f',
-  'margin-bottom': '12px',
-  'text-align': 'center',
 }
 
 const emptyQueueStyle: JSX.CSSProperties = {

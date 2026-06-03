@@ -459,19 +459,46 @@ const countPaidParticipants = (event) =>
     (p) => p.players.length === event.nop && allPlayersPaid(event, p.players),
   ).length
 
-const isQualifiedParticipant = (event, participant) => {
+const isQualifiedParticipant = (event, participant) =>
+  getParticipantDisqualifyReason(event, participant) == null
+
+const getParticipantDisqualifyReason = (event, participant) => {
   const players = participant.players || []
-  if (event.nop > 1 && players.length !== event.nop) return false
-  if (!meetsSexRequirement(event, players)) return false
-  if (event.restriction === 'Rated' && event.ratingLimit) {
-    if (validateRatingRequirement(event, players).length > 0) return false
+  if (event.nop > 1 && players.length !== event.nop) {
+    return `incomplete team (${players.length}/${event.nop} players)`
   }
-  if (!allPlayersPaid(event, players)) return false
-  return true
+  if (!meetsSexRequirement(event, players)) {
+    if (event.sex === 'Mixed' && event.type === 'Team') {
+      return 'team must include at least one female player'
+    }
+    return `does not meet sex requirement (${event.sex})`
+  }
+  if (event.restriction === 'Rated' && event.ratingLimit) {
+    if (validateRatingRequirement(event, players).length > 0) {
+      return `exceeds rating limit (${event.ratingLimit})`
+    }
+  }
+  if (!allPlayersPaid(event, players)) {
+    return 'not all players have paid'
+  }
+  return null
 }
 
 const getQualifiedParticipants = (event) =>
   event.participants.filter((p) => isQualifiedParticipant(event, p))
+
+const describeUnqualifiedParticipants = (event) => {
+  const issues = []
+  for (const p of event.participants) {
+    const reason = getParticipantDisqualifyReason(event, p)
+    if (!reason) continue
+    const label =
+      (p.players || []).map((pl) => `${pl.firstName} ${pl.lastName}`).join('/') ||
+      'unnamed'
+    issues.push(`${label}: ${reason}`)
+  }
+  return issues
+}
 
 /**
  * Validate rating requirement based on event type
@@ -747,8 +774,9 @@ const validateGenerateGroupsRules = (event) => {
     errors.push('Event does not have a group stage as first stage')
   }
 
-  if (getQualifiedParticipants(event).length < 4) {
-    errors.push('Minimum 4 qualified participants required')
+  const qualified = getQualifiedParticipants(event).length
+  if (qualified < 4) {
+    errors.push(formatNotEnoughQualifiedError(event, qualified))
   }
 
   const groupStage = event.eventStages.find((s) => s.type === 'group')
@@ -757,6 +785,13 @@ const validateGenerateGroupsRules = (event) => {
   }
 
   return errors
+}
+
+const formatNotEnoughQualifiedError = (event, qualified) => {
+  const issues = describeUnqualifiedParticipants(event)
+  const header = `Minimum 4 qualified participants required (found ${qualified})`
+  if (issues.length === 0) return header
+  return `${header}. Unqualified: ${issues.join('; ')}`
 }
 
 const calculateNumberOfGroups = (totalParticipants) => {
@@ -906,8 +941,9 @@ const validateGenerateKnockoutRules = (event) => {
   const groupStage = event.eventStages.find((s) => s.type === 'group')
 
   if (event.stages[0] === 'knockout') {
-    if (getQualifiedParticipants(event).length < 4) {
-      errors.push('Minimum 4 qualified participants required')
+    const qualified = getQualifiedParticipants(event).length
+    if (qualified < 4) {
+      errors.push(formatNotEnoughQualifiedError(event, qualified))
     }
   }
 
