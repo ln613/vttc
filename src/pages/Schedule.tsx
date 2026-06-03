@@ -5,7 +5,7 @@ import ToggleButton from '../components/ToggleButton'
 import { eventState, eventActions, type EventOption } from '../stores/eventStore'
 import { liveScoreState, liveScoreActions } from '../stores/liveScoreStore'
 import { authState } from '../stores/authStore'
-import { MatchRow, ConfirmMatchDialog, getTeamSubMatchTitle } from './EventDetail'
+import { MatchRow, ConfirmMatchDialog, SetOrderDialog, getTeamSubMatchTitle } from './EventDetail'
 import { eventDetailState } from '../stores/eventDetailStore'
 import type { Match } from '../../shared/types/Match'
 import type { Stage, GroupStage, KnockoutStage } from '../../shared/types/Tournament'
@@ -58,6 +58,9 @@ const Schedule = () => {
       </div>
       <Show when={eventDetailState.showConfirmDialog}>
         <ConfirmMatchDialog />
+      </Show>
+      <Show when={eventDetailState.showOrderDialog}>
+        <SetOrderDialog />
       </Show>
     </div>
   )

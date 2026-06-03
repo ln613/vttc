@@ -2525,13 +2525,12 @@ export const saveTeamMatchAssignment = async (body) => {
     (match) => {
       if (!match.isTeamMatch) throwError('Match is not a team match')
       if (match.winningSide != null) throwError('Match is already finished')
-      const startedFlag = side === 1 ? 'side1Started' : 'side2Started'
-      if (!match[startedFlag]) {
-        throwError(`Side ${side} has not started yet`)
-      }
       const assignment = buildTeamAssignment(match, side, assignmentIds)
       const field = side === 1 ? 'side1Assignment' : 'side2Assignment'
-      let next = { ...match, [field]: assignment }
+      // Saving the order implicitly starts the side — the standalone
+      // Start handshake is no longer part of the spec.
+      const startedFlag = side === 1 ? 'side1Started' : 'side2Started'
+      let next = { ...match, [field]: assignment, [startedFlag]: true }
       const bothAssigned = !!next.side1Assignment && !!next.side2Assignment
       if (bothAssigned && (!next.subMatches || next.subMatches.length === 0)) {
         next = {

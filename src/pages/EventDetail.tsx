@@ -1,4 +1,4 @@
-import { Show, For, Switch, Match as MatchCase, onMount, onCleanup, type JSX } from 'solid-js'
+import { Show, For, Switch, Match as MatchCase, createSignal, onMount, onCleanup, type JSX } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { Header } from '../components/Header'
 import Button from '../components/Button'
@@ -68,6 +68,9 @@ const EventDetail = () => {
       <Show when={eventDetailState.showConfirmDialog}>
         <ConfirmMatchDialog />
       </Show>
+      <Show when={eventDetailState.showOrderDialog}>
+        <SetOrderDialog />
+      </Show>
       <Show when={eventDetailState.toastMessage}>
         {(toast) => (
           <div style={toastStyle(toast().type)}>{toast().text}</div>
@@ -75,6 +78,112 @@ const EventDetail = () => {
       </Show>
     </div>
   )
+}
+
+const dialogOverlayStyle: JSX.CSSProperties = {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  'background-color': 'rgba(0, 0, 0, 0.5)',
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'center',
+  'z-index': 1000,
+  padding: '16px',
+}
+
+const dialogContentStyle: JSX.CSSProperties = {
+  'background-color': '#fff',
+  'border-radius': '12px',
+  padding: '24px',
+  width: '100%',
+  'max-width': '480px',
+  'max-height': '90vh',
+  overflow: 'auto',
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '16px',
+}
+
+const dialogTitleStyle: JSX.CSSProperties = {
+  'font-size': '20px',
+  'font-weight': 700,
+  color: '#2c3e50',
+  'text-align': 'center',
+}
+
+const orderSidePanelStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '8px',
+  padding: '12px',
+  border: '1px solid #eee',
+  'border-radius': '8px',
+}
+
+const orderSideLabelStyle: JSX.CSSProperties = {
+  'font-size': '15px',
+  'font-weight': 700,
+  color: '#2c3e50',
+}
+
+const orderSideDoneStyle: JSX.CSSProperties = {
+  color: '#27ae60',
+  'font-weight': 600,
+  'font-size': '14px',
+}
+
+const orderSideWaitingStyle: JSX.CSSProperties = {
+  color: '#888',
+  'font-style': 'italic',
+  'font-size': '13px',
+}
+
+const orderDialogFooterStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'justify-content': 'flex-end',
+  gap: '8px',
+}
+
+const orderFormStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '8px',
+}
+
+const orderSlotStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  gap: '12px',
+}
+
+const orderSlotLabelStyle: JSX.CSSProperties = {
+  'font-size': '15px',
+  'font-weight': 700,
+  color: '#3498db',
+  'min-width': '24px',
+}
+
+const orderSelectStyle: JSX.CSSProperties = {
+  flex: 1,
+  padding: '8px 12px',
+  'font-size': '14px',
+  border: '1px solid #ccc',
+  'border-radius': '6px',
+}
+
+const orderAutoStyle: JSX.CSSProperties = {
+  flex: 1,
+  'font-size': '14px',
+  color: '#888',
+  'font-style': 'italic',
+}
+
+const orderFormButtonRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'justify-content': 'flex-end',
 }
 
 const toastStyle = (type: 'success' | 'error'): JSX.CSSProperties => ({
@@ -90,6 +199,166 @@ const toastStyle = (type: 'success' | 'error'): JSX.CSSProperties => ({
   'box-shadow': '0 4px 12px rgba(0, 0, 0, 0.15)',
   'max-width': '480px',
 })
+
+// Dialog for picking the order of play on a parent team match. Mounted
+// at the page level (EventDetail + Schedule) so it can be triggered
+// from any MatchRow's "Set Order" button.
+export const SetOrderDialog = () => {
+  const match = () => eventDetailActions.getOrderDialogMatch()
+  const userId = () => authState.user?._id?.toString()
+  const userSide = (): 1 | 2 | undefined => {
+    const m = match()
+    const uid = userId()
+    if (!m || !uid) return undefined
+    if ((m.side1 || []).some((p) => p._id?.toString() === uid)) return 1
+    if ((m.side2 || []).some((p) => p._id?.toString() === uid)) return 2
+    return undefined
+  }
+  const homeSide = () => match()?.homeSide
+  const side1Done = () => !!match()?.side1Assignment
+  const side2Done = () => !!match()?.side2Assignment
+  const canAct = (side: 1 | 2): boolean =>
+    authState.isAdmin || userSide() === side
+  const showForm = (side: 1 | 2): boolean => {
+    if (side === 1 && side1Done()) return false
+    if (side === 2 && side2Done()) return false
+    return canAct(side)
+  }
+  const sideLabel = (side: 1 | 2): string => {
+    const name = formatSidePlayers(getMatchSidePlayers((side === 1 ? match()?.side1 : match()?.side2) || []))
+    return `${name} (${homeSide() === side ? 'Home' : 'Away'})`
+  }
+
+  return (
+    <div style={dialogOverlayStyle} onClick={() => eventDetailActions.closeOrderDialog()}>
+      <div style={dialogContentStyle} onClick={(e) => e.stopPropagation()}>
+        <div style={dialogTitleStyle}>Set Order of Play</div>
+        <Show when={match()}>
+          <div style={orderSidePanelStyle}>
+            <div style={orderSideLabelStyle}>{sideLabel(1)}</div>
+            <Show when={side1Done()}>
+              <div style={orderSideDoneStyle}>Order locked in ✓</div>
+            </Show>
+            <Show when={showForm(1)}>
+              <SetOrderForm
+                side={1}
+                players={match()?.side1 || []}
+                isHome={homeSide() === 1}
+              />
+            </Show>
+            <Show when={!side1Done() && !showForm(1)}>
+              <div style={orderSideWaitingStyle}>Waiting…</div>
+            </Show>
+          </div>
+          <div style={orderSidePanelStyle}>
+            <div style={orderSideLabelStyle}>{sideLabel(2)}</div>
+            <Show when={side2Done()}>
+              <div style={orderSideDoneStyle}>Order locked in ✓</div>
+            </Show>
+            <Show when={showForm(2)}>
+              <SetOrderForm
+                side={2}
+                players={match()?.side2 || []}
+                isHome={homeSide() === 2}
+              />
+            </Show>
+            <Show when={!side2Done() && !showForm(2)}>
+              <div style={orderSideWaitingStyle}>Waiting…</div>
+            </Show>
+          </div>
+        </Show>
+        <div style={orderDialogFooterStyle}>
+          <Button color="#888" onClick={() => eventDetailActions.closeOrderDialog()}>
+            Close
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const SetOrderForm = (props: {
+  side: 1 | 2
+  players: Player[]
+  isHome: boolean
+}) => {
+  const slotLabels = () => (props.isHome ? ['A', 'B', 'C', 'D'] : ['X', 'Y', 'Z', 'W'])
+  const picksCount = () => Math.max(0, props.players.length - 1)
+  const [picks, setPicks] = createSignal<string[]>(
+    Array.from({ length: picksCount() }, () => ''),
+  )
+
+  const optionsForSlot = (slotIndex: number) => {
+    const chosen = new Set(
+      picks().filter((_, i) => i !== slotIndex && picks()[i]),
+    )
+    return props.players
+      .filter((p) => !chosen.has(p._id))
+      .map((p) => ({
+        value: p._id,
+        label: `${p.firstName} ${p.lastName}`,
+      }))
+  }
+
+  const handlePick = (slotIndex: number, playerId: string) => {
+    const next = [...picks()]
+    next[slotIndex] = playerId
+    setPicks(next)
+  }
+
+  const remainingPlayer = (): Player | undefined => {
+    const chosen = new Set(picks().filter(Boolean))
+    return props.players.find((p) => !chosen.has(p._id))
+  }
+  const allPicked = () => picks().every(Boolean)
+  const remainingLabel = () => {
+    if (!allPicked()) return '(auto)'
+    const r = remainingPlayer()
+    return r ? `${r.firstName} ${r.lastName} (auto)` : '(auto)'
+  }
+
+  const isSaving = () => eventDetailState.savingOrderSide === props.side
+  const handleSave = () => {
+    void eventDetailActions.saveOrderForSide(props.side, picks())
+  }
+
+  return (
+    <div style={orderFormStyle}>
+      <For each={Array.from({ length: picksCount() }, (_, i) => i)}>
+        {(slotIndex) => (
+          <div style={orderSlotStyle}>
+            <span style={orderSlotLabelStyle}>{slotLabels()[slotIndex]}</span>
+            <select
+              style={orderSelectStyle}
+              value={picks()[slotIndex]}
+              onChange={(e) =>
+                handlePick(slotIndex, (e.target as HTMLSelectElement).value)
+              }
+            >
+              <option value="" disabled>
+                -- Select --
+              </option>
+              <For each={optionsForSlot(slotIndex)}>
+                {(opt) => <option value={opt.value}>{opt.label}</option>}
+              </For>
+            </select>
+          </div>
+        )}
+      </For>
+      <div style={orderSlotStyle}>
+        <span style={orderSlotLabelStyle}>
+          {slotLabels()[picksCount()]}
+        </span>
+        <span style={orderAutoStyle}>{remainingLabel()}</span>
+      </div>
+      <div style={orderFormButtonRowStyle}>
+        <Button onClick={handleSave} disabled={!allPicked() || isSaving()}>
+          {isSaving() ? 'Saving…' : 'Save Order'}
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 export const ConfirmMatchDialog = () => {
   const preview = () => eventDetailActions.getConfirmDialogPreview()
@@ -676,11 +945,16 @@ export const MatchRow = (props: MatchRowProps) => {
 
   const handleStartClick = () => {
     const eventId = props.eventId ?? eventDetailState.eventId
-    if (eventId) {
-      navigate(
-        `/game-play?eventId=${eventId}&stage=${props.stage}&groupIndex=${props.groupIndex}&matchId=${props.match._id}`,
-      )
+    if (!eventId) return
+    // Parent team match: open the Set Order dialog right here instead of
+    // navigating to game-play. The picker IS the team-match start.
+    if (props.match.isTeamMatch) {
+      eventDetailActions.openOrderDialog(props.match._id, eventId)
+      return
     }
+    navigate(
+      `/game-play?eventId=${eventId}&stage=${props.stage}&groupIndex=${props.groupIndex}&matchId=${props.match._id}`,
+    )
   }
 
   const handleConfirmClick = () => {
@@ -814,7 +1088,11 @@ export const MatchRow = (props: MatchRowProps) => {
               size="small"
               disabled={startContinueDisabled()}
             >
-              {isTeamParent() || isUserInMatch(props.match) ? 'Start' : 'Umpire'}
+              {isTeamParent()
+                ? 'Set Order'
+                : isUserInMatch(props.match)
+                  ? 'Start'
+                  : 'Umpire'}
             </Button>
           </Show>
           <Show when={showContinue()}>

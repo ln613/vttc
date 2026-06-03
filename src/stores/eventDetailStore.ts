@@ -33,6 +33,11 @@ interface EventDetailState {
   showConfirmDialog: boolean
   confirmDialogMatchId: string | null
   confirmDialogEventId: string | null
+  // Set Order dialog for a parent team match.
+  showOrderDialog: boolean
+  orderDialogMatchId: string | null
+  orderDialogEventId: string | null
+  savingOrderSide: 1 | 2 | null
   resettingMatchId: string | null
   resettingEvent: boolean
   toastMessage: ToastMessage | null
@@ -57,6 +62,10 @@ const getInitialState = (): EventDetailState => ({
   showConfirmDialog: false,
   confirmDialogMatchId: null,
   confirmDialogEventId: null,
+  showOrderDialog: false,
+  orderDialogMatchId: null,
+  orderDialogEventId: null,
+  savingOrderSide: null,
   resettingMatchId: null,
   toastMessage: null,
   resettingEvent: false,
@@ -349,6 +358,65 @@ export const eventDetailActions = {
       confirmDialogMatchId: null,
       confirmDialogEventId: null,
     })
+  },
+
+  openOrderDialog: (matchId: string, eventId?: string) => {
+    setEventDetailState({
+      showOrderDialog: true,
+      orderDialogMatchId: matchId,
+      orderDialogEventId: eventId ?? eventDetailState.eventId,
+    })
+  },
+
+  closeOrderDialog: () => {
+    setEventDetailState({
+      showOrderDialog: false,
+      orderDialogMatchId: null,
+      orderDialogEventId: null,
+      savingOrderSide: null,
+    })
+  },
+
+  getOrderDialogMatch: (): Match | undefined => {
+    const matchId = eventDetailState.orderDialogMatchId
+    if (!matchId) return undefined
+    if (eventDetailState.data) {
+      const m = findMatchById(eventDetailState.data, matchId)
+      if (m) return m
+    }
+    for (const event of eventState.data || []) {
+      const m = findMatchById(event, matchId)
+      if (m) return m
+    }
+    return undefined
+  },
+
+  saveOrderForSide: async (side: 1 | 2, assignmentIds: string[]) => {
+    const matchId = eventDetailState.orderDialogMatchId
+    const eventId =
+      eventDetailState.orderDialogEventId ?? eventDetailState.eventId
+    if (!matchId || !eventId) return
+    setEventDetailState({ savingOrderSide: side })
+    try {
+      await apiPost('saveTeamMatchAssignment', {
+        _id: eventId,
+        matchId,
+        side,
+        assignmentIds,
+      })
+      if (eventDetailState.eventId === eventId) {
+        await fetchEvent(eventId, true)
+      }
+    } catch (err) {
+      setEventDetailState({
+        error:
+          err instanceof Error
+            ? err.message
+            : 'Failed to save team match order',
+      })
+    } finally {
+      setEventDetailState({ savingOrderSide: null })
+    }
   },
 
   getConfirmDialogMatch: (): Match | undefined => {
