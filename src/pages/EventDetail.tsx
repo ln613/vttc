@@ -1658,7 +1658,8 @@ const matchRowActionsStyle: JSX.CSSProperties = {
   'flex-direction': 'row',
   'flex-wrap': 'wrap',
   'align-items': 'center',
-  'justify-content': 'center',
+  'justify-content': 'flex-end',
+  'align-self': 'stretch',
   gap: '8px',
 }
 
@@ -1667,7 +1668,7 @@ const matchRowsTableStyle: JSX.CSSProperties = {
   'grid-template-columns': 'auto auto auto',
   'column-gap': '16px',
   'row-gap': '4px',
-  margin: '0 auto',
+  'align-self': 'flex-end',
   'align-items': 'center',
   'justify-items': 'center',
 }

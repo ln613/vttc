@@ -48,7 +48,7 @@ The Total column is the total matches played so far.
     - results of each game: "11 : 6, 10 : 12, ...", left side represents the left participant (Eric in this case), the winning numbers are bold.
   - style 2:
     - default style
-    - each player/team is 1 row (name, game score, match score)
+    - each player/team is 1 row (name, game score, match score, align right)
           Nan Li   7  11   3   1
       Eric Huang  11   9   6   2
     - match score use bigger font and different color
@@ -89,7 +89,7 @@ The Total column is the total matches played so far.
       - delete the next round schedule if exist
       - if the game play page for that match is opened somewhere, pop up msg saying the match has been reset, then go back (if cannot go back, go to Schedule page)
   - if admin and SIMULATION=1, show "Simulate" button (only for matches already assigned a table), which will simulate the match and submit the results
-  - if there are multiple buttons, place them in one row
+  - button row align right, if there are multiple buttons, place them in one row
 
 ### interaction
 
