@@ -6,6 +6,7 @@ import type {
 } from '../../shared/types/Table'
 import type { Player } from '../../shared/types/Player'
 import { apiGet, apiPost } from '../utils/api'
+import { authState } from './authStore'
 import {
   subscribeToLiveScoreUpdates,
   type EventSubscription,
@@ -62,9 +63,14 @@ const startSubscription = () => {
   subscription = subscribeToLiveScoreUpdates(() => {
     void fetchLiveScore()
   })
-  heartbeatTimer = setInterval(() => {
-    void fetchLiveScore()
-  }, LIVE_SCORE_HEARTBEAT_MS)
+  // The heartbeat keeps the server's auto-start logic firing even when
+  // no writes are happening — one admin viewer is enough, so gate it to
+  // admins to avoid every connected client polling once a minute.
+  if (authState.isAdmin) {
+    heartbeatTimer = setInterval(() => {
+      void fetchLiveScore()
+    }, LIVE_SCORE_HEARTBEAT_MS)
+  }
 }
 
 const stopUpdates = () => {

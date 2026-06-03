@@ -425,6 +425,10 @@ const MatchSchedule = (props: MatchScheduleProps) => {
                     groupIndex={props.groupIndex}
                     stage={props.stage}
                     parent={item.parent}
+                    markUnavailablePlayers={
+                      liveScoreActions.getTableForMatch(item.match._id) ===
+                      undefined
+                    }
                   />
                 </div>
               )}
@@ -740,6 +744,11 @@ export const MatchRow = (props: MatchRowProps) => {
   // in the queue, surface that table number as its badge.
   const lockedTable = () =>
     assignedTable() === undefined ? props.match.lockedTableNumber : undefined
+  // Finished rows don't need any table/queue badge — they're history.
+  const showAssignedBadge = () =>
+    assignedTable() !== undefined && phase() !== 'finished'
+  const showLockedBadge = () =>
+    lockedTable() !== undefined && phase() !== 'finished'
   const showQueueBadge = () =>
     !props.hideQueueBadge &&
     assignedTable() === undefined &&
@@ -747,9 +756,7 @@ export const MatchRow = (props: MatchRowProps) => {
     inQueue() &&
     phase() === 'not_started'
   const hasBadge = () =>
-    assignedTable() !== undefined ||
-    lockedTable() !== undefined ||
-    showQueueBadge()
+    showAssignedBadge() || showLockedBadge() || showQueueBadge()
   return (
     <div
       style={getMatchRowStyle(
@@ -758,10 +765,10 @@ export const MatchRow = (props: MatchRowProps) => {
         inQueue(),
       )}
     >
-      <Show when={assignedTable() !== undefined}>
+      <Show when={showAssignedBadge()}>
         <div style={matchRowTableNumberStyle}>{assignedTable()}</div>
       </Show>
-      <Show when={lockedTable() !== undefined}>
+      <Show when={showLockedBadge()}>
         <div style={matchRowTableNumberStyle}>{lockedTable()}</div>
       </Show>
       <Show when={showQueueBadge()}>
