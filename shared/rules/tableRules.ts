@@ -186,12 +186,11 @@ const filterByRule4 = (
 }
 
 /**
- * Final should be on table 6 if available
+ * Final must be on table 6. If 6 is not available, defer assignment by
+ * returning [] so the final stays in the queue until table 6 frees up.
  */
-const filterForFinal = (tables: TableNumber[]): TableNumber[] => {
-  if (tables.includes(6)) return [6]
-  return tables
-}
+const filterForFinal = (tables: TableNumber[]): TableNumber[] =>
+  tables.includes(6) ? [6] : []
 
 /**
  * Rule 5: Prefer table 1, 4 in that order for low-tier matches

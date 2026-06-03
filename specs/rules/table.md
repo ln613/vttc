@@ -37,7 +37,7 @@ Rule listed below are based on priority. A rule with lower priority cannot viola
   - final should be on table 6
   - semi final should not be on table 5
 5. If a match can use table 1 or 4, prefer using 1 or 4 in that order if available
-7. For group of 3 (single or team), assign a single table for the group, and assign each match in the group to that table one at a time, until all matches in that group are finished.
+6. For group of 3 (single or team), assign a single table for the group, and assign each match in the group to that table one at a time, until all matches in that group are finished.
 7. For group of 4 or more (single or team), no fixed table for the group, all matches in the group will be placed in the main match queue
 
 ## Match Queue

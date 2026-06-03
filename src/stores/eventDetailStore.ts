@@ -280,20 +280,26 @@ export const eventDetailActions = {
       return (eventDetailState.data?.participants?.length ?? 0) >= 4
     }
 
-    // Find current incomplete round
-    const currentRound = knockoutStage.rounds.find((r) => !r.isComplete)
-    if (!currentRound) return false
+    // Find the first empty placeholder round.
+    const emptyRoundIdx = knockoutStage.rounds.findIndex(
+      (r) => r.matches.length === 0,
+    )
+    if (emptyRoundIdx === -1) return false
 
-    // Current round has no matches generated yet (empty placeholder round)
-    if (currentRound.matches.length === 0) {
-      // If it is the first round, also require group stage to be complete
-      if (currentRound.index === 0 && groupStage) {
-        return isGroupStageComplete
-      }
-      return true
+    // First round: require group stage complete (or no group stage).
+    if (emptyRoundIdx === 0) {
+      return isGroupStageComplete
     }
 
-    return false
+    // Otherwise: previous round must have all matches finished + confirmed.
+    const prevRound = knockoutStage.rounds[emptyRoundIdx - 1]
+    return (
+      prevRound.matches.length > 0 &&
+      prevRound.matches.every(
+        (m) =>
+          m.match?.winningSide != null && m.match?.confirmed === true,
+      )
+    )
   },
 
   generateNextRound: async () => {

@@ -919,14 +919,31 @@ const validateGenerateKnockoutRules = (event) => {
   }
 
   if (knockoutStage.rounds.length > 0) {
+    const isRoundDone = (r) =>
+      r.matches.length > 0 &&
+      r.matches.every(
+        (m) => m.match?.winningSide != null && m.match?.confirmed === true,
+      )
+
     const lastRound = knockoutStage.rounds[knockoutStage.rounds.length - 1]
-    if (lastRound.isComplete && lastRound.participantCount === 2) {
+    if (
+      lastRound.participantCount === 2 &&
+      (lastRound.isComplete || isRoundDone(lastRound))
+    ) {
       errors.push('Event is already complete')
     }
 
-    const currentRound = knockoutStage.rounds.find((r) => !r.isComplete)
-    if (currentRound && currentRound.matches.some((m) => !m.winner)) {
-      errors.push('Current knockout round must be completed first')
+    // Find first empty placeholder round; the prior round must be fully
+    // finished+confirmed. Use match-level data to be resilient to legacy
+    // entries where km.winner / round.isComplete may not be stamped.
+    const emptyRoundIdx = knockoutStage.rounds.findIndex(
+      (r) => !r.matches || r.matches.length === 0,
+    )
+    if (emptyRoundIdx > 0) {
+      const prev = knockoutStage.rounds[emptyRoundIdx - 1]
+      if (!isRoundDone(prev)) {
+        errors.push('Current knockout round must be completed first')
+      }
     }
   }
 
@@ -1174,19 +1191,38 @@ const createSubsequentRoundSeedingList = (previousSeedingList, previousMatches) 
   return newList.sort((a, b) => a.seed - b.seed)
 }
 
+// Older KnockoutMatch records may not have km.winner stamped (the field used to
+// be set only by finishMatch). Backfill it from km.match.winningSide here so
+// downstream round generation works regardless of when the match was confirmed.
+const backfillKnockoutMatchWinner = (km) => {
+  if (km.winner || !km.match) return km
+  const side = km.match.winningSide
+  if (side !== 1 && side !== 2) return km
+  const winner = side === 1 ? km.participant1 : km.participant2
+  if (!winner) return km
+  return { ...km, winner }
+}
+
 const advanceKnockoutRound = (stage, event) => {
   // Find a complete round whose next round has no matches yet
   for (let i = 0; i < stage.rounds.length - 1; i++) {
     const round = stage.rounds[i]
     const nextRound = stage.rounds[i + 1]
 
-    const allMatchesComplete = round.matches.length > 0 && round.matches.every((m) => m.winner)
+    const normalizedMatches = round.matches.map(backfillKnockoutMatchWinner)
+    const allMatchesComplete =
+      normalizedMatches.length > 0 &&
+      normalizedMatches.every((m) => m.winner && m.match?.confirmed)
     if (!allMatchesComplete) continue
     if (nextRound.matches.length > 0) continue // Next round already populated
 
-    const updatedCurrentRound = { ...round, isComplete: true }
+    const updatedCurrentRound = {
+      ...round,
+      matches: normalizedMatches,
+      isComplete: true,
+    }
 
-    const nextSeedingList = createSubsequentRoundSeedingList(stage.seedingList, round.matches)
+    const nextSeedingList = createSubsequentRoundSeedingList(stage.seedingList, normalizedMatches)
     const nextRoundNames = getKnockoutRoundName(
       nextRound.participantCount,
       stage.rounds[0].participantCount,

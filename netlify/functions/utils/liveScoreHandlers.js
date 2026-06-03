@@ -219,7 +219,7 @@ const loadTableState = async () => {
 /**
  * Save table state to DB
  */
-const saveTableState = async (tables, matchQueue) => {
+const saveTableState = async (tables, matchQueue, groupTableMap) => {
   const db = getDB()
   await db.collection(TABLE_STATE_COLLECTION).updateOne(
     { docId: TABLE_STATE_DOC_ID },
@@ -228,6 +228,7 @@ const saveTableState = async (tables, matchQueue) => {
         docId: TABLE_STATE_DOC_ID,
         tables,
         matchQueue,
+        groupTableMap: groupTableMap || {},
         updatedAt: new Date().toISOString(),
       },
     },
@@ -345,7 +346,8 @@ const getAllowedTables = (item, availableTables) => {
       allowed = allowed.filter((t) => t !== 5)
     }
     if (isFinal) {
-      if (allowed.includes(6)) return [6]
+      // Final must be on table 6. If 6 is busy, defer by returning [].
+      return allowed.includes(6) ? [6] : []
     }
   }
 
@@ -474,15 +476,18 @@ const hasGroupPlayerConflict = (groupKey, allItems, playersOnTables) => {
 /**
  * Assign tables to matches from the queue
  */
-const assignTablesToMatches = (tables, queue, allItems) => {
+const assignTablesToMatches = (tables, queue, allItems, groupTableMap) => {
   const updatedTables = tables.map((t) => ({ ...t }))
   const remainingQueue = []
   const playersOnTables = getPlayersOnTables(updatedTables)
   const assignedGroupKeys = new Set()
+  const updatedGroupTableMap = pruneGroupTableMap(groupTableMap || {}, allItems)
 
   for (const item of queue) {
+    const isGroupOfThree = item.groupKey && item.groupSize === 3
+
     // Group of 3: check all players in the group
-    if (item.groupKey && item.groupSize === 3) {
+    if (isGroupOfThree) {
       if (assignedGroupKeys.has(item.groupKey)) {
         remainingQueue.push(item)
         continue
@@ -498,8 +503,20 @@ const assignTablesToMatches = (tables, queue, allItems) => {
       }
     }
 
+    // Tables reserved for other groups of 3 are off-limits to this item.
+    const myLockedTable = isGroupOfThree
+      ? updatedGroupTableMap[item.groupKey]
+      : undefined
+    const reservedForOthers = new Set(
+      Object.entries(updatedGroupTableMap)
+        .filter(([key]) => key !== item.groupKey)
+        .map(([, table]) => table),
+    )
+
     const availableTables = updatedTables
-      .filter((t) => t.status === 'available')
+      .filter(
+        (t) => t.status === 'available' && !reservedForOthers.has(t.tableNumber),
+      )
       .map((t) => t.tableNumber)
 
     if (availableTables.length === 0) {
@@ -513,7 +530,17 @@ const assignTablesToMatches = (tables, queue, allItems) => {
       continue
     }
 
-    const tableNumber = allowedTables[0]
+    // Group of 3 must reuse the table the group was first assigned to.
+    let tableNumber = allowedTables[0]
+    if (isGroupOfThree && myLockedTable != null) {
+      if (!allowedTables.includes(myLockedTable)) {
+        // The group's table is currently busy (or not allowed). Defer.
+        remainingQueue.push(item)
+        continue
+      }
+      tableNumber = myLockedTable
+    }
+
     const tableIndex = updatedTables.findIndex(
       (t) => t.tableNumber === tableNumber,
     )
@@ -531,12 +558,30 @@ const assignTablesToMatches = (tables, queue, allItems) => {
       for (const p of match.side2 || []) playersOnTables.add(p._id?.toString())
     }
 
-    if (item.groupKey && item.groupSize === 3) {
+    if (isGroupOfThree) {
       assignedGroupKeys.add(item.groupKey)
+      updatedGroupTableMap[item.groupKey] = tableNumber
     }
   }
 
-  return { tables: updatedTables, remainingQueue }
+  return {
+    tables: updatedTables,
+    remainingQueue,
+    groupTableMap: updatedGroupTableMap,
+  }
+}
+
+// Drop entries for groups whose matches are all finished/no longer pending.
+const pruneGroupTableMap = (map, allItems) => {
+  const liveGroupKeys = new Set()
+  for (const it of allItems) {
+    if (it.groupKey && it.groupSize === 3) liveGroupKeys.add(it.groupKey)
+  }
+  const next = {}
+  for (const [key, val] of Object.entries(map)) {
+    if (liveGroupKeys.has(key)) next[key] = val
+  }
+  return next
 }
 
 // ==================== API HANDLERS ====================
@@ -570,8 +615,17 @@ export const getLiveScore = async () => {
   const unassignedQueue = filterOutAssignedMatches(matchQueue, assignedMatchIds)
 
   // Assign tables to matches
-  const result = assignTablesToMatches(tables, unassignedQueue, allMatchItems)
-  await saveTableState(result.tables, result.remainingQueue)
+  const result = assignTablesToMatches(
+    tables,
+    unassignedQueue,
+    allMatchItems,
+    savedState?.groupTableMap,
+  )
+  await saveTableState(
+    result.tables,
+    result.remainingQueue,
+    result.groupTableMap,
+  )
 
   const activeSessionMatchIds = await getActiveSessionMatchIds()
 
@@ -735,7 +789,13 @@ const freeTableForMatch = async (matchId) => {
     }
     return t
   })
-  if (changed) await saveTableState(tables, state.matchQueue || [])
+  if (changed) {
+    await saveTableState(
+      tables,
+      state.matchQueue || [],
+      state.groupTableMap,
+    )
+  }
 }
 
 export const rebuildMatchQueue = async () => {
@@ -754,8 +814,17 @@ export const rebuildMatchQueue = async () => {
   const unassignedQueue = filterOutAssignedMatches(matchQueue, assignedMatchIds)
 
   // Assign
-  const result = assignTablesToMatches(tables, unassignedQueue, allMatchItems)
-  await saveTableState(result.tables, result.remainingQueue)
+  const result = assignTablesToMatches(
+    tables,
+    unassignedQueue,
+    allMatchItems,
+    savedState?.groupTableMap,
+  )
+  await saveTableState(
+    result.tables,
+    result.remainingQueue,
+    result.groupTableMap,
+  )
 
   return { tables: result.tables, matchQueue: result.remainingQueue }
 }
