@@ -31,11 +31,7 @@ export const acquireMatchSession = async (body) => {
 
   const current = await collection.findOne({ matchId: body.matchId })
 
-  if (
-    current &&
-    isActive(current) &&
-    (current.userId !== body.userId || current.sessionId !== body.sessionId)
-  ) {
+  if (current && isActive(current) && current.userId !== body.userId) {
     if (!body.asAdmin) {
       throwError('Another user is currently umpiring this match')
     }

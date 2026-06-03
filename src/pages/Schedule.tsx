@@ -150,10 +150,12 @@ const buildScheduleData = (myMatchesOnly: boolean) => {
     onTables: sortByTable(
       allEntries.filter((e) => liveScoreActions.getTableForMatch(e.match._id) !== undefined),
     ),
-    inQueue: allEntries.filter(
-      (e) =>
-        liveScoreActions.getTableForMatch(e.match._id) === undefined &&
-        liveScoreActions.isMatchInQueue(e.match._id),
+    inQueue: sortByServerQueueOrder(
+      allEntries.filter(
+        (e) =>
+          liveScoreActions.getTableForMatch(e.match._id) === undefined &&
+          liveScoreActions.isMatchInQueue(e.match._id),
+      ),
     ),
     finished: allEntries
       .filter(
@@ -182,6 +184,20 @@ const matchFinishedTime = (match: Match): number => {
     (match as unknown as { confirmedAt?: string; updatedAt?: string })
       .updatedAt
   return v ? new Date(v).getTime() : 0
+}
+
+// Mirror the order of the server-built match queue so Schedule's
+// In Queue section matches the Live Score Match Queue exactly.
+const sortByServerQueueOrder = (entries: MatchEntry[]): MatchEntry[] => {
+  const order = new Map<string, number>()
+  liveScoreState.matchQueue.forEach((item, i) => {
+    if (item.matchId) order.set(item.matchId.toString(), i)
+  })
+  return [...entries].sort((a, b) => {
+    const ai = order.get(a.match._id.toString()) ?? Number.POSITIVE_INFINITY
+    const bi = order.get(b.match._id.toString()) ?? Number.POSITIVE_INFINITY
+    return ai - bi
+  })
 }
 
 const sortByTable = (entries: MatchEntry[]): MatchEntry[] =>

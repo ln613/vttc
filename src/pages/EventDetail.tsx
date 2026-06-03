@@ -1815,9 +1815,6 @@ const matchScheduleContentStyle: JSX.CSSProperties = {
   'flex-direction': 'column',
   gap: '10px',
   'margin-top': '12px',
-  padding: '12px',
-  'background-color': '#f0f2f5',
-  'border-radius': '8px',
 }
 
 const matchScheduleItemStyle: JSX.CSSProperties = {
