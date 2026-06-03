@@ -400,6 +400,7 @@ interface MatchScheduleProps {
 
 const MatchSchedule = (props: MatchScheduleProps) => {
   const isExpanded = () => eventDetailActions.isMatchScheduleExpanded(props.groupIndex)
+  const items = () => expandMatchesForSchedule(props.matches)
 
   return (
     <Show when={props.matches && props.matches.length > 0}>
@@ -411,9 +412,20 @@ const MatchSchedule = (props: MatchScheduleProps) => {
         />
         <Show when={isExpanded()}>
           <div style={matchScheduleContentStyle}>
-            <For each={props.matches}>
-              {(match) => (
-                <MatchRow match={match} groupIndex={props.groupIndex} stage={props.stage} />
+            <For each={items()}>
+              {(item) => (
+                <div style={matchScheduleItemStyle}>
+                  <Show when={item.parent && item.subMatchIndex != null}>
+                    <div style={subMatchTitleStyle}>
+                      {getTeamSubMatchTitle(item.parent!, item.subMatchIndex!)}
+                    </div>
+                  </Show>
+                  <MatchRow
+                    match={item.match}
+                    groupIndex={props.groupIndex}
+                    stage={props.stage}
+                  />
+                </div>
               )}
             </For>
           </div>
@@ -446,6 +458,84 @@ export interface MatchRowProps {
   // If true, individual player names render in red when the player is
   // currently on a table (used by the Schedule queue section).
   markUnavailablePlayers?: boolean
+}
+
+// Lineup position labels per team-match type. Kept in sync with the JS
+// helper in netlify/functions/utils/eventHandlers.js (getTeamMatchLineupJS).
+export const TEAM_SUB_MATCH_LABELS: Record<
+  string,
+  { home: string; away: string }[]
+> = {
+  type1: [
+    { home: 'A', away: 'Y' },
+    { home: 'B', away: 'X' },
+    { home: 'AB', away: 'XY' },
+  ],
+  type2: [
+    { home: 'A', away: 'Y' },
+    { home: 'B', away: 'X' },
+    { home: 'AB', away: 'XY' },
+    { home: 'A', away: 'X' },
+    { home: 'B', away: 'Y' },
+  ],
+  type3: [
+    { home: 'BC', away: 'YZ' },
+    { home: 'A', away: 'X' },
+    { home: 'C', away: 'Z' },
+    { home: 'A', away: 'Y' },
+    { home: 'B', away: 'X' },
+  ],
+}
+
+export const deriveTeamMatchType = (
+  parent: Match,
+): keyof typeof TEAM_SUB_MATCH_LABELS | undefined => {
+  const nop = (parent.side1 || []).length
+  const matches = parent.numberOfMatches || 5
+  if (nop === 2 && matches === 3) return 'type1'
+  if (nop === 2) return 'type2'
+  if (nop === 3) return 'type3'
+  return undefined
+}
+
+export const getTeamSubMatchTitle = (
+  parent: Match,
+  subMatchIndex: number,
+): string => {
+  const type =
+    (parent.teamMatchType as keyof typeof TEAM_SUB_MATCH_LABELS | undefined) ||
+    deriveTeamMatchType(parent)
+  const pair = type ? TEAM_SUB_MATCH_LABELS[type]?.[subMatchIndex] : undefined
+  if (!pair) return `Team Match ${subMatchIndex + 1}`
+  return `Team Match ${subMatchIndex + 1} - ${pair.home} vs ${pair.away}`
+}
+
+export interface MatchScheduleItem {
+  match: Match
+  parent?: Match
+  subMatchIndex?: number
+}
+
+// For each match: emit the sub-matches (in order) when the parent is an
+// expanded but not-yet-finalised team match; otherwise emit the parent.
+export const expandMatchesForSchedule = (
+  matches: Match[],
+): MatchScheduleItem[] => {
+  const items: MatchScheduleItem[] = []
+  for (const m of matches) {
+    const isTeam = !!m.isTeamMatch
+    const hasSubs = Array.isArray(m.subMatches) && m.subMatches.length > 0
+    const finalised = m.winningSide != null && m.confirmed === true
+    if (isTeam && hasSubs && !finalised) {
+      m.subMatches!.forEach((sub, idx) => {
+        if (sub.cancelledAt) return
+        items.push({ match: sub, parent: m, subMatchIndex: idx })
+      })
+      continue
+    }
+    items.push({ match: m })
+  }
+  return items
 }
 
 const collectPlayerIds = (entity: unknown, ids: Set<string>) => {
@@ -1679,6 +1769,19 @@ const matchScheduleContentStyle: JSX.CSSProperties = {
   padding: '12px',
   'background-color': '#f0f2f5',
   'border-radius': '8px',
+}
+
+const matchScheduleItemStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '2px',
+}
+
+const subMatchTitleStyle: JSX.CSSProperties = {
+  'font-size': '12px',
+  'font-weight': 600,
+  color: '#3498db',
+  'text-align': 'left',
 }
 
 const getMatchRowStyle = (

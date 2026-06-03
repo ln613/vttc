@@ -92,6 +92,11 @@ The Total column is the total matches played so far.
   - only Start and Reset buttons visible to parent team match
   - if admin and SIMULATION=1, show "Simulate" button (only for matches already assigned a table), which will simulate the match and submit the results
   - button row align right, if there are multiple buttons, place them in one row
+  - for a team match
+    - when sub-matches generated, replace the parent one with the sub ones
+    - when the first sub match is assigned a table, show the table number instead of "Q" for all other sub matches in queue since they are fixed
+    - show title for each sub match, "Team Match {n} - BC vs YZ"
+
 
 ### interaction
 

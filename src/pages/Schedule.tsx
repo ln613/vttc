@@ -5,7 +5,7 @@ import ToggleButton from '../components/ToggleButton'
 import { eventState, eventActions, type EventOption } from '../stores/eventStore'
 import { liveScoreState, liveScoreActions } from '../stores/liveScoreStore'
 import { authState } from '../stores/authStore'
-import { MatchRow, ConfirmMatchDialog } from './EventDetail'
+import { MatchRow, ConfirmMatchDialog, getTeamSubMatchTitle } from './EventDetail'
 import { eventDetailState } from '../stores/eventDetailStore'
 import type { Match } from '../../shared/types/Match'
 import type { Stage, GroupStage, KnockoutStage } from '../../shared/types/Tournament'
@@ -311,53 +311,9 @@ const pushTeamAwareEntries = (
   entries.push({ ...ctx, match })
 }
 
-// Lineup position labels per team-match type. Kept in sync with the JS
-// helper in netlify/functions/utils/eventHandlers.js (getTeamMatchLineupJS).
-const TEAM_SUB_MATCH_LABELS: Record<string, { home: string; away: string }[]> = {
-  type1: [
-    { home: 'A', away: 'Y' },
-    { home: 'B', away: 'X' },
-    { home: 'AB', away: 'XY' },
-  ],
-  type2: [
-    { home: 'A', away: 'Y' },
-    { home: 'B', away: 'X' },
-    { home: 'AB', away: 'XY' },
-    { home: 'A', away: 'X' },
-    { home: 'B', away: 'Y' },
-  ],
-  type3: [
-    { home: 'BC', away: 'YZ' },
-    { home: 'A', away: 'X' },
-    { home: 'C', away: 'Z' },
-    { home: 'A', away: 'Y' },
-    { home: 'B', away: 'X' },
-  ],
-}
-
 const subMatchTitle = (entry: MatchEntry): string | undefined => {
-  const parent = entry.parent
-  const idx = entry.subMatchIndex
-  if (!parent || idx == null) return undefined
-  const type =
-    (parent.teamMatchType as keyof typeof TEAM_SUB_MATCH_LABELS | undefined) ||
-    deriveTeamMatchType(parent)
-  const pair = type ? TEAM_SUB_MATCH_LABELS[type]?.[idx] : undefined
-  if (!pair) return `Team Match ${idx + 1}`
-  return `Team Match ${idx + 1} - ${pair.home} vs ${pair.away}`
-}
-
-// Pre-existing team matches may not have teamMatchType set. Fall back
-// to the closest defined type based on the roster size.
-const deriveTeamMatchType = (
-  parent: Match,
-): keyof typeof TEAM_SUB_MATCH_LABELS | undefined => {
-  const nop = (parent.side1 || []).length
-  const matches = parent.numberOfMatches || 5
-  if (nop === 2 && matches === 3) return 'type1'
-  if (nop === 2) return 'type2'
-  if (nop === 3) return 'type3'
-  return undefined
+  if (!entry.parent || entry.subMatchIndex == null) return undefined
+  return getTeamSubMatchTitle(entry.parent, entry.subMatchIndex)
 }
 
 const isUserInEntry = (entry: MatchEntry): boolean => {
