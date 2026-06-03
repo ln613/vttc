@@ -68,6 +68,9 @@ const PartialTeamItem = (props: { team: PartialTeamInfo }) => {
             </span>
           </Show>
         </div>
+        <Show when={props.team.sexViolationReason}>
+          <div style={violationStyle}>{props.team.sexViolationReason}</div>
+        </Show>
       </div>
       <Show when={isSelected()}>
         <div style={checkmarkStyle}>✓</div>
@@ -204,6 +207,13 @@ const topNStyle: JSX.CSSProperties = {
 const exceededRatingStyle: JSX.CSSProperties = {
   color: '#e74c3c',
   'font-weight': '600',
+}
+
+const violationStyle: JSX.CSSProperties = {
+  'font-size': '12px',
+  color: '#e74c3c',
+  'font-weight': '600',
+  'margin-top': '4px',
 }
 
 const checkmarkStyle: JSX.CSSProperties = {

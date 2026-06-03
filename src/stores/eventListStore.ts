@@ -24,6 +24,7 @@ export interface PartialTeamInfo {
   disabled: boolean
   exceedsCombinedRating: boolean
   exceedsTopN: boolean
+  sexViolationReason?: string
 }
 
 export type FeeDialogMode = 'registration' | 'feeInfo'

@@ -367,10 +367,17 @@ const validateAddParticipantInput = (body) => {
 const validateAddParticipantRules = (event, players) => {
   const errors = []
 
-  // Check number of players matches nop
-  if (players.length !== event.nop) {
-    errors.push(`Expected ${event.nop} player(s), got ${players.length}`)
+  if (players.length === 0) {
+    errors.push('At least one player required')
+    return errors
   }
+  if (players.length > event.nop) {
+    errors.push(`Expected at most ${event.nop} player(s), got ${players.length}`)
+  }
+
+  // Partial team save is allowed; rules that may still be satisfied
+  // by adding more players are deferred until the team is full.
+  const isFullTeam = players.length === event.nop
 
   // Check for duplicate players in input
   const playerIds = new Set()
@@ -387,7 +394,7 @@ const validateAddParticipantRules = (event, players) => {
     errors.push('Event has reached maximum participants')
   }
 
-  // Check rating requirement
+  // Check rating requirement (combined sum can only grow; flag now if over)
   if (event.restriction === 'Rated' && event.ratingLimit) {
     const ratingErrors = validateRatingRequirement(event, players)
     errors.push(...ratingErrors)
@@ -407,6 +414,9 @@ const validateAddParticipantRules = (event, players) => {
     }
   }
 
+  // Sex requirement: defer mixed-team / mixed-double checks until full
+  validatePartialSexRequirement(event, players, isFullTeam, errors)
+
   // Check if player is already in event
   for (const player of players) {
     const existing = event.participants.find((p) =>
@@ -418,6 +428,50 @@ const validateAddParticipantRules = (event, players) => {
   }
 
   return errors
+}
+
+const validatePartialSexRequirement = (event, players, isFullTeam, errors) => {
+  const required = event.sex
+  if (!required || required === 'All') return
+
+  if (required === 'Man') {
+    for (const p of players) {
+      if (!isMaleSex(p.sex)) {
+        errors.push(
+          `Player ${p.firstName} ${p.lastName} is not male (men's event)`,
+        )
+      }
+    }
+    return
+  }
+  if (required === 'Woman') {
+    for (const p of players) {
+      if (!isFemaleSex(p.sex)) {
+        errors.push(
+          `Player ${p.firstName} ${p.lastName} is not female (women's event)`,
+        )
+      }
+    }
+    return
+  }
+  if (required === 'Mixed') {
+    if (event.type === 'Single') return
+    if (!isFullTeam) return // a missing required sex may be added later
+    if (event.type === 'Double') {
+      const men = players.filter((p) => isMaleSex(p.sex)).length
+      const women = players.filter((p) => isFemaleSex(p.sex)).length
+      if (men !== 1 || women !== 1) {
+        errors.push('Mixed doubles requires exactly one male and one female')
+      }
+      return
+    }
+    if (event.type === 'Team') {
+      const hasFemale = players.some((p) => isFemaleSex(p.sex))
+      if (!hasFemale) {
+        errors.push('Mixed team must include at least one female player')
+      }
+    }
+  }
 }
 
 const isMaleSex = (sex) => {
@@ -2764,9 +2818,15 @@ const validateEventHasNoSchedule = (event) => {
 const validateEditParticipantRules = (event, players, currentParticipantId) => {
   const errors = []
 
-  if (players.length !== event.nop) {
-    errors.push(`Expected ${event.nop} player(s), got ${players.length}`)
+  if (players.length === 0) {
+    errors.push('At least one player required')
+    return errors
   }
+  if (players.length > event.nop) {
+    errors.push(`Expected at most ${event.nop} player(s), got ${players.length}`)
+  }
+
+  const isFullTeam = players.length === event.nop
 
   const playerIds = new Set()
   for (const player of players) {
@@ -2796,6 +2856,9 @@ const validateEditParticipantRules = (event, players, currentParticipantId) => {
       }
     }
   }
+
+  // Sex requirement: defer mixed-team / mixed-double checks until full
+  validatePartialSexRequirement(event, players, isFullTeam, errors)
 
   // Check if player is already in a different participant
   for (const player of players) {
@@ -2881,7 +2944,8 @@ const mapPartialTeamInfo = (team, player, event) => {
   const combinedRating = allPlayers.reduce((sum, p) => sum + (p.rating || 0), 0)
   const topN = calculateTopNRating(allPlayers, event)
   const { exceedsCombinedRating, exceedsTopN } = checkRatingExceeded(event, allPlayers)
-  const disabled = exceedsCombinedRating || exceedsTopN
+  const sexViolation = mergeSexViolationReason(event, allPlayers)
+  const disabled = exceedsCombinedRating || exceedsTopN || !!sexViolation
 
   return {
     participantId: team._id,
@@ -2892,6 +2956,7 @@ const mapPartialTeamInfo = (team, player, event) => {
     disabled,
     exceedsCombinedRating,
     exceedsTopN,
+    sexViolationReason: sexViolation || undefined,
   }
 }
 
@@ -2966,6 +3031,56 @@ const validateTeamCanAcceptPlayer = (team, event, player) => {
   if (wouldExceedRatingLimits(event, allPlayers)) {
     throwError('Adding this player would exceed the rating limit')
   }
+  const sexErr = mergeSexViolationReason(event, allPlayers)
+  if (sexErr) throwError(sexErr)
+}
+
+// Returns a string describing why joining this team would violate the
+// event's sex requirement, or null if the merge is allowed (including
+// when the team still has open slots and a fix is still possible later).
+const mergeSexViolationReason = (event, allPlayers) => {
+  const required = event.sex
+  if (!required || required === 'All') return null
+  if (required === 'Mixed' && event.type === 'Single') return null
+
+  if (required === 'Man') {
+    for (const p of allPlayers) {
+      if (!isMaleSex(p.sex)) {
+        return `Player ${p.firstName} ${p.lastName} is not male (men's event)`
+      }
+    }
+    return null
+  }
+  if (required === 'Woman') {
+    for (const p of allPlayers) {
+      if (!isFemaleSex(p.sex)) {
+        return `Player ${p.firstName} ${p.lastName} is not female (women's event)`
+      }
+    }
+    return null
+  }
+
+  // Mixed Team / Mixed Double: only enforce once the merge fills the team.
+  const isFullTeam = allPlayers.length === event.nop
+  if (!isFullTeam) return null
+
+  if (required === 'Mixed' && event.type === 'Double') {
+    const men = allPlayers.filter((p) => isMaleSex(p.sex)).length
+    const women = allPlayers.filter((p) => isFemaleSex(p.sex)).length
+    if (men !== 1 || women !== 1) {
+      return 'Mixed doubles requires exactly one male and one female'
+    }
+    return null
+  }
+  if (required === 'Mixed' && event.type === 'Team') {
+    const hasFemale = allPlayers.some((p) => isFemaleSex(p.sex))
+    if (!hasFemale) {
+      return 'Mixed team must include at least one female player'
+    }
+    return null
+  }
+
+  return null
 }
 
 const createNewParticipant = async (collection, event, player) => {
@@ -3036,17 +3151,41 @@ const validateRegisterForEventRules = (event, player) => {
   return errors
 }
 
+const CLUB_TIMEZONE = process.env.CLUB_TIMEZONE || 'America/Vancouver'
+
+const getClubDate = () =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: CLUB_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
+
+const getClubMinutesOfDay = () => {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: CLUB_TIMEZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date())
+  const h = parseInt(parts.find((p) => p.type === 'hour').value, 10)
+  const m = parseInt(parts.find((p) => p.type === 'minute').value, 10)
+  return h * 60 + m
+}
+
+// Compare against the club's timezone so an event scheduled for "today
+// at 12pm" isn't classified as already started just because the server
+// runs in a different timezone (or because Date parsing of YYYY-MM-DD
+// drifts into the previous day).
 const isEventStarted = (event) => {
   if (!event.date) return false
-  const now = new Date()
-  const eventDate = new Date(event.date)
-  if (event.time) {
-    const timeParts = parseTime(event.time)
-    if (timeParts) {
-      eventDate.setHours(timeParts.hours, timeParts.minutes, 0, 0)
-    }
-  }
-  return now >= eventDate
+  const today = getClubDate()
+  if (event.date < today) return true
+  if (event.date > today) return false
+  if (!event.time) return true
+  const eventMinutes = parseTime(event.time)
+  if (eventMinutes == null) return true
+  return getClubMinutesOfDay() >= eventMinutes
 }
 
 const parseTime = (timeStr) => {
@@ -3057,7 +3196,7 @@ const parseTime = (timeStr) => {
   const period = match[3].toUpperCase()
   if (period === 'PM' && hours !== 12) hours += 12
   if (period === 'AM' && hours === 12) hours = 0
-  return { hours, minutes }
+  return hours * 60 + minutes
 }
 
 export const getPlayerUnpaidFees = async (body) => {

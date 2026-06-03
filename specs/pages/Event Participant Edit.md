@@ -49,12 +49,14 @@ Vertical
 - title
 - list of (number of rows = nop):
   - "Player {n}: " + dropdown (all players ("{name} - {rating}", filter out players not qualified for the event due to rating and sex), order by name)
+  - Remove icon if nop > 1 and a player already selected
 - button "Cancel" (red)
 - button "Save" (green)
 
 ### interaction
 
 - on save: call add participant API
+  - allow partial team save, but show err if partial team already violate some rules (e.g., combined rating). allow save if a rule may be satisfied later when more players added to the team (e.g., for mixed team of 3, the selection of 2 male players is allowed to save)
   - ignore the age restriction if player doesn't have dob on file
   - show result in toast notification, close on success, stay on fail
   - update and re-order the list

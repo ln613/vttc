@@ -1,4 +1,12 @@
-import { Show, For, onMount, onCleanup, createSignal, type JSX } from 'solid-js'
+import {
+  Show,
+  For,
+  onMount,
+  onCleanup,
+  createSignal,
+  createMemo,
+  type JSX,
+} from 'solid-js'
 import { useSearchParams } from '@solidjs/router'
 import { Header } from '../components/Header'
 import Select from '../components/Select'
@@ -17,7 +25,7 @@ import {
   calculateCombinedRating,
   calculateTopNCombinedRating,
   isPlayerPaid,
-  isPlayerQualifiedForEvent,
+  buildSlotSelectableFilter,
 } from '../stores/eventParticipantEditStore'
 
 // ==================== Styles ====================
@@ -151,6 +159,23 @@ const paymentFeeStyle: JSX.CSSProperties = {
   color: '#333',
   'margin-left': 'auto',
   'margin-right': '12px',
+}
+
+const playerSlotRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'flex-end',
+  gap: '8px',
+  'margin-bottom': '16px',
+}
+
+const playerSlotSelectStyle: JSX.CSSProperties = {
+  flex: 1,
+}
+
+const playerSlotIconStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  'padding-bottom': '12px',
 }
 
 // ==================== Icons ====================
@@ -585,18 +610,30 @@ const ParticipantDialog = (props: {
     }
   }
 
-  const playerOptions = () =>
-    props.players
-      .filter((p) => isPlayerQualifiedForEvent(props.event, p))
-      .sort((a, b) => {
-        const nameA = `${a.firstName} ${a.lastName}`.toLowerCase()
-        const nameB = `${b.firstName} ${b.lastName}`.toLowerCase()
-        return nameA.localeCompare(nameB)
-      })
-      .map((p) => ({
+  const sortedPlayers = createMemo(() =>
+    [...props.players].sort((a, b) => {
+      const nameA = `${a.firstName} ${a.lastName}`.toLowerCase()
+      const nameB = `${b.firstName} ${b.lastName}`.toLowerCase()
+      return nameA.localeCompare(nameB)
+    }),
+  )
+
+  const slotOptions = createMemo(() => {
+    const ids = selectedPlayerIds()
+    const all = sortedPlayers()
+    return Array.from({ length: props.event.nop }, (_, slotIndex) => {
+      const isSelectable = buildSlotSelectableFilter(
+        props.event,
+        ids,
+        slotIndex,
+        all,
+      )
+      return all.filter(isSelectable).map((p) => ({
         value: p._id,
         label: `${p.firstName} ${p.lastName} - ${p.rating || 0}`,
       }))
+    })
+  })
 
   return (
     <div style={dialogOverlayStyle}>
@@ -606,13 +643,23 @@ const ParticipantDialog = (props: {
         </h2>
         <For each={Array.from({ length: props.event.nop }, (_, i) => i)}>
           {(index) => (
-            <Select
-              label={`Player ${index + 1}`}
-              name={`player-${index}`}
-              value={selectedPlayerIds()[index]}
-              onChange={(value) => handlePlayerChange(index, value)}
-              options={playerOptions()}
-            />
+            <div style={playerSlotRowStyle}>
+              <div style={playerSlotSelectStyle}>
+                <Select
+                  label={`Player ${index + 1}`}
+                  name={`player-${index}`}
+                  value={selectedPlayerIds()[index]}
+                  onChange={(value) => handlePlayerChange(index, value)}
+                  options={slotOptions()[index]}
+                  noMargin
+                />
+              </div>
+              <Show when={props.event.nop > 1 && selectedPlayerIds()[index]}>
+                <div style={playerSlotIconStyle}>
+                  <DeleteIcon onClick={() => handlePlayerChange(index, '')} />
+                </div>
+              </Show>
+            </div>
           )}
         </For>
         <div style={buttonContainerStyle}>

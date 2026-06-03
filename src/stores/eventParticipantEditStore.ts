@@ -389,3 +389,69 @@ export const isPlayerQualifiedForEvent = (
 ): boolean =>
   meetsEventSexRequirement(event, player) &&
   meetsEventRatingRequirement(event, player)
+
+// Build a predicate that decides whether a player can fill the given slot
+// of a team-in-progress. Doing the per-slot setup once (instead of inside
+// the per-player filter) keeps the dialog responsive when the player list
+// is large.
+export const buildSlotSelectableFilter = (
+  event: EventOption,
+  selectedPlayerIds: string[],
+  slotIndex: number,
+  allPlayers: Player[],
+): ((player: Player) => boolean) => {
+  const playerById = new Map<string, Player>(
+    allPlayers.map((p) => [p._id, p]),
+  )
+
+  const otherIds: string[] = []
+  for (let i = 0; i < selectedPlayerIds.length; i++) {
+    if (i === slotIndex) continue
+    const id = selectedPlayerIds[i]
+    if (id) otherIds.push(id)
+  }
+  const takenSet = new Set(otherIds)
+
+  let othersHaveMale = false
+  let othersHaveFemale = false
+  for (const id of otherIds) {
+    const p = playerById.get(id)
+    if (!p) continue
+    const s = normalizedSex(p.sex)
+    if (s === 'male') othersHaveMale = true
+    else if (s === 'female') othersHaveFemale = true
+  }
+
+  const isMixed = event.sex === 'Mixed'
+  const remainingSlotsIfPicked = event.nop - otherIds.length - 1
+
+  return (player: Player): boolean => {
+    if (!isPlayerQualifiedForEvent(event, player)) return false
+    if (takenSet.has(player._id)) return false
+    if (!isMixed) return true
+    if (event.type === 'Single') return true
+
+    const playerSex = normalizedSex(player.sex)
+
+    if (event.type === 'Double') {
+      if (playerSex === 'male' && othersHaveMale) return false
+      if (playerSex === 'female' && othersHaveFemale) return false
+      return true
+    }
+
+    if (event.type === 'Team') {
+      // Need at least 1 female. If no female yet and this would be the
+      // last slot, only females are selectable.
+      if (
+        !othersHaveFemale &&
+        remainingSlotsIfPicked === 0 &&
+        playerSex !== 'female'
+      ) {
+        return false
+      }
+      return true
+    }
+
+    return true
+  }
+}
