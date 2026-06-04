@@ -77,6 +77,7 @@ The Total column is the total matches played so far.
     - Reset button, admin only
   - match finished
     - white bg
+    - for parent team match, show a collapsable section with all sub-matches
     - Confirm button
       - if finished but not confirmed
       - red bg

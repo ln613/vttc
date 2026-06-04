@@ -695,8 +695,9 @@ const MatchSchedule = (props: MatchScheduleProps) => {
                     stage={props.stage}
                     parent={item.parent}
                     markUnavailablePlayers={
+                      item.match.winningSide == null &&
                       liveScoreActions.getTableForMatch(item.match._id) ===
-                      undefined
+                        undefined
                     }
                   />
                 </div>
@@ -1132,6 +1133,75 @@ export const MatchRow = (props: MatchRowProps) => {
           </Show>
         </div>
       </Show>
+      <Show
+        when={
+          isTeamParent() &&
+          hasResult() &&
+          Array.isArray(props.match.subMatches) &&
+          props.match.subMatches.length > 0
+        }
+      >
+        <FinishedTeamSubMatches parent={props.match} />
+      </Show>
+    </div>
+  )
+}
+
+// Collapsible list of sub-matches shown under a finalised parent team
+// match row. Cancelled sub-matches (the ones the tally skipped after
+// the team match was decided) are marked but still listed.
+const FinishedTeamSubMatches = (props: { parent: Match }) => {
+  const [expanded, setExpanded] = createSignal(false)
+  const playedSubs = () =>
+    (props.parent.subMatches || [])
+      .map((sub, index) => ({ sub, index }))
+      .filter(({ sub }) => !sub.cancelledAt)
+  return (
+    <div style={finishedTeamSubsContainerStyle}>
+      <button
+        style={finishedTeamSubsToggleStyle}
+        onClick={() => setExpanded(!expanded())}
+      >
+        <span>{expanded() ? '▼' : '▶'}</span>
+        <span>Matches</span>
+      </button>
+      <Show when={expanded()}>
+        <div style={finishedTeamSubsListStyle}>
+          <For each={playedSubs()}>
+            {(entry) => (
+              <FinishedSubMatchRow
+                parent={props.parent}
+                sub={entry.sub}
+                index={entry.index}
+              />
+            )}
+          </For>
+        </div>
+      </Show>
+    </div>
+  )
+}
+
+const FinishedSubMatchRow = (props: {
+  parent: Match
+  sub: Match
+  index: number
+}) => {
+  const provisional = () => getProvisionalMatchResult(props.sub)
+  return (
+    <div style={finishedSubRowStyle}>
+      <div style={finishedSubTitleStyle}>
+        {getTeamSubMatchTitle(props.parent, props.index)}
+      </div>
+      <MatchRowsTable
+        side1Players={getMatchSidePlayers(props.sub.side1 || [])}
+        side2Players={getMatchSidePlayers(props.sub.side2 || [])}
+        games={props.sub.games}
+        gamesWon1={provisional().gamesWon1}
+        gamesWon2={provisional().gamesWon2}
+        winningSide={provisional().winningSide}
+        parent={props.parent}
+      />
     </div>
   )
 }
@@ -2164,6 +2234,48 @@ const matchContentContainerStyle: JSX.CSSProperties = {
 // is rendered on the left so long team rosters don't slide under it.
 const matchContentWithBadgeStyle: JSX.CSSProperties = {
   'padding-left': '64px',
+}
+
+const finishedTeamSubsContainerStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '8px',
+  width: '100%',
+}
+
+const finishedTeamSubsToggleStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  gap: '6px',
+  background: 'transparent',
+  border: 'none',
+  padding: '4px 0',
+  color: '#3498db',
+  'font-size': '13px',
+  'font-weight': 600,
+  cursor: 'pointer',
+  'align-self': 'flex-start',
+}
+
+const finishedTeamSubsListStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '8px',
+  width: '100%',
+  'padding-left': '16px',
+  'border-left': '2px solid #e0e0e0',
+}
+
+const finishedSubRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '4px',
+}
+
+const finishedSubTitleStyle: JSX.CSSProperties = {
+  'font-size': '12px',
+  'font-weight': 600,
+  color: '#3498db',
 }
 
 const matchRowActionsStyle: JSX.CSSProperties = {
