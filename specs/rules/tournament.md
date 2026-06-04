@@ -145,6 +145,31 @@ In the previous example, in the first round, Tom and Joe will have a bye, Tony v
 
 In the previous example, if John beat Tony and Glen beat Frank in the first round, then the 2nd round seeding is Tom, Joe, John, Glen, and the 2nd round matches will be Tom vs Glen, Joe vs John.
 
+#### Partial Round Generation
+
+- upon match confirm, if a branch in the bracket is already available for next round, generate the next round only for that branch
+- for example (Q = Quarterfinal, S = Semifinal),
+
+Q       S
+
+A --|
+    |-- A
+B --|
+
+C --|
+    |-- D
+D --|
+
+E --|
+    |-- 
+F --|
+
+G --|
+    |-- G
+H --|
+
+At this point, although the Quarterfinal round is not finished, the Semifinal match between A and D is ready, so the Semifinal round can be partially generated and the match between A and D can be put in queue
+
 ## Participant Sex
 
 - All: No restriction, both men and women can participate

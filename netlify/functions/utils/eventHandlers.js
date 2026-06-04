@@ -1358,7 +1358,7 @@ const backfillKnockoutMatchWinner = (km) => {
 }
 
 const advanceKnockoutRound = (stage, event) => {
-  // Find a complete round whose next round has no matches yet
+  // Find a complete round whose next round still has empty slots to fill.
   for (let i = 0; i < stage.rounds.length - 1; i++) {
     const round = stage.rounds[i]
     const nextRound = stage.rounds[i + 1]
@@ -1368,33 +1368,47 @@ const advanceKnockoutRound = (stage, event) => {
       normalizedMatches.length > 0 &&
       normalizedMatches.every((m) => m.winner && m.match?.confirmed)
     if (!allMatchesComplete) continue
-    if (nextRound.matches.length > 0) continue // Next round already populated
 
-    const updatedCurrentRound = {
+    const slots = normalizedMatches.length / 2
+    const nextMatches = (nextRound.matches || []).slice()
+    while (nextMatches.length < slots) {
+      nextMatches.push(makeKnockoutSlotPlaceholder())
+    }
+
+    let changed = false
+    for (let j = 0; j < slots; j++) {
+      if (nextMatches[j]?.match) continue
+      const m1 = normalizedMatches[j * 2]
+      const m2 = normalizedMatches[j * 2 + 1]
+      if (!isKmReadyForAdvance(m1) || !isKmReadyForAdvance(m2)) continue
+      const newKm = buildPartialNextRoundMatch(
+        stage,
+        nextRound,
+        m1,
+        m2,
+        event,
+      )
+      if (!newKm) continue
+      nextMatches[j] = newKm
+      changed = true
+    }
+
+    if (!changed) continue
+
+    const updatedRounds = [...stage.rounds]
+    updatedRounds[i] = {
       ...round,
       matches: normalizedMatches,
       isComplete: true,
     }
-
-    const nextSeedingList = createSubsequentRoundSeedingList(stage.seedingList, normalizedMatches)
-    const nextRoundNames = getKnockoutRoundName(
-      nextRound.participantCount,
-      stage.rounds[0].participantCount,
-    )
-    const nextRoundMatches = createKnockoutMatches(nextSeedingList, event, nextRoundNames.name)
-
-    const updatedNextRound = {
-      ...nextRound,
-      matches: nextRoundMatches,
-    }
-
-    const updatedRounds = [...stage.rounds]
-    updatedRounds[i] = updatedCurrentRound
-    updatedRounds[i + 1] = updatedNextRound
+    updatedRounds[i + 1] = { ...nextRound, matches: nextMatches }
 
     return {
       ...stage,
-      seedingList: nextSeedingList,
+      seedingList: createSubsequentRoundSeedingList(
+        stage.seedingList,
+        normalizedMatches,
+      ),
       rounds: updatedRounds,
     }
   }
@@ -1537,8 +1551,10 @@ export const finishMatch = async (body) => {
             rounds: updatedRounds,
           }
 
-          // If confirmed and round complete, generate next round schedule
-          if (confirmed && roundComplete) {
+          // Always try to advance the bracket after a confirm — partial
+          // generation will populate the next-round slot whose source
+          // matches are both done.
+          if (confirmed) {
             generateNextRoundIfNeeded(updatedStages, event)
           }
           break
@@ -1782,7 +1798,7 @@ const applyFinishToTeamSubMatch = (
           ...knockoutStage,
           rounds: updatedRounds,
         }
-        if (confirmed && updatedParent.confirmed && roundComplete) {
+        if (confirmed && updatedParent.confirmed) {
           generateNextRoundIfNeeded(updatedStages, event)
         }
         return true
@@ -3296,35 +3312,123 @@ const generateNextRoundIfNeeded = (updatedStages, event) => {
     return
   }
 
-  // Find a complete round whose next round has no matches yet
-  for (let i = 0; i < knockoutStage.rounds.length - 1; i++) {
-    const round = knockoutStage.rounds[i]
-    const nextRound = knockoutStage.rounds[i + 1]
+  // Partial generation: for each round, populate next-round slots whose
+  // two source matches are both done — don't wait for the whole round
+  // to finish. The pairing follows the bracket convention
+  // (slot j of next round = matches[j] vs matches[N-1-j] of this round).
+  let workingStage = knockoutStage
+  for (let i = 0; i < workingStage.rounds.length - 1; i++) {
+    const round = workingStage.rounds[i]
+    const nextRound = workingStage.rounds[i + 1]
+    if (round.matches.length === 0) continue
+    const slots = round.matches.length / 2
+    const currentNextMatches = nextRound.matches || []
+    const updatedNextMatches = currentNextMatches.slice()
+    while (updatedNextMatches.length < slots) {
+      updatedNextMatches.push(makeKnockoutSlotPlaceholder())
+    }
 
-    const roundFullyComplete = isRoundFullyComplete(round)
-    if (!roundFullyComplete) continue
-    if (nextRound.matches.length > 0) continue // Next round already populated
+    let changed = false
+    for (let j = 0; j < slots; j++) {
+      if (updatedNextMatches[j]?.match) continue
+      // Consecutive pairing: slot j of the next round is fed by matches
+      // [2j] and [2j+1] of this round — matches the bracket visual and
+      // the spec example (QF1+QF2 → SF1, QF3+QF4 → SF2).
+      const m1 = round.matches[j * 2]
+      const m2 = round.matches[j * 2 + 1]
+      const ready =
+        m1 && m2 && isKmReadyForAdvance(m1) && isKmReadyForAdvance(m2)
+      if (!ready) continue
+      const newKm = buildPartialNextRoundMatch(
+        workingStage,
+        nextRound,
+        m1,
+        m2,
+        event,
+      )
+      if (!newKm) continue
+      updatedNextMatches[j] = newKm
+      changed = true
+    }
 
-    // Generate next round matches directly
-    const nextSeedingList = createSubsequentRoundSeedingList(knockoutStage.seedingList, round.matches)
-    const nextRoundNames = getKnockoutRoundName(
-      nextRound.participantCount,
-      knockoutStage.rounds[0].participantCount,
+    if (!changed) continue
+
+    const fullyPopulated = updatedNextMatches.every(
+      (km) => km && km.match,
     )
-    const nextRoundMatches = createKnockoutMatches(nextSeedingList, event, nextRoundNames.name)
-
-    const updatedRounds = knockoutStage.rounds.map((r, idx) => {
-      if (idx === i) return { ...r, isComplete: true }
-      if (idx === i + 1) return { ...r, matches: nextRoundMatches }
+    const updatedRounds = workingStage.rounds.map((r, idx) => {
+      if (idx === i + 1) {
+        return { ...r, matches: updatedNextMatches }
+      }
+      // Mark the current round complete if every slot in next round is
+      // now filled — keeps existing UI gates (isComplete) working.
+      if (idx === i && fullyPopulated) return { ...r, isComplete: true }
       return r
     })
 
-    updatedStages[knockoutStageIndex] = {
-      ...knockoutStage,
-      seedingList: nextSeedingList,
-      rounds: updatedRounds,
+    workingStage = { ...workingStage, rounds: updatedRounds }
+    if (fullyPopulated) {
+      // Keep stage.seedingList up to date when the whole round advances
+      // (matches the legacy behaviour).
+      workingStage = {
+        ...workingStage,
+        seedingList: createSubsequentRoundSeedingList(
+          workingStage.seedingList,
+          round.matches,
+        ),
+      }
     }
-    return
+  }
+  updatedStages[knockoutStageIndex] = workingStage
+}
+
+// Empty next-round slot used while partial generation is in flight.
+// Downstream code already skips entries without `.match`, so this stays
+// inert until partial generation replaces it with a real knockout match.
+const makeKnockoutSlotPlaceholder = () => ({
+  participant1: undefined,
+  participant2: undefined,
+  isBye1: false,
+  isBye2: false,
+  winner: undefined,
+  match: undefined,
+})
+
+// A knockout match is ready to feed the next round once it has a
+// winner. Real matches additionally need to be confirmed; bye entries
+// (isBye2) already have a winner baked in.
+const isKmReadyForAdvance = (km) => {
+  if (!km.winner) return false
+  if (km.isBye2) return true
+  return !!km.match?.confirmed
+}
+
+const buildPartialNextRoundMatch = (stage, nextRound, m1, m2, event) => {
+  const w1 = m1.winner
+  const w2 = m2.winner
+  if (!w1 || !w2) return undefined
+  const findSeed = (participant) => {
+    const entry = stage.seedingList?.find(
+      (e) => e.participant && isSameParticipant(e.participant, participant),
+    )
+    return entry?.seed ?? 999
+  }
+  const s1 = findSeed(w1)
+  const s2 = findSeed(w2)
+  // Lower seed number = higher seeding → participant1.
+  const top = s1 <= s2 ? w1 : w2
+  const bottom = s1 <= s2 ? w2 : w1
+  const nextRoundNames = getKnockoutRoundName(
+    nextRound.participantCount,
+    stage.rounds[0].participantCount,
+  )
+  const numberOfGames = getKnockoutGamesCount(event, nextRoundNames.name)
+  return {
+    match: buildKnockoutMatchRecord(event, top, bottom, numberOfGames),
+    participant1: top,
+    participant2: bottom,
+    isBye1: false,
+    isBye2: false,
   }
 }
 
