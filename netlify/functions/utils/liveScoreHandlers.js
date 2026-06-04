@@ -408,6 +408,13 @@ const getAllowedTables = (item, availableTables) => {
   }
 
   if (isLow) {
+    if (isFinal || isSemifinal) {
+      // Low-tier semifinal/final prefers tables 2 or 3.
+      const preferredOrder = [2, 3, 1, 4, ...TABLE_ORDER]
+      return [...allowed].sort(
+        (a, b) => preferredOrder.indexOf(a) - preferredOrder.indexOf(b),
+      )
+    }
     return sortByPreference(allowed, true)
   }
 

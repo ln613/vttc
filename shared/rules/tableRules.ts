@@ -136,6 +136,10 @@ export const getAllowedTables = (
   let allowed = filterByRule1(availableTables, isKnockout)
 
   if (isLow) {
+    // Low-tier semifinal/final prefers the central tables 2 or 3.
+    if (isFinal || isSemifinal) {
+      return sortByLowTierKnockoutPreference(allowed)
+    }
     return sortByPreference(allowed, isLow)
   }
 
@@ -191,6 +195,17 @@ const filterByRule4 = (
  */
 const filterForFinal = (tables: TableNumber[]): TableNumber[] =>
   tables.includes(6) ? [6] : []
+
+// Low-tier semifinal/final preference: try table 2 or 3 first, then
+// fall through to the general low-tier preference order.
+const sortByLowTierKnockoutPreference = (
+  tables: TableNumber[],
+): TableNumber[] => {
+  const preferredOrder: TableNumber[] = [2, 3, 1, 4, ...TABLE_ORDER]
+  return [...tables].sort(
+    (a, b) => preferredOrder.indexOf(a) - preferredOrder.indexOf(b),
+  )
+}
 
 /**
  * Rule 5: Prefer table 1, 4 in that order for low-tier matches

@@ -24,7 +24,9 @@ Rule listed below are based on priority. A rule with lower priority cannot viola
   - single event with rating limit 1000 and below
   - team event with combined rating limit 2000 and below
   - single event with max age 13 and below
-  any table can be used for any stage
+  apply the following rules:
+  - any table can be used for any stage
+  - for semifinal and final, prefer using table 2 or 3
 3. For any other events, table 8 should not be used at all
 4. For the following events
   - open singles
