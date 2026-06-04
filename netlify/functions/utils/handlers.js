@@ -30,6 +30,7 @@ import {
   saveTeamMatchAssignment,
   resetMatch,
   resetEvent,
+  deleteEvent,
 } from './eventHandlers.js'
 import {
   signIn,
@@ -92,6 +93,7 @@ export const apiHandlers = {
     saveTeamMatchAssignment: withEventNotify(saveTeamMatchAssignment),
     resetMatch: withEventNotify(resetMatch),
     resetEvent: withEventNotify(resetEvent),
+    deleteEvent: withEventNotify(deleteEvent),
     registerForEvent: withEventNotify(registerForEvent),
     getPartialTeams: (body) => getPartialTeams(body),
     getPlayerUnpaidFees: (body) => getPlayerUnpaidFees(body),

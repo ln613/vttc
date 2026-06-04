@@ -7,7 +7,7 @@ import type {
   Participant,
   Stage,
 } from '../../shared/types/Tournament'
-import { apiGet } from '../utils/api'
+import { apiGet, apiPost } from '../utils/api'
 
 export interface EventOption {
   _id: string
@@ -77,6 +77,11 @@ export const eventActions = {
 
   getEventById: (_id: string): EventOption | undefined =>
     eventState.data?.find((e) => e._id === _id),
+
+  deleteEvent: async (eventId: string) => {
+    await apiPost('deleteEvent', { _id: eventId })
+    await eventActions.refreshEvents()
+  },
 
   reset: () => setEventState(getInitialState()),
 }

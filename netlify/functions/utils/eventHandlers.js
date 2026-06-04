@@ -3465,6 +3465,20 @@ export const resetEvent = async (body) => {
   return { success: true }
 }
 
+// Delete an event entirely (admin only — caller-side gate; the API
+// trusts the request).
+export const deleteEvent = async (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body._id) throwError('Event ID is required')
+
+  const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
+  const result = await collection.deleteOne({ _id: toObjectId(body._id) })
+  if (result.deletedCount === 0) throwError('Event not found')
+
+  return { success: true }
+}
+
 const validateResetEventInput = (body) => {
   if (!body) throwError('Request body is required')
   if (!body._id) throwError('Event ID is required')

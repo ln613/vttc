@@ -47,6 +47,7 @@ Vertical
       - if already registered but still in a partial team
       - on click, show the select teammate dialog (replace the skip button with cancel button)
     - edit icon (admin only): goes to Event Edit page for that event
+    - delete icon (super admin only): confirm and delete the event completely 
     - multi-user icon (admin only): goes to Event Participant Edit page
   - for past events (before today or already finished), use light gray bg
   - for my upcoming or unfinished events, use light green bg
