@@ -2439,6 +2439,42 @@ const validateSaveMatchSetupInput = (body) => {
   if (!body.leftSide) throwError('Left side is required')
 }
 
+// Mark a side as having opened the Set Order dialog. Used so admins
+// can see which sides are already being handled by players. Idempotent.
+export const markTeamMatchSideOpened = async (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body._id) throwError('Event ID is required')
+  if (!body.matchId) throwError('Match ID is required')
+  if (body.side !== 1 && body.side !== 2) throwError('Side must be 1 or 2')
+
+  const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
+  const event = await collection.findOne({ _id: toObjectId(body._id) })
+  if (!event) throwError('Event not found')
+
+  const flag = body.side === 1 ? 'side1Started' : 'side2Started'
+  let didChange = false
+  const updatedStages = updateMatchInStages(
+    event.eventStages,
+    body.matchId,
+    (match) => {
+      if (!match.isTeamMatch) throwError('Match is not a team match')
+      if (match.winningSide != null) return match
+      if (match[flag]) return match
+      didChange = true
+      return { ...match, [flag]: true }
+    },
+  )
+
+  if (didChange) {
+    await collection.updateOne(
+      { _id: toObjectId(body._id) },
+      { $set: { eventStages: updatedStages } },
+    )
+  }
+  return { success: true }
+}
+
 // Record that a side has clicked "Start" on a team match. Both sides
 // must start before the match can move on to the order-of-play picker.
 export const startTeamMatchSide = async (body) => {

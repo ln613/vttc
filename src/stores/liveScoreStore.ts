@@ -151,6 +151,19 @@ export const liveScoreActions = {
     await apiPost('cancelMatch', { _id: eventId, matchId })
   },
 
+  assignMatchToTable: async (
+    eventId: string,
+    matchId: string,
+    tableNumber: number,
+  ) => {
+    await apiPost('assignMatchToTable', {
+      _id: eventId,
+      matchId,
+      tableNumber,
+    })
+    await fetchLiveScore()
+  },
+
   isMatchInQueue: (matchId: string): boolean =>
     liveScoreState.matchQueue.some(
       (item) => item.matchId?.toString() === matchId.toString(),

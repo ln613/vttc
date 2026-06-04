@@ -895,6 +895,56 @@ export const cancelMatch = async (body) => {
   return { success: true }
 }
 
+// Admin-only manual assignment: drop a queued match onto a chosen table
+// regardless of the normal table-assignment rules.
+export const assignMatchToTable = async (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body._id) throwError('Event ID is required')
+  if (!body.matchId) throwError('Match ID is required')
+  if (body.tableNumber == null) throwError('tableNumber is required')
+
+  const events = await getStartedEvents()
+  const allMatchItems = extractAllRemainingMatches(events)
+  const item = allMatchItems.find(
+    (m) => m.matchId?.toString() === body.matchId.toString(),
+  )
+  if (!item) throwError('Match not found in the current queue')
+
+  const state = await loadTableState()
+  const tables = state?.tables || createInitialTables()
+  const targetIndex = tables.findIndex(
+    (t) => t.tableNumber === body.tableNumber,
+  )
+  if (targetIndex === -1) throwError('Table not found')
+  if (tables[targetIndex].status !== 'available') {
+    throwError('Table is not available')
+  }
+
+  const updatedTables = tables.map((t, i) =>
+    i === targetIndex
+      ? {
+          ...t,
+          match: { ...item, tableNumber: body.tableNumber },
+          status: 'assigned',
+        }
+      : t,
+  )
+
+  // Recompute the queue: drop the just-assigned match so other clients
+  // don't see it in queue any more.
+  const matchQueue = buildMatchQueue(allMatchItems)
+  const assignedIds = getAssignedMatchIds(updatedTables)
+  const remainingQueue = filterOutAssignedMatches(matchQueue, assignedIds)
+
+  await saveTableState(
+    updatedTables,
+    remainingQueue,
+    state?.groupTableMap,
+  )
+
+  return { success: true }
+}
+
 const freeTableForMatch = async (matchId) => {
   const state = await loadTableState()
   if (!state?.tables) return

@@ -26,6 +26,7 @@ import {
   updateGame,
   saveMatchSetup,
   startTeamMatchSide,
+  markTeamMatchSideOpened,
   saveTeamMatchAssignment,
   resetMatch,
   resetEvent,
@@ -44,6 +45,7 @@ import {
   rebuildMatchQueue,
   postponeMatch,
   cancelMatch,
+  assignMatchToTable,
 } from './liveScoreHandlers.js'
 import {
   acquireMatchSession,
@@ -86,6 +88,7 @@ export const apiHandlers = {
     updateGame: withEventNotify(updateGame),
     saveMatchSetup: withEventNotify(saveMatchSetup),
     startTeamMatchSide: withEventNotify(startTeamMatchSide),
+    markTeamMatchSideOpened: withEventNotify(markTeamMatchSideOpened),
     saveTeamMatchAssignment: withEventNotify(saveTeamMatchAssignment),
     resetMatch: withEventNotify(resetMatch),
     resetEvent: withEventNotify(resetEvent),
@@ -107,6 +110,7 @@ export const apiHandlers = {
     },
     postponeMatch: withEventNotify(postponeMatch),
     cancelMatch: withEventNotify(cancelMatch),
+    assignMatchToTable: withEventNotify(assignMatchToTable),
     acquireMatchSession: async (body) => {
       const result = await acquireMatchSession(body)
       await notifyLiveScoreUpdate()

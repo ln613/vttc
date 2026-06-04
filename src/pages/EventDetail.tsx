@@ -1,4 +1,4 @@
-import { Show, For, Switch, Match as MatchCase, createSignal, onMount, onCleanup, type JSX } from 'solid-js'
+import { Show, For, Switch, Match as MatchCase, createSignal, createEffect, onMount, onCleanup, type JSX } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { Header } from '../components/Header'
 import Button from '../components/Button'
@@ -7,7 +7,7 @@ import { eventDetailState, eventDetailActions } from '../stores/eventDetailStore
 import type { StageTab } from '../stores/eventDetailStore'
 import { eventState } from '../stores/eventStore'
 import { authState } from '../stores/authStore'
-import { liveScoreActions } from '../stores/liveScoreStore'
+import { liveScoreActions, liveScoreState } from '../stores/liveScoreStore'
 import type { Group, GroupParticipant, Participant, KnockoutRound, KnockoutMatch as KnockoutMatchType, Stage } from '../../shared/types/Tournament'
 import type { Player } from '../../shared/types/Player'
 import { getProvisionalMatchResult } from '../../shared/rules/matchRules'
@@ -70,6 +70,9 @@ const EventDetail = () => {
       </Show>
       <Show when={eventDetailState.showOrderDialog}>
         <SetOrderDialog />
+      </Show>
+      <Show when={eventDetailState.showAssignDialog}>
+        <AssignTableDialog />
       </Show>
       <Show when={eventDetailState.toastMessage}>
         {(toast) => (
@@ -141,12 +144,6 @@ const orderSideWaitingStyle: JSX.CSSProperties = {
   'font-size': '13px',
 }
 
-const orderDialogFooterStyle: JSX.CSSProperties = {
-  display: 'flex',
-  'justify-content': 'flex-end',
-  gap: '8px',
-}
-
 const orderFormStyle: JSX.CSSProperties = {
   display: 'flex',
   'flex-direction': 'column',
@@ -183,7 +180,62 @@ const orderAutoStyle: JSX.CSSProperties = {
 
 const orderFormButtonRowStyle: JSX.CSSProperties = {
   display: 'flex',
-  'justify-content': 'flex-end',
+  'justify-content': 'center',
+}
+
+const assignDialogContentStyle: JSX.CSSProperties = {
+  'background-color': '#fff',
+  'border-radius': '12px',
+  padding: '20px',
+  width: 'auto',
+  'max-width': '360px',
+  display: 'flex',
+  'flex-direction': 'column',
+  'align-items': 'center',
+  gap: '14px',
+}
+
+const assignDialogTitleStyle: JSX.CSSProperties = {
+  'font-size': '18px',
+  'font-weight': 700,
+  color: '#2c3e50',
+  'text-align': 'center',
+}
+
+const assignDialogGridStyle: JSX.CSSProperties = {
+  display: 'grid',
+  'grid-template-columns': 'repeat(4, 64px)',
+  'grid-auto-rows': '64px',
+  gap: '8px',
+}
+
+// Table cells match the live-score palette: green when available, red
+// when assigned-but-not-started, blue when in progress. The number is
+// always gold per the live-score style.
+const assignTableCellStyle = (
+  status: 'available' | 'not_started' | 'in_progress',
+  assigning: boolean,
+): JSX.CSSProperties => {
+  const bg =
+    status === 'available'
+      ? '#27ae60'
+      : status === 'not_started'
+        ? '#c0392b'
+        : '#2980b9'
+  return {
+    width: '64px',
+    height: '64px',
+    'border-radius': '10px',
+    'font-size': '24px',
+    'font-weight': 900,
+    color: '#f1c40f',
+    'background-color': bg,
+    border: assigning ? '3px solid #f1c40f' : '3px solid transparent',
+    cursor: status === 'available' ? 'pointer' : 'not-allowed',
+    opacity: assigning ? 0.7 : 1,
+    'text-shadow': '2px 2px 4px rgba(0,0,0,0.3)',
+    padding: 0,
+  }
 }
 
 const toastStyle = (type: 'success' | 'error'): JSX.CSSProperties => ({
@@ -199,6 +251,59 @@ const toastStyle = (type: 'success' | 'error'): JSX.CSSProperties => ({
   'box-shadow': '0 4px 12px rgba(0, 0, 0, 0.15)',
   'max-width': '480px',
 })
+
+// Admin-only dialog: manually assign a queued match to a chosen table.
+// Layout mirrors the physical table arrangement (5/6/7/8 on top row,
+// 1/2/3/4 on bottom) using the dark live-score background.
+export const AssignTableDialog = () => {
+  const tables = () => liveScoreState.tables
+  const tableState = (n: number) =>
+    tables().find((t) => t.tableNumber === n)
+  const isAvailable = (n: number) => tableState(n)?.status === 'available'
+  const isAssigning = (n: number) =>
+    eventDetailState.assigningTableNumber === n
+  const tableStatus = (
+    n: number,
+  ): 'available' | 'not_started' | 'in_progress' => {
+    const t = tableState(n)
+    if (!t || t.status === 'available') return 'available'
+    const status = t.match?.matchStatus
+    return status === 'not_started' ? 'not_started' : 'in_progress'
+  }
+
+  const handleClick = (n: number) => {
+    if (!isAvailable(n) || eventDetailState.assigningTableNumber != null) return
+    if (!confirm(`Assign this match to table ${n}?`)) return
+    void eventDetailActions.assignMatchToTable(n)
+  }
+
+  return (
+    <div style={dialogOverlayStyle} onClick={() => eventDetailActions.closeAssignDialog()}>
+      <div
+        style={assignDialogContentStyle}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={assignDialogTitleStyle}>Assign to Table</div>
+        <div style={assignDialogGridStyle}>
+          <For each={[5, 6, 7, 8, 1, 2, 3, 4]}>
+            {(n) => (
+              <button
+                style={assignTableCellStyle(tableStatus(n), isAssigning(n))}
+                onClick={() => handleClick(n)}
+                disabled={
+                  !isAvailable(n) ||
+                  eventDetailState.assigningTableNumber != null
+                }
+              >
+                {n}
+              </button>
+            )}
+          </For>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // Dialog for picking the order of play on a parent team match. Mounted
 // at the page level (EventDetail + Schedule) so it can be triggered
@@ -217,8 +322,21 @@ export const SetOrderDialog = () => {
   const homeSide = () => match()?.homeSide
   const side1Done = () => !!match()?.side1Assignment
   const side2Done = () => !!match()?.side2Assignment
-  const canAct = (side: 1 | 2): boolean =>
-    authState.isAdmin || userSide() === side
+  // Both sides finished setting their orders — auto-dismiss the dialog
+  // so nobody is left staring at it.
+  createEffect(() => {
+    if (side1Done() && side2Done()) {
+      eventDetailActions.closeOrderDialog()
+    }
+  })
+  const sideStarted = (side: 1 | 2): boolean =>
+    !!(side === 1 ? match()?.side1Started : match()?.side2Started)
+  const canAct = (side: 1 | 2): boolean => {
+    // Players can only act for their own side. Admins act as a backup
+    // for sides that no player has opened yet.
+    if (authState.isAdmin) return !sideStarted(side)
+    return userSide() === side
+  }
   const showForm = (side: 1 | 2): boolean => {
     if (side === 1 && side1Done()) return false
     if (side === 2 && side2Done()) return false
@@ -267,11 +385,6 @@ export const SetOrderDialog = () => {
             </Show>
           </div>
         </Show>
-        <div style={orderDialogFooterStyle}>
-          <Button color="#888" onClick={() => eventDetailActions.closeOrderDialog()}>
-            Close
-          </Button>
-        </div>
       </div>
     </div>
   )
@@ -906,9 +1019,9 @@ export const MatchRow = (props: MatchRowProps) => {
     hasResult() ||
     (props.match.games && props.match.games.length > 0) ||
     (props.match.initialServingSide != null && props.match.leftSide != null) ||
-    // Team match handshake / sub-match generation also counts as started.
-    !!props.match.side1Started ||
-    !!props.match.side2Started ||
+    // Team match parent: only the sub-match expansion counts as
+    // "started". Opening the order dialog (which sets side1Started /
+    // side2Started) shouldn't take the Set Order button away.
     (Array.isArray(props.match.subMatches) && props.match.subMatches.length > 0)
   const isConfirming = () =>
     eventDetailState.confirmingMatchId === props.match._id
@@ -936,6 +1049,10 @@ export const MatchRow = (props: MatchRowProps) => {
     !authState.isAdmin && sessionActive()
   const phase = (): 'not_started' | 'in_progress' | 'finished' => {
     if (hasResult()) return 'finished'
+    // Parent team match never enters "in progress" — once it expands
+    // into sub-matches the queue extractor replaces it with them, so
+    // the parent row itself stays in the not-started visual state.
+    if (props.match.isTeamMatch) return 'not_started'
     if (hasStarted()) return 'in_progress'
     return 'not_started'
   }
@@ -978,6 +1095,24 @@ export const MatchRow = (props: MatchRowProps) => {
   // Parent team match rows only expose the Start button — sub-match
   // rows handle Continue/Confirm/Reset/Simulate via their own MatchRow.
   const isTeamParent = () => !!props.match.isTeamMatch
+  const allPlayersAvailable = () => {
+    const players = [
+      ...(props.match.side1 || []),
+      ...(props.match.side2 || []),
+    ]
+    return players.every(
+      (p) => !liveScoreActions.isPlayerOnTable(p._id?.toString()),
+    )
+  }
+  const anyTableAvailable = () =>
+    liveScoreActions.getAvailableTables().length > 0
+  const showAssign = () =>
+    authState.isAdmin &&
+    !hasStarted() &&
+    assignedTable() === undefined &&
+    inQueue() &&
+    allPlayersAvailable() &&
+    anyTableAvailable()
   const showStart = () =>
     !hasStarted() &&
     assignedTable() !== undefined &&
@@ -1012,7 +1147,14 @@ export const MatchRow = (props: MatchRowProps) => {
     showContinue() ||
     showConfirm() ||
     showReset() ||
-    showSimulate()
+    showSimulate() ||
+    showAssign()
+
+  const handleAssignClick = () => {
+    const eventId = props.eventId ?? eventDetailState.eventId ?? undefined
+    if (!eventId) return
+    eventDetailActions.openAssignDialog(props.match._id, eventId)
+  }
 
   // Sub-matches of a team match carry a lockedTableNumber so they can
   // run on the same table sequentially. When the sub-match is waiting
@@ -1131,6 +1273,11 @@ export const MatchRow = (props: MatchRowProps) => {
               Simulate
             </Button>
           </Show>
+          <Show when={showAssign()}>
+            <Button onClick={handleAssignClick} color="#3498db" size="small">
+              Assign
+            </Button>
+          </Show>
         </div>
       </Show>
       <Show
@@ -1145,6 +1292,48 @@ export const MatchRow = (props: MatchRowProps) => {
       </Show>
     </div>
   )
+}
+
+const finishedTeamSubsContainerStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '8px',
+  width: '100%',
+}
+
+const finishedTeamSubsToggleStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  gap: '6px',
+  background: 'transparent',
+  border: 'none',
+  padding: '4px 0',
+  color: '#3498db',
+  'font-size': '13px',
+  'font-weight': 600,
+  cursor: 'pointer',
+  'align-self': 'flex-start',
+}
+
+const finishedTeamSubsListStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '8px',
+  width: '100%',
+  'padding-left': '16px',
+  'border-left': '2px solid #e0e0e0',
+}
+
+const finishedSubRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '4px',
+}
+
+const finishedSubTitleStyle: JSX.CSSProperties = {
+  'font-size': '12px',
+  'font-weight': 600,
+  color: '#3498db',
 }
 
 // Collapsible list of sub-matches shown under a finalised parent team
@@ -2234,48 +2423,6 @@ const matchContentContainerStyle: JSX.CSSProperties = {
 // is rendered on the left so long team rosters don't slide under it.
 const matchContentWithBadgeStyle: JSX.CSSProperties = {
   'padding-left': '64px',
-}
-
-const finishedTeamSubsContainerStyle: JSX.CSSProperties = {
-  display: 'flex',
-  'flex-direction': 'column',
-  gap: '8px',
-  width: '100%',
-}
-
-const finishedTeamSubsToggleStyle: JSX.CSSProperties = {
-  display: 'flex',
-  'align-items': 'center',
-  gap: '6px',
-  background: 'transparent',
-  border: 'none',
-  padding: '4px 0',
-  color: '#3498db',
-  'font-size': '13px',
-  'font-weight': 600,
-  cursor: 'pointer',
-  'align-self': 'flex-start',
-}
-
-const finishedTeamSubsListStyle: JSX.CSSProperties = {
-  display: 'flex',
-  'flex-direction': 'column',
-  gap: '8px',
-  width: '100%',
-  'padding-left': '16px',
-  'border-left': '2px solid #e0e0e0',
-}
-
-const finishedSubRowStyle: JSX.CSSProperties = {
-  display: 'flex',
-  'flex-direction': 'column',
-  gap: '4px',
-}
-
-const finishedSubTitleStyle: JSX.CSSProperties = {
-  'font-size': '12px',
-  'font-weight': 600,
-  color: '#3498db',
 }
 
 const matchRowActionsStyle: JSX.CSSProperties = {

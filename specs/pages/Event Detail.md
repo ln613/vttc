@@ -58,6 +58,11 @@ The Total column is the total matches played so far.
   - match not started, no table assigned, but in queue
     - light green bg
     - big "Q" (left aligned)
+    - Assign button
+      - admin only
+      - visible when all players in the match are available and there are tables available
+      - on click, show a dialog with all tables (grid layout) with number, same bg color as live score page
+      - on click on a free table, confirm to assign the match to that table, ignore any table assigning rules 
   - match not started, but table assigned
     - light red bg
     - big table number (left aligned)

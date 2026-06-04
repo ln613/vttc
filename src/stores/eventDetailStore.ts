@@ -15,6 +15,7 @@ import { apiGet, apiPost } from '../utils/api'
 import { waitForPendingSave } from './gamePlayStore'
 import { subscribeToEventUpdates, type EventSubscription } from '../utils/pusher'
 import { eventState } from './eventStore'
+import { authState } from './authStore'
 import { getProvisionalMatchResult } from '../../shared/rules/matchRules'
 
 export type StageTab = 'group' | 'knockout' | 'bracket'
@@ -38,6 +39,11 @@ interface EventDetailState {
   orderDialogMatchId: string | null
   orderDialogEventId: string | null
   savingOrderSide: 1 | 2 | null
+  // Assign-to-table dialog for a queued match (admin only).
+  showAssignDialog: boolean
+  assignDialogMatchId: string | null
+  assignDialogEventId: string | null
+  assigningTableNumber: number | null
   resettingMatchId: string | null
   resettingEvent: boolean
   toastMessage: ToastMessage | null
@@ -66,6 +72,10 @@ const getInitialState = (): EventDetailState => ({
   orderDialogMatchId: null,
   orderDialogEventId: null,
   savingOrderSide: null,
+  showAssignDialog: false,
+  assignDialogMatchId: null,
+  assignDialogEventId: null,
+  assigningTableNumber: null,
   resettingMatchId: null,
   toastMessage: null,
   resettingEvent: false,
@@ -361,11 +371,31 @@ export const eventDetailActions = {
   },
 
   openOrderDialog: (matchId: string, eventId?: string) => {
+    const resolvedEventId = eventId ?? eventDetailState.eventId
     setEventDetailState({
       showOrderDialog: true,
       orderDialogMatchId: matchId,
-      orderDialogEventId: eventId ?? eventDetailState.eventId,
+      orderDialogEventId: resolvedEventId,
     })
+    if (authState.isAdmin) return
+    // Players: tell the server we've opened the dialog so admins can
+    // see that the side is being handled by a player.
+    const match = eventDetailActions.getOrderDialogMatch()
+    if (!match || !resolvedEventId) return
+    const uid = authState.user?._id?.toString()
+    if (!uid) return
+    const side =
+      (match.side1 || []).some((p) => p._id?.toString() === uid)
+        ? 1
+        : (match.side2 || []).some((p) => p._id?.toString() === uid)
+          ? 2
+          : undefined
+    if (!side) return
+    void apiPost('markTeamMatchSideOpened', {
+      _id: resolvedEventId,
+      matchId,
+      side,
+    }).catch(() => {})
   },
 
   closeOrderDialog: () => {
@@ -375,6 +405,53 @@ export const eventDetailActions = {
       orderDialogEventId: null,
       savingOrderSide: null,
     })
+  },
+
+  openAssignDialog: (matchId: string, eventId?: string) => {
+    setEventDetailState({
+      showAssignDialog: true,
+      assignDialogMatchId: matchId,
+      assignDialogEventId: eventId ?? eventDetailState.eventId,
+    })
+  },
+
+  closeAssignDialog: () => {
+    setEventDetailState({
+      showAssignDialog: false,
+      assignDialogMatchId: null,
+      assignDialogEventId: null,
+      assigningTableNumber: null,
+    })
+  },
+
+  assignMatchToTable: async (tableNumber: number) => {
+    const matchId = eventDetailState.assignDialogMatchId
+    const eventId =
+      eventDetailState.assignDialogEventId ?? eventDetailState.eventId
+    if (!matchId || !eventId) return
+    setEventDetailState({ assigningTableNumber: tableNumber })
+    try {
+      await apiPost('assignMatchToTable', {
+        _id: eventId,
+        matchId,
+        tableNumber,
+      })
+      if (eventDetailState.eventId === eventId) {
+        await fetchEvent(eventId, true)
+      }
+    } catch (err) {
+      setEventDetailState({
+        error:
+          err instanceof Error ? err.message : 'Failed to assign match to table',
+      })
+    } finally {
+      setEventDetailState({
+        showAssignDialog: false,
+        assignDialogMatchId: null,
+        assignDialogEventId: null,
+        assigningTableNumber: null,
+      })
+    }
   },
 
   getOrderDialogMatch: (): Match | undefined => {
