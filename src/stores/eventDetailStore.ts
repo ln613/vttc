@@ -556,8 +556,16 @@ export const eventDetailActions = {
    * A match can be reset if it is finished and confirmed,
    * and no match in the next round has started/finished.
    */
-  canResetMatch: (matchId: string, stage: 'group' | 'knockout', groupIndex: number): boolean => {
-    const event = eventDetailState.data
+  canResetMatch: (
+    matchId: string,
+    stage: 'group' | 'knockout',
+    groupIndex: number,
+    sourceEventId?: string,
+  ): boolean => {
+    // Look up the event from the EventDetail page first, then fall back
+    // to the shared events list so this works from Schedule too (where
+    // eventDetailState.data is null).
+    const event = resolveEventForMatch(matchId, sourceEventId)
     if (!event) return false
 
     if (stage === 'group') {
@@ -625,7 +633,32 @@ export const eventDetailActions = {
   },
 }
 
-const canResetGroupMatch = (event: Event, matchId: string): boolean => {
+// Find an event that contains the given match. Tries the EventDetail
+// page's loaded event first, then the shared events list (used by
+// Schedule). sourceEventId narrows the search when provided.
+const resolveEventForMatch = (
+  matchId: string,
+  sourceEventId?: string,
+): { eventStages?: Stage[] } | undefined => {
+  if (sourceEventId && eventDetailState.data?._id === sourceEventId) {
+    return eventDetailState.data
+  }
+  if (sourceEventId) {
+    const evt = (eventState.data || []).find((e) => e._id === sourceEventId)
+    if (evt) return evt
+  }
+  if (eventDetailState.data) {
+    const found = findMatchById(eventDetailState.data, matchId)
+    if (found) return eventDetailState.data
+  }
+  for (const evt of eventState.data || []) {
+    const found = findMatchById(evt, matchId)
+    if (found) return evt
+  }
+  return undefined
+}
+
+const canResetGroupMatch = (event: { eventStages?: Stage[] }, matchId: string): boolean => {
   const groupStage = event.eventStages?.find(
     (s): s is Extract<Stage, { type: 'group' }> => s.type === 'group',
   )
@@ -653,7 +686,11 @@ const canResetGroupMatch = (event: Event, matchId: string): boolean => {
   return false
 }
 
-const canResetKnockoutMatch = (event: Event, matchId: string, roundIndex: number): boolean => {
+const canResetKnockoutMatch = (
+  event: { eventStages?: Stage[] },
+  matchId: string,
+  roundIndex: number,
+): boolean => {
   const knockoutStage = event.eventStages?.find(
     (s): s is Extract<Stage, { type: 'knockout' }> => s.type === 'knockout',
   )

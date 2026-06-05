@@ -1036,6 +1036,7 @@ export const MatchRow = (props: MatchRowProps) => {
         props.match._id,
         props.stage,
         props.groupIndex,
+        props.eventId,
       )
     )
   }
