@@ -30,7 +30,7 @@ The number of games in each match.
 
 ## Number of Matches Section
 
-Same as Number of Games Section, but indicate the number of matches in each team match, only visible if selected type is Team.
+Same as Number of Games Section, but indicate the number of matches in each team match, only visible if selected type is Team. For both group and knockout stage, default is "Best of 5"
 
 ## Number of Qualifiers Section
 
