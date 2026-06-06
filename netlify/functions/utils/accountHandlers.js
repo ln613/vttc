@@ -177,10 +177,14 @@ const authenticatePlayer = async (emailOrPhone, password) => {
   if (!(await verifyPassword(password, player.password))) throwError('Invalid password')
 
   const token = generatePlayerToken(player)
+  // Players flagged as admin/super-admin in the players collection get
+  // the corresponding role on sign-in (super-admin implies admin).
+  const isSuperAdmin = !!player.isSuperAdmin
+  const isAdmin = isSuperAdmin || !!player.isAdmin
   return {
     token,
-    isAdmin: false,
-    isSuperAdmin: false,
+    isAdmin,
+    isSuperAdmin,
     player: {
       _id: player._id.toString(),
       firstName: player.firstName,

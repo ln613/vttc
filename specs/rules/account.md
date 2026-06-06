@@ -9,3 +9,5 @@
   - username: vttc
   - password: ADMIN_PASSWORD
 - Player
+  - player with isAdmin = true is a player and an admin
+  - player with isSuperAdmin = true is a player and a super admin
