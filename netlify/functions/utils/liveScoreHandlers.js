@@ -717,15 +717,18 @@ const pruneGroupTableMap = (map, allItems) => {
 /**
  * Get live score data (tables + match queue)
  */
-export const getLiveScore = async () => {
+export const getLiveScore = async (params = {}) => {
   let events = await getStartedEvents()
 
-  // Always attempt auto-generation for any started event that needs it,
-  // even if other events are mid-play. autoGenerateForEvent is a no-op
-  // when the event already has its groups/schedule generated.
-  const anyChanged = await autoGenerateForStartedEvents(events)
-  if (anyChanged) {
-    events = await getStartedEvents()
+  // Auto-generation only runs when the caller opts in (the LiveScore
+  // page mount + its admin-only heartbeat). Other clients reading the
+  // live state get whatever's already there without triggering the
+  // group/schedule generation as a side-effect.
+  if (params.runAutoStart) {
+    const anyChanged = await autoGenerateForStartedEvents(events)
+    if (anyChanged) {
+      events = await getStartedEvents()
+    }
   }
 
   const allMatchItems = extractAllRemainingMatches(events)

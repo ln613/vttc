@@ -34,15 +34,20 @@ const [liveScoreState, setLiveScoreState] =
 let subscription: EventSubscription | null = null
 // Periodic refetch ensures auto-start (group/schedule generation + queue
 // rebuild) fires once an event's start time passes, even when no pusher
-// event has been emitted by a write in the meantime.
+// event has been emitted by a write in the meantime. The heartbeat lives
+// in the LiveScore page (admin only) so other pages don't trigger
+// auto-start just by being open.
 const LIVE_SCORE_HEARTBEAT_MS = 60_000
-let heartbeatTimer: ReturnType<typeof setInterval> | null = null
+let autoStartHeartbeatTimer: ReturnType<typeof setInterval> | null = null
 
 export { liveScoreState }
 
-const fetchLiveScore = async () => {
+const fetchLiveScore = async (runAutoStart = false) => {
   try {
-    const data = await apiGet<LiveScoreData>('liveScore')
+    const data = await apiGet<LiveScoreData>(
+      'liveScore',
+      runAutoStart ? { runAutoStart: '1' } : undefined,
+    )
     setLiveScoreState({
       tables: data.tables || [],
       matchQueue: data.matchQueue || [],
@@ -63,24 +68,27 @@ const startSubscription = () => {
   subscription = subscribeToLiveScoreUpdates(() => {
     void fetchLiveScore()
   })
-  // The heartbeat keeps the server's auto-start logic firing even when
-  // no writes are happening — one admin viewer is enough, so gate it to
-  // admins to avoid every connected client polling once a minute.
-  if (authState.isAdmin) {
-    heartbeatTimer = setInterval(() => {
-      void fetchLiveScore()
-    }, LIVE_SCORE_HEARTBEAT_MS)
+}
+
+const startAutoStartHeartbeat = () => {
+  stopAutoStartHeartbeat()
+  autoStartHeartbeatTimer = setInterval(() => {
+    void fetchLiveScore(true)
+  }, LIVE_SCORE_HEARTBEAT_MS)
+}
+
+const stopAutoStartHeartbeat = () => {
+  if (autoStartHeartbeatTimer) {
+    clearInterval(autoStartHeartbeatTimer)
+    autoStartHeartbeatTimer = null
   }
 }
 
 const stopUpdates = () => {
+  stopAutoStartHeartbeat()
   if (subscription) {
     subscription.unsubscribe()
     subscription = null
-  }
-  if (heartbeatTimer) {
-    clearInterval(heartbeatTimer)
-    heartbeatTimer = null
   }
 }
 
@@ -132,6 +140,16 @@ export const liveScoreActions = {
     startSubscription()
   },
 
+  // Used by the LiveScore page on mount. Auto-start runs only for
+  // admins (both on mount and via the 60s heartbeat).
+  fetchLiveScoreWithAutoStart: async () => {
+    setLiveScoreState({ loading: true, error: null })
+    await fetchLiveScore(authState.isAdmin)
+    startSubscription()
+    if (authState.isAdmin) startAutoStartHeartbeat()
+  },
+
+  stopAutoStartHeartbeat,
   stopUpdates,
 
   getTable: (tableNumber: number): TableAssignment | undefined =>

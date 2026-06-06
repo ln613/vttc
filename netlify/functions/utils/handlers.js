@@ -71,7 +71,7 @@ export const apiHandlers = {
     events: (params) => getEvents(params),
     event: (params) => getEvent(params),
     eventSeries: () => getEventSeries(),
-    liveScore: () => getLiveScore(),
+    liveScore: (params) => getLiveScore(params),
   },
   post: {
     saveTournament: (body) => saveTournament(body),

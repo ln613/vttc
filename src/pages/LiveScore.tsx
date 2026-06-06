@@ -20,7 +20,7 @@ import {
 
 const LiveScore = () => {
   onMount(() => {
-    liveScoreActions.fetchLiveScore()
+    liveScoreActions.fetchLiveScoreWithAutoStart()
   })
 
   onCleanup(() => {

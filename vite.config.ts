@@ -6,6 +6,8 @@ export default defineConfig({
   plugins: [solid()],
   server: {
     host: true,
+    port: 5174,
+    strictPort: true,
   },
   optimizeDeps: {
     include: ['pusher-js'],
