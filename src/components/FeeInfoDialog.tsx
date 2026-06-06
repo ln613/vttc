@@ -68,8 +68,24 @@ const PaymentInfo = () => (
       the name/event info to the comment box.
     </p>
     <FeeTable fees={eventListState.unpaidFees} />
+    <RatingFeeCheckbox />
     <TotalRow fees={eventListState.unpaidFees} />
   </>
+)
+
+const RatingFeeCheckbox = () => (
+  <label style={ratingFeeRowStyle}>
+    <input
+      type="checkbox"
+      checked={eventListState.includeRatingFee}
+      onChange={(e) =>
+        eventListActions.setIncludeRatingFee(
+          (e.target as HTMLInputElement).checked,
+        )
+      }
+    />
+    <span>Include ${eventListActions.RATING_FEE} rating fee</span>
+  </label>
 )
 
 const FeeTable = (props: { fees: UnpaidFeeInfo[] }) => (
@@ -92,8 +108,15 @@ const FeeRow = (props: { fee: UnpaidFeeInfo }) => (
 )
 
 const TotalRow = (props: { fees: UnpaidFeeInfo[] }) => {
-  const total = () =>
-    props.fees.reduce((sum, f) => sum + (f.registrationFee || 0), 0)
+  const total = () => {
+    const base = props.fees.reduce(
+      (sum, f) => sum + (f.registrationFee || 0),
+      0,
+    )
+    return eventListState.includeRatingFee
+      ? base + eventListActions.RATING_FEE
+      : base
+  }
 
   return (
     <div style={totalRowStyle}>
@@ -227,6 +250,17 @@ const feeCellStyle: JSX.CSSProperties = {
 const feeCellRightStyle: JSX.CSSProperties = {
   width: '60px',
   'text-align': 'right',
+}
+
+const ratingFeeRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  gap: '8px',
+  padding: '8px 12px',
+  'font-size': '13px',
+  color: '#333',
+  cursor: 'pointer',
+  'user-select': 'none',
 }
 
 const totalRowStyle: JSX.CSSProperties = {

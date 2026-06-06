@@ -41,6 +41,7 @@ interface EventListState {
   showFeeDialog: boolean
   feeDialogMode: FeeDialogMode
   unpaidFees: UnpaidFeeInfo[]
+  includeRatingFee: boolean
   registeredEventName: string
   showTeammateDialog: boolean
   teammateDialogMode: TeammateDialogMode
@@ -60,6 +61,7 @@ const getInitialState = (): EventListState => ({
   showFeeDialog: false,
   feeDialogMode: 'registration',
   unpaidFees: [],
+  includeRatingFee: true,
   registeredEventName: '',
   showTeammateDialog: false,
   teammateDialogMode: 'registration',
@@ -489,6 +491,8 @@ const getPlayerName = (): string => {
   return `${user.firstName} ${user.lastName}`
 }
 
+const RATING_FEE = 8
+
 const buildFeeInfoText = (): string => {
   const fees = eventListState.unpaidFees
   if (fees.length === 0) return ''
@@ -498,9 +502,17 @@ const buildFeeInfoText = (): string => {
   for (const f of fees) {
     lines.push(`${f.eventName} (${f.date}) - $${f.registrationFee}`)
   }
-  const total = fees.reduce((sum, f) => sum + (f.registrationFee || 0), 0)
+  let total = fees.reduce((sum, f) => sum + (f.registrationFee || 0), 0)
+  if (eventListState.includeRatingFee) {
+    lines.push(`Rating fee - $${RATING_FEE}`)
+    total += RATING_FEE
+  }
   lines.push(`Total: $${total}`)
   return lines.join('\n')
+}
+
+const setIncludeRatingFee = (value: boolean) => {
+  setEventListState({ includeRatingFee: value })
 }
 
 export const eventListActions = {
@@ -521,6 +533,8 @@ export const eventListActions = {
   skipTeammateSelection,
   closeTeammateDialog,
   showFeeInfo,
+  setIncludeRatingFee,
+  RATING_FEE,
   closeFeeDialog,
   buildFeeInfoText,
   showTeammateDialogForManage,
