@@ -15,7 +15,7 @@ Vertical
 
 - table columns (align left) - Player, Rating, "Delete" icon| "Payment" icon
 - order by Rating desc
-- admin only, show player in red if payment has not been received
+- admin only, show player in red (not for the host) if payment has not been received
 - "Payment" icon should be hidden if the player has paid
 
 ## Double/Team Participant
@@ -24,7 +24,7 @@ Vertical
 - each participant consists of multiple rows, 1 player per row (order by Rating desc), no divider between rows. The cells in Combined Rating and "Delete" icon columns are merged, and center aligned vertically
 - For team participant, if topPlayersRatingEnabled, add a column "Top {topPlayersCount} Combined"
 - order by Combined Rating desc
-- admin only, show individual player in all teams in red if payment has not been received
+- admin only, show individual player in all teams in red (not for the host) if payment has not been received
 - "Payment" icon should be hidden if whole team has paid
 
 ## interaction

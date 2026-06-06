@@ -398,13 +398,19 @@ const doRegister = async (
       ...(participantId && { participantId }),
     })
     await eventActions.refreshEvents()
-    setEventListState({
-      registering: false,
-      showFeeDialog: true,
-      feeDialogMode: 'registration',
-      unpaidFees: result.unpaidFees,
-      registeredEventName: event.eventName,
-    })
+    // Hosts are always treated as paid — skip the post-registration
+    // fee dialog for them per the Event List spec.
+    if (authState.user?.host) {
+      setEventListState({ registering: false })
+    } else {
+      setEventListState({
+        registering: false,
+        showFeeDialog: true,
+        feeDialogMode: 'registration',
+        unpaidFees: result.unpaidFees,
+        registeredEventName: event.eventName,
+      })
+    }
   } catch (err) {
     setEventListState({
       registering: false,
@@ -437,6 +443,7 @@ const showFeeInfo = async (event: EventOption) => {
 const isPlayerUnpaid = (event: EventOption): boolean => {
   const userId = authState.user?._id
   if (!userId) return false
+  if (authState.user?.host) return false
   if (!isPlayerInEvent(event, userId)) return false
   const paidIds = event.paidPlayerIds || []
   return !paidIds.includes(userId)

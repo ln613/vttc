@@ -50,8 +50,15 @@ const isPlayerInEvent = (event: EventOption, playerId: string): boolean =>
     ),
   ) ?? false
 
+const isPlayerHost = (playerId: string): boolean => {
+  const data = playerState.data || []
+  const player = data.find((p) => p._id?.toString() === playerId?.toString())
+  return !!player?.host
+}
+
 const isPlayerUnpaid = (event: EventOption, playerId: string): boolean =>
   isPlayerInEvent(event, playerId) &&
+  !isPlayerHost(playerId) &&
   !(event.paidPlayerIds || []).includes(playerId)
 
 const getUnpaidEventsForPlayer = (playerId: string): EventOption[] =>

@@ -19,6 +19,7 @@ Vertical
   - payment icon
     - if the player has unpaid events
     - show the payment confirm dialog
+    - hide for players who are host ('host' field = true)
   - register icon
     - if the player has email but not registered yet
     - on click

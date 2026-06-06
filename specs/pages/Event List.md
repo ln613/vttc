@@ -43,6 +43,7 @@ Vertical
     - fee icon
       - if already registered but not paid
       - on click, show the fee info dialog
+      - hide for players who are host, host always considered paid
     - multi player icon
       - if already registered but still in a partial team
       - on click, show the select teammate dialog (replace the skip button with cancel button)
@@ -68,4 +69,4 @@ Vertical
       - the "Confirm" and "Skip" buttons
     - call API to register the player for the event (if a partial team selected, add the player to the team)
     - the API will return fees for all events (with the same event series, if available) the player registered but not paid (for team event, fee = team fee / number of players per team)
-    - show the fee info dialog with all events and fee info, and a chekbox to whether include the $8 rating fee (check by default), tell the user to either go to the club to pay the fee or send e-transfer to vttc@vttc.ca and copy the name/event info to the comment box (provide a copy button)
+    - show the fee info dialog (not for the host) with all events and fee info, and a chekbox to whether include the $8 rating fee (check by default), tell the user to either go to the club to pay the fee or send e-transfer to vttc@vttc.ca and copy the name/event info to the comment box (provide a copy button)

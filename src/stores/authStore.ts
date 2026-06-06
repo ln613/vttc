@@ -11,6 +11,7 @@ interface AuthUser {
   dateOfBirth?: string
   rating?: number
   pending?: boolean
+  host?: boolean
 }
 
 interface SignInResponse {

@@ -191,6 +191,7 @@ const authenticatePlayer = async (emailOrPhone, password) => {
       dateOfBirth: player.dateOfBirth,
       rating: player.rating,
       pending: !!player.pending,
+      host: !!player.host,
     },
   }
 }
@@ -472,6 +473,7 @@ export const signUp = async (body) => {
       sex: playerDoc.sex,
       dateOfBirth: playerDoc.dateOfBirth,
       rating: playerDoc.rating,
+      host: !!playerDoc.host,
     },
   }
 }

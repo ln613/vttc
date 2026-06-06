@@ -3,7 +3,7 @@ import type { Participant } from '../../shared/types/Tournament'
 import type { Player } from '../../shared/types/Player'
 import { apiPost } from '../utils/api'
 import { eventActions, type EventOption } from './eventStore'
-import { playerActions } from './playerStore'
+import { playerActions, playerState } from './playerStore'
 
 interface ToastMessage {
   type: 'success' | 'error'
@@ -353,6 +353,12 @@ export const isPlayerPaid = (
   event: EventOption,
   playerId: string,
 ): boolean => {
+  // Hosts are always treated as paid.
+  const players = playerState.data || []
+  const player = players.find(
+    (p) => p._id?.toString() === playerId?.toString(),
+  )
+  if (player?.host) return true
   const paidIds = event.paidPlayerIds || []
   return paidIds.includes(playerId)
 }

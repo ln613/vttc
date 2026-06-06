@@ -9,4 +9,5 @@ export interface Player {
   phone?: string
   password?: string
   hasAccount?: boolean
+  host?: boolean
 }

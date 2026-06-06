@@ -6,6 +6,7 @@ import MatchConfirmDialog from '../components/MatchConfirmDialog'
 import { eventDetailState, eventDetailActions } from '../stores/eventDetailStore'
 import type { StageTab } from '../stores/eventDetailStore'
 import { eventState } from '../stores/eventStore'
+import { playerState } from '../stores/playerStore'
 import { authState } from '../stores/authStore'
 import { liveScoreActions, liveScoreState } from '../stores/liveScoreStore'
 import type { Group, GroupParticipant, Participant, KnockoutRound, KnockoutMatch as KnockoutMatchType, Stage } from '../../shared/types/Tournament'
@@ -711,7 +712,18 @@ const isParticipantUnpaid = (participant: Participant): boolean => {
   if (!participant.players?.length || participant.players.length !== nop) {
     return true
   }
-  return !participant.players.every((p) => paidIds.includes(p._id.toString()))
+  // Hosts are always treated as paid.
+  return !participant.players.every(
+    (p) => isPlayerHost(p._id?.toString()) || paidIds.includes(p._id.toString()),
+  )
+}
+
+const isPlayerHost = (playerId: string | undefined): boolean => {
+  if (!playerId) return false
+  const players = playerState.data || []
+  return !!players.find(
+    (p) => p._id?.toString() === playerId.toString(),
+  )?.host
 }
 
 const ParticipantRow = (props: ParticipantRowProps) => {

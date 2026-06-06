@@ -13,6 +13,7 @@ export const getPlayers = async () => {
       phone: 1,
       dateOfBirth: 1,
       password: 1,
+      host: 1,
       _id: 1,
     },
   )
