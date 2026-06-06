@@ -452,6 +452,15 @@ const handleFeeIconClick = (e: MouseEvent, event: EventOption) => {
   eventListActions.showFeeInfo(event)
 }
 
+const handleDeleteIconClick = (e: MouseEvent, event: EventOption) => {
+  e.stopPropagation()
+  e.preventDefault()
+  if (!confirm(`Delete "${event.eventName}"? This cannot be undone.`)) return
+  eventActions.deleteEvent(event._id).catch((err) =>
+    alert(err instanceof Error ? err.message : 'Failed to delete event'),
+  )
+}
+
 const handleMultiPlayerIconClick = (e: MouseEvent, event: EventOption) => {
   e.stopPropagation()
   eventListActions.showTeammateDialogForManage(event)
@@ -540,25 +549,7 @@ const EventListItem = (props: EventListItemProps) => {
         <Show when={authState.isSuperAdmin}>
           <div
             style={iconStyle}
-            onClick={async (e) => {
-              e.stopPropagation()
-              if (
-                !confirm(
-                  `Delete "${props.event.eventName}"? This cannot be undone.`,
-                )
-              ) {
-                return
-              }
-              try {
-                await eventActions.deleteEvent(props.event._id)
-              } catch (err) {
-                alert(
-                  err instanceof Error
-                    ? err.message
-                    : 'Failed to delete event',
-                )
-              }
-            }}
+            onClick={(e) => handleDeleteIconClick(e, props.event)}
           >
             <DeleteIcon />
           </div>
