@@ -1093,11 +1093,18 @@ export const MatchRow = (props: MatchRowProps) => {
     eventDetailActions.showConfirmDialog(props.match._id, eventId)
   }
 
-  const handleResetClick = () => {
-    if (confirm('Are you sure you want to reset this match? All game data will be deleted.')) {
-      const eventId = props.eventId ?? eventDetailState.eventId ?? undefined
-      eventDetailActions.resetMatch(props.match._id, eventId)
+  const handleResetClick = (e?: MouseEvent) => {
+    e?.stopPropagation()
+    e?.preventDefault()
+    if (
+      !confirm(
+        'Are you sure you want to reset this match? All game data will be deleted.',
+      )
+    ) {
+      return
     }
+    const eventId = props.eventId ?? eventDetailState.eventId ?? undefined
+    void eventDetailActions.resetMatch(props.match._id, eventId)
   }
 
   const handleSimulateClick = () => {
