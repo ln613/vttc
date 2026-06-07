@@ -7,6 +7,7 @@ import { eventDetailState, eventDetailActions } from '../stores/eventDetailStore
 import type { StageTab } from '../stores/eventDetailStore'
 import { eventState } from '../stores/eventStore'
 import { playerState } from '../stores/playerStore'
+import { customConfirm } from '../stores/confirmDialogStore'
 import { authState } from '../stores/authStore'
 import { liveScoreActions, liveScoreState } from '../stores/liveScoreStore'
 import type { Group, GroupParticipant, Participant, KnockoutRound, KnockoutMatch as KnockoutMatchType, Stage } from '../../shared/types/Tournament'
@@ -272,12 +273,12 @@ export const AssignTableDialog = () => {
     return status === 'not_started' ? 'not_started' : 'in_progress'
   }
 
-  const handleClick = (e: MouseEvent, n: number) => {
+  const handleClick = async (e: MouseEvent, n: number) => {
     e.stopPropagation()
     e.preventDefault()
     if (!isAvailable(n) || eventDetailState.assigningTableNumber != null) return
-    if (!confirm(`Assign this match to table ${n}?`)) return
-    void eventDetailActions.assignMatchToTable(n)
+    if (!(await customConfirm(`Assign this match to table ${n}?`))) return
+    await eventDetailActions.assignMatchToTable(n)
   }
 
   return (
@@ -504,12 +505,13 @@ const EventHeader = () => {
   const timeDisplay = () => eventDetailState.data?.time || ''
   const summary = () => eventDetailActions.getEventSummary()
 
-  const handleResetEvent = (e?: MouseEvent) => {
+  const handleResetEvent = async (e?: MouseEvent) => {
     e?.stopPropagation()
     e?.preventDefault()
     if (
-      confirm(
+      await customConfirm(
         'Are you sure you want to reset this event? All schedules, matches and groups will be deleted. Participants will be kept.',
+        { confirmColor: '#e74c3c' },
       )
     ) {
       eventDetailActions.resetEvent()
@@ -1097,13 +1099,14 @@ export const MatchRow = (props: MatchRowProps) => {
     eventDetailActions.showConfirmDialog(props.match._id, eventId)
   }
 
-  const handleResetClick = (e?: MouseEvent) => {
+  const handleResetClick = async (e?: MouseEvent) => {
     e?.stopPropagation()
     e?.preventDefault()
     if (
-      !confirm(
+      !(await customConfirm(
         'Are you sure you want to reset this match? All game data will be deleted.',
-      )
+        { confirmColor: '#e74c3c' },
+      ))
     ) {
       return
     }

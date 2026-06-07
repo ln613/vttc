@@ -16,6 +16,7 @@ import type { Participant } from '../../shared/types/Tournament'
 import { type EventOption } from '../stores/eventStore'
 import { playerState, getPerPlayerFee } from '../stores/playerStore'
 import { authState } from '../stores/authStore'
+import { customConfirm } from '../stores/confirmDialogStore'
 import {
   eventParticipantEditState,
   eventParticipantEditActions,
@@ -415,20 +416,28 @@ const SingleParticipantRow = (props: {
       <td style={tdStyle}>
         <div style={actionCellStyle}>
           <Show when={props.showDelete}>
-            <DeleteIcon
-              onClick={() =>
-                eventParticipantEditActions.handleDeleteClick(
-                  props.participant,
-                )
-              }
-            />
+            <span
+              class="vttc-tap"
+              onClick={(e) => {
+                e.stopPropagation()
+                e.preventDefault()
+                eventParticipantEditActions.handleDeleteClick(props.participant)
+              }}
+            >
+              <DeleteIcon onClick={() => undefined} />
+            </span>
           </Show>
           <Show when={!isPlayerPaid(props.event, player()?._id)}>
-            <PaymentIcon
-              onClick={() =>
+            <span
+              class="vttc-tap"
+              onClick={(e) => {
+                e.stopPropagation()
+                e.preventDefault()
                 eventParticipantEditActions.openPaymentDialog(props.participant)
-              }
-            />
+              }}
+            >
+              <PaymentIcon onClick={() => undefined} />
+            </span>
           </Show>
         </div>
       </td>
@@ -546,22 +555,41 @@ const TeamParticipantRows = (props: {
               rowSpan={sortedPlayers().length}
             >
               <div style={actionCellStyle}>
-                <EditIcon
-                  onClick={() =>
+                <span
+                  class="vttc-tap"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
                     eventParticipantEditActions.openEditDialog(props.participant)
-                  }
-                />
+                  }}
+                >
+                  <EditIcon onClick={() => undefined} />
+                </span>
                 <Show when={props.showDelete}>
-                  <DeleteIcon
-                    onClick={() =>
+                  <span
+                    class="vttc-tap"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      e.preventDefault()
                       eventParticipantEditActions.handleDeleteClick(
                         props.participant,
                       )
-                    }
-                  />
+                    }}
+                  >
+                    <DeleteIcon onClick={() => undefined} />
+                  </span>
                 </Show>
                 <Show when={!wholeTeamPaid()}>
-                  <PaymentIcon onClick={handlePaymentClick} />
+                  <span
+                    class="vttc-tap"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      e.preventDefault()
+                      handlePaymentClick()
+                    }}
+                  >
+                    <PaymentIcon onClick={() => undefined} />
+                  </span>
                 </Show>
               </div>
             </td>
@@ -655,8 +683,16 @@ const ParticipantDialog = (props: {
                 />
               </div>
               <Show when={props.event.nop > 1 && selectedPlayerIds()[index]}>
-                <div style={playerSlotIconStyle}>
-                  <DeleteIcon onClick={() => handlePlayerChange(index, '')} />
+                <div
+                  class="vttc-tap"
+                  style={playerSlotIconStyle}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    handlePlayerChange(index, '')
+                  }}
+                >
+                  <DeleteIcon onClick={() => undefined} />
                 </div>
               </Show>
             </div>
@@ -715,13 +751,13 @@ const TeamPaymentDialog = (props: {
               <Show when={!isPlayerPaid(props.event, player._id)}>
                 <Button
                   color="#27ae60"
-                  onClick={(e) => {
+                  onClick={async (e) => {
                     e?.stopPropagation()
                     e?.preventDefault()
                     if (
-                      !window.confirm(
+                      !(await customConfirm(
                         'Confirm payment received for this player?',
-                      )
+                      ))
                     )
                       return
                     void eventParticipantEditActions.paymentReceivedForTeamPlayer(
@@ -739,13 +775,13 @@ const TeamPaymentDialog = (props: {
           <Show when={props.event.nop > 1 && unpaidPlayerIds().length > 0}>
             <Button
               color="#27ae60"
-              onClick={(e) => {
+              onClick={async (e) => {
                 e?.stopPropagation()
                 e?.preventDefault()
                 if (
-                  !window.confirm(
+                  !(await customConfirm(
                     'Confirm payment received for all players in this team?',
-                  )
+                  ))
                 )
                   return
                 void eventParticipantEditActions.paymentReceivedForAllTeamPlayers(
@@ -791,13 +827,14 @@ const TeamDeleteDialog = (props: {
               </span>
               <Button
                 color="#e74c3c"
-                onClick={(e) => {
+                onClick={async (e) => {
                   e?.stopPropagation()
                   e?.preventDefault()
                   if (
-                    !window.confirm(
+                    !(await customConfirm(
                       'Are you sure you want to remove this player from the team?',
-                    )
+                      { confirmColor: '#e74c3c' },
+                    ))
                   )
                     return
                   void eventParticipantEditActions.deletePlayerFromTeam(
@@ -814,13 +851,14 @@ const TeamDeleteDialog = (props: {
         <div style={buttonContainerStyle}>
           <Button
             color="#e74c3c"
-            onClick={(e) => {
+            onClick={async (e) => {
               e?.stopPropagation()
               e?.preventDefault()
               if (
-                !window.confirm(
+                !(await customConfirm(
                   'Are you sure you want to delete this participant?',
-                )
+                  { confirmColor: '#e74c3c' },
+                ))
               )
                 return
               void eventParticipantEditActions.deleteWholeParticipant(

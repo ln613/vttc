@@ -8,6 +8,7 @@ import {
 } from 'solid-js'
 import { liveScoreState, liveScoreActions } from '../stores/liveScoreStore'
 import { authState } from '../stores/authStore'
+import { customConfirm } from '../stores/confirmDialogStore'
 import ToggleButton from '../components/ToggleButton'
 import type { TableAssignment, MatchQueueItem } from '../../shared/types/Table'
 import type { Player } from '../../shared/types/Player'
@@ -319,13 +320,18 @@ const AssignedTable = (props: AssignedTableProps) => {
     return getTeamSubMatchTitle(parent, idx)
   }
 
-  const handleCancel = (e?: MouseEvent) => {
+  const handleCancel = async (e?: MouseEvent) => {
     e?.stopPropagation()
     e?.preventDefault()
-    if (!confirm('Cancel this match and put it back at the end of the queue?')) {
+    if (
+      !(await customConfirm(
+        'Cancel this match and put it back at the end of the queue?',
+        { confirmColor: '#e74c3c' },
+      ))
+    ) {
       return
     }
-    void liveScoreActions.cancelMatch(
+    await liveScoreActions.cancelMatch(
       props.matchItem.eventId,
       props.matchItem.matchId,
     )

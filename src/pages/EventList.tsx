@@ -7,6 +7,7 @@ import Select from '../components/Select'
 import Button from '../components/Button'
 import FeeInfoDialog from '../components/FeeInfoDialog'
 import TeammateSelectDialog from '../components/TeammateSelectDialog'
+import { customConfirm, customAlert } from '../stores/confirmDialogStore'
 import { eventListState, eventListActions } from '../stores/eventListStore'
 import { parseLocalDate, formatLocalDate } from '../utils/date'
 import { authState, authActions } from '../stores/authStore'
@@ -409,7 +410,7 @@ const handleIconClick = (
   navigate(path)
 }
 
-const handleRegisterClick = (e: MouseEvent, event: EventOption) => {
+const handleRegisterClick = async (e: MouseEvent, event: EventOption) => {
   e.stopPropagation()
   e.preventDefault()
 
@@ -420,11 +421,11 @@ const handleRegisterClick = (e: MouseEvent, event: EventOption) => {
 
   const blockReason = eventListActions.getRegisterBlockReason(event)
   if (blockReason) {
-    window.alert(blockReason)
+    await customAlert(blockReason)
     return
   }
 
-  if (!window.confirm(`Do you want to register for "${event.eventName}"?`)) {
+  if (!(await customConfirm(`Do you want to register for "${event.eventName}"?`))) {
     return
   }
 
@@ -454,13 +455,24 @@ const handleFeeIconClick = (e: MouseEvent, event: EventOption) => {
   eventListActions.showFeeInfo(event)
 }
 
-const handleDeleteIconClick = (e: MouseEvent, event: EventOption) => {
+const handleDeleteIconClick = async (e: MouseEvent, event: EventOption) => {
   e.stopPropagation()
   e.preventDefault()
-  if (!confirm(`Delete "${event.eventName}"? This cannot be undone.`)) return
-  eventActions.deleteEvent(event._id).catch((err) =>
-    alert(err instanceof Error ? err.message : 'Failed to delete event'),
-  )
+  if (
+    !(await customConfirm(
+      `Delete "${event.eventName}"? This cannot be undone.`,
+      { confirmColor: '#e74c3c' },
+    ))
+  ) {
+    return
+  }
+  try {
+    await eventActions.deleteEvent(event._id)
+  } catch (err) {
+    await customAlert(
+      err instanceof Error ? err.message : 'Failed to delete event',
+    )
+  }
 }
 
 const handleMultiPlayerIconClick = (e: MouseEvent, event: EventOption) => {
@@ -500,6 +512,7 @@ const EventListItem = (props: EventListItemProps) => {
         <Show when={shouldShowRegisterIcon(props.event)}>
           <div
             style={iconStyle}
+            class="vttc-tap"
             onClick={(e) => handleRegisterClick(e, props.event)}
           >
             <RegisterIcon
@@ -510,6 +523,7 @@ const EventListItem = (props: EventListItemProps) => {
         <Show when={shouldShowFeeIcon(props.event)}>
           <div
             style={iconStyle}
+            class="vttc-tap"
             onClick={(e) => handleFeeIconClick(e, props.event)}
           >
             <FeeIcon />
@@ -518,6 +532,7 @@ const EventListItem = (props: EventListItemProps) => {
         <Show when={shouldShowMultiPlayerIcon(props.event)}>
           <div
             style={iconStyle}
+            class="vttc-tap"
             onClick={(e) => handleMultiPlayerIconClick(e, props.event)}
           >
             <MultiPlayerIcon />
@@ -526,6 +541,7 @@ const EventListItem = (props: EventListItemProps) => {
         <Show when={authState.isAdmin}>
           <div
             style={iconStyle}
+            class="vttc-tap"
             onClick={(e) =>
               handleIconClick(
                 e,
@@ -538,6 +554,7 @@ const EventListItem = (props: EventListItemProps) => {
           </div>
           <div
             style={iconStyle}
+            class="vttc-tap"
             onClick={(e) =>
               handleIconClick(
                 e,
@@ -552,6 +569,7 @@ const EventListItem = (props: EventListItemProps) => {
         <Show when={authState.isSuperAdmin}>
           <div
             style={iconStyle}
+            class="vttc-tap"
             onClick={(e) => handleDeleteIconClick(e, props.event)}
           >
             <DeleteIcon />

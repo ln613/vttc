@@ -4,6 +4,7 @@ import type { Player } from '../../shared/types/Player'
 import { apiPost } from '../utils/api'
 import { eventActions, type EventOption } from './eventStore'
 import { playerActions, playerState } from './playerStore'
+import { customConfirm } from './confirmDialogStore'
 
 interface ToastMessage {
   type: 'success' | 'error'
@@ -179,12 +180,19 @@ export const eventParticipantEditActions = {
       eventParticipantEditActions.openDeleteDialog(participant)
       return
     }
-    // Singles (or team with only one player left) — confirm inline so
-    // the prompt fires inside the user gesture and works on mobile.
-    if (!window.confirm('Are you sure you want to delete this participant?')) {
-      return
-    }
-    void eventParticipantEditActions.deleteWholeParticipant(participant._id)
+    // Singles (or team with only one player left). The custom in-page
+    // dialog can be awaited safely outside the user-gesture window.
+    void (async () => {
+      if (
+        !(await customConfirm(
+          'Are you sure you want to delete this participant?',
+          { confirmColor: '#e74c3c' },
+        ))
+      ) {
+        return
+      }
+      void eventParticipantEditActions.deleteWholeParticipant(participant._id)
+    })()
   },
 
   deleteWholeParticipant: async (participantId: string) => {

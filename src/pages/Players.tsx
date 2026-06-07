@@ -7,6 +7,7 @@ import type { Player } from '../../shared/types/Player'
 import { playerState, playerActions, getPerPlayerFee } from '../stores/playerStore'
 import { authState, authActions } from '../stores/authStore'
 import { signUpActions } from '../stores/signUpStore'
+import { customConfirm } from '../stores/confirmDialogStore'
 
 const Players = () => {
   onMount(() => {
@@ -131,14 +132,28 @@ const AdminPlayerTable = () => {
                 <td style={adminTdStyle} onClick={(e) => e.stopPropagation()}>
                   <div style={actionCellStyle}>
                     <Show when={playerActions.hasUnpaidEvents(player._id)}>
-                      <PaymentIcon
-                        onClick={() => playerActions.openPaymentDialog(player)}
-                      />
+                      <span
+                        class="vttc-tap"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          e.preventDefault()
+                          playerActions.openPaymentDialog(player)
+                        }}
+                      >
+                        <PaymentIcon onClick={() => undefined} />
+                      </span>
                     </Show>
                     <Show when={needsRegistration(player)}>
-                      <RegisterIcon
-                        onClick={() => handleRegisterClick(player)}
-                      />
+                      <span
+                        class="vttc-tap"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          e.preventDefault()
+                          handleRegisterClick(player)
+                        }}
+                      >
+                        <RegisterIcon onClick={() => undefined} />
+                      </span>
                     </Show>
                   </div>
                 </td>
@@ -211,13 +226,13 @@ const PaymentConfirmDialog = (props: { player: Player }) => {
               <Button
                 color="#27ae60"
                 size="small"
-                onClick={(e) => {
+                onClick={async (e) => {
                   e?.stopPropagation()
                   e?.preventDefault()
                   if (
-                    !window.confirm(
+                    !(await customConfirm(
                       'Confirm payment received for this event?',
-                    )
+                    ))
                   )
                     return
                   void playerActions.confirmPayment(event._id, props.player._id)
@@ -232,13 +247,13 @@ const PaymentConfirmDialog = (props: { player: Player }) => {
           <Show when={unpaidEvents().length > 0}>
             <Button
               color="#27ae60"
-              onClick={(e) => {
+              onClick={async (e) => {
                 e?.stopPropagation()
                 e?.preventDefault()
                 if (
-                  !window.confirm(
+                  !(await customConfirm(
                     'Confirm payment received for all events?',
-                  )
+                  ))
                 )
                   return
                 void playerActions.confirmAllPayments(props.player._id)

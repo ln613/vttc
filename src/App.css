@@ -69,3 +69,28 @@
     opacity: 0.3;
   }
 }
+
+/* Hover lift effect for Button — pointer devices only. On touch devices
+ * (hover: none) the synthesized mouseenter would shift the button under
+ * the finger between touchend and click, causing the synthesized click
+ * to miss. Keeping the effect CSS-only and gated on `hover: hover` means
+ * iOS Safari ignores it entirely. */
+@media (hover: hover) {
+  .vttc-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.2);
+  }
+}
+
+/* Icon tap-target: any element that opts in gets a 44x44px minimum hit
+ * area and suppressed double-tap zoom — meets Apple HIG and stops iOS
+ * from re-classifying small taps as scroll gestures. */
+.vttc-tap {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}

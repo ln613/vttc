@@ -5,6 +5,7 @@ import SingleSelectTags from '../components/SingleSelectTags'
 import Select from '../components/Select'
 import Button from '../components/Button'
 import Toggle from '../components/Toggle'
+import { customConfirm } from '../stores/confirmDialogStore'
 import {
   tournamentEditState,
   tournamentEditActions,
@@ -170,11 +171,13 @@ const TournamentEdit = (props: TournamentEditProps) => {
           </Button>
           <Button
             color="#27ae60"
-            onClick={(e) => {
+            onClick={async (e) => {
               e?.stopPropagation()
               e?.preventDefault()
               if (
-                !window.confirm('Are you sure you want to save this tournament?')
+                !(await customConfirm(
+                  'Are you sure you want to save this tournament?',
+                ))
               )
                 return
               void tournamentEditActions.saveTournament(props.onSave)

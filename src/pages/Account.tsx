@@ -278,6 +278,7 @@ const ProfileActionIcons = () => (
       <Show when={!accountPageState.saving}>
         <Show when={!accountPageState.editing}>
           <button
+            class="vttc-tap"
             style={iconButtonStyle}
             onClick={accountPageActions.enterEditMode}
             title="Edit"
@@ -287,8 +288,9 @@ const ProfileActionIcons = () => (
         </Show>
         <Show when={accountPageState.editing}>
           <button
+            class="vttc-tap"
             style={cancelIconStyle}
-            onClick={accountPageActions.exitEditMode}
+            onClick={() => void accountPageActions.exitEditMode()}
             title="Cancel"
           >
             <CancelIcon />

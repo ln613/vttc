@@ -13,6 +13,7 @@ import {
   gamePlayActions,
 } from '../stores/gamePlayStore'
 import { eventDetailActions } from '../stores/eventDetailStore'
+import { customConfirm } from '../stores/confirmDialogStore'
 import { authState } from '../stores/authStore'
 import { subscribeToMatchReset, type EventSubscription } from '../utils/pusher'
 import type { Player } from '../../shared/types/Player'
@@ -278,21 +279,29 @@ interface HamburgerMenuProps {
 const HamburgerMenu = (props: HamburgerMenuProps) => {
   const matchSubmitted = () => gamePlayState.matchSubmitted
 
-  const handleResetGame = (e?: MouseEvent) => {
+  const handleResetGame = async (e?: MouseEvent) => {
     e?.stopPropagation()
     e?.preventDefault()
-    if (confirm('Are you sure you want to reset the current game?')) {
+    if (
+      await customConfirm('Are you sure you want to reset the current game?', {
+        confirmColor: '#e74c3c',
+      })
+    ) {
       gamePlayActions.resetCurrentGame()
     } else {
       gamePlayActions.closeMenu()
     }
   }
 
-  const handleResetMatch = (e?: MouseEvent) => {
+  const handleResetMatch = async (e?: MouseEvent) => {
     e?.stopPropagation()
     e?.preventDefault()
     if (matchSubmitted()) return
-    if (confirm('Are you sure you want to reset the whole match?')) {
+    if (
+      await customConfirm('Are you sure you want to reset the whole match?', {
+        confirmColor: '#e74c3c',
+      })
+    ) {
       gamePlayActions.resetWholeMatch()
     } else {
       gamePlayActions.closeMenu()

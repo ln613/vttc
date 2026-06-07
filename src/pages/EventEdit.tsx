@@ -17,6 +17,7 @@ import {
   type EventEditFormData,
 } from '../stores/eventEditStore'
 import type { BestOfOption, QualifiersCount } from '../../shared/types'
+import { customConfirm } from '../stores/confirmDialogStore'
 
 const GROUP_GAMES_OPTIONS: BestOfOption[] = ['Best of 3', 'Best of 5']
 const KNOCKOUT_GAMES_OPTIONS: BestOfOption[] = [
@@ -190,7 +191,7 @@ const EventEdit = (props: EventEditProps) => {
       label: t.name,
     }))
 
-  const handleCancel = (e?: MouseEvent) => {
+  const handleCancel = async (e?: MouseEvent) => {
     e?.stopPropagation()
     e?.preventDefault()
     if (props.onCancel) {
@@ -198,7 +199,10 @@ const EventEdit = (props: EventEditProps) => {
       return
     }
     if (eventEditActions.hasChanges()) {
-      const confirmed = window.confirm('You have unsaved changes. Are you sure you want to cancel?')
+      const confirmed = await customConfirm(
+        'You have unsaved changes. Are you sure you want to cancel?',
+        { confirmColor: '#e74c3c' },
+      )
       if (!confirmed) return
     }
     navigate('/events')

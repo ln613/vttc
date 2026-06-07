@@ -84,32 +84,26 @@ const Button = (props: ButtonProps) => {
     'box-shadow': '0 4px 6px rgba(0, 0, 0, 0.15)',
     transition: 'all 0.2s ease',
     opacity: disabled() ? 0.6 : 1,
+    // touch-action: manipulation suppresses iOS's 300ms double-tap zoom
+    // and stops the OS from re-classifying small taps as scroll gestures.
+    'touch-action': 'manipulation',
+    // Larger minimum hit-target so finger taps land reliably on mobile.
+    'min-height': '44px',
     ...sizeStyles(),
   })
 
-  const handleMouseEnter = (e: MouseEvent) => {
-    if (!disabled()) {
-      const target = e.currentTarget as HTMLButtonElement
-      target.style.transform = 'translateY(-2px)'
-      target.style.boxShadow = '0 6px 8px rgba(0, 0, 0, 0.2)'
-    }
-  }
-
-  const handleMouseLeave = (e: MouseEvent) => {
-    const target = e.currentTarget as HTMLButtonElement
-    target.style.transform = 'translateY(0)'
-    target.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.15)'
-  }
-
+  // No JS mouseenter/mouseleave: those fire as synthesized events between
+  // touchend and click on iOS, physically shifting the button under the
+  // finger and making the synthesized click miss. The :hover effect lives
+  // in App.css inside @media (hover: hover) so only real pointer devices
+  // see it.
   return (
     <button
       type={props.type ?? 'button'}
       style={buttonStyle()}
       onClick={props.onClick}
       disabled={disabled()}
-      class={props.class ?? ''}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      class={`vttc-btn ${props.class ?? ''}`}
     >
       {props.children}
     </button>

@@ -1,4 +1,5 @@
 import { Router, Route } from '@solidjs/router'
+import type { JSX } from 'solid-js'
 import './App.css'
 import TournamentEdit from './pages/TournamentEdit'
 import EventEdit from './pages/EventEdit'
@@ -10,9 +11,17 @@ import Players from './pages/Players'
 import GamePlay from './pages/GamePlay'
 import LiveScore from './pages/LiveScore'
 import Account from './pages/Account'
+import ConfirmDialog from './components/ConfirmDialog'
+
+const RootLayout = (props: { children?: JSX.Element }) => (
+  <>
+    {props.children}
+    <ConfirmDialog />
+  </>
+)
 
 const App = () => (
-  <Router>
+  <Router root={RootLayout}>
     <Route path="/" component={EventList} />
     <Route path="/events" component={EventList} />
     <Route path="/players" component={Players} />

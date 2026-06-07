@@ -3,6 +3,7 @@ import { authState, authActions } from './authStore'
 import { apiPost } from '../utils/api'
 import { normalizeSex, toDbSex } from '../../shared/rules/sex'
 import { playerState, playerActions } from './playerStore'
+import { customConfirm } from './confirmDialogStore'
 import type { Player } from '../../shared/types/Player'
 
 interface AccountProfileData {
@@ -114,7 +115,7 @@ export const accountPageActions = {
     setAccountPageState({ editing: true, error: null, saved: false })
   },
 
-  exitEditMode: () => {
+  exitEditMode: async () => {
     if (!hasFormChanged()) {
       setAccountPageState({
         formData: { ...accountPageState.initialFormData },
@@ -123,7 +124,7 @@ export const accountPageActions = {
       })
       return
     }
-    if (!confirm('Discard unsaved changes?')) return
+    if (!(await customConfirm('Discard unsaved changes?', { confirmColor: '#e74c3c' }))) return
     setAccountPageState({
       formData: { ...accountPageState.initialFormData },
       editing: false,
