@@ -144,17 +144,11 @@ export const playerActions = {
   },
 
   confirmPayment: async (eventId: string, playerId: string) => {
-    const confirmed = window.confirm('Confirm payment received for this event?')
-    if (!confirmed) return
     await markPaymentReceived(eventId, playerId)
     closeDialogIfFullyPaid(playerId)
   },
 
   confirmAllPayments: async (playerId: string) => {
-    const confirmed = window.confirm(
-      'Confirm payment received for all events?',
-    )
-    if (!confirmed) return
     const events = getUnpaidEventsForPlayer(playerId)
     for (const event of events) {
       await markPaymentReceived(event._id, playerId)

@@ -211,9 +211,17 @@ const PaymentConfirmDialog = (props: { player: Player }) => {
               <Button
                 color="#27ae60"
                 size="small"
-                onClick={() =>
-                  playerActions.confirmPayment(event._id, props.player._id)
-                }
+                onClick={(e) => {
+                  e?.stopPropagation()
+                  e?.preventDefault()
+                  if (
+                    !window.confirm(
+                      'Confirm payment received for this event?',
+                    )
+                  )
+                    return
+                  void playerActions.confirmPayment(event._id, props.player._id)
+                }}
               >
                 Confirm
               </Button>
@@ -224,7 +232,17 @@ const PaymentConfirmDialog = (props: { player: Player }) => {
           <Show when={unpaidEvents().length > 0}>
             <Button
               color="#27ae60"
-              onClick={() => playerActions.confirmAllPayments(props.player._id)}
+              onClick={(e) => {
+                e?.stopPropagation()
+                e?.preventDefault()
+                if (
+                  !window.confirm(
+                    'Confirm payment received for all events?',
+                  )
+                )
+                  return
+                void playerActions.confirmAllPayments(props.player._id)
+              }}
             >
               Confirm All
             </Button>

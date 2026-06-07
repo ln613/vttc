@@ -90,9 +90,6 @@ export const tournamentEditActions = {
       return
     }
 
-    const confirmed = window.confirm('Are you sure you want to save this tournament?')
-    if (!confirmed) return
-
     setTournamentEditState({ saving: true, error: null })
 
     try {

@@ -272,7 +272,9 @@ export const AssignTableDialog = () => {
     return status === 'not_started' ? 'not_started' : 'in_progress'
   }
 
-  const handleClick = (n: number) => {
+  const handleClick = (e: MouseEvent, n: number) => {
+    e.stopPropagation()
+    e.preventDefault()
     if (!isAvailable(n) || eventDetailState.assigningTableNumber != null) return
     if (!confirm(`Assign this match to table ${n}?`)) return
     void eventDetailActions.assignMatchToTable(n)
@@ -290,7 +292,7 @@ export const AssignTableDialog = () => {
             {(n) => (
               <button
                 style={assignTableCellStyle(tableStatus(n), isAssigning(n))}
-                onClick={() => handleClick(n)}
+                onClick={(e) => handleClick(e, n)}
                 disabled={
                   !isAvailable(n) ||
                   eventDetailState.assigningTableNumber != null
@@ -502,7 +504,9 @@ const EventHeader = () => {
   const timeDisplay = () => eventDetailState.data?.time || ''
   const summary = () => eventDetailActions.getEventSummary()
 
-  const handleResetEvent = () => {
+  const handleResetEvent = (e?: MouseEvent) => {
+    e?.stopPropagation()
+    e?.preventDefault()
     if (
       confirm(
         'Are you sure you want to reset this event? All schedules, matches and groups will be deleted. Participants will be kept.',

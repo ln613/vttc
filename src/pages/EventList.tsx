@@ -405,11 +405,13 @@ const handleIconClick = (
   navigate: (path: string) => void,
 ) => {
   e.stopPropagation()
+  e.preventDefault()
   navigate(path)
 }
 
 const handleRegisterClick = (e: MouseEvent, event: EventOption) => {
   e.stopPropagation()
+  e.preventDefault()
 
   if (!authActions.isSignedIn()) {
     authActions.showSignInDialog()
@@ -422,10 +424,9 @@ const handleRegisterClick = (e: MouseEvent, event: EventOption) => {
     return
   }
 
-  const confirmed = window.confirm(
-    `Do you want to register for "${event.eventName}"?`,
-  )
-  if (!confirmed) return
+  if (!window.confirm(`Do you want to register for "${event.eventName}"?`)) {
+    return
+  }
 
   eventListActions.registerForEvent(event)
 }
@@ -449,6 +450,7 @@ const shouldShowMultiPlayerIcon = (event: EventOption): boolean => {
 
 const handleFeeIconClick = (e: MouseEvent, event: EventOption) => {
   e.stopPropagation()
+  e.preventDefault()
   eventListActions.showFeeInfo(event)
 }
 
@@ -463,6 +465,7 @@ const handleDeleteIconClick = (e: MouseEvent, event: EventOption) => {
 
 const handleMultiPlayerIconClick = (e: MouseEvent, event: EventOption) => {
   e.stopPropagation()
+  e.preventDefault()
   eventListActions.showTeammateDialogForManage(event)
 }
 

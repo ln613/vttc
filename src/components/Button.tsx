@@ -3,7 +3,7 @@ import type { JSX } from 'solid-js'
 interface ButtonProps {
   children: JSX.Element
   color?: string
-  onClick?: () => void
+  onClick?: (e?: MouseEvent) => void
   type?: 'button' | 'submit' | 'reset'
   disabled?: boolean
   class?: string

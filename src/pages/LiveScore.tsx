@@ -319,11 +319,13 @@ const AssignedTable = (props: AssignedTableProps) => {
     return getTeamSubMatchTitle(parent, idx)
   }
 
-  const handleCancel = async () => {
+  const handleCancel = (e?: MouseEvent) => {
+    e?.stopPropagation()
+    e?.preventDefault()
     if (!confirm('Cancel this match and put it back at the end of the queue?')) {
       return
     }
-    await liveScoreActions.cancelMatch(
+    void liveScoreActions.cancelMatch(
       props.matchItem.eventId,
       props.matchItem.matchId,
     )

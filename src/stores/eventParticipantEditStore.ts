@@ -177,20 +177,20 @@ export const eventParticipantEditActions = {
 
     if (isTeamEvent && hasMultiplePlayers) {
       eventParticipantEditActions.openDeleteDialog(participant)
-    } else {
-      eventParticipantEditActions.deleteWholeParticipant(participant._id)
+      return
     }
+    // Singles (or team with only one player left) — confirm inline so
+    // the prompt fires inside the user gesture and works on mobile.
+    if (!window.confirm('Are you sure you want to delete this participant?')) {
+      return
+    }
+    void eventParticipantEditActions.deleteWholeParticipant(participant._id)
   },
 
   deleteWholeParticipant: async (participantId: string) => {
     const { selectedEventId } = eventParticipantEditState
     const selectedEvent = eventActions.getEventById(selectedEventId)
     if (!selectedEvent) return
-
-    const confirmed = window.confirm(
-      'Are you sure you want to delete this participant?',
-    )
-    if (!confirmed) return
 
     try {
       await apiPost('deleteParticipant', {
@@ -215,11 +215,6 @@ export const eventParticipantEditActions = {
     const { selectedEventId } = eventParticipantEditState
     const selectedEvent = eventActions.getEventById(selectedEventId)
     if (!selectedEvent) return
-
-    const confirmed = window.confirm(
-      'Are you sure you want to remove this player from the team?',
-    )
-    if (!confirmed) return
 
     try {
       await apiPost('deletePlayerFromTeam', {
@@ -269,20 +264,11 @@ export const eventParticipantEditActions = {
   },
 
   paymentReceivedForTeamPlayer: async (playerId: string) => {
-    const confirmed = window.confirm(
-      'Confirm payment received for this player?',
-    )
-    if (!confirmed) return
     await eventParticipantEditActions.paymentReceived(playerId)
     eventParticipantEditActions.closePaymentDialogIfFullyPaid()
   },
 
   paymentReceivedForAllTeamPlayers: async (playerIds: string[]) => {
-    const confirmed = window.confirm(
-      'Confirm payment received for all players in this team?',
-    )
-    if (!confirmed) return
-
     for (const playerId of playerIds) {
       await eventParticipantEditActions.paymentReceived(playerId)
     }

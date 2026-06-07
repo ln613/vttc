@@ -278,7 +278,9 @@ interface HamburgerMenuProps {
 const HamburgerMenu = (props: HamburgerMenuProps) => {
   const matchSubmitted = () => gamePlayState.matchSubmitted
 
-  const handleResetGame = () => {
+  const handleResetGame = (e?: MouseEvent) => {
+    e?.stopPropagation()
+    e?.preventDefault()
     if (confirm('Are you sure you want to reset the current game?')) {
       gamePlayActions.resetCurrentGame()
     } else {
@@ -286,7 +288,9 @@ const HamburgerMenu = (props: HamburgerMenuProps) => {
     }
   }
 
-  const handleResetMatch = () => {
+  const handleResetMatch = (e?: MouseEvent) => {
+    e?.stopPropagation()
+    e?.preventDefault()
     if (matchSubmitted()) return
     if (confirm('Are you sure you want to reset the whole match?')) {
       gamePlayActions.resetWholeMatch()

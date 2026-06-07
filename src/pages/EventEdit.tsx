@@ -190,7 +190,9 @@ const EventEdit = (props: EventEditProps) => {
       label: t.name,
     }))
 
-  const handleCancel = () => {
+  const handleCancel = (e?: MouseEvent) => {
+    e?.stopPropagation()
+    e?.preventDefault()
     if (props.onCancel) {
       props.onCancel()
       return

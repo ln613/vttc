@@ -715,11 +715,19 @@ const TeamPaymentDialog = (props: {
               <Show when={!isPlayerPaid(props.event, player._id)}>
                 <Button
                   color="#27ae60"
-                  onClick={() =>
-                    eventParticipantEditActions.paymentReceivedForTeamPlayer(
+                  onClick={(e) => {
+                    e?.stopPropagation()
+                    e?.preventDefault()
+                    if (
+                      !window.confirm(
+                        'Confirm payment received for this player?',
+                      )
+                    )
+                      return
+                    void eventParticipantEditActions.paymentReceivedForTeamPlayer(
                       player._id,
                     )
-                  }
+                  }}
                 >
                   Confirm
                 </Button>
@@ -731,11 +739,19 @@ const TeamPaymentDialog = (props: {
           <Show when={props.event.nop > 1 && unpaidPlayerIds().length > 0}>
             <Button
               color="#27ae60"
-              onClick={() =>
-                eventParticipantEditActions.paymentReceivedForAllTeamPlayers(
+              onClick={(e) => {
+                e?.stopPropagation()
+                e?.preventDefault()
+                if (
+                  !window.confirm(
+                    'Confirm payment received for all players in this team?',
+                  )
+                )
+                  return
+                void eventParticipantEditActions.paymentReceivedForAllTeamPlayers(
                   unpaidPlayerIds(),
                 )
-              }
+              }}
             >
               Confirm All
             </Button>
@@ -775,12 +791,20 @@ const TeamDeleteDialog = (props: {
               </span>
               <Button
                 color="#e74c3c"
-                onClick={() =>
-                  eventParticipantEditActions.deletePlayerFromTeam(
+                onClick={(e) => {
+                  e?.stopPropagation()
+                  e?.preventDefault()
+                  if (
+                    !window.confirm(
+                      'Are you sure you want to remove this player from the team?',
+                    )
+                  )
+                    return
+                  void eventParticipantEditActions.deletePlayerFromTeam(
                     props.participant._id,
                     player._id,
                   )
-                }
+                }}
               >
                 Delete
               </Button>
@@ -790,11 +814,19 @@ const TeamDeleteDialog = (props: {
         <div style={buttonContainerStyle}>
           <Button
             color="#e74c3c"
-            onClick={() =>
-              eventParticipantEditActions.deleteWholeParticipant(
+            onClick={(e) => {
+              e?.stopPropagation()
+              e?.preventDefault()
+              if (
+                !window.confirm(
+                  'Are you sure you want to delete this participant?',
+                )
+              )
+                return
+              void eventParticipantEditActions.deleteWholeParticipant(
                 props.participant._id,
               )
-            }
+            }}
           >
             Delete All
           </Button>
