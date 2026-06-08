@@ -494,21 +494,42 @@ const LandscapeInfoBox = (_props: { onExit: () => void }) => {
     }
     return undefined
   }
-  // Completed games come from the saved match; the current game row
-  // is sourced from gamePlayState.score1/score2 so it updates live on
-  // every "+"/"-" tap (match.games[currentGameIndex] is only committed
-  // when a game ends).
-  const visibleGames = () => {
-    const m = match()
-    if (!m) return []
-    const games = m.games || []
-    const finished = games.filter((g) => g.winningSide != null)
+  // Completed games come from the client-side gameHistory (which is
+  // pushed to immediately when a game ends and survives until the
+  // match is reset). The current game row is sourced from
+  // gamePlayState.score1/score2 so it updates live on every "+"/"-"
+  // tap — the saved match.games[currentGameIndex] only reflects the
+  // committed final score.
+  const visibleGames = (): {
+    score1: number
+    score2: number
+    winningSide?: 1 | 2
+  }[] => {
+    const finished = gamePlayState.gameHistory.map((g) => ({
+      score1: g.score1,
+      score2: g.score2,
+      winningSide: g.winningSide,
+    }))
     const current = {
       score1: gamePlayState.score1,
       score2: gamePlayState.score2,
       winningSide: undefined,
     }
     return [...finished, current]
+  }
+
+  // Side to highlight in a row: the confirmed winner for finished
+  // games, or the leading side for the in-progress game (undefined
+  // when tied).
+  const highlightSide = (g: {
+    score1: number
+    score2: number
+    winningSide?: 1 | 2
+  }): 1 | 2 | undefined => {
+    if (g.winningSide) return g.winningSide
+    if (g.score1 > g.score2) return 1
+    if (g.score2 > g.score1) return 2
+    return undefined
   }
   // The umpire's left is the phone screen's right (mirrored view —
   // matches scoreBoxesContainerStyle's row-reverse). Map gamePlayState
@@ -540,9 +561,21 @@ const LandscapeInfoBox = (_props: { onExit: () => void }) => {
             <For each={visibleGames()}>
               {(g, i) => {
                 const lr = leftRightScores(g)
+                const hSide = highlightSide(g)
+                const leftSideOnScreen =
+                  gamePlayState.leftSide === 1 ? 2 : 1
+                const leftHighlight = hSide === leftSideOnScreen
+                const rightHighlight = hSide != null && !leftHighlight
                 return (
                   <div style={landscapeGameScoreRowStyle}>
-                    G{i() + 1}: {lr.left}:{lr.right}
+                    <span>G{i() + 1} </span>
+                    <span style={getLandscapeScoreNumStyle(leftHighlight)}>
+                      {lr.left}
+                    </span>
+                    <span>:</span>
+                    <span style={getLandscapeScoreNumStyle(rightHighlight)}>
+                      {lr.right}
+                    </span>
                   </div>
                 )
               }}
@@ -1208,6 +1241,11 @@ const landscapeGameScoreRowStyle: JSX.CSSProperties = {
   color: 'rgba(255,255,255,0.85)',
   'font-variant-numeric': 'tabular-nums',
 }
+
+const getLandscapeScoreNumStyle = (highlight: boolean): JSX.CSSProperties => ({
+  color: highlight ? '#f1c40f' : 'inherit',
+  'font-weight': highlight ? 700 : 'inherit',
+})
 
 const scoreBoxesContainerStyle: JSX.CSSProperties = {
   display: 'flex',

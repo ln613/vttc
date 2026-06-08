@@ -19,9 +19,10 @@ Landscape:
 - info box (vertical, align center)
   - same as the table section in live score page
   - show game scores:
-    G1: 11:7
-    G2:  3:5
+    G1 11:7
+    G2  3:5
     ...
+    highlight the winning/leading side
   - no hamburger menu
   - transparent bg
 - score box for participant 2
