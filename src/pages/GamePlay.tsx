@@ -13,8 +13,10 @@ import {
   gamePlayActions,
 } from '../stores/gamePlayStore'
 import { eventDetailActions } from '../stores/eventDetailStore'
+import { liveScoreActions } from '../stores/liveScoreStore'
 import { customConfirm } from '../stores/confirmDialogStore'
 import { authState } from '../stores/authStore'
+import { getTeamSubMatchTitle } from './EventDetail'
 import { subscribeToMatchReset, type EventSubscription } from '../utils/pusher'
 import type { Player } from '../../shared/types/Player'
 import SingleSelectTags from '../components/SingleSelectTags'
@@ -31,6 +33,10 @@ const GamePlay = () => {
 
   onMount(() => {
     gamePlayActions.initializeFromUrl(searchParams)
+    // Load live-score state so the landscape info box can resolve the
+    // current table number for this match. fetchLiveScore (no flag)
+    // doesn't trigger server-side auto-generation.
+    void liveScoreActions.fetchLiveScore()
     if (containerRef) {
       preventDoubleTapZoom(containerRef)
     }
@@ -115,11 +121,15 @@ const GamePlay = () => {
     !!gamePlayState.sessionError ||
     gamePlayState.matchReset
 
+  const isLandscape = createIsLandscape()
+
   return (
     <div ref={containerRef} style={containerStyle}>
       <div style={{ ...contentStyle, ...(sessionBlocked() ? blockedStyle : {}) }}>
-        <Header onExit={handleExit} />
-        <ScoreBoxes />
+        <Show when={!isLandscape()}>
+          <Header onExit={handleExit} />
+        </Show>
+        <ScoreBoxes landscape={isLandscape()} onExit={handleExit} />
       </div>
       <Show
         when={
@@ -260,6 +270,23 @@ const createIsWideScreen = () => {
   })
 
   return isWide
+}
+
+const createIsLandscape = () => {
+  const [isLandscape, setIsLandscape] = createSignal(
+    window.innerWidth > window.innerHeight,
+  )
+
+  onMount(() => {
+    const handleResize = () => {
+      setIsLandscape(window.innerWidth > window.innerHeight)
+    }
+
+    window.addEventListener('resize', handleResize)
+    onCleanup(() => window.removeEventListener('resize', handleResize))
+  })
+
+  return isLandscape
 }
 
 // Hamburger Menu Components
@@ -403,7 +430,12 @@ const NarrowHeader = (props: HeaderProps) => {
   )
 }
 
-const ScoreBoxes = () => {
+interface ScoreBoxesProps {
+  landscape: boolean
+  onExit: () => void
+}
+
+const ScoreBoxes = (props: ScoreBoxesProps) => {
   const leftSide = () => gamePlayState.leftSide
   const rightSide = () => (leftSide() === 1 ? 2 : 1)
   const winningSide = () => gamePlayActions.getGameWinningSide()
@@ -413,12 +445,112 @@ const ScoreBoxes = () => {
     <div style={scoreBoxesOuterStyle}>
       <div style={scoreBoxesContainerStyle}>
         <ScoreBox side={leftSide()} isLeft={true} />
+        <Show when={props.landscape}>
+          <LandscapeInfoBox onExit={props.onExit} />
+        </Show>
         <ScoreBox side={rightSide()} isLeft={false} />
       </div>
       <Show when={winningSide()}>
         <GameEndButton isMatchFinished={isMatchFinished()} />
       </Show>
     </div>
+  )
+}
+
+const LandscapeInfoBox = (_props: { onExit: () => void }) => {
+  const event = () => gamePlayState.data
+  const match = () => gamePlayActions.getCurrentMatch()
+  const stageName = () => gamePlayActions.getStageName()
+  const numberOfGames = () => gamePlayActions.getNumberOfGames()
+  const currentGameIndex = () => gamePlayState.currentGameIndex
+  const tableNumber = () => {
+    const m = match()
+    if (!m) return undefined
+    if (m.lockedTableNumber) return m.lockedTableNumber
+    return liveScoreActions.getTableForMatch(m._id)
+  }
+  const subMatchLabel = (): string | undefined => {
+    const m = match()
+    if (!m || !m.parentMatchId) return undefined
+    const ev = event()
+    if (!ev) return undefined
+    for (const stage of ev.eventStages || []) {
+      const lists =
+        stage.type === 'group'
+          ? stage.groups.map((g) => g.matches)
+          : stage.type === 'knockout'
+            ? stage.rounds.map((r) =>
+                r.matches.map((km) => km.match).filter((x): x is NonNullable<typeof x> => !!x),
+              )
+            : []
+      for (const list of lists) {
+        for (const top of list) {
+          if (!top.subMatches) continue
+          const idx = top.subMatches.findIndex((s) => s._id === m._id)
+          if (idx === -1) continue
+          return getTeamSubMatchTitle(top, idx)
+        }
+      }
+    }
+    return undefined
+  }
+  // Completed games come from the saved match; the current game row
+  // is sourced from gamePlayState.score1/score2 so it updates live on
+  // every "+"/"-" tap (match.games[currentGameIndex] is only committed
+  // when a game ends).
+  const visibleGames = () => {
+    const m = match()
+    if (!m) return []
+    const games = m.games || []
+    const finished = games.filter((g) => g.winningSide != null)
+    const current = {
+      score1: gamePlayState.score1,
+      score2: gamePlayState.score2,
+      winningSide: undefined,
+    }
+    return [...finished, current]
+  }
+  // The umpire's left is the phone screen's right (mirrored view —
+  // matches scoreBoxesContainerStyle's row-reverse). Map gamePlayState
+  // .leftSide (umpire's left) to the visually-right column accordingly.
+  const leftRightScores = (game: { score1: number; score2: number }) => {
+    const leftSideOnScreen = gamePlayState.leftSide === 1 ? 2 : 1
+    const left = leftSideOnScreen === 1 ? game.score1 : game.score2
+    const right = leftSideOnScreen === 1 ? game.score2 : game.score1
+    return { left, right }
+  }
+
+  return (
+    <Show when={event()}>
+      <div style={landscapeInfoBoxStyle}>
+        <Show when={tableNumber()}>
+          <div style={landscapeTableNumberStyle}>{tableNumber()}</div>
+        </Show>
+        <div style={landscapeEventNameStyle}>{event()!.eventName}</div>
+        <div style={landscapeStageNameStyle}>{stageName()}</div>
+        <Show when={subMatchLabel()}>
+          <div style={landscapeSubMatchStyle}>{subMatchLabel()}</div>
+        </Show>
+        <div style={landscapeBestOfStyle}>Best of {numberOfGames()}</div>
+        <div style={landscapeGameInfoStyle}>
+          Game {currentGameIndex() + 1} / {numberOfGames()}
+        </div>
+        <Show when={visibleGames().length > 0}>
+          <div style={landscapeGameScoresStyle}>
+            <For each={visibleGames()}>
+              {(g, i) => {
+                const lr = leftRightScores(g)
+                return (
+                  <div style={landscapeGameScoreRowStyle}>
+                    G{i() + 1}: {lr.left}:{lr.right}
+                  </div>
+                )
+              }}
+            </For>
+          </div>
+        </Show>
+      </div>
+    </Show>
   )
 }
 
@@ -447,9 +579,12 @@ const ScoreBox = (props: ScoreBoxProps) => {
       const boxWidth = pointBoxRef.offsetWidth
       const boxHeight = pointBoxRef.offsetHeight
       const padding = 32
+      // Reserve roughly three lines + top padding for the participant
+      // names that now live inside the point box.
+      const namesReserve = 80
 
       const availableWidth = boxWidth - padding * 2
-      const availableHeight = boxHeight - padding * 2
+      const availableHeight = boxHeight - padding * 2 - namesReserve
 
       const minDimension = Math.min(availableWidth, availableHeight)
       const newFontSize = Math.max(minDimension, 40)
@@ -480,7 +615,6 @@ const ScoreBox = (props: ScoreBoxProps) => {
 
   return (
     <div style={scoreBoxWrapperStyle}>
-      <ParticipantNames side={props.side} />
       <div style={scoreAreaContainerStyle}>
         <button
           style={getPlusButtonStyle(isServing(), isGameOver())}
@@ -494,7 +628,12 @@ const ScoreBox = (props: ScoreBoxProps) => {
           style={getPointBoxStyle(isServing(), isGameOver())}
           onClick={handleAddPoint}
         >
-          <div style={getScoreDisplayStyle(fontSize(), isWinner())}>{score()}</div>
+          <ParticipantNames side={props.side} />
+          <div style={pointBoxScoreWrapStyle}>
+            <div style={getScoreDisplayStyle(fontSize(), isWinner())}>
+              {score()}
+            </div>
+          </div>
         </div>
         <GamesWonBadge gamesWon={gamesWon()} isLeft={props.isLeft} />
         <TimeoutBadge timeout={timeout()} isLeft={props.isLeft} onToggle={handleToggleTimeout} />
@@ -544,8 +683,23 @@ interface ParticipantNamesProps {
 }
 
 const ParticipantNames = (props: ParticipantNamesProps) => {
-  const displayName = () => gamePlayActions.getParticipantName(props.side)
-  return <div style={participantNamesStyle}>{displayName()}</div>
+  const lines = () => gamePlayActions.getParticipantNameLines(props.side)
+  const isLandscape = createIsLandscape()
+  // Extra breathing room above the names in portrait so they don't
+  // crowd the "+" button. Landscape keeps the tighter spacing.
+  const containerStyle = (): JSX.CSSProperties =>
+    isLandscape()
+      ? participantNamesStyle
+      : { ...participantNamesStyle, 'padding-top': '24px' }
+  return (
+    <div style={containerStyle()}>
+      <div style={participantNamesInnerStyle}>
+        <For each={lines()}>
+          {(name) => <div>{name}</div>}
+        </For>
+      </div>
+    </div>
+  )
 }
 
 // Game End Button Component (Next Game / Finish)
@@ -988,6 +1142,73 @@ const scoreBoxesOuterStyle: JSX.CSSProperties = {
   flex: 1,
 }
 
+// Transparent backdrop — sits between the two score boxes. Keeps the
+// live-score table palette for the text (yellow table number, white
+// text on the dark page background) but no card/box around it.
+const landscapeInfoBoxStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  'align-items': 'center',
+  'justify-content': 'center',
+  gap: '6px',
+  flex: '0 0 auto',
+  'min-width': '160px',
+  padding: '12px 16px',
+  'text-align': 'center',
+  'background-color': 'transparent',
+}
+
+const landscapeTableNumberStyle: JSX.CSSProperties = {
+  'font-size': '64px',
+  'font-weight': 900,
+  color: '#f1c40f',
+  'line-height': 1,
+}
+
+const landscapeEventNameStyle: JSX.CSSProperties = {
+  'font-size': '14px',
+  'font-weight': 600,
+  color: '#fff',
+}
+
+const landscapeStageNameStyle: JSX.CSSProperties = {
+  'font-size': '12px',
+  'font-weight': 500,
+  color: 'rgba(255,255,255,0.8)',
+}
+
+const landscapeSubMatchStyle: JSX.CSSProperties = {
+  'font-size': '12px',
+  'font-weight': 500,
+  color: 'rgba(255,255,255,0.8)',
+}
+
+const landscapeBestOfStyle: JSX.CSSProperties = {
+  'font-size': '12px',
+  'font-weight': 500,
+  color: 'rgba(255,255,255,0.7)',
+}
+
+const landscapeGameInfoStyle: JSX.CSSProperties = {
+  'font-size': '13px',
+  'font-weight': 700,
+  color: '#fff',
+}
+
+const landscapeGameScoresStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  'align-items': 'center',
+  gap: '2px',
+  'margin-top': '6px',
+}
+
+const landscapeGameScoreRowStyle: JSX.CSSProperties = {
+  'font-size': '12px',
+  color: 'rgba(255,255,255,0.85)',
+  'font-variant-numeric': 'tabular-nums',
+}
+
 const scoreBoxesContainerStyle: JSX.CSSProperties = {
   display: 'flex',
   'flex-direction': 'row-reverse',
@@ -1045,22 +1266,35 @@ const getTimeoutBadgeStyle = (isLeft: boolean, timeout: boolean): JSX.CSSPropert
   cursor: 'pointer',
 })
 
+// Outer wrapper just owns the top padding; the inner block has a
+// fixed height so the score below stays at the same Y on both sides.
 const participantNamesStyle: JSX.CSSProperties = {
   'font-size': '16px',
   'font-weight': 600,
   color: '#fff',
   'text-align': 'center',
   'word-break': 'break-word',
-  'margin-bottom': '8px',
   width: '100%',
-  // Reserve up to three lines and bottom-anchor the name so the next
-  // element (the score box) starts at the same vertical position on
-  // both sides regardless of how the names wrap.
-  'min-height': '3.9em',
+  padding: '10px 8px 0',
   display: 'flex',
-  'align-items': 'flex-end',
   'justify-content': 'center',
   'line-height': 1.3,
+  'box-sizing': 'border-box',
+  'flex': '0 0 auto',
+}
+
+// Fixed-height name area, bottom-anchored, overflow clipped — same
+// height on both sides regardless of player count or wrapping, which
+// keeps the big score number vertically aligned across the two boxes.
+const participantNamesInnerStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  'align-items': 'center',
+  'justify-content': 'flex-end',
+  gap: '2px',
+  width: '100%',
+  height: '3.9em',
+  overflow: 'hidden',
 }
 
 const getPlusButtonStyle = (isServing: boolean, isGameOver: boolean): JSX.CSSProperties => ({
@@ -1084,12 +1318,21 @@ const getPointBoxStyle = (isServing: boolean, isGameOver: boolean): JSX.CSSPrope
   flex: 1,
   'background-color': isServing ? '#c0392b' : '#2980b9',
   display: 'flex',
-  'align-items': 'center',
-  'justify-content': 'center',
+  'flex-direction': 'column',
+  'align-items': 'stretch',
   cursor: isGameOver ? 'default' : 'pointer',
   overflow: 'hidden',
   'min-height': 0,
 })
+
+const pointBoxScoreWrapStyle: JSX.CSSProperties = {
+  flex: 1,
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'center',
+  'min-height': 0,
+  width: '100%',
+}
 
 const getScoreDisplayStyle = (fontSize: number, isWinner: boolean): JSX.CSSProperties => ({
   'font-size': `${fontSize}px`,

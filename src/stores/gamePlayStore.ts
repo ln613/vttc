@@ -785,6 +785,23 @@ export const gamePlayActions = {
     return formatPlayerNames(decorated)
   },
 
+  // One entry per player. Used by the in-score-box name display so
+  // doubles render with each player on their own line.
+  getParticipantNameLines: (side: 1 | 2): string[] => {
+    const players =
+      side === 1
+        ? gamePlayActions.getSide1Players()
+        : gamePlayActions.getSide2Players()
+    if (!players || players.length === 0) return ['Player']
+    const parent = getCurrentParentMatch()
+    return players.map((p) => {
+      const base = `${p.firstName} ${p.lastName}`
+      if (!parent) return base
+      const label = getTeamPlayerOrderLabel(parent, p._id?.toString())
+      return label ? `${base} (${label})` : base
+    })
+  },
+
   getCurrentGameConfig: (): GameConfig => {
     if (!isHandicapEnabled()) return { ...DEFAULT_GAME_CONFIG }
 

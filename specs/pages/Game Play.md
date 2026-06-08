@@ -2,22 +2,41 @@
 
 ## Layout
 
+Portrait:
+
 - header
-  - hamburger icon, show/hide the following menu:
-    - Reset Game
-      - reset the current game
-      - show confirm window, "Are you sure you want to reset the current game?"
-    - Reset Match
-      - reset the whole match
-      - show confirm window, "Are you sure you want to reset the whole match?"
-      - if match is finished and submitted, the Reset Match menu will be disabled
-    - Exit: go back to the previous page
+  - hamburger menu
   - if screen width > 640px:
     - stage name, event name, game info
   - otherwise:
     - event name (align left)
     - stage name, game info
 - score box for participant 1, score box for participant 2, each is half width of the screen
+
+Landscape:
+
+- score box for participant 1
+- info box (vertical, align center)
+  - same as the table section in live score page
+  - show game scores:
+    G1: 11:7
+    G2:  3:5
+    ...
+  - no hamburger menu
+  - transparent bg
+- score box for participant 2
+
+## Hamburger Menu
+
+hamburger icon, show/hide the following menu:
+  - Reset Game
+    - reset the current game
+    - show confirm window, "Are you sure you want to reset the current game?"
+  - Reset Match
+    - reset the whole match
+    - show confirm window, "Are you sure you want to reset the whole match?"
+    - if match is finished and submitted, the Reset Match menu will be disabled
+  - Exit: go back to the previous page
 
 ## Stage Name
 
@@ -37,13 +56,14 @@
 
 ## Score Box
 
-- participant names
-  - for team sub-match, name followed by " ({order})"
-  - same height on both sides
 - "+" button (above the box, full width, dark red for the serving side, dark blue for the other)
-- current point
-  - huge white number
-  - red bg for the serving side, blue for the other
+- point box
+  - participant names
+    - for team sub-match, name followed by " ({order})"
+    - for double matches, each player per row
+  - current point
+    - huge white number
+    - red bg for the serving side, blue for the other
 - "-" button (under the point box, full width, dark red for the serving side, dark blue for the other)
 - show the number of games won at the top-right corner for the left score box, or the top-left corner for the right score box (it will cover part of the "+" button and part of the big point box)
 - show "T" at the top-left corner for the right score box, or the top-right corner for the left score box
