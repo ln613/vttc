@@ -54,14 +54,14 @@ const getSizeStyles = (size: 'small' | 'medium'): JSX.CSSProperties => {
   if (size === 'small') {
     return {
       'font-size': '12px',
-      padding: '6px 16px',
+      padding: '4px 16px',
       'border-radius': '4px',
       'letter-spacing': '0.5px',
     }
   }
   return {
     'font-size': '16px',
-    padding: '12px 40px',
+    padding: '8px 40px',
     'border-radius': '8px',
     'letter-spacing': '1px',
   }
@@ -87,8 +87,6 @@ const Button = (props: ButtonProps) => {
     // touch-action: manipulation suppresses iOS's 300ms double-tap zoom
     // and stops the OS from re-classifying small taps as scroll gestures.
     'touch-action': 'manipulation',
-    // Larger minimum hit-target so finger taps land reliably on mobile.
-    'min-height': '44px',
     ...sizeStyles(),
   })
 

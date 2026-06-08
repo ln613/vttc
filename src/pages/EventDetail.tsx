@@ -1080,7 +1080,9 @@ export const MatchRow = (props: MatchRowProps) => {
     isUserInMatch(props.match) ||
     (props.stage === 'group' && isUserInGroup(props.groupIndex, props.eventId))
 
-  const handleStartClick = () => {
+  const handleStartClick = (e?: MouseEvent) => {
+    e?.stopPropagation()
+    e?.preventDefault()
     const eventId = props.eventId ?? eventDetailState.eventId
     if (!eventId) return
     // Parent team match: open the Set Order dialog right here instead of
@@ -1094,7 +1096,9 @@ export const MatchRow = (props: MatchRowProps) => {
     )
   }
 
-  const handleConfirmClick = () => {
+  const handleConfirmClick = (e?: MouseEvent) => {
+    e?.stopPropagation()
+    e?.preventDefault()
     const eventId = props.eventId ?? eventDetailState.eventId ?? undefined
     eventDetailActions.showConfirmDialog(props.match._id, eventId)
   }
@@ -1114,7 +1118,9 @@ export const MatchRow = (props: MatchRowProps) => {
     void eventDetailActions.resetMatch(props.match._id, eventId)
   }
 
-  const handleSimulateClick = () => {
+  const handleSimulateClick = (e?: MouseEvent) => {
+    e?.stopPropagation()
+    e?.preventDefault()
     const eventId = props.eventId ?? eventDetailState.eventId ?? undefined
     eventDetailActions.simulateMatch(props.match._id, props.match, eventId)
   }
@@ -1177,7 +1183,9 @@ export const MatchRow = (props: MatchRowProps) => {
     showSimulate() ||
     showAssign()
 
-  const handleAssignClick = () => {
+  const handleAssignClick = (e?: MouseEvent) => {
+    e?.stopPropagation()
+    e?.preventDefault()
     const eventId = props.eventId ?? eventDetailState.eventId ?? undefined
     if (!eventId) return
     eventDetailActions.openAssignDialog(props.match._id, eventId)

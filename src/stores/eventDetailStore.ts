@@ -725,15 +725,32 @@ const findMatchById = (
   for (const stage of event.eventStages || []) {
     if (stage.type === 'group') {
       for (const group of stage.groups) {
-        const match = group.matches.find((m) => m._id === matchId)
-        if (match) return match
+        const found = findInMatchList(group.matches, matchId)
+        if (found) return found
       }
     }
     if (stage.type === 'knockout') {
       for (const round of stage.rounds) {
-        const km = round.matches.find((m) => m.match?._id === matchId)
-        if (km?.match) return km.match
+        for (const km of round.matches) {
+          if (!km.match) continue
+          const found = findInMatchList([km.match], matchId)
+          if (found) return found
+        }
       }
+    }
+  }
+  return undefined
+}
+
+// Search top-level matches AND any team match's subMatches[] so that
+// sub-match-driven flows (Confirm/Reset dialogs on a team sub-match row)
+// can locate the right Match.
+const findInMatchList = (matches: Match[], matchId: string): Match | undefined => {
+  for (const m of matches) {
+    if (m._id === matchId) return m
+    if (m.subMatches && m.subMatches.length > 0) {
+      const sub = findInMatchList(m.subMatches, matchId)
+      if (sub) return sub
     }
   }
   return undefined
