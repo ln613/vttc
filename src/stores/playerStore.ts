@@ -14,6 +14,7 @@ interface PlayerState {
   loading: boolean
   error: string | null
   search: string
+  unpaidOnly: boolean
   paymentPlayer: Player | null
   toastMessage: ToastMessage | null
 }
@@ -23,6 +24,7 @@ const getInitialState = (): PlayerState => ({
   loading: false,
   error: null,
   search: '',
+  unpaidOnly: false,
   paymentPlayer: null,
   toastMessage: null,
 })
@@ -119,13 +121,22 @@ export const playerActions = {
     setPlayerState({ search })
   },
 
+  setUnpaidOnly: (unpaidOnly: boolean) => {
+    setPlayerState({ unpaidOnly })
+  },
+
   filteredPlayers: (): Player[] => {
     const players = playerState.data
     if (!players) return []
     const term = playerState.search.trim()
-    const filtered = term
+    let filtered = term
       ? players.filter((p) => matchesSearch(p, term))
       : [...players]
+    if (playerState.unpaidOnly) {
+      filtered = filtered.filter((p) =>
+        getUnpaidEventsForPlayer(p._id).length > 0,
+      )
+    }
     return filtered.sort(sortByRatingDesc)
   },
 

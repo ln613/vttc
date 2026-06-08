@@ -8,6 +8,7 @@ Vertical
 - title row
   - "Players" (h1, align left)
   - search box (align right, filter on type, on first name or last name)
+  - Unpaid checkbox (admin only)
 - Player Table
 
 ## Player Table

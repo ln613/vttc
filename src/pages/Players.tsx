@@ -43,6 +43,18 @@ const TitleRow = () => (
       onInput={(e) => playerActions.setSearch(e.currentTarget.value)}
       style={searchBoxStyle}
     />
+    <Show when={authState.isAdmin || authState.isSuperAdmin}>
+      <label style={unpaidLabelStyle}>
+        <input
+          type="checkbox"
+          checked={playerState.unpaidOnly}
+          onChange={(e) =>
+            playerActions.setUnpaidOnly(e.currentTarget.checked)
+          }
+        />
+        <span>Unpaid</span>
+      </label>
+    </Show>
   </div>
 )
 
@@ -315,6 +327,17 @@ const searchBoxStyle: JSX.CSSProperties = {
   'min-width': '0',
   flex: '1',
   'max-width': '220px',
+}
+
+const unpaidLabelStyle: JSX.CSSProperties = {
+  display: 'inline-flex',
+  'align-items': 'center',
+  gap: '6px',
+  'font-size': '14px',
+  color: '#333',
+  cursor: 'pointer',
+  'user-select': 'none',
+  'white-space': 'nowrap',
 }
 
 const baseTableContainerStyle: JSX.CSSProperties = {

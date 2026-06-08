@@ -66,6 +66,21 @@ const sectionTitleStyle: JSX.CSSProperties = {
   'text-align': 'left',
 }
 
+const eventNameStyle: JSX.CSSProperties = {
+  'font-size': '20px',
+  'font-weight': 700,
+  color: '#2c3e50',
+  'margin-top': '16px',
+  'text-align': 'left',
+}
+
+const eventSeriesStyle: JSX.CSSProperties = {
+  'font-size': '14px',
+  color: '#7f8c8d',
+  'margin-top': '4px',
+  'text-align': 'left',
+}
+
 const tableStyle: JSX.CSSProperties = {
   width: '100%',
   'border-collapse': 'collapse',
@@ -297,6 +312,10 @@ const EventParticipantEdit = () => {
         <Show when={selectedEvent()}>
           {(event) => (
             <>
+              <div style={eventNameStyle}>{event().eventName}</div>
+              <Show when={event().eventSeries}>
+                <div style={eventSeriesStyle}>{event().eventSeries}</div>
+              </Show>
               <h3 style={sectionTitleStyle}>
                 {getParticipantsCountText(event())}
               </h3>

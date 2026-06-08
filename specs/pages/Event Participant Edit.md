@@ -8,6 +8,8 @@ Vertical
 - title row
   - "Edit Event Participants" (h1, align left)
   - Add Participant button (align right)
+- event name
+- series name, if available
 - section title "Registered: {number of participants}, Paid: {number of paid participants/teams, for team event, only if the whole team have paid}, if not unlimited, followed by "Max: {number of max participants}"
 - Table of participants (alternate bg color - white, lavender)
 
