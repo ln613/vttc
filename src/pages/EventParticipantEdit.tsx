@@ -17,6 +17,7 @@ import { type EventOption } from '../stores/eventStore'
 import { playerState, getPerPlayerFee } from '../stores/playerStore'
 import { authState } from '../stores/authStore'
 import { customConfirm } from '../stores/confirmDialogStore'
+import { parseLocalDate } from '../utils/date'
 import {
   eventParticipantEditState,
   eventParticipantEditActions,
@@ -79,6 +80,25 @@ const eventSeriesStyle: JSX.CSSProperties = {
   color: '#7f8c8d',
   'margin-top': '4px',
   'text-align': 'left',
+}
+
+const eventDateTimeStyle: JSX.CSSProperties = {
+  'font-size': '14px',
+  color: '#555',
+  'margin-top': '4px',
+  'text-align': 'left',
+}
+
+const formatEventDateTime = (date?: string, time?: string): string => {
+  if (!date) return ''
+  const d = parseLocalDate(date)
+  const datePart = d.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+  return time ? `${datePart}  ${time}` : datePart
 }
 
 const tableStyle: JSX.CSSProperties = {
@@ -315,6 +335,11 @@ const EventParticipantEdit = () => {
               <div style={eventNameStyle}>{event().eventName}</div>
               <Show when={event().eventSeries}>
                 <div style={eventSeriesStyle}>{event().eventSeries}</div>
+              </Show>
+              <Show when={event().date}>
+                <div style={eventDateTimeStyle}>
+                  {formatEventDateTime(event().date, event().time)}
+                </div>
               </Show>
               <h3 style={sectionTitleStyle}>
                 {getParticipantsCountText(event())}

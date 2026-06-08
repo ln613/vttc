@@ -733,12 +733,26 @@ const isPlayerHost = (playerId: string | undefined): boolean => {
 }
 
 const ParticipantRow = (props: ParticipantRowProps) => {
-  const displayName = () => getParticipantDisplayName(props.participant)
   const rowBg = () => (props.index % 2 === 0 ? '#f8f9fa' : '#fff')
-  const showUnpaid = () =>
+  const event = () => eventDetailState.data
+  const paidIds = () => event()?.paidPlayerIds || []
+  const sortedPlayers = () =>
+    [...(props.participant.players || [])].sort(
+      (a, b) => (b.rating || 0) - (a.rating || 0),
+    )
+  const isPlayerInRed = (player: { _id?: string }): boolean => {
+    if (!authState.isAdmin) return false
+    const id = player._id?.toString()
+    if (!id) return false
+    if (isPlayerHost(id)) return false
+    return !paidIds().includes(id)
+  }
+  // Team-name display still uses the all-or-nothing red rule, but
+  // ignores hosts when deciding.
+  const teamUnpaid = () =>
     authState.isAdmin && isParticipantUnpaid(props.participant)
-  const unpaidColor = (): JSX.CSSProperties =>
-    showUnpaid() ? { color: '#e74c3c' } : {}
+  const teamNameStyle = (): JSX.CSSProperties =>
+    teamUnpaid() ? { color: '#e74c3c' } : {}
 
   return (
     <div
@@ -748,21 +762,32 @@ const ParticipantRow = (props: ParticipantRowProps) => {
       }}
     >
       <span style={participantIndexStyle}>{props.index}</span>
-      <span style={{ ...participantNameStyle, ...unpaidColor() }}>
-        {displayName()}
+      <span style={participantNameStyle}>
+        <Show
+          when={props.participant.teamName}
+          fallback={
+            <For each={sortedPlayers()}>
+              {(player, i) => (
+                <>
+                  <Show when={i() > 0}>
+                    <span> / </span>
+                  </Show>
+                  <span
+                    style={isPlayerInRed(player) ? { color: '#e74c3c' } : {}}
+                  >
+                    {player.firstName} {player.lastName}
+                  </span>
+                </>
+              )}
+            </For>
+          }
+        >
+          <span style={teamNameStyle()}>{props.participant.teamName}</span>
+        </Show>
       </span>
       <span style={participantRatingStyle}>{props.participant.rating}</span>
     </div>
   )
-}
-
-const getParticipantDisplayName = (participant: Participant): string => {
-  if (!participant.players || participant.players.length === 0) return 'Unknown'
-  if (participant.teamName) return participant.teamName
-  const sorted = [...participant.players].sort(
-    (a, b) => (b.rating || 0) - (a.rating || 0),
-  )
-  return sorted.map((p) => `${p.firstName} ${p.lastName}`).join(' / ')
 }
 
 interface GroupDisplayProps {

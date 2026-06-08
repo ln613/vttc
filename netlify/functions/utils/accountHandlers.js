@@ -363,20 +363,26 @@ export const updateProfile = async (body) => {
 
   await save(PLAYERS_COLLECTION, updateData)
 
-  // Propagate the new rating to every remaining future event the
-  // player is still registered in — the participant.players[].rating
-  // and the participant.rating (combined) need to reflect the change
-  // so qualification/seeding/sorting all stay accurate.
-  if (ratingChanged) {
-    await propagateRatingToFutureEvents(body._id, newRating)
-  }
+  // Propagate to every remaining future event the player is still
+  // registered in. Rating updates when admin-adjusted; host is always
+  // synced from the player record so the host-counts-as-paid logic
+  // stays correct even if host was flipped outside updateProfile.
+  await propagatePlayerSnapshotToFutureEvents(body._id, {
+    rating: newRating,
+    host: !!existing?.host,
+    ratingChanged,
+  })
 
   return { success: true, affectedEvents: [] }
 }
 
-// Update the embedded player.rating snapshot inside participants of
-// every future event the player is in, then recompute participant.rating.
-const propagateRatingToFutureEvents = async (playerId, newRating) => {
+// Refresh the embedded player snapshot inside participants of every
+// future event the player is in. When the rating changed, also
+// recompute participant.rating (combined).
+const propagatePlayerSnapshotToFutureEvents = async (
+  playerId,
+  { rating, host, ratingChanged },
+) => {
   const db = getDB()
   const today = new Date().toISOString().slice(0, 10)
   const events = await db
@@ -386,20 +392,25 @@ const propagateRatingToFutureEvents = async (playerId, newRating) => {
   for (const event of events) {
     let modified = false
     const updatedParticipants = (event.participants || []).map((p) => {
-      const hasPlayer = (p.players || []).some(
+      const player = (p.players || []).find(
         (pl) => pl._id?.toString() === playerId?.toString(),
       )
-      if (!hasPlayer) return p
+      if (!player) return p
+      const ratingDiffers = ratingChanged && player.rating !== rating
+      const hostDiffers = !!player.host !== host
+      if (!ratingDiffers && !hostDiffers) return p
       modified = true
       const updatedPlayers = (p.players || []).map((pl) =>
         pl._id?.toString() === playerId?.toString()
-          ? { ...pl, rating: newRating }
+          ? { ...pl, ...(ratingChanged ? { rating } : {}), host }
           : pl,
       )
       return {
         ...p,
         players: updatedPlayers,
-        rating: calculateParticipantRating(updatedPlayers, event.nop),
+        ...(ratingChanged
+          ? { rating: calculateParticipantRating(updatedPlayers, event.nop) }
+          : {}),
       }
     })
     if (modified) {

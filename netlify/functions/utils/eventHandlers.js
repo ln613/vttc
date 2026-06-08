@@ -505,7 +505,12 @@ const meetsSexRequirement = (event, players) => {
 
 const allPlayersPaid = (event, players) => {
   const paidIds = event.paidPlayerIds || []
-  return players.every((p) => paidIds.includes(p._id.toString()))
+  // Hosts (player.host === true on the embedded snapshot) are always
+  // treated as paid, so a team with one or more hosts can still be
+  // counted as fully paid once the non-host players settle their fees.
+  return players.every(
+    (p) => p?.host === true || paidIds.includes(p._id.toString()),
+  )
 }
 
 const countPaidParticipants = (event) =>

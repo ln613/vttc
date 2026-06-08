@@ -303,12 +303,23 @@ export const eventParticipantEditActions = {
 export const canShowDeleteColumn = (event: EventOption): boolean =>
   !event.hasSchedule
 
+// Hosts are always treated as paid; team participants count as paid
+// only when every non-host player is in paidPlayerIds.
+const isHostPlayer = (playerId: string): boolean =>
+  !!(playerState.data || []).find(
+    (p) => p._id?.toString() === playerId.toString(),
+  )?.host
+
 const countPaidParticipants = (event: EventOption): number => {
   const paidIds = event.paidPlayerIds || []
   return event.participants.filter(
     (p) =>
       p.players.length === event.nop &&
-      p.players.every((pl) => paidIds.includes(pl._id.toString())),
+      p.players.every(
+        (pl) =>
+          isHostPlayer(pl._id.toString()) ||
+          paidIds.includes(pl._id.toString()),
+      ),
   ).length
 }
 

@@ -3,6 +3,7 @@ import type { Participant } from '../../shared/types/Tournament'
 import type { EventOption } from './eventStore'
 import { eventState, eventActions } from './eventStore'
 import { authState } from './authStore'
+import { playerState } from './playerStore'
 import { apiPost } from '../utils/api'
 import { parseLocalDate } from '../utils/date'
 
@@ -110,11 +111,21 @@ const isPlayerInEvent = (event: EventOption, playerId: string): boolean =>
     ),
   ) ?? false
 
+// Hosts are always treated as paid; team participants count as paid
+// only when every non-host player is in paidPlayerIds.
+const isPlayerHost = (playerId: string): boolean =>
+  !!(playerState.data || []).find(
+    (p) => p._id?.toString() === playerId.toString(),
+  )?.host
+
 const isParticipantPaid = (event: EventOption, participant: Participant): boolean => {
   const paidIds = event.paidPlayerIds || []
   return (
     participant.players.length === event.nop &&
-    participant.players.every((p) => paidIds.includes(p._id.toString()))
+    participant.players.every(
+      (p) =>
+        isPlayerHost(p._id.toString()) || paidIds.includes(p._id.toString()),
+    )
   )
 }
 
