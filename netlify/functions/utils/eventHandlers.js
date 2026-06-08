@@ -560,7 +560,7 @@ const describeUnqualifiedParticipants = (event) => {
  * - Double: combined rating of the pair must meet the limit
  * - Team: combined rating must meet the limit, plus top N players check if enabled
  */
-const validateRatingRequirement = (event, players) => {
+export const validateRatingRequirement = (event, players) => {
   const errors = []
   const { type, ratingLimit, topPlayersRatingEnabled, topPlayersCount, topPlayersRatingLimit } = event
 
@@ -605,7 +605,7 @@ const validateRatingRequirement = (event, players) => {
   return errors
 }
 
-const calculateParticipantRating = (players, nop) => {
+export const calculateParticipantRating = (players, nop) => {
   if (players.length === 0) return 0
   if (nop === 1) return players[0]?.rating || 0
   if (nop <= 3) return players.reduce((sum, p) => sum + (p.rating || 0), 0)
@@ -624,7 +624,7 @@ const calculateAge = (dateOfBirth, referenceDate) => {
   return age
 }
 
-const meetsAgeRequirement = (player, ageLimitType, ageLimit, referenceDate) => {
+export const meetsAgeRequirement = (player, ageLimitType, ageLimit, referenceDate) => {
   if (!player.dateOfBirth) return false
   const age = calculateAge(player.dateOfBirth, referenceDate)
   if (ageLimitType === 'U') return age <= ageLimit
@@ -4094,7 +4094,9 @@ const validateRegisterForEventRules = (event, player) => {
     errors.push('You are already registered for this event')
   }
 
-  // Age requirement is strict for self-registration (no DOB → blocked)
+  // Age requirement is strict for self-registration (no DOB → blocked).
+  // The only spec-allowed exception (admin adding players without dob to
+  // Age events) lives in addParticipant, not here.
   if (event.restriction === 'Age' && event.ageLimitType && event.ageLimit) {
     if (!player.dateOfBirth) {
       errors.push(
@@ -4114,6 +4116,29 @@ const validateRegisterForEventRules = (event, player) => {
           : `over ${event.ageLimit}`
       errors.push(`Player does not meet age requirement (${requirement})`)
     }
+  }
+
+  // Rating restriction — for Singles, the player's rating alone must
+  // satisfy the limit. For Doubles/Team partial-team registration the
+  // combined check is deferred until the team is full (handled by
+  // addPlayerToExistingTeam / addParticipant), but if the single player
+  // already exceeds the limit no future combination can fix it.
+  if (event.restriction === 'Rated' && event.ratingLimit) {
+    if ((player.rating || 0) > event.ratingLimit) {
+      errors.push(
+        `Player rating (${player.rating || 0}) exceeds limit (${event.ratingLimit})`,
+      )
+    }
+  }
+
+  // Sex restriction — Female/Male events require the player's sex to
+  // match. Mixed events can only be evaluated once the team is full,
+  // so defer to addParticipant for those.
+  if (event.sex === 'Female' && player.sex !== 'F' && player.sex !== 'female') {
+    errors.push('Event is for female players only')
+  }
+  if (event.sex === 'Male' && player.sex !== 'M' && player.sex !== 'male') {
+    errors.push('Event is for male players only')
   }
 
   return errors

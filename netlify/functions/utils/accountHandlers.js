@@ -2,6 +2,13 @@ import { getDB, save, toObjectId } from './db.js'
 import crypto from 'crypto'
 import argon2 from 'argon2'
 import { sendVerificationEmail, sendPendingPasswordEmail } from './email.js'
+import {
+  validateRatingRequirement,
+  meetsAgeRequirement,
+  deleteParticipant,
+  deletePlayerFromTeam,
+  calculateParticipantRating,
+} from './eventHandlers.js'
 
 // In-memory store for verification codes (per email)
 const verificationCodes = new Map()
@@ -237,18 +244,18 @@ const validateEmailIfProvided = (email) => {
 }
 
 /**
- * Validate Canadian phone number (if provided)
+ * Validate Canadian/US (NANP) phone number (if provided)
  */
-const validateCanadianPhoneIfProvided = (phone) => {
-  if (phone && !isValidCanadianPhone(phone)) {
-    throwError('Invalid Canadian phone number')
+const validateNorthAmericanPhoneIfProvided = (phone) => {
+  if (phone && !isValidNorthAmericanPhone(phone)) {
+    throwError('Invalid Canadian/US phone number')
   }
 }
 
 /**
- * Check if a phone number is a valid Canadian phone number
+ * Check if a phone number is a valid Canadian/US (NANP) phone number
  */
-const isValidCanadianPhone = (phone) => {
+const isValidNorthAmericanPhone = (phone) => {
   const digits = phone.replace(/\D/g, '')
   if (digits.length === 10) {
     return /^[2-9]\d{2}[2-9]\d{6}$/.test(digits)
@@ -260,26 +267,240 @@ const isValidCanadianPhone = (phone) => {
 }
 
 /**
+ * Validate rating (if provided) — must be a non-negative integer.
+ */
+const validateRatingIfProvided = (rating) => {
+  if (rating === undefined || rating === null || rating === '') return
+  if (!Number.isInteger(rating) || rating < 0) {
+    throwError('Rating must be a non-negative integer')
+  }
+}
+
+/**
  * Update player profile
  */
 export const updateProfile = async (body) => {
   validateUpdateProfileInput(body)
   validateEmailIfProvided(body.email)
-  validateCanadianPhoneIfProvided(body.phone)
+  validateNorthAmericanPhoneIfProvided(body.phone)
+  validateRatingIfProvided(body.rating)
 
+  const db = getDB()
+  const collection = db.collection(PLAYERS_COLLECTION)
+  const existing = await collection.findOne({ _id: toObjectId(body._id) })
+
+  // Resolve the effective rating and dob the player would have after
+  // this save — used both for the unqualified-event check and for
+  // propagation to future events.
+  const newRating =
+    body.rating !== undefined && body.rating !== null && body.rating !== ''
+      ? Number(body.rating)
+      : existing?.rating
+  const newDateOfBirth = body.dateOfBirth || ''
+
+  // Detect future events the player is registered for that the player
+  // would no longer qualify for under the new rating/dateOfBirth.
+  const affectedEvents = await findAffectedFutureEvents({
+    playerId: body._id,
+    newRating,
+    newDateOfBirth,
+  })
+
+  // Spec: ask BEFORE saving. If there are affected events and the
+  // caller hasn't confirmed removal, return the list and persist
+  // nothing.
+  if (affectedEvents.length > 0 && !body.confirmRemove) {
+    return { success: false, needsConfirm: true, affectedEvents }
+  }
+
+  // If confirmed, remove the player from those events first so that the
+  // subsequent propagation doesn't touch them.
+  if (body.confirmRemove && affectedEvents.length > 0) {
+    for (const ev of affectedEvents) {
+      try {
+        await removePlayerFromEvent({ _id: ev._id, playerId: body._id })
+      } catch {
+        // continue on per-event failure
+      }
+    }
+  }
+
+  // Build the player update document.
   const updateData = {
     _id: body._id,
     firstName: body.firstName || '',
     lastName: body.lastName || '',
     sex: body.sex || '',
-    dateOfBirth: body.dateOfBirth || '',
+    dateOfBirth: newDateOfBirth,
     email: body.email || '',
     phone: body.phone || '',
   }
 
+  // Rating is only persisted when explicitly provided. When it changes,
+  // append an entry to the player's ratingHistory[] so the previous
+  // rating + the time of the change are kept in the db.
+  let ratingChanged = false
+  if (body.rating !== undefined && body.rating !== null && body.rating !== '') {
+    const previousRating = existing?.rating
+    updateData.rating = newRating
+    const existingHistory = Array.isArray(existing?.ratingHistory)
+      ? existing.ratingHistory
+      : []
+    if (previousRating !== newRating) {
+      ratingChanged = true
+      updateData.ratingHistory = [
+        ...existingHistory,
+        {
+          rating: newRating,
+          previousRating: previousRating ?? null,
+          changedAt: new Date().toISOString(),
+        },
+      ]
+    } else {
+      updateData.ratingHistory = existingHistory
+    }
+  }
+
   await save(PLAYERS_COLLECTION, updateData)
 
-  return { success: true }
+  // Propagate the new rating to every remaining future event the
+  // player is still registered in — the participant.players[].rating
+  // and the participant.rating (combined) need to reflect the change
+  // so qualification/seeding/sorting all stay accurate.
+  if (ratingChanged) {
+    await propagateRatingToFutureEvents(body._id, newRating)
+  }
+
+  return { success: true, affectedEvents: [] }
+}
+
+// Update the embedded player.rating snapshot inside participants of
+// every future event the player is in, then recompute participant.rating.
+const propagateRatingToFutureEvents = async (playerId, newRating) => {
+  const db = getDB()
+  const today = new Date().toISOString().slice(0, 10)
+  const events = await db
+    .collection('events')
+    .find({ date: { $gte: today } })
+    .toArray()
+  for (const event of events) {
+    let modified = false
+    const updatedParticipants = (event.participants || []).map((p) => {
+      const hasPlayer = (p.players || []).some(
+        (pl) => pl._id?.toString() === playerId?.toString(),
+      )
+      if (!hasPlayer) return p
+      modified = true
+      const updatedPlayers = (p.players || []).map((pl) =>
+        pl._id?.toString() === playerId?.toString()
+          ? { ...pl, rating: newRating }
+          : pl,
+      )
+      return {
+        ...p,
+        players: updatedPlayers,
+        rating: calculateParticipantRating(updatedPlayers, event.nop),
+      }
+    })
+    if (modified) {
+      await db
+        .collection('events')
+        .updateOne(
+          { _id: event._id },
+          { $set: { participants: updatedParticipants } },
+        )
+    }
+  }
+}
+
+// For every future event the player is registered in, simulate the
+// participant with the new rating/dob and report the events they would
+// no longer qualify for.
+const findAffectedFutureEvents = async ({ playerId, newRating, newDateOfBirth }) => {
+  const db = getDB()
+  const today = new Date().toISOString().slice(0, 10)
+  const events = await db
+    .collection('events')
+    .find({ date: { $gte: today } })
+    .toArray()
+  const affected = []
+  for (const event of events) {
+    const participant = (event.participants || []).find((p) =>
+      (p.players || []).some(
+        (pl) => pl._id?.toString() === playerId?.toString(),
+      ),
+    )
+    if (!participant) continue
+    const updatedPlayers = (participant.players || []).map((p) =>
+      p._id?.toString() === playerId?.toString()
+        ? { ...p, rating: newRating, dateOfBirth: newDateOfBirth || p.dateOfBirth }
+        : p,
+    )
+    const reason = computeUnqualifiedReason(event, updatedPlayers)
+    if (reason) {
+      affected.push({
+        _id: event._id.toString(),
+        eventName: event.eventName,
+        date: event.date,
+        reason,
+      })
+    }
+  }
+  return affected
+}
+
+const computeUnqualifiedReason = (event, players) => {
+  if (event.restriction === 'Rated' && event.ratingLimit) {
+    const errs = validateRatingRequirement(event, players)
+    if (errs.length > 0) return `exceeds rating limit (${event.ratingLimit})`
+  }
+  if (event.restriction === 'Age' && event.ageLimitType && event.ageLimit) {
+    for (const p of players) {
+      if (!p.dateOfBirth) continue
+      if (!meetsAgeRequirement(p, event.ageLimitType, event.ageLimit, event.date)) {
+        const req =
+          event.ageLimitType === 'U'
+            ? `under ${event.ageLimit}`
+            : `over ${event.ageLimit}`
+        return `does not meet age requirement (${req})`
+      }
+    }
+  }
+  return null
+}
+
+// Remove a player from an event regardless of singles/team — looks up
+// the participant by playerId then routes to the appropriate delete
+// endpoint. Used after admin confirms removal in the Account page flow.
+export const removePlayerFromEvent = async (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body._id) throwError('Event ID is required')
+  if (!body.playerId) throwError('Player ID is required')
+
+  const db = getDB()
+  const event = await db
+    .collection('events')
+    .findOne({ _id: toObjectId(body._id) })
+  if (!event) throwError('Event not found')
+
+  const participant = (event.participants || []).find((p) =>
+    (p.players || []).some(
+      (pl) => pl._id?.toString() === body.playerId.toString(),
+    ),
+  )
+  if (!participant) return { success: true }
+
+  if ((event.nop ?? 1) > 1) {
+    return deletePlayerFromTeam({
+      _id: body._id,
+      participantId: participant._id,
+      playerId: body.playerId,
+    })
+  }
+  return deleteParticipant({
+    _id: body._id,
+    participantId: participant._id,
+  })
 }
 
 /**

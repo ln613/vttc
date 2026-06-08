@@ -1,4 +1,4 @@
-import { getPlayers } from './playerHandlers.js'
+import { getPlayers, getPlayerRatingHistory } from './playerHandlers.js'
 import {
   saveTournament,
   getTournaments,
@@ -40,6 +40,7 @@ import {
   verifyCode,
   signUp,
   registerPlayerByAdmin,
+  removePlayerFromEvent,
 } from './accountHandlers.js'
 import {
   getLiveScore,
@@ -66,6 +67,7 @@ const withEventNotify = (fn) => async (body) => {
 export const apiHandlers = {
   get: {
     players: () => getPlayers(),
+    playerRatingHistory: (params) => getPlayerRatingHistory(params),
     tournaments: () => getTournaments(),
     tournament: (params) => getTournament(params),
     events: (params) => getEvents(params),
@@ -105,6 +107,7 @@ export const apiHandlers = {
     updateProfile: (body) => updateProfile(body),
     changePassword: (body) => changePassword(body),
     registerPlayerByAdmin: (body) => registerPlayerByAdmin(body),
+    removePlayerFromEvent: withEventNotify(removePlayerFromEvent),
     rebuildMatchQueue: async () => {
       const result = await rebuildMatchQueue()
       await notifyLiveScoreUpdate()

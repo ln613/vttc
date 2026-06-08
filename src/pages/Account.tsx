@@ -1,4 +1,4 @@
-import { Show, onMount, onCleanup, type JSX } from 'solid-js'
+import { Show, For, onMount, onCleanup, type JSX } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { Header } from '../components/Header'
 import Input from '../components/Input'
@@ -151,6 +151,53 @@ const changePasswordButtonContainerStyle: JSX.CSSProperties = {
   'margin-top': '20px',
 }
 
+// Rating row mirrors the sign-up dialog's verification-code field:
+// bare input + attached button sharing borders, so they read as a
+// single control. Label sits above like all other Input components.
+const ratingFieldStyle: JSX.CSSProperties = {
+  'margin-bottom': '16px',
+}
+
+const ratingLabelStyle: JSX.CSSProperties = {
+  display: 'block',
+  'font-weight': 700,
+  'font-size': '14px',
+  'margin-bottom': '8px',
+  color: '#333',
+  'text-align': 'left',
+}
+
+const ratingRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'stretch',
+}
+
+const ratingInputBoxStyle = (disabled: boolean): JSX.CSSProperties => ({
+  flex: '1',
+  padding: '12px 16px',
+  'font-size': '16px',
+  border: '1px solid #ddd',
+  'border-right': 'none',
+  'border-radius': '8px 0 0 8px',
+  outline: 'none',
+  'box-sizing': 'border-box',
+  'background-color': disabled ? '#f5f5f5' : '#fff',
+  color: '#333',
+  cursor: disabled ? 'not-allowed' : 'text',
+})
+
+const ratingHistoryButtonStyle: JSX.CSSProperties = {
+  padding: '0 20px',
+  'font-size': '14px',
+  'font-weight': 600,
+  border: '1px solid #2185d0',
+  'border-radius': '0 8px 8px 0',
+  'background-color': '#2185d0',
+  color: '#fff',
+  cursor: 'pointer',
+  'white-space': 'nowrap',
+}
+
 const Account = () => {
   const navigate = useNavigate()
   const params = useParams()
@@ -174,9 +221,7 @@ const Account = () => {
       <SavingOverlay />
       <SavedOverlay />
       <div style={contentStyle}>
-        <h1 style={titleStyle}>
-          {accountPageState.targetDisplayName || 'Account'}
-        </h1>
+        <h1 style={titleStyle}>{accountPageActions.getTitle()}</h1>
         <ProfileSection />
         <Show
           when={!accountPageState.editing && !accountPageState.targetPlayerId}
@@ -190,6 +235,9 @@ const Account = () => {
       </div>
       <Show when={accountPageState.showChangePasswordDialog}>
         <ChangePasswordDialog />
+      </Show>
+      <Show when={accountPageState.showRatingHistoryDialog}>
+        <RatingHistoryDialog />
       </Show>
       <SpinnerKeyframes />
     </div>
@@ -374,6 +422,37 @@ const ProfileSection = () => (
       onChange={(value) => accountPageActions.setField('phone', value)}
       disabled={!accountPageState.editing}
     />
+    <Show when={isAdminOrSuperAdmin()}>
+      <div style={ratingFieldStyle}>
+        <label for="rating" style={ratingLabelStyle}>
+          Rating
+        </label>
+        <div style={ratingRowStyle}>
+          <input
+            id="rating"
+            name="rating"
+            type="text"
+            value={accountPageState.formData.rating}
+            onInput={(e) =>
+              accountPageActions.setField('rating', e.currentTarget.value)
+            }
+            disabled={!accountPageState.editing}
+            style={ratingInputBoxStyle(!accountPageState.editing)}
+          />
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              e.preventDefault()
+              void accountPageActions.showRatingHistory()
+            }}
+            style={ratingHistoryButtonStyle}
+          >
+            History
+          </button>
+        </div>
+      </div>
+    </Show>
     <Show when={accountPageState.error}>
       <div style={errorMessageStyle}>{accountPageState.error}</div>
     </Show>
@@ -452,5 +531,97 @@ const ChangePasswordDialog = () => (
     </div>
   </div>
 )
+
+const RatingHistoryDialog = () => (
+  <div
+    style={overlayStyle}
+    onClick={(e) => {
+      e.stopPropagation()
+      e.preventDefault()
+      accountPageActions.hideRatingHistory()
+    }}
+  >
+    <div style={dialogStyle} onClick={(e) => e.stopPropagation()}>
+      <h3 style={dialogTitleStyle}>Rating Adjustment History</h3>
+      <Show
+        when={!accountPageState.loadingRatingHistory}
+        fallback={<div style={ratingHistoryEmptyStyle}>Loading...</div>}
+      >
+        <Show
+          when={accountPageState.ratingHistory.length > 0}
+          fallback={
+            <div style={ratingHistoryEmptyStyle}>No rating changes yet.</div>
+          }
+        >
+          <div style={ratingHistoryListStyle}>
+            <For each={accountPageState.ratingHistory}>
+              {(entry: {
+                rating: number
+                previousRating: number | null
+                changedAt: string
+              }) => (
+                <div style={ratingHistoryRowStyle}>
+                  <span>{formatRatingChangedAt(entry.changedAt)}</span>
+                  <span style={ratingHistoryRatingStyle}>
+                    {entry.previousRating != null
+                      ? `${entry.previousRating} → ${entry.rating}`
+                      : `${entry.rating}`}
+                  </span>
+                </div>
+              )}
+            </For>
+          </div>
+        </Show>
+      </Show>
+      <div style={dialogButtonContainerStyle}>
+        <Button
+          color="#3498db"
+          onClick={accountPageActions.hideRatingHistory}
+        >
+          Close
+        </Button>
+      </div>
+    </div>
+  </div>
+)
+
+const formatRatingChangedAt = (iso: string): string => {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return iso
+  return d.toLocaleString()
+}
+
+const ratingHistoryListStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '8px',
+  'max-height': '50vh',
+  'overflow-y': 'auto',
+  'margin-top': '12px',
+}
+
+const ratingHistoryRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'justify-content': 'space-between',
+  'align-items': 'center',
+  gap: '12px',
+  padding: '8px 12px',
+  'background-color': '#f5f7fa',
+  'border-radius': '6px',
+  'font-size': '13px',
+  color: '#333',
+}
+
+const ratingHistoryRatingStyle: JSX.CSSProperties = {
+  'font-weight': 700,
+  color: '#2c3e50',
+}
+
+const ratingHistoryEmptyStyle: JSX.CSSProperties = {
+  padding: '24px',
+  color: '#888',
+  'text-align': 'center',
+}
 
 export default Account
