@@ -88,6 +88,7 @@ hamburger icon, show/hide the following menu:
 
 - event name (align left)
 - stage name
+  - for team sub-matches, followed by " - Team Match {n} - {A} vs {X}"
 - game init setting (3 columns)
   - column 1
     - empty

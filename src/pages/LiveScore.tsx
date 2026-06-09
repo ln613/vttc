@@ -881,10 +881,12 @@ const availableTableStyle: JSX.CSSProperties = {
   'border-radius': '12px',
   'min-height': 0,
   overflow: 'hidden',
+  // Match the assigned cell so available-cell number scales the same.
+  'container-type': 'size',
 }
 
 const availableTableNumberStyle: JSX.CSSProperties = {
-  'font-size': '72px',
+  'font-size': 'clamp(40px, 45cqh, 120px)',
   'font-weight': 900,
   color: '#f1c40f',
   'text-shadow': '2px 2px 4px rgba(0,0,0,0.3)',
@@ -903,18 +905,24 @@ const getAssignedTableStyle = (
     'align-items': 'center',
     'justify-content': 'center',
     gap: '2px',
-    padding: '8px',
+    // Generous internal padding so text never hugs the cell edge.
+    padding: '12px',
     'border-radius': '12px',
     'background-color': isNotStarted ? '#c0392b' : '#2980b9',
     border: flashes ? '3px solid #f1c40f' : '3px solid transparent',
     'min-height': 0,
     overflow: 'hidden',
     animation: flashes ? 'flashBorder 1s ease-in-out infinite' : 'none',
+    // Enable container query units (cqw/cqh/cqmin) for the children
+    // so each cell's text scales with its own dimensions.
+    'container-type': 'size',
   }
 }
 
 const tableNumberAssignedStyle: JSX.CSSProperties = {
-  'font-size': '64px',
+  // ~28% of cell height, clamped so it never gets absurdly large or
+  // tiny on extreme aspect ratios.
+  'font-size': 'clamp(36px, 28cqh, 96px)',
   'font-weight': 900,
   color: '#f1c40f',
   'line-height': 1,
@@ -1004,7 +1012,7 @@ const postponeCancelButtonStyle: JSX.CSSProperties = {
 }
 
 const eventNameTableStyle: JSX.CSSProperties = {
-  'font-size': '12px',
+  'font-size': 'clamp(10px, 5cqh, 16px)',
   'font-weight': 600,
   color: '#fff',
   'text-align': 'center',
@@ -1015,21 +1023,21 @@ const eventNameTableStyle: JSX.CSSProperties = {
 }
 
 const stageNameTableStyle: JSX.CSSProperties = {
-  'font-size': '11px',
+  'font-size': 'clamp(9px, 4.5cqh, 14px)',
   'font-weight': 500,
   color: 'rgba(255,255,255,0.8)',
   'text-align': 'center',
 }
 
 const subMatchTableLabelStyle: JSX.CSSProperties = {
-  'font-size': '11px',
+  'font-size': 'clamp(9px, 4.5cqh, 14px)',
   'font-weight': 500,
   color: 'rgba(255,255,255,0.8)',
   'text-align': 'center',
 }
 
 const bestOfTableStyle: JSX.CSSProperties = {
-  'font-size': '11px',
+  'font-size': 'clamp(9px, 4cqh, 14px)',
   'font-weight': 500,
   color: 'rgba(255,255,255,0.7)',
   'text-align': 'center',
@@ -1048,7 +1056,7 @@ const tablePlayerRowStyle: JSX.CSSProperties = {
 }
 
 const tablePlayerStyle: JSX.CSSProperties = {
-  'font-size': '13px',
+  'font-size': 'clamp(11px, 5.5cqh, 18px)',
   'font-weight': 600,
   color: '#fff',
   'text-align': 'center',
@@ -1058,7 +1066,7 @@ const tablePlayerStyle: JSX.CSSProperties = {
 }
 
 const gameScoreBadgeStyle: JSX.CSSProperties = {
-  'font-size': '16px',
+  'font-size': 'clamp(13px, 6cqh, 22px)',
   'font-weight': 800,
   color: '#f1c40f',
   'min-width': '20px',
@@ -1079,7 +1087,7 @@ const gameScoreBadgeWinnerStyle: JSX.CSSProperties = {
 }
 
 const vsStyle: JSX.CSSProperties = {
-  'font-size': '20px',
+  'font-size': 'clamp(14px, 7cqh, 26px)',
   'font-weight': 700,
   color: '#fff',
   'text-align': 'center',

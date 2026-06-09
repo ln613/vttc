@@ -1010,9 +1010,49 @@ const InitScreen = () => {
   const [leftChoice, setLeftChoice] = createSignal<1 | 2 | null>(null)
 
   const event = () => gamePlayState.data
-  const stageName = () => gamePlayActions.getStageName()
+  const stageName = () => {
+    const base = gamePlayActions.getStageName()
+    const sub = subMatchLabel()
+    return sub ? `${base} - ${sub}` : base
+  }
   const participant1Name = () => gamePlayActions.getParticipantName(1)
   const participant2Name = () => gamePlayActions.getParticipantName(2)
+
+  // For team sub-matches, append " - {A} vs {X}" (the participant pair
+  // label). The "Team Match {n}" portion is already in getStageName()
+  // via its own sub-match suffix, so we trim it from the helper output
+  // to avoid duplicating it.
+  const subMatchLabel = (): string | undefined => {
+    const m = gamePlayActions.getCurrentMatch()
+    if (!m || !m.parentMatchId) return undefined
+    const ev = event()
+    if (!ev) return undefined
+    for (const stage of ev.eventStages || []) {
+      const lists =
+        stage.type === 'group'
+          ? stage.groups.map((g) => g.matches)
+          : stage.type === 'knockout'
+            ? stage.rounds.map((r) =>
+                r.matches
+                  .map((km) => km.match)
+                  .filter((x): x is NonNullable<typeof x> => !!x),
+              )
+            : []
+      for (const list of lists) {
+        for (const top of list) {
+          if (!top.subMatches) continue
+          const idx = top.subMatches.findIndex((s) => s._id === m._id)
+          if (idx === -1) continue
+          const full = getTeamSubMatchTitle(top, idx)
+          // Drop the leading "Team Match N - " when present, since
+          // getStageName already shows that piece.
+          const dash = full.indexOf(' - ')
+          return dash === -1 ? full : full.slice(dash + 3)
+        }
+      }
+    }
+    return undefined
+  }
 
   const handleServeClick = (side: 1 | 2) => () => setServeChoice(side)
   const handleLeftClick = (side: 1 | 2) => () => {
