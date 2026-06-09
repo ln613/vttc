@@ -1630,7 +1630,7 @@ const getMinusButtonStyle = (isServing: boolean, isDisabled: boolean): JSX.CSSPr
 const gameEndButtonStyle: JSX.CSSProperties = {
   width: '100%',
   height: '60px',
-  'border-radius': '12px',
+  'border-radius': '0',
   border: 'none',
   'background-color': '#27ae60',
   color: '#fff',
@@ -1640,7 +1640,6 @@ const gameEndButtonStyle: JSX.CSSProperties = {
   display: 'flex',
   'align-items': 'center',
   'justify-content': 'center',
-  'margin-top': '4px',
 }
 
 const dialogOverlayStyle: JSX.CSSProperties = {
