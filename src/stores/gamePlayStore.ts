@@ -260,7 +260,12 @@ const restoreGameProgress = (match: Match) => {
     match.initialServingSide as 1 | 2,
     currentGameIndex,
   )
-  const servingSide = calculateServingSide(score1, score2, gameFirstServeSide)
+  const servingSide = calculateServingSide(
+    score1,
+    score2,
+    gameFirstServeSide,
+    currentGame?.config?.targetPoints ?? 11,
+  )
 
   const matchSubmitted = match.winningSide != null
 
@@ -311,10 +316,23 @@ const calculateServingSide = (
   score1: number,
   score2: number,
   gameFirstServeSide: 1 | 2,
+  targetPoints: number,
 ): 1 | 2 => {
   const totalPoints = score1 + score2
-  const serveBlocks = Math.floor(totalPoints / 2)
-  const shouldSwitch = serveBlocks % 2 === 1
+  const deuceThreshold = targetPoints - 1
+  // After both sides reach (targetPoints - 1) — e.g. 10:10 in a
+  // standard game — serves alternate every 1 point instead of every
+  // 2. Up to that moment serves still alternate every 2 points; we
+  // collapse both eras into a "serve block count" and use its parity
+  // to decide whether to switch from the game's first server.
+  const inDeuce = score1 >= deuceThreshold && score2 >= deuceThreshold
+  const preDeuceBlocks = inDeuce
+    ? deuceThreshold
+    : Math.floor(totalPoints / 2)
+  const postDeuceBlocks = inDeuce
+    ? totalPoints - 2 * deuceThreshold
+    : 0
+  const shouldSwitch = (preDeuceBlocks + postDeuceBlocks) % 2 === 1
   return shouldSwitch ? getOpposingSide(gameFirstServeSide) : gameFirstServeSide
 }
 
@@ -675,6 +693,7 @@ export const gamePlayActions = {
       newScore1,
       newScore2,
       gameFirstServeSide,
+      gameConfig.targetPoints,
     )
 
     setGamePlayState({
@@ -698,6 +717,7 @@ export const gamePlayActions = {
       newScore1,
       newScore2,
       gameFirstServeSide,
+      gamePlayActions.getCurrentGameConfig().targetPoints,
     )
 
     setGamePlayState({
