@@ -63,10 +63,12 @@ const overlayStyle: JSX.CSSProperties = {
 
 const dialogStyle: JSX.CSSProperties = {
   'background-color': '#fff',
-  padding: '24px 32px',
+  padding: '20px 24px',
   'border-radius': '12px',
-  'max-width': '480px',
-  width: '90%',
+  // Auto-size to content (with caps) so short prompts render compactly
+  // instead of stretching to a fixed wide rectangle.
+  'max-width': 'min(420px, 90vw)',
+  'min-width': '240px',
   'box-shadow': '0 4px 20px rgba(0, 0, 0, 0.15)',
   'touch-action': 'manipulation',
 }

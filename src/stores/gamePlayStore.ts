@@ -5,6 +5,7 @@ import { DEFAULT_GAME_CONFIG } from '../../shared/types/Match'
 import type { Player } from '../../shared/types/Player'
 import { apiGet, apiPost } from '../utils/api'
 import { authState } from './authStore'
+import { customAlert, customConfirm } from './confirmDialogStore'
 import { getTeamPlayerOrderLabel } from '../pages/EventDetail'
 import {
   subscribeToLiveScoreUpdates,
@@ -50,6 +51,13 @@ interface GamePlayState {
   showFinishDialog: boolean
   gameHistory: GameResult[]
   lastScoredSide: 1 | 2 | null
+  // Whether the "switch sides" prompt has been shown in the current
+  // last-game (so it doesn't repeat).
+  lastGameSwitchPrompted: boolean
+  // Whether the umpire actually accepted the side switch. Only when
+  // this is true can a later deduction trigger the "switch back"
+  // notice. Resets when a new game starts.
+  lastGameSideSwitched: boolean
   sessionId: string | null
   sessionTakenOver: boolean
   sessionError: string | null
@@ -89,6 +97,8 @@ const getInitialState = (): GamePlayState => ({
   showFinishDialog: false,
   gameHistory: [],
   lastScoredSide: null,
+  lastGameSwitchPrompted: false,
+  lastGameSideSwitched: false,
   sessionId: null,
   sessionTakenOver: false,
   matchReset: false,
@@ -312,6 +322,73 @@ const getGameFirstServeSide = (
 ): 1 | 2 =>
   gameIndex % 2 === 0 ? initialServingSide : getOpposingSide(initialServingSide)
 
+// In the last game of the match, when one side first reaches the
+// switching point (half-way through the target — 5 of 11, 3 of 7,
+// 10 of 21) ask the umpire to confirm with the players ("Switch
+// sides?"). The switch always happens, but only after the umpire
+// dismisses the prompt — so the players have a chance to physically
+// move first.
+const maybePromptLastGameSwitch = (
+  score1: number,
+  score2: number,
+  gameConfig: GameConfig,
+) => {
+  if (gamePlayState.lastGameSwitchPrompted) return
+  const lastGameIndex = gamePlayActions.getNumberOfGames() - 1
+  if (gamePlayState.currentGameIndex !== lastGameIndex) return
+  const switchingPoint = Math.floor((gameConfig.targetPoints - 1) / 2)
+  if (score1 < switchingPoint && score2 < switchingPoint) return
+
+  setGamePlayState({ lastGameSwitchPrompted: true })
+  void customConfirm('Switch sides?', {
+    confirmLabel: 'Yes',
+    cancelLabel: 'No',
+  }).then((confirmed) => {
+    if (!confirmed) return
+    const flipped: 1 | 2 = gamePlayState.leftSide === 1 ? 2 : 1
+    setGamePlayState({
+      leftSide: flipped,
+      lastGameSideSwitched: true,
+    })
+  })
+}
+
+// Counterpart to maybePromptLastGameSwitch: if the umpire deducts
+// points after a switch and both scores drop back below the
+// switching point, inform the players to switch back (single OK
+// button — no confirm) and flip leftSide automatically. Clearing the
+// flag means a later climb back to the switching point will re-fire
+// the forward-switch prompt.
+const maybePromptLastGameSwitchBack = (
+  score1: number,
+  score2: number,
+  gameConfig: GameConfig,
+) => {
+  if (!gamePlayState.lastGameSwitchPrompted) return
+  const lastGameIndex = gamePlayActions.getNumberOfGames() - 1
+  if (gamePlayState.currentGameIndex !== lastGameIndex) return
+  const switchingPoint = Math.floor((gameConfig.targetPoints - 1) / 2)
+  if (score1 >= switchingPoint || score2 >= switchingPoint) return
+
+  // Reset the "prompted" flag so the forward prompt can fire again if
+  // a side climbs back to the switching point.
+  if (!gamePlayState.lastGameSideSwitched) {
+    setGamePlayState({ lastGameSwitchPrompted: false })
+    return
+  }
+
+  // Forward switch had actually been accepted — undo it and inform.
+  const flipped: 1 | 2 = gamePlayState.leftSide === 1 ? 2 : 1
+  setGamePlayState({
+    leftSide: flipped,
+    lastGameSideSwitched: false,
+    lastGameSwitchPrompted: false,
+  })
+  void customAlert(
+    'Scores dropped below the switching point\nplease switch back.',
+  )
+}
+
 const calculateServingSide = (
   score1: number,
   score2: number,
@@ -495,6 +572,8 @@ export const gamePlayActions = {
       saveError: null,
       menuOpen: false,
       matchSubmitted: false,
+      lastGameSwitchPrompted: false,
+      lastGameSideSwitched: false,
       sessionId: null,
       sessionTakenOver: false,
       sessionError: null,
@@ -704,6 +783,7 @@ export const gamePlayActions = {
     })
 
     debouncedSaveGame()
+    maybePromptLastGameSwitch(newScore1, newScore2, gameConfig)
   },
 
   deductPointFromSide: (side: 1 | 2) => {
@@ -713,11 +793,12 @@ export const gamePlayActions = {
       gamePlayState.initialServingSide,
       gamePlayState.currentGameIndex,
     )
+    const gameConfig = gamePlayActions.getCurrentGameConfig()
     const newServingSide = calculateServingSide(
       newScore1,
       newScore2,
       gameFirstServeSide,
-      gamePlayActions.getCurrentGameConfig().targetPoints,
+      gameConfig.targetPoints,
     )
 
     setGamePlayState({
@@ -727,6 +808,7 @@ export const gamePlayActions = {
     })
 
     debouncedSaveGame()
+    maybePromptLastGameSwitchBack(newScore1, newScore2, gameConfig)
   },
 
   getCurrentMatch: (): Match | undefined => {
@@ -920,6 +1002,8 @@ export const gamePlayActions = {
       timeout2: false,
       gameHistory: newGameHistory,
       lastScoredSide: null,
+      lastGameSwitchPrompted: false,
+      lastGameSideSwitched: false,
     })
 
     // Save the new game's starting state so the server advances its

@@ -110,3 +110,5 @@ hamburger icon, show/hide the following menu:
 - on who is on left changed: change the participant on the left score box accordingly
 - Start button only enabled if both "Serve First" and "Umpire's Left" are selected
 - on Start button clicked, save the info to the match to DB, so when coming back to the match (when the continue button is clicked), no need to show the init screen again
+- whenever the first side reaches the switching point in the last game, confirm with players ("Switch sides?") then switch side
+- if already switched and points get deducted by pressing "-", whenever the last side reaches the switching point - 1, inform the players to switch back

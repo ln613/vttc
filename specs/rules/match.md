@@ -6,6 +6,7 @@
 - Alternate serves every 2 points
 - Whoever reachs 11 points and leads by 2 or more points wins the game
 - If the game is tied at 10:10, then alternate serves every 1 point. The side who leads by 2 first wins the game
+- In the last game of the match (3rd game for best of 3, 5th game for best of 5), when one side reaches the switching point 5, players switch side
 
 There are some variations of the game.
 
@@ -18,6 +19,7 @@ No need to win by 2 after 10:10, whoever reachs 11 points wins the game
 - Plays to 7 points
 - Alternate serves every 1 point after 6:6, must win by 2
 - Golden short game: no need to win by 2 after 6:6, whoever reachs 7 points wins the game
+- switching point is 3
 
 ### long Game
 
