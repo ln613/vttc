@@ -58,7 +58,10 @@ interface GamePlayState {
 
 const getInitialState = (): GamePlayState => ({
   data: null,
-  loading: false,
+  // Start in the loading state so the GamePlay page shows its spinner
+  // immediately instead of a brief flash of empty score boxes while
+  // initializeFromUrl → fetchEvent kicks off.
+  loading: true,
   error: null,
   eventId: null,
   stage: 'group',
@@ -72,7 +75,11 @@ const getInitialState = (): GamePlayState => ({
   servingSide: 1,
   initialServingSide: 1,
   leftSide: 1,
-  showInitDialog: true,
+  // Start hidden — we flip it to true only after fetchEvent confirms
+  // the match has NO saved initialServingSide/leftSide. Defaulting to
+  // true caused a brief flash of the dialog on reload of an already-
+  // started match while data was loading.
+  showInitDialog: false,
   isSaving: false,
   saveError: null,
   timeout1: false,
@@ -226,6 +233,13 @@ const restoreMatchSetupIfExists = () => {
       showInitDialog: false,
     })
     restoreGameProgress(match)
+    return
+  }
+  // No saved setup → ask the umpire who serves / who's on the left.
+  // (Team matches use a different setup flow — TeamSetupDialog — so
+  // skip the init dialog for those.)
+  if (!match.isTeamMatch) {
+    setGamePlayState({ showInitDialog: true })
   }
 }
 
@@ -456,7 +470,9 @@ export const gamePlayActions = {
       servingSide: 1,
       initialServingSide: 1,
       leftSide: 1,
-      showInitDialog: true,
+      // Stays hidden until restoreMatchSetupIfExists determines the
+      // match has no saved init data.
+      showInitDialog: false,
       isSaving: false,
       saveError: null,
       menuOpen: false,

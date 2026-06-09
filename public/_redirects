@@ -1,1 +1,3 @@
+# Serve /docs/* as static files before the SPA catch-all.
+/docs/*    /docs/:splat   200
 /*    /index.html   200

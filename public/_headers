@@ -1,0 +1,10 @@
+# Files under /docs/ are public downloads. The catch-all SPA redirect
+# only fires when no static file matches, so /docs/<file> is served
+# directly from dist/docs/<file>.
+
+/docs/*
+  Cache-Control: public, max-age=300
+  Content-Disposition: attachment
+
+/docs/*.apk
+  Content-Type: application/vnd.android.package-archive

@@ -125,20 +125,25 @@ const GamePlay = () => {
 
   return (
     <div ref={containerRef} style={containerStyle}>
-      <div
-        style={{
-          ...contentStyle,
-          // Landscape has no header — drop the top breathing room
-          // so the score boxes truly run edge-to-edge.
-          ...(isLandscape() ? { padding: '0' } : {}),
-          ...(sessionBlocked() ? blockedStyle : {}),
-        }}
+      <Show
+        when={!gamePlayState.loading}
+        fallback={<LoadingSpinner />}
       >
-        <Show when={!isLandscape()}>
-          <Header onExit={handleExit} />
-        </Show>
-        <ScoreBoxes landscape={isLandscape()} onExit={handleExit} />
-      </div>
+        <div
+          style={{
+            ...contentStyle,
+            // Landscape has no header — drop the top breathing room
+            // so the score boxes truly run edge-to-edge.
+            ...(isLandscape() ? { padding: '0' } : {}),
+            ...(sessionBlocked() ? blockedStyle : {}),
+          }}
+        >
+          <Show when={!isLandscape()}>
+            <Header onExit={handleExit} />
+          </Show>
+          <ScoreBoxes landscape={isLandscape()} onExit={handleExit} />
+        </div>
+      </Show>
       <Show
         when={
           gamePlayActions.isTeamMatch() &&
@@ -295,6 +300,33 @@ const createIsLandscape = () => {
   })
 
   return isLandscape
+}
+
+const LoadingSpinner = () => (
+  <div style={loadingContainerStyle}>
+    <div style={spinnerStyle} />
+    <style>{spinnerKeyframes}</style>
+  </div>
+)
+
+const spinnerKeyframes = `
+@keyframes gp-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+`
+
+const loadingContainerStyle: JSX.CSSProperties = {
+  flex: 1,
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'center',
+}
+
+const spinnerStyle: JSX.CSSProperties = {
+  width: '56px',
+  height: '56px',
+  border: '5px solid rgba(255, 255, 255, 0.15)',
+  'border-top-color': '#f1c40f',
+  'border-radius': '50%',
+  animation: 'gp-spin 0.9s linear infinite',
 }
 
 // Hamburger Menu Components
