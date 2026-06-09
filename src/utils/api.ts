@@ -1,5 +1,12 @@
+// In dev → point at the local netlify dev server.
+// In a Cordova/APK build (no real origin) → use VITE_PROD_HOST so the
+// WebView can hit the live API. In a regular web build → same-origin
+// (empty string).
 const getApiHost = () => {
-  return import.meta.env.DEV ? `http://${window.location.hostname}:8888` : ''
+  if (import.meta.env.DEV) {
+    return `http://${window.location.hostname}:8888`
+  }
+  return import.meta.env.VITE_PROD_HOST || ''
 }
 
 export const api = async <T>(type: string, params: Record<string, string> = {}): Promise<T> => {

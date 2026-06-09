@@ -24,3 +24,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Cordova / APK build outputs
+apk/www
+apk/platforms
+apk/plugins
+apk/node_modules
+apk/.cordova
+apk/.gradle

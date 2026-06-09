@@ -1,0 +1,19 @@
+{
+  "name": "vttc-cordova",
+  "displayName": "VTTC",
+  "version": "1.0.0",
+  "description": "Vancouver Table Tennis Club — Cordova wrapper",
+  "main": "index.js",
+  "private": true,
+  "type": "module",
+  "cordova": {
+    "platforms": [
+      "android"
+    ],
+    "plugins": {}
+  },
+  "devDependencies": {
+    "cordova": "^13.0.0",
+    "cordova-android": "^15.0.0"
+  }
+}

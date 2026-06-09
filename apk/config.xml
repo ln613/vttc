@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='utf-8'?>
+<widget id="ca.vttc.app" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+    <name>VTTC</name>
+    <description>Vancouver Table Tennis Club</description>
+    <author email="info@vttc.ca" href="https://vttc.ca">Vancouver Table Tennis Club</author>
+    <content src="index.html" />
+    <access origin="*" />
+    <allow-intent href="http://*/*" />
+    <allow-intent href="https://*/*" />
+    <allow-intent href="tel:*" />
+    <allow-intent href="mailto:*" />
+    <allow-intent href="geo:*" />
+    <preference name="DisallowOverscroll" value="true" />
+    <preference name="Orientation" value="default" />
+    <preference name="AndroidLaunchMode" value="singleTop" />
+    <preference name="AndroidInsecureFileModeEnabled" value="true" />
+    <preference name="MixedContentMode" value="0" />
+    <preference name="AndroidWindowSplashScreenAnimatedIcon" value="resources/android/icon/icon.png" />
+    <platform name="android">
+        <icon src="resources/android/icon/icon.png" />
+        <allow-intent href="market:*" />
+    </platform>
+</widget>

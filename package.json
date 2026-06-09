@@ -9,7 +9,13 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest"
+    "test": "vitest",
+    "apk:sync": "vite build && node apk/sync.js",
+    "apk:prepare": "npm --prefix apk install && cd apk && npx cordova platform add android --no-fetch --no-update-notifier",
+    "apk:build": "npm run apk:sync && cd apk && npx cordova build android --no-update-notifier",
+    "postapk:build": "node apk/upload-to-gdrive.js",
+    "apk:build:release": "npm run apk:sync && cd apk && npx cordova build android --release --no-update-notifier",
+    "postapk:build:release": "node apk/upload-to-gdrive.js"
   },
   "dependencies": {
     "@solidjs/router": "^0.15.3",
@@ -26,7 +32,7 @@
     "eslint": "^9.39.1",
     "globals": "^16.5.0",
     "mongodb-memory-server": "^11.0.1",
-    "netlify-cli": "^23.13.0",
+    "netlify-cli": "^26.1.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4",

@@ -1,4 +1,4 @@
-import { Router, Route } from '@solidjs/router'
+import { HashRouter, Route } from '@solidjs/router'
 import type { JSX } from 'solid-js'
 import './App.css'
 import TournamentEdit from './pages/TournamentEdit'
@@ -21,7 +21,7 @@ const RootLayout = (props: { children?: JSX.Element }) => (
 )
 
 const App = () => (
-  <Router root={RootLayout}>
+  <HashRouter root={RootLayout}>
     <Route path="/" component={EventList} />
     <Route path="/events" component={EventList} />
     <Route path="/players" component={Players} />
@@ -36,7 +36,7 @@ const App = () => (
     <Route path="/event/:id" component={EventDetail} />
     <Route path="/game-play" component={GamePlay} />
     <Route path="/live-score" component={LiveScore} />
-  </Router>
+  </HashRouter>
 )
 
 export default App
