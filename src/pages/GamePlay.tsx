@@ -19,9 +19,10 @@ import { authState } from '../stores/authStore'
 import { getTeamSubMatchTitle } from './EventDetail'
 import { subscribeToMatchReset, type EventSubscription } from '../utils/pusher'
 import type { Player } from '../../shared/types/Player'
-import SingleSelectTags from '../components/SingleSelectTags'
 import Button from '../components/Button'
 import MatchConfirmDialog from '../components/MatchConfirmDialog'
+import serveIconUrl from '../assets/serve.png'
+import tableIconUrl from '../assets/table.png'
 
 const GamePlay = () => {
   const [searchParams] = useSearchParams()
@@ -129,20 +130,31 @@ const GamePlay = () => {
         when={!gamePlayState.loading}
         fallback={<LoadingSpinner />}
       >
-        <div
-          style={{
-            ...contentStyle,
-            // Landscape has no header — drop the top breathing room
-            // so the score boxes truly run edge-to-edge.
-            ...(isLandscape() ? { padding: '0' } : {}),
-            ...(sessionBlocked() ? blockedStyle : {}),
-          }}
+        <Show
+          when={
+            !gamePlayActions.isTeamMatch() &&
+            gamePlayState.showInitDialog &&
+            !sessionBlocked()
+          }
+          fallback={
+            <div
+              style={{
+                ...contentStyle,
+                // Landscape has no header — drop the top breathing room
+                // so the score boxes truly run edge-to-edge.
+                ...(isLandscape() ? { padding: '0' } : {}),
+                ...(sessionBlocked() ? blockedStyle : {}),
+              }}
+            >
+              <Show when={!isLandscape()}>
+                <Header onExit={handleExit} />
+              </Show>
+              <ScoreBoxes landscape={isLandscape()} onExit={handleExit} />
+            </div>
+          }
         >
-          <Show when={!isLandscape()}>
-            <Header onExit={handleExit} />
-          </Show>
-          <ScoreBoxes landscape={isLandscape()} onExit={handleExit} />
-        </div>
+          <InitScreen />
+        </Show>
       </Show>
       <Show
         when={
@@ -153,16 +165,6 @@ const GamePlay = () => {
         }
       >
         <TeamSetupDialog />
-      </Show>
-      <Show
-        when={
-          !gamePlayActions.isTeamMatch() &&
-          gamePlayState.showInitDialog &&
-          !gamePlayState.loading &&
-          !sessionBlocked()
-        }
-      >
-        <InitDialog />
       </Show>
       <Show when={gamePlayState.showFinishDialog && !sessionBlocked()}>
         <FinishConfirmDialog />
@@ -599,7 +601,7 @@ const LandscapeInfoBox = (_props: { onExit: () => void }) => {
         <Show when={visibleGames().length > 0}>
           <div style={landscapeGameScoresStyle}>
             <For each={visibleGames()}>
-              {(g, i) => {
+              {(g) => {
                 const lr = leftRightScores(g)
                 const hSide = highlightSide(g)
                 const leftSideOnScreen =
@@ -608,7 +610,6 @@ const LandscapeInfoBox = (_props: { onExit: () => void }) => {
                 const rightHighlight = hSide != null && !leftHighlight
                 return (
                   <div style={landscapeGameScoreRowStyle}>
-                    <span>G{i() + 1} </span>
                     <span style={getLandscapeScoreNumStyle(leftHighlight)}>
                       {lr.left}
                     </span>
@@ -1000,62 +1001,212 @@ const TeamOrderForm = (props: {
   )
 }
 
-// Init Dialog Component
-const InitDialog = () => {
-  const initialServingSide = () => gamePlayState.initialServingSide
-  const leftSide = () => gamePlayState.leftSide
+// Full-page Init Screen — replaces the score boxes until the umpire
+// picks who serves first and who's on their left. Icons start in
+// gray-scale and turn color when selected; Start is gated on both
+// picks being made.
+const InitScreen = () => {
+  const [serveChoice, setServeChoice] = createSignal<1 | 2 | null>(null)
+  const [leftChoice, setLeftChoice] = createSignal<1 | 2 | null>(null)
+
+  const event = () => gamePlayState.data
+  const stageName = () => gamePlayActions.getStageName()
   const participant1Name = () => gamePlayActions.getParticipantName(1)
   const participant2Name = () => gamePlayActions.getParticipantName(2)
 
-  const options = () => [participant1Name(), participant2Name()]
-
-  const handleServingChange = (selected: string) => {
-    const side = selected === participant1Name() ? 1 : 2
-    gamePlayActions.setInitialServingSide(side as 1 | 2)
+  const handleServeClick = (side: 1 | 2) => () => setServeChoice(side)
+  const handleLeftClick = (side: 1 | 2) => () => {
+    setLeftChoice(side)
+    // Live-preview: update the global leftSide so when Start is
+    // pressed the score boxes already show the right orientation.
+    gamePlayActions.setLeftSide(side)
   }
 
-  const handleLeftSideChange = (selected: string) => {
-    const side = selected === participant1Name() ? 1 : 2
-    gamePlayActions.setLeftSide(side as 1 | 2)
-  }
+  const canStart = () => serveChoice() != null && leftChoice() != null
 
-  const handleOk = () => {
+  const handleStart = () => {
+    if (!canStart()) return
+    gamePlayActions.setInitialServingSide(serveChoice()!)
+    gamePlayActions.setLeftSide(leftChoice()!)
     gamePlayActions.confirmInitDialog()
   }
 
-  const selectedServing = () => initialServingSide() === 1 ? participant1Name() : participant2Name()
-  const selectedLeft = () => leftSide() === 1 ? participant1Name() : participant2Name()
-
   return (
-    <div style={dialogOverlayStyle}>
-      <div style={dialogContentStyle}>
-        <div style={dialogFieldStyle}>
-          <SingleSelectTags
-            label="Who serves first"
-            options={options()}
-            selectedValue={selectedServing()}
-            onChange={handleServingChange}
-            vertical
+    <div style={initScreenStyle}>
+      <div style={initHeaderStyle}>
+        <div style={initEventNameStyle}>{event()?.eventName}</div>
+        <div style={initStageNameStyle}>{stageName()}</div>
+      </div>
+      <div style={initColumnsStyle}>
+        <div style={initColumnStyle}>
+          <div style={initColPlaceholderStyle} />
+          <div style={initRowLabelStyle}>{participant1Name()}</div>
+          <div style={initRowLabelStyle}>{participant2Name()}</div>
+        </div>
+        <div style={initColumnStyle}>
+          <div style={initColHeaderStyle}>Serve First</div>
+          <InitIcon
+            src={serveIconUrl}
+            active={serveChoice() === 1}
+            onClick={handleServeClick(1)}
+            alt="Serve first"
+          />
+          <InitIcon
+            src={serveIconUrl}
+            active={serveChoice() === 2}
+            onClick={handleServeClick(2)}
+            alt="Serve first"
           />
         </div>
-        <div style={dialogFieldStyle}>
-          <SingleSelectTags
-            label="Who is on umpire's left"
-            options={options()}
-            selectedValue={selectedLeft()}
-            onChange={handleLeftSideChange}
-            vertical
+        <div style={initColumnStyle}>
+          <div style={initColHeaderStyle}>Umpire's Left</div>
+          <InitIcon
+            src={tableIconUrl}
+            active={leftChoice() === 1}
+            onClick={handleLeftClick(1)}
+            alt="Umpire's left"
           />
-        </div>
-        <div style={dialogButtonContainerStyle}>
-          <Button onClick={handleOk}>OK</Button>
+          <InitIcon
+            src={tableIconUrl}
+            active={leftChoice() === 2}
+            onClick={handleLeftClick(2)}
+            alt="Umpire's left"
+          />
         </div>
       </div>
+      <div style={initButtonSpacerStyle} />
+      <button
+        style={initStartButtonStyle(canStart())}
+        disabled={!canStart()}
+        onClick={handleStart}
+      >
+        Start
+      </button>
     </div>
   )
 }
 
+const InitIcon = (props: {
+  src: string
+  active: boolean
+  alt: string
+  onClick: () => void
+}) => (
+  <button
+    style={initIconButtonStyle(props.active)}
+    onClick={props.onClick}
+    aria-pressed={props.active}
+  >
+    <img src={props.src} alt={props.alt} style={initIconImgStyle(props.active)} />
+  </button>
+)
+
 // Styles
+// ==================== Init Screen styles ====================
+
+const initScreenStyle: JSX.CSSProperties = {
+  flex: 1,
+  display: 'flex',
+  'flex-direction': 'column',
+  padding: '24px',
+  color: '#fff',
+}
+
+const initHeaderStyle: JSX.CSSProperties = {
+  'text-align': 'left',
+}
+
+const initEventNameStyle: JSX.CSSProperties = {
+  'font-size': '22px',
+  'font-weight': 700,
+  color: '#fff',
+}
+
+const initStageNameStyle: JSX.CSSProperties = {
+  'font-size': '14px',
+  color: 'rgba(255,255,255,0.7)',
+  'margin-top': '4px',
+}
+
+// Outer row holding the three vertical columns. Centered both
+// horizontally (justify-content) and vertically (align-items, since
+// flex-direction: row puts the cross axis on the vertical side).
+const initColumnsStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'row',
+  'align-items': 'center',
+  'justify-content': 'center',
+  gap: '32px',
+  flex: 1,
+}
+
+// Each column stacks top-to-bottom with consistent row spacing.
+const initColumnStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  'align-items': 'center',
+  gap: '20px',
+}
+
+// Placeholder cell at the top of column 1 so the participant names
+// line up vertically with the icons in columns 2 and 3.
+const initColPlaceholderStyle: JSX.CSSProperties = {
+  height: '20px',
+}
+
+const initColHeaderStyle: JSX.CSSProperties = {
+  'font-size': '14px',
+  'font-weight': 600,
+  color: 'rgba(255,255,255,0.8)',
+  height: '20px',
+  display: 'flex',
+  'align-items': 'center',
+}
+
+const initRowLabelStyle: JSX.CSSProperties = {
+  'font-size': '16px',
+  'font-weight': 600,
+  color: '#fff',
+  display: 'flex',
+  'align-items': 'center',
+  'min-height': '80px', // matches icon button height so rows align
+}
+
+const initIconButtonStyle = (active: boolean): JSX.CSSProperties => ({
+  background: 'transparent',
+  border: 'none',
+  padding: '8px',
+  cursor: 'pointer',
+  'border-radius': '12px',
+  outline: active ? '3px solid #f1c40f' : '3px solid transparent',
+  transition: 'outline-color 0.15s ease',
+})
+
+const initIconImgStyle = (active: boolean): JSX.CSSProperties => ({
+  width: '64px',
+  height: '64px',
+  filter: active ? 'none' : 'grayscale(1)',
+  opacity: active ? 1 : 0.55,
+  transition: 'filter 0.15s ease, opacity 0.15s ease',
+})
+
+const initButtonSpacerStyle: JSX.CSSProperties = {
+  flex: '0 0 24px',
+  width: '100%',
+}
+
+const initStartButtonStyle = (enabled: boolean): JSX.CSSProperties => ({
+  width: '100%',
+  padding: '16px',
+  'font-size': '20px',
+  'font-weight': 700,
+  color: '#fff',
+  border: 'none',
+  'border-radius': '12px',
+  background: enabled ? '#27ae60' : '#555',
+  cursor: enabled ? 'pointer' : 'not-allowed',
+})
+
 const containerStyle: JSX.CSSProperties = {
   height: '100dvh',
   'background-color': '#1a1a2e',

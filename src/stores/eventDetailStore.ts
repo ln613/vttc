@@ -14,7 +14,7 @@ import type { MatchPreview } from '../components/MatchConfirmDialog'
 import { apiGet, apiPost } from '../utils/api'
 import { waitForPendingSave } from './gamePlayStore'
 import { subscribeToEventUpdates, type EventSubscription } from '../utils/pusher'
-import { eventState } from './eventStore'
+import { eventState, eventActions } from './eventStore'
 import { authState } from './authStore'
 import { getProvisionalMatchResult } from '../../shared/rules/matchRules'
 
@@ -584,6 +584,10 @@ export const eventDetailActions = {
       if (eventDetailState.eventId === eventId) {
         await fetchEvent(eventId, true)
       }
+      // Refresh the shared events list too so consumers that read
+      // from eventState (Schedule, EventList) update immediately
+      // instead of waiting for the pusher live-score ping.
+      void eventActions.refreshEvents()
     } catch (err) {
       setEventDetailState({
         error:

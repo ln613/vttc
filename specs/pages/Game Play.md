@@ -19,8 +19,8 @@ Landscape:
 - info box (vertical, align center)
   - same as the table section in live score page
   - show game scores:
-    G1 11:7
-    G2  3:5
+    11:7
+    3:5
     ...
     highlight the winning/leading side
   - no hamburger menu
@@ -84,13 +84,28 @@ hamburger icon, show/hide the following menu:
     - on confirm, clear game score, update match score, go back to event detail page and update the ranking table
 - click on "T" toggles the style of "T" (dark bg white text or white bg black text), the dark bg means the timeout has been called by the player(s) on that side 
 
-## Init Dialog (show on load)
+## Init screen
 
-- Who serves first: single select tags (participant 1, participant 2, vertical)
-- Who is on umpire's left: single select tags (participant 1, participant 2, vertical)
-- OK button
+- event name (align left)
+- stage name
+- game init setting (3 columns)
+  - column 1
+    - empty
+    - participant 1
+    - participant 2
+  - column 2
+    - "Serve First"
+    - serve icon (in assets folder, default gray-scale)
+    - serve icon (default gray-scale)
+  - column 3
+    - "Umpire's Left"
+    - table icon (in assets folder, default gray-scale)
+    - table icon (default gray-scale)
+- Start button (full width, align bottom)
 
 ### interaction
 
+- click on 1 serve/table icon, make it color icon, gray-scale the other
 - on who is on left changed: change the participant on the left score box accordingly
-- on OK clicked, save the info to the match to DB, so when coming back to the match (when the continue button is clicked), no need to show the dialog again 
+- Start button only enabled if both "Serve First" and "Umpire's Left" are selected
+- on Start button clicked, save the info to the match to DB, so when coming back to the match (when the continue button is clicked), no need to show the init screen again
