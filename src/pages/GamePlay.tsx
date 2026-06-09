@@ -530,7 +530,11 @@ const LandscapeInfoBox = (_props: { onExit: () => void }) => {
           if (!top.subMatches) continue
           const idx = top.subMatches.findIndex((s) => s._id === m._id)
           if (idx === -1) continue
-          return getTeamSubMatchTitle(top, idx)
+          // stageName above already includes "Team Match {n}" — drop
+          // the leading "Team Match N - " here so it isn't duplicated.
+          const full = getTeamSubMatchTitle(top, idx)
+          const dash = full.indexOf(' - ')
+          return dash === -1 ? full : full.slice(dash + 3)
         }
       }
     }
@@ -594,7 +598,6 @@ const LandscapeInfoBox = (_props: { onExit: () => void }) => {
         <Show when={subMatchLabel()}>
           <div style={landscapeSubMatchStyle}>{subMatchLabel()}</div>
         </Show>
-        <div style={landscapeBestOfStyle}>Best of {numberOfGames()}</div>
         <div style={landscapeGameInfoStyle}>
           Game {currentGameIndex() + 1} / {numberOfGames()}
         </div>
@@ -1450,12 +1453,6 @@ const landscapeSubMatchStyle: JSX.CSSProperties = {
   'font-size': '18px',
   'font-weight': 500,
   color: 'rgba(255,255,255,0.8)',
-}
-
-const landscapeBestOfStyle: JSX.CSSProperties = {
-  'font-size': '16px',
-  'font-weight': 500,
-  color: 'rgba(255,255,255,0.7)',
 }
 
 const landscapeGameInfoStyle: JSX.CSSProperties = {

@@ -300,7 +300,6 @@ const AssignedTable = (props: AssignedTableProps) => {
   const match = () => props.matchItem.match
   const side1Players = () => match()?.side1 || []
   const side2Players = () => match()?.side2 || []
-  const bestOf = () => match()?.config?.numberOfGames
   const isInProgress = () => !isNotStarted()
   const provisional = () => {
     const m = match()
@@ -358,9 +357,6 @@ const AssignedTable = (props: AssignedTableProps) => {
       <div style={stageNameTableStyle}>{props.matchItem.stageName}</div>
       <Show when={subMatchLabel()}>
         {(label) => <div style={subMatchTableLabelStyle}>{label()}</div>}
-      </Show>
-      <Show when={bestOf()}>
-        <div style={bestOfTableStyle}>Best of {bestOf()}</div>
       </Show>
       <div style={tableSpacer} />
       <TablePlayerDisplay
@@ -1020,6 +1016,10 @@ const eventNameTableStyle: JSX.CSSProperties = {
   'text-overflow': 'ellipsis',
   'white-space': 'nowrap',
   'max-width': '100%',
+  // Generous line-height + tiny vertical padding so ascenders don't
+  // get clipped by `overflow: hidden` (which is needed for ellipsis).
+  'line-height': 1.4,
+  padding: '2px 0',
 }
 
 const stageNameTableStyle: JSX.CSSProperties = {
@@ -1027,6 +1027,7 @@ const stageNameTableStyle: JSX.CSSProperties = {
   'font-weight': 500,
   color: 'rgba(255,255,255,0.8)',
   'text-align': 'center',
+  'line-height': 1.3,
 }
 
 const subMatchTableLabelStyle: JSX.CSSProperties = {
@@ -1034,13 +1035,7 @@ const subMatchTableLabelStyle: JSX.CSSProperties = {
   'font-weight': 500,
   color: 'rgba(255,255,255,0.8)',
   'text-align': 'center',
-}
-
-const bestOfTableStyle: JSX.CSSProperties = {
-  'font-size': 'clamp(9px, 4cqh, 14px)',
-  'font-weight': 500,
-  color: 'rgba(255,255,255,0.7)',
-  'text-align': 'center',
+  'line-height': 1.3,
 }
 
 const tableSpacer: JSX.CSSProperties = {
