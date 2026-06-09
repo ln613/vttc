@@ -125,7 +125,15 @@ const GamePlay = () => {
 
   return (
     <div ref={containerRef} style={containerStyle}>
-      <div style={{ ...contentStyle, ...(sessionBlocked() ? blockedStyle : {}) }}>
+      <div
+        style={{
+          ...contentStyle,
+          // Landscape has no header — drop the top breathing room
+          // so the score boxes truly run edge-to-edge.
+          ...(isLandscape() ? { padding: '0' } : {}),
+          ...(sessionBlocked() ? blockedStyle : {}),
+        }}
+      >
         <Show when={!isLandscape()}>
           <Header onExit={handleExit} />
         </Show>
@@ -1030,7 +1038,10 @@ const contentStyle: JSX.CSSProperties = {
   flex: 1,
   display: 'flex',
   'flex-direction': 'column',
-  padding: '8px 16px 16px',
+  // No side/bottom padding so the score boxes can run flush to the
+  // screen edges; the header still gets a touch of top padding so it
+  // doesn't sit on the status bar.
+  padding: '8px 0 0',
   'min-height': 0,
 }
 
@@ -1038,6 +1049,7 @@ const wideHeaderStyle: JSX.CSSProperties = {
   display: 'flex',
   'justify-content': 'space-between',
   'align-items': 'center',
+  padding: '0 16px',
   'margin-bottom': '16px',
 }
 
@@ -1056,6 +1068,7 @@ const eventNameWideStyle: JSX.CSSProperties = {
 const narrowHeaderContainerStyle: JSX.CSSProperties = {
   display: 'flex',
   'flex-direction': 'column',
+  padding: '0 16px',
   'margin-bottom': '16px',
 }
 
@@ -1192,38 +1205,38 @@ const landscapeInfoBoxStyle: JSX.CSSProperties = {
 }
 
 const landscapeTableNumberStyle: JSX.CSSProperties = {
-  'font-size': '64px',
+  'font-size': '96px',
   'font-weight': 900,
   color: '#f1c40f',
   'line-height': 1,
 }
 
 const landscapeEventNameStyle: JSX.CSSProperties = {
-  'font-size': '14px',
+  'font-size': '20px',
   'font-weight': 600,
   color: '#fff',
 }
 
 const landscapeStageNameStyle: JSX.CSSProperties = {
-  'font-size': '12px',
+  'font-size': '18px',
   'font-weight': 500,
   color: 'rgba(255,255,255,0.8)',
 }
 
 const landscapeSubMatchStyle: JSX.CSSProperties = {
-  'font-size': '12px',
+  'font-size': '18px',
   'font-weight': 500,
   color: 'rgba(255,255,255,0.8)',
 }
 
 const landscapeBestOfStyle: JSX.CSSProperties = {
-  'font-size': '12px',
+  'font-size': '16px',
   'font-weight': 500,
   color: 'rgba(255,255,255,0.7)',
 }
 
 const landscapeGameInfoStyle: JSX.CSSProperties = {
-  'font-size': '13px',
+  'font-size': '18px',
   'font-weight': 700,
   color: '#fff',
 }
@@ -1232,12 +1245,12 @@ const landscapeGameScoresStyle: JSX.CSSProperties = {
   display: 'flex',
   'flex-direction': 'column',
   'align-items': 'center',
-  gap: '2px',
-  'margin-top': '6px',
+  gap: '4px',
+  'margin-top': '10px',
 }
 
 const landscapeGameScoreRowStyle: JSX.CSSProperties = {
-  'font-size': '12px',
+  'font-size': '18px',
   color: 'rgba(255,255,255,0.85)',
   'font-variant-numeric': 'tabular-nums',
 }
@@ -1250,7 +1263,6 @@ const getLandscapeScoreNumStyle = (highlight: boolean): JSX.CSSProperties => ({
 const scoreBoxesContainerStyle: JSX.CSSProperties = {
   display: 'flex',
   'flex-direction': 'row-reverse',
-  gap: '8px',
   flex: 1,
 }
 
@@ -1338,7 +1350,7 @@ const participantNamesInnerStyle: JSX.CSSProperties = {
 const getPlusButtonStyle = (isServing: boolean, isGameOver: boolean): JSX.CSSProperties => ({
   width: '100%',
   height: '60px',
-  'border-radius': '12px 12px 0 0',
+  'border-radius': '0',
   border: 'none',
   'background-color': isServing ? '#922b21' : '#1a5276',
   color: '#fff',
@@ -1382,7 +1394,7 @@ const getScoreDisplayStyle = (fontSize: number, isWinner: boolean): JSX.CSSPrope
 const getMinusButtonStyle = (isServing: boolean, isDisabled: boolean): JSX.CSSProperties => ({
   width: '100%',
   height: '60px',
-  'border-radius': '0 0 12px 12px',
+  'border-radius': '0',
   border: 'none',
   'background-color': isServing ? '#922b21' : '#1a5276',
   color: '#fff',
