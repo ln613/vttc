@@ -884,6 +884,10 @@ export const gamePlayActions = {
 
     const startingScores = getStartingScores()
 
+    // Players switch sides after every game (table tennis convention),
+    // so flip leftSide for the new game.
+    const flippedLeftSide: 1 | 2 = gamePlayState.leftSide === 1 ? 2 : 1
+
     setGamePlayState({
       currentGameIndex: nextIndex,
       score1: startingScores.score1,
@@ -891,6 +895,7 @@ export const gamePlayActions = {
       gamesWon1: newGamesWon1,
       gamesWon2: newGamesWon2,
       servingSide: nextGameFirstServeSide,
+      leftSide: flippedLeftSide,
       timeout1: false,
       timeout2: false,
       gameHistory: newGameHistory,
