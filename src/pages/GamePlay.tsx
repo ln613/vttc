@@ -16,7 +16,11 @@ import { eventDetailActions } from '../stores/eventDetailStore'
 import { liveScoreActions, liveScoreState } from '../stores/liveScoreStore'
 import { customConfirm } from '../stores/confirmDialogStore'
 import { authState } from '../stores/authStore'
-import { getTeamSubMatchTitle } from './EventDetail'
+import {
+  getTeamSubMatchTitle,
+  TEAM_SUB_MATCH_LABELS,
+  deriveTeamMatchType,
+} from './EventDetail'
 import { subscribeToMatchReset, type EventSubscription } from '../utils/pusher'
 import type { Player } from '../../shared/types/Player'
 import Button from '../components/Button'
@@ -54,16 +58,27 @@ const GamePlay = () => {
     }
   })
 
-  // Tablet mode: page is sitting on a table with no match assigned.
-  // Watch live-score updates and load the match as soon as one is
-  // assigned to that table — so the tablet auto-transitions from the
-  // big-number screen to the score boxes.
+  // Tablet mode: page is pinned to a table; the live-score store is
+  // the source of truth for what's currently on it. Three cases:
+  //   1) No matchId loaded + a match is now on the table → load it.
+  //   2) A match is loaded but the table no longer holds it (the
+  //      match was postponed / cancelled / reassigned elsewhere) →
+  //      drop it; on the next tick this same effect loads whatever
+  //      replaced it (or shows the no-match screen).
+  //   3) Match on the table matches the one loaded → nothing to do.
   createEffect(() => {
-    if (gamePlayState.matchId) return
     if (gamePlayState.tableNumber == null) return
     const tableNumber = gamePlayState.tableNumber
     const t = liveScoreState.tables.find((x) => x.tableNumber === tableNumber)
     const m = t?.match
+    const currentMatchId = gamePlayState.matchId
+    const tableMatchId = m?.matchId
+
+    if (currentMatchId && tableMatchId !== currentMatchId) {
+      void gamePlayActions.clearMatchForTable()
+      return
+    }
+    if (currentMatchId) return
     if (!m) return
     const params: Record<string, string> = {
       tableNumber: String(tableNumber),
@@ -98,6 +113,9 @@ const GamePlay = () => {
 
   // Once both team-match orders are saved, sub-matches exist. Hop the
   // page to the next live sub-match so the players can keep playing.
+  // Tablet sessions keep their `tableNumber` query param so a later
+  // sub-match completion can fall back to the "no match" screen on
+  // the same table.
   createEffect(() => {
     if (!gamePlayActions.isTeamMatch()) return
     if (!gamePlayActions.bothSidesAssigned()) return
@@ -110,11 +128,35 @@ const GamePlay = () => {
     )
     const eventId = gamePlayState.eventId
     if (!eventId) return
+    // Tablet stays on the table — drop the parent match and let the
+    // No-Match-Assigned screen show. Refresh live-score first so the
+    // auto-load effect sees the post-expansion tableState (parent
+    // freed; a sub-match may be queued onto this table next).
+    if (authState.isTablet) {
+      void (async () => {
+        await liveScoreActions.fetchLiveScore()
+        await gamePlayActions.clearMatchForTable()
+      })()
+      return
+    }
     if (nextSub) {
+      const next: Record<string, string> = {
+        eventId,
+        stage: gamePlayState.stage,
+        groupIndex: String(gamePlayState.groupIndex),
+        matchId: nextSub._id,
+      }
+      if (gamePlayState.tableNumber != null) {
+        next.tableNumber = String(gamePlayState.tableNumber)
+      }
       navigate(
-        `/game-play?eventId=${eventId}&stage=${gamePlayState.stage}&groupIndex=${gamePlayState.groupIndex}&matchId=${nextSub._id}`,
+        `/game-play?${new URLSearchParams(next).toString()}`,
         { replace: true },
       )
+      // Drive the actual page state too — navigate() updates the URL
+      // but doesn't re-run onMount, so initializeFromUrl wouldn't
+      // pick up the new matchId on its own.
+      void gamePlayActions.initializeFromUrl(next)
     } else {
       // No live sub-match left (team match finalised); leave the page.
       goBackOrSchedule(navigate)
@@ -155,11 +197,7 @@ const GamePlay = () => {
           when={!gamePlayState.matchId && gamePlayState.tableNumber != null}
           fallback={
             <Show
-              when={
-                !gamePlayActions.isTeamMatch() &&
-                gamePlayState.showInitDialog &&
-                !sessionBlocked()
-              }
+              when={gamePlayState.showInitDialog && !sessionBlocked()}
               fallback={
                 <div
                   style={{
@@ -663,20 +701,24 @@ const LandscapeInfoBox = (_props: { onExit: () => void }) => {
           <div style={landscapeGameScoresStyle}>
             <For each={visibleGames()}>
               {(g) => {
-                const lr = leftRightScores(g)
-                const hSide = highlightSide(g)
-                const leftSideOnScreen =
+                // Wrap in accessors so leftSide changes (switch-side)
+                // flow through to the previous-game rows in the
+                // info box — plain `const lr = …` captured the
+                // value at row-creation time and stayed stale.
+                const lr = () => leftRightScores(g)
+                const hSide = () => highlightSide(g)
+                const leftSideOnScreen = () =>
                   gamePlayState.leftSide === 1 ? 2 : 1
-                const leftHighlight = hSide === leftSideOnScreen
-                const rightHighlight = hSide != null && !leftHighlight
+                const leftHighlight = () => hSide() === leftSideOnScreen()
+                const rightHighlight = () => hSide() != null && !leftHighlight()
                 return (
                   <div style={landscapeGameScoreRowStyle}>
-                    <span style={getLandscapeScoreNumStyle(leftHighlight)}>
-                      {lr.left}
+                    <span style={getLandscapeScoreNumStyle(leftHighlight())}>
+                      {lr().left}
                     </span>
                     <span>:</span>
-                    <span style={getLandscapeScoreNumStyle(rightHighlight)}>
-                      {lr.right}
+                    <span style={getLandscapeScoreNumStyle(rightHighlight())}>
+                      {lr().right}
                     </span>
                   </div>
                 )
@@ -872,10 +914,19 @@ const FinishConfirmDialog = () => {
   }
 
   const handleConfirm = async () => {
+    const eventId = gamePlayState.eventId
     await gamePlayActions.confirmFinishMatch()
-    // Invalidate cached event data so the ranking table refreshes on navigation back
     eventDetailActions.invalidateData()
-    navigate(`/event/${gamePlayState.eventId}`)
+    // Tablet stays on the table after finishing — clear the match so
+    // the No-Match-Assigned screen renders. Refresh live-score first
+    // so the auto-load effect doesn't immediately re-pick the
+    // just-finished match from stale state.
+    if (authState.isTablet) {
+      await liveScoreActions.fetchLiveScore()
+      await gamePlayActions.clearMatchForTable()
+      return
+    }
+    navigate(`/event/${eventId}`)
   }
 
   return (
@@ -1069,21 +1120,33 @@ const TeamOrderForm = (props: {
 const InitScreen = () => {
   const [serveChoice, setServeChoice] = createSignal<1 | 2 | null>(null)
   const [leftChoice, setLeftChoice] = createSignal<1 | 2 | null>(null)
+  const isLandscape = createIsLandscape()
 
   const event = () => gamePlayState.data
-  const stageName = () => {
-    const base = gamePlayActions.getStageName()
-    const sub = subMatchLabel()
-    return sub ? `${base} - ${sub}` : base
-  }
+  // Plain stage name — the team sub-match qualifier moved out to the
+  // participants line per spec.
+  const stageName = () => gamePlayActions.getStageName()
   const participant1Name = () => gamePlayActions.getParticipantName(1)
   const participant2Name = () => gamePlayActions.getParticipantName(2)
 
-  // For team sub-matches, append " - {A} vs {X}" (the participant pair
-  // label). The "Team Match {n}" portion is already in getStageName()
-  // via its own sub-match suffix, so we trim it from the helper output
-  // to avoid duplicating it.
-  const subMatchLabel = (): string | undefined => {
+  // Participants line shown below the stage name:
+  //   - singles:               "{name1} vs {name2}"
+  //   - doubles:               "{name1A}/{name1B} vs {name2A}/{name2B}"
+  //   - team parent:           same as doubles, but the team rosters
+  //   - team sub-match:        "Team Match {n} - {A} vs {X}"
+  // getParticipantName already joins doubles names with " / ", so we
+  // reuse it for singles/doubles/team-parent and only switch to
+  // getTeamSubMatchTitle for team sub-matches.
+  const participants = (): string => {
+    const m = gamePlayActions.getCurrentMatch()
+    if (m && m.parentMatchId) {
+      const title = teamSubMatchTitle()
+      if (title) return title
+    }
+    return `${participant1Name()} vs ${participant2Name()}`
+  }
+
+  const teamSubMatchTitle = (): string | undefined => {
     const m = gamePlayActions.getCurrentMatch()
     if (!m || !m.parentMatchId) return undefined
     const ev = event()
@@ -1104,11 +1167,7 @@ const InitScreen = () => {
           if (!top.subMatches) continue
           const idx = top.subMatches.findIndex((s) => s._id === m._id)
           if (idx === -1) continue
-          const full = getTeamSubMatchTitle(top, idx)
-          // Drop the leading "Team Match N - " when present, since
-          // getStageName already shows that piece.
-          const dash = full.indexOf(' - ')
-          return dash === -1 ? full : full.slice(dash + 3)
+          return getTeamSubMatchTitle(top, idx)
         }
       }
     }
@@ -1137,55 +1196,308 @@ const InitScreen = () => {
       <div style={initHeaderStyle}>
         <div style={initEventNameStyle}>{event()?.eventName}</div>
         <div style={initStageNameStyle}>{stageName()}</div>
+        <div style={initParticipantsStyle}>{participants()}</div>
       </div>
-      <div style={initColumnsStyle}>
-        <div style={initColumnStyle}>
-          <div style={initColPlaceholderStyle} />
-          <div style={initRowLabelStyle}>{participant1Name()}</div>
-          <div style={initRowLabelStyle}>{participant2Name()}</div>
-        </div>
-        <div style={initColumnStyle}>
-          <div style={initColHeaderStyle}>Serve First</div>
-          <InitIcon
-            src={serveIconUrl}
-            active={serveChoice() === 1}
-            onClick={handleServeClick(1)}
-            alt="Serve first"
+      <Show
+        when={gamePlayActions.isTeamMatch()}
+        fallback={
+          <RegularInitBody
+            serveChoice={serveChoice()}
+            leftChoice={leftChoice()}
+            onServeClick={handleServeClick}
+            onLeftClick={handleLeftClick}
+            participant1Name={participant1Name()}
+            participant2Name={participant2Name()}
+            canStart={canStart()}
+            onStart={handleStart}
+            landscape={isLandscape()}
           />
-          <InitIcon
-            src={serveIconUrl}
-            active={serveChoice() === 2}
-            onClick={handleServeClick(2)}
-            alt="Serve first"
-          />
-        </div>
-        <div style={initColumnStyle}>
-          <div style={initColHeaderStyle}>Umpire's Left</div>
-          <InitIcon
-            src={tableIconUrl}
-            active={leftChoice() === 1}
-            onClick={handleLeftClick(1)}
-            alt="Umpire's left"
-          />
-          <InitIcon
-            src={tableIconUrl}
-            active={leftChoice() === 2}
-            onClick={handleLeftClick(2)}
-            alt="Umpire's left"
-          />
-        </div>
-      </div>
-      <div style={initButtonSpacerStyle} />
-      <button
-        style={initStartButtonStyle(canStart())}
-        disabled={!canStart()}
-        onClick={handleStart}
+        }
       >
-        Start
-      </button>
+        <TeamInitBody landscape={isLandscape()} />
+      </Show>
     </div>
   )
 }
+
+const RegularInitBody = (props: {
+  serveChoice: 1 | 2 | null
+  leftChoice: 1 | 2 | null
+  onServeClick: (side: 1 | 2) => () => void
+  onLeftClick: (side: 1 | 2) => () => void
+  participant1Name: string
+  participant2Name: string
+  canStart: boolean
+  onStart: () => void
+  landscape: boolean
+}) => (
+  <>
+    <div style={initColumnsStyle}>
+      <div style={initColumnStyle}>
+        <div style={initColPlaceholderStyle} />
+        <div style={initRowLabelStyle}>{props.participant1Name}</div>
+        <div style={initRowLabelStyle}>{props.participant2Name}</div>
+      </div>
+      <div style={initColumnStyle}>
+        <div style={initColHeaderStyle}>Serve First</div>
+        <InitIcon
+          src={serveIconUrl}
+          active={props.serveChoice === 1}
+          onClick={props.onServeClick(1)}
+          alt="Serve first"
+        />
+        <InitIcon
+          src={serveIconUrl}
+          active={props.serveChoice === 2}
+          onClick={props.onServeClick(2)}
+          alt="Serve first"
+        />
+      </div>
+      <div style={initColumnStyle}>
+        <div style={initColHeaderStyle}>Umpire's Left</div>
+        <InitIcon
+          src={tableIconUrl}
+          active={props.leftChoice === 1}
+          onClick={props.onLeftClick(1)}
+          alt="Umpire's left"
+        />
+        <InitIcon
+          src={tableIconUrl}
+          active={props.leftChoice === 2}
+          onClick={props.onLeftClick(2)}
+          alt="Umpire's left"
+        />
+      </div>
+    </div>
+    <div style={initButtonSpacerStyle} />
+    <button
+      style={initStartButtonStyle(props.canStart, props.landscape)}
+      disabled={!props.canStart}
+      onClick={props.onStart}
+    >
+      Start
+    </button>
+  </>
+)
+
+// Team-parent init setup. Top: format list (lineup). Below: order
+// section, one row per slot showing the home player slot, the A
+// label, the X label, and the away player slot. Tapping "Select…"
+// opens a player picker for that side; picking a player drops them
+// into the slot and clears them from any other slot they were in.
+// "Set Order" at the bottom commits both side orders to the DB.
+const HOME_LABELS = ['A', 'B', 'C', 'D'] as const
+const AWAY_LABELS = ['X', 'Y', 'Z', 'W'] as const
+
+interface PickerState {
+  side: 'home' | 'away'
+  slotIndex: number
+}
+
+const TeamInitBody = (props: { landscape: boolean }) => {
+  const match = () => gamePlayActions.getCurrentMatch()
+  const homeSideNum = (): 1 | 2 => (match()?.homeSide === 2 ? 2 : 1)
+  const awaySideNum = (): 1 | 2 => (homeSideNum() === 1 ? 2 : 1)
+  const homePlayers = (): Player[] =>
+    homeSideNum() === 1 ? match()?.side1 || [] : match()?.side2 || []
+  const awayPlayers = (): Player[] =>
+    awaySideNum() === 1 ? match()?.side1 || [] : match()?.side2 || []
+  const nop = () => homePlayers().length
+  const teamType = (): keyof typeof TEAM_SUB_MATCH_LABELS | undefined => {
+    const m = match()
+    if (!m) return undefined
+    return (
+      (m.teamMatchType as keyof typeof TEAM_SUB_MATCH_LABELS | undefined) ||
+      deriveTeamMatchType(m)
+    )
+  }
+  const lineup = () => {
+    const t = teamType()
+    return t ? TEAM_SUB_MATCH_LABELS[t] || [] : []
+  }
+
+  // homeSlots[i] / awaySlots[i] hold the playerId in slot i (label
+  // HOME_LABELS[i] / AWAY_LABELS[i]). Empty string = unassigned.
+  const [homeSlots, setHomeSlots] = createSignal<string[]>([])
+  const [awaySlots, setAwaySlots] = createSignal<string[]>([])
+  const [picker, setPicker] = createSignal<PickerState | null>(null)
+
+  createEffect(() => {
+    setHomeSlots(new Array<string>(nop()).fill(''))
+    setAwaySlots(new Array<string>(nop()).fill(''))
+  })
+
+  const labelFor = (side: 'home' | 'away', i: number) =>
+    side === 'home' ? HOME_LABELS[i] : AWAY_LABELS[i]
+
+  const playerById = (
+    players: Player[],
+    id: string,
+  ): Player | undefined => players.find((p) => p._id === id)
+
+  const slotLabel = (side: 'home' | 'away', i: number): string => {
+    const slots = side === 'home' ? homeSlots() : awaySlots()
+    const players = side === 'home' ? homePlayers() : awayPlayers()
+    const id = slots[i]
+    if (!id) return 'Select…'
+    const p = playerById(players, id)
+    return p ? `${p.firstName} ${p.lastName}` : 'Select…'
+  }
+
+  // Pick a player into the open slot. If they were already in
+  // another slot on that side, swap (put the previous occupant
+  // of this slot into the slot the picked player came from), so
+  // the order remains a permutation. After the pick, if exactly
+  // one slot remains empty AND exactly one player is unassigned,
+  // auto-fill it — so picking A on a 2-player team auto-fills B,
+  // and finishing the second pick on a 3-player team auto-fills C.
+  const handlePick = (playerId: string) => {
+    const p = picker()
+    if (!p) return
+    const getSlots = p.side === 'home' ? homeSlots : awaySlots
+    const setSlots = p.side === 'home' ? setHomeSlots : setAwaySlots
+    const players = p.side === 'home' ? homePlayers() : awayPlayers()
+    const cur = [...getSlots()]
+    const prevOccupant = cur[p.slotIndex]
+    const existingIdx = cur.indexOf(playerId)
+    cur[p.slotIndex] = playerId
+    if (existingIdx >= 0 && existingIdx !== p.slotIndex) {
+      cur[existingIdx] = prevOccupant
+    }
+    const emptyIndices = cur
+      .map((id, i) => (id ? -1 : i))
+      .filter((i) => i >= 0)
+    const assigned = new Set(cur.filter(Boolean))
+    const unassigned = players.filter((pl) => !assigned.has(pl._id))
+    if (emptyIndices.length === 1 && unassigned.length === 1) {
+      cur[emptyIndices[0]] = unassigned[0]._id
+    }
+    setSlots(cur)
+    setPicker(null)
+  }
+
+  const allFilled = () =>
+    homeSlots().every(Boolean) && awaySlots().every(Boolean)
+
+  const handleSetOrder = async () => {
+    if (!allFilled()) return
+    await gamePlayActions.saveTeamSideAssignment(homeSideNum(), homeSlots())
+    await gamePlayActions.saveTeamSideAssignment(awaySideNum(), awaySlots())
+  }
+
+  return (
+    <>
+      {/* Format on the left (vertically centered) + Order section on
+          the right. */}
+      <div style={teamInitMainStyle}>
+        <div style={teamInitFormatBlockStyle}>
+          <For each={lineup()}>
+            {(e) => (
+              <div style={teamInitFormatRowStyle}>
+                {e.home} vs {e.away}
+              </div>
+            )}
+          </For>
+        </div>
+
+        <div style={teamInitOrderBlockStyle}>
+          <For each={Array.from({ length: nop() }, (_, i) => i)}>
+            {(i) => (
+              <div style={teamInitOrderRowStyle}>
+                <button
+                  type="button"
+                  style={teamInitSlotStyle(!!homeSlots()[i])}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    setPicker({ side: 'home', slotIndex: i })
+                  }}
+                >
+                  {slotLabel('home', i)}
+                </button>
+                <div style={teamInitLabelChipStyle}>{labelFor('home', i)}</div>
+                <div style={teamInitLabelChipStyle}>{labelFor('away', i)}</div>
+                <button
+                  type="button"
+                  style={teamInitSlotStyle(!!awaySlots()[i])}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    setPicker({ side: 'away', slotIndex: i })
+                  }}
+                >
+                  {slotLabel('away', i)}
+                </button>
+              </div>
+            )}
+          </For>
+        </div>
+      </div>
+
+      <div style={initButtonSpacerStyle} />
+      <button
+        style={initStartButtonStyle(allFilled(), props.landscape)}
+        disabled={!allFilled()}
+        onClick={() => void handleSetOrder()}
+      >
+        Set Order
+      </button>
+
+      <Show when={picker()}>
+        {(p) => (
+          <TeamPlayerPickerDialog
+            players={
+              p().side === 'home' ? homePlayers() : awayPlayers()
+            }
+            label={labelFor(p().side, p().slotIndex)}
+            onPick={handlePick}
+            onClose={() => setPicker(null)}
+          />
+        )}
+      </Show>
+    </>
+  )
+}
+
+const TeamPlayerPickerDialog = (props: {
+  players: Player[]
+  label: string
+  onPick: (id: string) => void
+  onClose: () => void
+}) => (
+  <div
+    style={teamInitPickerOverlayStyle}
+    onClick={(e) => {
+      e.stopPropagation()
+      e.preventDefault()
+      props.onClose()
+    }}
+  >
+    <div
+      style={teamInitPickerDialogStyle}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div style={teamInitPickerTitleStyle}>Select Player {props.label}</div>
+      <div style={teamInitPickerListStyle}>
+        <For each={props.players}>
+          {(p) => (
+            <button
+              type="button"
+              style={teamInitPickerItemStyle}
+              onClick={(e) => {
+                e.stopPropagation()
+                e.preventDefault()
+                props.onPick(p._id)
+              }}
+            >
+              {p.firstName} {p.lastName}
+            </button>
+          )}
+        </For>
+      </div>
+    </div>
+  </div>
+)
 
 const InitIcon = (props: {
   src: string
@@ -1201,6 +1513,132 @@ const InitIcon = (props: {
     <img src={props.src} alt={props.alt} style={initIconImgStyle(props.active)} />
   </button>
 )
+
+// ==================== Team Init styles ====================
+
+const teamInitMainStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'row',
+  'align-items': 'center',
+  gap: '24px',
+  flex: 1,
+}
+
+const teamInitFormatBlockStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  'align-items': 'flex-start',
+  'justify-content': 'center',
+  gap: '6px',
+  'flex-shrink': 0,
+}
+
+const teamInitFormatRowStyle: JSX.CSSProperties = {
+  'font-size': '16px',
+  'font-weight': 600,
+  color: 'rgba(255,255,255,0.85)',
+}
+
+const teamInitOrderBlockStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '12px',
+  flex: 1,
+  'min-width': 0,
+}
+
+const teamInitOrderRowStyle: JSX.CSSProperties = {
+  display: 'grid',
+  'grid-template-columns': '1fr 44px 44px 1fr',
+  'align-items': 'center',
+  gap: '12px',
+}
+
+const teamInitSlotStyle = (filled: boolean): JSX.CSSProperties => ({
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'center',
+  'min-height': '48px',
+  padding: '8px 12px',
+  'font-size': '15px',
+  'font-weight': 600,
+  color: filled ? '#fff' : 'rgba(255,255,255,0.6)',
+  background: filled ? 'rgba(255,255,255,0.08)' : 'transparent',
+  border: '2px dashed rgba(255,255,255,0.35)',
+  'border-radius': '10px',
+  cursor: 'pointer',
+  'word-break': 'break-word',
+  'text-align': 'center',
+})
+
+const teamInitLabelChipStyle: JSX.CSSProperties = {
+  width: '44px',
+  height: '44px',
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'center',
+  'font-size': '20px',
+  'font-weight': 800,
+  color: '#1a1a2e',
+  'background-color': '#f1c40f',
+  'border-radius': '8px',
+  'user-select': 'none',
+}
+
+const teamInitPickerOverlayStyle: JSX.CSSProperties = {
+  position: 'fixed',
+  top: '0',
+  left: '0',
+  right: '0',
+  bottom: '0',
+  'background-color': 'rgba(0, 0, 0, 0.55)',
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'center',
+  'z-index': '2000',
+  padding: '16px',
+}
+
+const teamInitPickerDialogStyle: JSX.CSSProperties = {
+  'background-color': '#fff',
+  'border-radius': '12px',
+  padding: '20px 24px',
+  width: '100%',
+  'max-width': 'min(420px, 90vw)',
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '8px',
+  'box-shadow': '0 4px 20px rgba(0, 0, 0, 0.15)',
+}
+
+const teamInitPickerTitleStyle: JSX.CSSProperties = {
+  'font-size': '18px',
+  'font-weight': 700,
+  color: '#2c3e50',
+  'margin-bottom': '4px',
+}
+
+const teamInitPickerListStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '8px',
+  'max-height': '60vh',
+  'overflow-y': 'auto',
+}
+
+const teamInitPickerItemStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  padding: '12px 14px',
+  'font-size': '15px',
+  'font-weight': 600,
+  color: '#333',
+  background: '#f8f9fa',
+  border: '1px solid #ddd',
+  'border-radius': '8px',
+  cursor: 'pointer',
+  'text-align': 'left',
+}
 
 // Styles
 // ==================== Init Screen styles ====================
@@ -1226,6 +1664,13 @@ const initEventNameStyle: JSX.CSSProperties = {
 const initStageNameStyle: JSX.CSSProperties = {
   'font-size': '14px',
   color: 'rgba(255,255,255,0.7)',
+  'margin-top': '4px',
+}
+
+const initParticipantsStyle: JSX.CSSProperties = {
+  'font-size': '16px',
+  'font-weight': 600,
+  color: 'rgba(255,255,255,0.9)',
   'margin-top': '4px',
 }
 
@@ -1296,14 +1741,22 @@ const initButtonSpacerStyle: JSX.CSSProperties = {
   width: '100%',
 }
 
-const initStartButtonStyle = (enabled: boolean): JSX.CSSProperties => ({
-  width: '100%',
+const initStartButtonStyle = (
+  enabled: boolean,
+  landscape = false,
+): JSX.CSSProperties => ({
+  // Landscape: extend the button past the InitScreen's 24px wrapper
+  // padding so it spans the whole screen edge-to-edge. width: 100%
+  // alone would only fill the parent's content area; adding 48px
+  // compensates for the two side paddings.
+  width: landscape ? 'calc(100% + 48px)' : '100%',
   padding: '16px',
   'font-size': '20px',
   'font-weight': 700,
   color: '#fff',
   border: 'none',
-  'border-radius': '12px',
+  'border-radius': landscape ? '0' : '12px',
+  margin: landscape ? '0 -24px -24px' : '0',
   background: enabled ? '#27ae60' : '#555',
   cursor: enabled ? 'pointer' : 'not-allowed',
 })

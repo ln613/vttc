@@ -13,6 +13,9 @@ const ConfirmDialog = () => (
       onClick={(e) => {
         e.stopPropagation()
         e.preventDefault()
+        // In modal mode the umpire must tap an explicit button —
+        // overlay clicks are swallowed.
+        if (confirmDialogState.modal) return
         confirmDialogActions.cancel()
       }}
     >

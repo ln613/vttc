@@ -145,11 +145,20 @@ const checkSessionOnce = async () => {
       'heartbeatMatchSession',
       { matchId, sessionId },
     )
-    if (result.takenOver) {
-      setGamePlayState({ sessionTakenOver: true })
-      stopHeartbeat()
-      unsubscribeLiveScore()
+    if (!result.takenOver) return
+    // The heartbeat was for (matchId, sessionId) we captured at the
+    // start; if the page has moved on since (e.g. tablet flow cleared
+    // the parent and loaded a sub-match), ignore the stale result so
+    // we don't flag the new session as taken-over.
+    if (
+      gamePlayState.matchId !== matchId ||
+      gamePlayState.sessionId !== sessionId
+    ) {
+      return
     }
+    setGamePlayState({ sessionTakenOver: true })
+    stopHeartbeat()
+    unsubscribeLiveScore()
   } catch {
     // Network errors are non-fatal; next heartbeat will retry.
   }
@@ -245,12 +254,17 @@ const restoreMatchSetupIfExists = () => {
     restoreGameProgress(match)
     return
   }
-  // No saved setup → ask the umpire who serves / who's on the left.
-  // (Team matches use a different setup flow — TeamSetupDialog — so
-  // skip the init dialog for those.)
-  if (!match.isTeamMatch) {
-    setGamePlayState({ showInitDialog: true })
+  // Team match parent: show the init screen too — the team-init
+  // variant lets the umpire set both side orders before starting.
+  // Skip when both orders are already saved (sub-matches will be
+  // generated and we auto-hop into one).
+  if (match.isTeamMatch) {
+    if (!match.side1Assignment || !match.side2Assignment) {
+      setGamePlayState({ showInitDialog: true })
+    }
+    return
   }
+  setGamePlayState({ showInitDialog: true })
 }
 
 const restoreGameProgress = (match: Match) => {
@@ -343,6 +357,7 @@ const maybePromptLastGameSwitch = (
   void customConfirm('Switch sides?', {
     confirmLabel: 'Yes',
     cancelLabel: 'No',
+    modal: true,
   }).then((confirmed) => {
     if (!confirmed) return
     const flipped: 1 | 2 = gamePlayState.leftSide === 1 ? 2 : 1
@@ -386,6 +401,7 @@ const maybePromptLastGameSwitchBack = (
   })
   void customAlert(
     'Scores dropped below the switching point\nplease switch back.',
+    { modal: true },
   )
 }
 
@@ -1120,6 +1136,37 @@ export const gamePlayActions = {
 
   exitAndFlush: async () => {
     await flushPendingSave()
+  },
+
+  // Tablet mode: drop the current match (after finishing or after
+  // expanding a team-match parent) so the page falls back to the
+  // "No Match Assigned" screen on this table. The live-score effect
+  // will auto-load whatever match gets queued next on this table.
+  clearMatchForTable: async () => {
+    await flushPendingSave()
+    releaseSession()
+    setGamePlayState({
+      matchId: null,
+      eventId: null,
+      data: null,
+      currentGameIndex: 0,
+      score1: 0,
+      score2: 0,
+      gamesWon1: 0,
+      gamesWon2: 0,
+      servingSide: 1,
+      initialServingSide: 1,
+      leftSide: 1,
+      showInitDialog: false,
+      showFinishDialog: false,
+      menuOpen: false,
+      matchSubmitted: false,
+      gameHistory: [],
+      lastScoredSide: null,
+      lastGameSwitchPrompted: false,
+      lastGameSideSwitched: false,
+      loading: false,
+    })
   },
 
   reset: () => {

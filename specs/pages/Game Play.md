@@ -92,21 +92,47 @@ When there is no match assigned, just show the big table number at screen center
 
 - event name (align left)
 - stage name
-  - for team sub-matches, followed by " - Team Match {n} - {A} vs {X}"
-- game init setting (3 columns)
-  - column 1
-    - empty
-    - participant 1
-    - participant 2
-  - column 2
-    - "Serve First"
-    - serve icon (in assets folder, default gray-scale)
-    - serve icon (default gray-scale)
-  - column 3
-    - "Umpire's Left"
-    - table icon (in assets folder, default gray-scale)
-    - table icon (default gray-scale)
-- Start button (full width, align bottom)
+- participants
+  - for singles, "{A} vs {X}"
+  - for doubles, "{A}/{B} vs {X}/{Y}"
+  - for team parent match, "{A}/{B} vs {X}/{Y}"
+  - for team sub-matches, "Team Match {n} - {A} vs {X}"
+- game init setting
+- Action button (full width, align bottom)
+  - Start button for regular match
+  - Set Order button for team parent match
+
+### Game Init Setting (Regular match)
+
+column 1
+- empty
+- participant 1
+- participant 2
+column 2
+- "Serve First"
+- serve icon (in assets folder, default gray-scale)
+- serve icon (default gray-scale)
+column 3
+- "Umpire's Left"
+- table icon (in assets folder, default gray-scale)
+- table icon (default gray-scale)
+
+### Game Init Setting (Team parent match)
+
+Format (align left, vertically middle)
+   A vs Y
+   B vs X
+  AB vs XY
+    ...
+Order section (right of format), each row:
+- home team player A
+  - when no player selected, "Select..."
+  - player A name
+- "A"
+_ "X"
+- away team player X
+  - when no player selected, "Select..."
+  - player X name
 
 ### interaction
 
@@ -114,5 +140,7 @@ When there is no match assigned, just show the big table number at screen center
 - on who is on left changed: change the participant on the left score box accordingly
 - Start button only enabled if both "Serve First" and "Umpire's Left" are selected
 - on Start button clicked, save the info to the match to DB, so when coming back to the match (when the continue button is clicked), no need to show the init screen again
+- on "Select..." click, show all players in that team, upon selection, adjust other positions automatically
 - whenever the first side reaches the switching point in the last game, confirm with players ("Switch sides?") then switch side
 - if already switched and points get deducted by pressing "-", whenever the last side reaches the switching point - 1, inform the players to switch back
+- for tablet account, after finishing a match or after setting order for a team parent match, stay on the page, show the No Match Assigned Screen, and when there is a match assigned, update automatically

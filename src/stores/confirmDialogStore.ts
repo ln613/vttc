@@ -7,6 +7,10 @@ interface ConfirmDialogState {
   cancelLabel: string
   confirmColor: string
   mode: 'confirm' | 'alert'
+  // When true, clicking the overlay outside the dialog does NOT
+  // dismiss it — used for prompts that must get an explicit choice
+  // from the umpire (e.g. "Switch sides?").
+  modal: boolean
 }
 
 const getInitialState = (): ConfirmDialogState => ({
@@ -16,6 +20,7 @@ const getInitialState = (): ConfirmDialogState => ({
   cancelLabel: 'Cancel',
   confirmColor: '#27ae60',
   mode: 'confirm',
+  modal: false,
 })
 
 const [confirmDialogState, setConfirmDialogState] = createStore<ConfirmDialogState>(
@@ -30,6 +35,9 @@ interface ConfirmOptions {
   confirmLabel?: string
   cancelLabel?: string
   confirmColor?: string
+  // When true, the overlay won't dismiss the dialog — the umpire
+  // must tap one of the explicit buttons.
+  modal?: boolean
 }
 
 // In-page replacement for window.confirm — returns a Promise that
@@ -49,12 +57,16 @@ export const customConfirm = (
       confirmLabel: options.confirmLabel || 'OK',
       cancelLabel: options.cancelLabel || 'Cancel',
       confirmColor: options.confirmColor || '#27ae60',
+      modal: !!options.modal,
     })
   })
 }
 
 // In-page replacement for window.alert.
-export const customAlert = (message: string): Promise<void> => {
+export const customAlert = (
+  message: string,
+  options: { modal?: boolean } = {},
+): Promise<void> => {
   if (resolver) resolver(false)
   return new Promise((resolve) => {
     resolver = () => resolve()
@@ -65,6 +77,7 @@ export const customAlert = (message: string): Promise<void> => {
       confirmLabel: 'OK',
       cancelLabel: '',
       confirmColor: '#27ae60',
+      modal: !!options.modal,
     })
   })
 }
