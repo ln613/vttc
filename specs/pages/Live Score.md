@@ -75,5 +75,6 @@ Each table will show:
 - on match postpone
   - show a dialog with a list of buttons, 5 Minutes, 10 Minutes, 30 Minutes, 1 Hour
   - on select, remove the match from the table and the queue, and set the time selected on the match to mark it not available for queuing. when the time is reached, it becomes available for queuing again.
+  - when postpone a team sub match, all remaining sub matches from the same parent match should also be postponed (for the same duration), since the sub match order must be kept
 - on match cancel: confirm and reset the match and put it back to the end of the queue
 - 1 min heartbeat (admin only) to allow event auto-start

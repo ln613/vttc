@@ -854,20 +854,65 @@ export const postponeMatch = async (body) => {
   if (!event) throwError('Event not found')
 
   const postponedUntil = new Date(Date.now() + body.minutes * 60_000).toISOString()
-  const updatedStages = updateMatchInStages(
-    event.eventStages,
+
+  // The set of match ids to postpone — always includes the target. If
+  // the target is a team sub-match, also cascade to every other
+  // remaining (not finished-and-confirmed) sub-match under the same
+  // parent — the sub-match order is fixed, so leaving siblings on the
+  // queue would break the play order.
+  const idsToPostpone = collectPostponeTargets(
+    event.eventStages || [],
     body.matchId,
-    (match) => ({ ...match, postponedUntil, cancelledAt: undefined }),
   )
+
+  let updatedStages = event.eventStages
+  for (const id of idsToPostpone) {
+    updatedStages = updateMatchInStages(updatedStages, id, (m) => ({
+      ...m,
+      postponedUntil,
+      cancelledAt: undefined,
+    }))
+  }
 
   await collection.updateOne(
     { _id: toObjectId(body._id) },
     { $set: { eventStages: updatedStages } },
   )
 
-  await freeTableForMatch(body.matchId)
+  for (const id of idsToPostpone) {
+    await freeTableForMatch(id)
+  }
 
   return { success: true }
+}
+
+// If matchId is a team sub-match, returns the target plus every other
+// non-finished-and-confirmed sub-match under the same parent (so the
+// whole remaining order moves together). Otherwise returns just
+// [matchId].
+const collectPostponeTargets = (eventStages, matchId) => {
+  for (const stage of eventStages) {
+    const parents =
+      stage.type === 'group'
+        ? (stage.groups || []).flatMap((g) => g.matches || [])
+        : stage.type === 'knockout'
+          ? (stage.rounds || []).flatMap((r) =>
+              (r.matches || []).map((km) => km.match).filter(Boolean),
+            )
+          : []
+    for (const parent of parents) {
+      if (!parent.isTeamMatch || !Array.isArray(parent.subMatches)) continue
+      if (!parent.subMatches.some((s) => s._id === matchId)) continue
+      return parent.subMatches
+        .filter(
+          (s) =>
+            !s.cancelledAt &&
+            !(s.winningSide != null && s.confirmed === true),
+        )
+        .map((s) => s._id)
+    }
+  }
+  return [matchId]
 }
 
 /**

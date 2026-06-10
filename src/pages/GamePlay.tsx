@@ -128,17 +128,10 @@ const GamePlay = () => {
     )
     const eventId = gamePlayState.eventId
     if (!eventId) return
-    // Tablet stays on the table — drop the parent match and let the
-    // No-Match-Assigned screen show. Refresh live-score first so the
-    // auto-load effect sees the post-expansion tableState (parent
-    // freed; a sub-match may be queued onto this table next).
-    if (authState.isTablet) {
-      void (async () => {
-        await liveScoreActions.fetchLiveScore()
-        await gamePlayActions.clearMatchForTable()
-      })()
-      return
-    }
+    // Tablet doesn't need a per-event hop here — the live-score
+    // effect below detects the parent → sub-match swap on this
+    // table generally and drives the transition.
+    if (authState.isTablet) return
     if (nextSub) {
       const next: Record<string, string> = {
         eventId,
@@ -917,15 +910,10 @@ const FinishConfirmDialog = () => {
     const eventId = gamePlayState.eventId
     await gamePlayActions.confirmFinishMatch()
     eventDetailActions.invalidateData()
-    // Tablet stays on the table after finishing — clear the match so
-    // the No-Match-Assigned screen renders. Refresh live-score first
-    // so the auto-load effect doesn't immediately re-pick the
-    // just-finished match from stale state.
-    if (authState.isTablet) {
-      await liveScoreActions.fetchLiveScore()
-      await gamePlayActions.clearMatchForTable()
-      return
-    }
+    // Tablet stays on the table — the live-score effect detects the
+    // finished match coming off the table and handles the transition
+    // generally (clear → no-match-assigned → load next).
+    if (authState.isTablet) return
     navigate(`/event/${eventId}`)
   }
 
