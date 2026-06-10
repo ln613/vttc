@@ -16,6 +16,7 @@ const verificationCodes = new Map()
 const PLAYERS_COLLECTION = 'players'
 const ADMIN_USERNAME = 'vttc'
 const SUPER_ADMIN_USERNAME = 'nan'
+const TABLET_USERNAME = 'tablet'
 
 /**
  * Throw error helper
@@ -42,6 +43,11 @@ const isSuperAdmin = (emailOrPhone) => emailOrPhone === SUPER_ADMIN_USERNAME
  * Check if the input is the admin username
  */
 const isAdmin = (emailOrPhone) => emailOrPhone === ADMIN_USERNAME
+
+/**
+ * Check if the input is the tablet kiosk username
+ */
+const isTablet = (emailOrPhone) => emailOrPhone === TABLET_USERNAME
 
 /**
  * Validate email format
@@ -128,6 +134,7 @@ const authenticateSuperAdmin = async (password) => {
     token,
     isAdmin: true,
     isSuperAdmin: true,
+    isTablet: false,
     player: {
       _id: 'superadmin',
       firstName: 'Super Admin',
@@ -160,9 +167,33 @@ const authenticateAdmin = (password) => {
     token,
     isAdmin: true,
     isSuperAdmin: false,
+    isTablet: false,
     player: {
       _id: 'admin',
       firstName: 'Admin',
+      lastName: '',
+    },
+  }
+}
+
+/**
+ * Authenticate tablet kiosk. Tablet role is read-only across the site
+ * but can umpire a game on the Game Play page.
+ */
+const authenticateTablet = (password) => {
+  const tabletPassword = process.env.TABLET_PASSWORD
+  if (!tabletPassword) throwError('Tablet password not configured')
+  if (password !== tabletPassword) throwError('Invalid password')
+
+  const token = generateAdminToken()
+  return {
+    token,
+    isAdmin: false,
+    isSuperAdmin: false,
+    isTablet: true,
+    player: {
+      _id: 'tablet',
+      firstName: 'Tablet',
       lastName: '',
     },
   }
@@ -192,6 +223,7 @@ const authenticatePlayer = async (emailOrPhone, password) => {
     token,
     isAdmin,
     isSuperAdmin,
+    isTablet: false,
     player: {
       _id: player._id.toString(),
       firstName: player.firstName,
@@ -221,6 +253,10 @@ export const signIn = async (body) => {
 
   if (isAdmin(emailOrPhone)) {
     return authenticateAdmin(password)
+  }
+
+  if (isTablet(emailOrPhone)) {
+    return authenticateTablet(password)
   }
 
   return authenticatePlayer(emailOrPhone, password)

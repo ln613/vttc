@@ -549,7 +549,8 @@ const useAutoScroll = (ref: () => HTMLDivElement | undefined) => {
 const MatchQueue = (props: { isMobile?: boolean }) => {
   let listRef: HTMLDivElement | undefined
   const [myMatchesOnly, setMyMatchesOnly] = createSignal(false)
-  const showMyMatches = () => !!authState.user?._id && !authState.isAdmin
+  const showMyMatches = () =>
+    !!authState.user?._id && !authState.isAdmin && !authState.isTablet
   const queue = () => {
     const all = liveScoreState.matchQueue
     if (!myMatchesOnly() || !showMyMatches()) return all

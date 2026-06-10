@@ -56,7 +56,8 @@ const ToolsSection = () => {
         when={
           authActions.isSignedIn() &&
           !authState.isAdmin &&
-          !authState.isSuperAdmin
+          !authState.isSuperAdmin &&
+          !authState.isTablet
         }
       >
         <ToggleButton
@@ -434,6 +435,7 @@ const handleRegisterClick = async (e: MouseEvent, event: EventOption) => {
 
 const shouldShowRegisterIcon = (event: EventOption): boolean => {
   if (authState.isAdmin) return false
+  if (authState.isTablet) return false
   if (eventListActions.isPlayerRegistered(event)) return false
   if (eventListActions.isEventStarted(event)) return false
   return true

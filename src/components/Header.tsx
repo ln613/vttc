@@ -2,6 +2,11 @@ import { Show, Switch, Match, For, createSignal, type JSX } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { authState, authActions } from '../stores/authStore'
 import { signUpState, signUpActions } from '../stores/signUpStore'
+import {
+  liveScoreState,
+  liveScoreActions,
+} from '../stores/liveScoreStore'
+import type { TableAssignment } from '../../shared/types/Table'
 import Input from './Input'
 import Button from './Button'
 import Select from './Select'
@@ -50,9 +55,30 @@ const PendingPasswordModal = () => {
 
 const TopBar = () => {
   const navigate = useNavigate()
+  const [showTablePicker, setShowTablePicker] = createSignal(false)
 
   const handleLiveScoreClick = () => {
+    if (authState.isTablet) {
+      // Tablet role: open the Umpire table-picker. Ensure live-score
+      // state is loaded so we have current table assignments.
+      void liveScoreActions.fetchLiveScore()
+      setShowTablePicker(true)
+      return
+    }
     navigate('/live-score')
+  }
+
+  const handleTablePick = (t: TableAssignment) => {
+    setShowTablePicker(false)
+    const m = t.match
+    if (!m) return
+    const params = new URLSearchParams({
+      eventId: m.eventId,
+      matchId: m.matchId,
+      stage: m.stageType,
+    })
+    if (m.groupIndex != null) params.set('groupIndex', String(m.groupIndex))
+    navigate(`/game-play?${params.toString()}`)
   }
 
   const handleEventsClick = () => {
@@ -79,9 +105,22 @@ const TopBar = () => {
     <div style={topBarStyle}>
       <div style={topBarContentStyle}>
         <div style={navLeftStyle}>
-          <button style={liveScoreButtonStyle} onClick={handleLiveScoreClick}>
-            <LiveScoreIcon />
+          <button
+            style={
+              authState.isTablet ? navLinkStyle : liveScoreButtonStyle
+            }
+            onClick={handleLiveScoreClick}
+          >
+            <Show when={authState.isTablet} fallback={<LiveScoreIcon />}>
+              Umpire
+            </Show>
           </button>
+          <Show when={showTablePicker()}>
+            <TablePickerDialog
+              onPick={handleTablePick}
+              onClose={() => setShowTablePicker(false)}
+            />
+          </Show>
           <button style={navLinkStyle} onClick={handleEventsClick}>
             Events
           </button>
@@ -98,6 +137,129 @@ const TopBar = () => {
       </div>
     </div>
   )
+}
+
+const TablePickerDialog = (props: {
+  onPick: (t: TableAssignment) => void
+  onClose: () => void
+}) => {
+  const assigned = () =>
+    liveScoreState.tables.filter((t) => t.status === 'assigned' && t.match)
+
+  return (
+    <div style={tablePickerOverlayStyle} onClick={props.onClose}>
+      <div style={tablePickerDialogStyle} onClick={(e) => e.stopPropagation()}>
+        <h3 style={tablePickerTitleStyle}>Pick a table to umpire</h3>
+        <Show
+          when={assigned().length > 0}
+          fallback={
+            <div style={tablePickerEmptyStyle}>No matches currently on tables.</div>
+          }
+        >
+          <div style={tablePickerListStyle}>
+            <For each={assigned()}>
+              {(t) => (
+                <button
+                  type="button"
+                  style={tablePickerItemStyle}
+                  onClick={() => props.onPick(t)}
+                >
+                  <span style={tablePickerNumStyle}>{t.tableNumber}</span>
+                  <span style={tablePickerMatchStyle}>
+                    {t.match?.eventName} — {t.match?.stageName}
+                  </span>
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
+        <div style={tablePickerFooterStyle}>
+          <Button color="#999" onClick={props.onClose}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const tablePickerOverlayStyle: JSX.CSSProperties = {
+  position: 'fixed',
+  top: '0',
+  left: '0',
+  right: '0',
+  bottom: '0',
+  'background-color': 'rgba(0, 0, 0, 0.5)',
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'center',
+  'z-index': '2000',
+  padding: '16px',
+}
+
+const tablePickerDialogStyle: JSX.CSSProperties = {
+  'background-color': '#fff',
+  'border-radius': '12px',
+  padding: '20px 24px',
+  'max-width': 'min(420px, 90vw)',
+  width: '100%',
+  'box-shadow': '0 4px 20px rgba(0, 0, 0, 0.15)',
+}
+
+const tablePickerTitleStyle: JSX.CSSProperties = {
+  'font-size': '18px',
+  'font-weight': 700,
+  color: '#333',
+  margin: '0 0 12px',
+}
+
+const tablePickerEmptyStyle: JSX.CSSProperties = {
+  padding: '16px',
+  color: '#888',
+  'text-align': 'center',
+}
+
+const tablePickerListStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '8px',
+  'max-height': '60vh',
+  'overflow-y': 'auto',
+}
+
+const tablePickerItemStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  gap: '12px',
+  padding: '10px 12px',
+  border: '1px solid #ddd',
+  'border-radius': '8px',
+  background: '#f8f9fa',
+  cursor: 'pointer',
+  'text-align': 'left',
+}
+
+const tablePickerNumStyle: JSX.CSSProperties = {
+  'font-size': '24px',
+  'font-weight': 800,
+  color: '#2c3e50',
+  'min-width': '32px',
+  'text-align': 'center',
+}
+
+const tablePickerMatchStyle: JSX.CSSProperties = {
+  flex: 1,
+  'font-size': '14px',
+  color: '#333',
+  overflow: 'hidden',
+  'text-overflow': 'ellipsis',
+}
+
+const tablePickerFooterStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'justify-content': 'flex-end',
+  gap: '12px',
+  'margin-top': '12px',
 }
 
 const LiveScoreIcon = () => (

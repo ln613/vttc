@@ -4,7 +4,7 @@
 
 - banner https://res.cloudinary.com/vttc/image/upload/v1767957616/banner.jpg
 - Top bar (blue bg, white text)
-  - Live score icon
+  - Live score icon (for tablet, show Umpire)
   - Events: go to the Home/Events List page
   - Schedule: go to the schedule page
   - Players: go to the Players page
@@ -72,3 +72,4 @@
   - "Confirm" and "New Player" buttons (Confirm enabled when an existing player selected, if only 1 existing player, then pre-select it)
 - after a new player is saved, show the msg: "Contact VTTC to get an initial rating before you can register for rating-restricted events."
 - after sign in, if the player account is pending, show a msg telling the player to change their password after initial sign in, and take them to the account page upon confirm
+- on click Umpire (tablet only): show the table selection dialog, upon selection, go to game play page for that table

@@ -18,6 +18,7 @@ interface SignInResponse {
   token: string
   isAdmin: boolean
   isSuperAdmin: boolean
+  isTablet?: boolean
   player: AuthUser
 }
 
@@ -28,6 +29,7 @@ interface AuthState {
   token: string | null
   isAdmin: boolean
   isSuperAdmin: boolean
+  isTablet: boolean
   loading: boolean
   error: string | null
   dialogView: DialogView
@@ -39,6 +41,7 @@ const getInitialState = (): AuthState => ({
   token: loadTokenFromStorage(),
   isAdmin: loadIsAdminFromStorage(),
   isSuperAdmin: loadIsSuperAdminFromStorage(),
+  isTablet: loadIsTabletFromStorage(),
   loading: false,
   error: null,
   dialogView: null,
@@ -78,16 +81,26 @@ const loadIsSuperAdminFromStorage = (): boolean => {
   }
 }
 
+const loadIsTabletFromStorage = (): boolean => {
+  try {
+    return localStorage.getItem('vttc_isTablet') === 'true'
+  } catch {
+    return false
+  }
+}
+
 const saveToStorage = (
   token: string,
   user: AuthUser,
   isAdmin: boolean,
   isSuperAdmin: boolean,
+  isTablet: boolean,
 ) => {
   localStorage.setItem('vttc_token', token)
   localStorage.setItem('vttc_user', JSON.stringify(user))
   localStorage.setItem('vttc_isAdmin', String(isAdmin))
   localStorage.setItem('vttc_isSuperAdmin', String(isSuperAdmin))
+  localStorage.setItem('vttc_isTablet', String(isTablet))
 }
 
 const clearStorage = () => {
@@ -95,6 +108,7 @@ const clearStorage = () => {
   localStorage.removeItem('vttc_user')
   localStorage.removeItem('vttc_isAdmin')
   localStorage.removeItem('vttc_isSuperAdmin')
+  localStorage.removeItem('vttc_isTablet')
 }
 
 const [authState, setAuthState] = createStore<AuthState>(getInitialState())
@@ -132,12 +146,14 @@ export const authActions = {
         result.player,
         result.isAdmin,
         result.isSuperAdmin,
+        !!result.isTablet,
       )
       setAuthState({
         user: result.player,
         token: result.token,
         isAdmin: result.isAdmin,
         isSuperAdmin: result.isSuperAdmin,
+        isTablet: !!result.isTablet,
         loading: false,
         error: null,
         dialogView: null,
@@ -158,6 +174,7 @@ export const authActions = {
       token: null,
       isAdmin: false,
       isSuperAdmin: false,
+      isTablet: false,
       dialogView: null,
       error: null,
     })

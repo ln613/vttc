@@ -54,11 +54,13 @@ const Schedule = () => {
       <div style={contentStyle}>
         <div style={titleRowStyle}>
           <h1 style={titleStyle}>Schedule</h1>
-          <ToggleButton
-            label="My Matches"
-            value={myMatchesOnly()}
-            onChange={(v) => setMyMatchesOnly(v)}
-          />
+          <Show when={!authState.isTablet}>
+            <ToggleButton
+              label="My Matches"
+              value={myMatchesOnly()}
+              onChange={(v) => setMyMatchesOnly(v)}
+            />
+          </Show>
         </div>
         <ScheduleContent myMatchesOnly={myMatchesOnly()} />
       </div>
