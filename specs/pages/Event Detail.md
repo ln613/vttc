@@ -66,6 +66,11 @@ The Total column is the total matches played so far.
   - match not started, but table assigned
     - light red bg
     - big table number (left aligned)
+    - Reset Team
+      - admin only
+      - team sub match only
+      - delete all sub matches from the same parent match
+      - recreate the parent match and assign it to the same table
     - Start/Umpire button
       - green bg
       - visible to admin and Player in match

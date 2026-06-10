@@ -2700,6 +2700,214 @@ const buildTeamSubMatches = (parent, lockedTableNumber) => {
   }))
 }
 
+// Admin action triggered from EventDetail's MatchRow for a not-started
+// team sub-match that's already on a table. Deletes the parent's
+// generated sub-matches, clears the side assignments (so the order
+// picker reopens), and reassigns the parent to the same table the
+// sub-match was on. Per spec: only the parent's table choice survives.
+export const resetTeamMatch = async (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body._id) throwError('Event ID is required')
+  if (!body.matchId) throwError('Match ID is required')
+
+  const { _id, matchId } = body
+  const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
+  const event = await collection.findOne({ _id: toObjectId(_id) })
+  if (!event) throwError('Event not found')
+
+  // Find the parent that owns this sub-match. Search both group and
+  // knockout stages.
+  const parentInfo = findTeamParentOfSub(event.eventStages || [], matchId)
+  if (!parentInfo) throwError('Parent team match not found')
+  const { parent } = parentInfo
+
+  // Remember which table the sub-match is sitting on so we can hand
+  // the same table back to the parent.
+  const tableNumber = await findTableNumberForMatch(db, matchId)
+
+  // Reset the parent: drop subMatches + side assignments + started
+  // flags. Keep the persisted lockedTableNumber as-is.
+  const resetParent = {
+    ...parent,
+    subMatches: [],
+    side1Assignment: undefined,
+    side2Assignment: undefined,
+    side1Started: false,
+    side2Started: false,
+  }
+  const updatedStages = replaceMatchInStages(
+    event.eventStages || [],
+    parent._id,
+    resetParent,
+  )
+  await collection.updateOne(
+    { _id: toObjectId(_id) },
+    { $set: { eventStages: updatedStages } },
+  )
+
+  // Reassign the parent to the same table the sub was on (if any).
+  if (tableNumber != null) {
+    await placeParentOnTable(db, {
+      event: { ...event, eventStages: updatedStages },
+      parent: resetParent,
+      tableNumber,
+    })
+  }
+
+  // Notify the sub-match's session (if any) that it was reset, so the
+  // tablet drops it.
+  await notifyMatchReset(_id, matchId)
+
+  return { success: true }
+}
+
+const findTeamParentOfSub = (eventStages, subMatchId) => {
+  for (const stage of eventStages) {
+    if (stage.type === 'group') {
+      for (const group of stage.groups || []) {
+        for (const m of group.matches || []) {
+          if (
+            m.isTeamMatch &&
+            Array.isArray(m.subMatches) &&
+            m.subMatches.some((s) => s._id === subMatchId)
+          ) {
+            return { parent: m }
+          }
+        }
+      }
+    } else if (stage.type === 'knockout') {
+      for (const round of stage.rounds || []) {
+        for (const km of round.matches || []) {
+          const m = km.match
+          if (!m) continue
+          if (
+            m.isTeamMatch &&
+            Array.isArray(m.subMatches) &&
+            m.subMatches.some((s) => s._id === subMatchId)
+          ) {
+            return { parent: m }
+          }
+        }
+      }
+    }
+  }
+  return null
+}
+
+const replaceMatchInStages = (eventStages, matchId, replacement) =>
+  eventStages.map((stage) => {
+    if (stage.type === 'group') {
+      return {
+        ...stage,
+        groups: (stage.groups || []).map((g) => ({
+          ...g,
+          matches: (g.matches || []).map((m) =>
+            m._id === matchId ? replacement : m,
+          ),
+        })),
+      }
+    }
+    if (stage.type === 'knockout') {
+      return {
+        ...stage,
+        rounds: (stage.rounds || []).map((r) => ({
+          ...r,
+          matches: (r.matches || []).map((km) =>
+            km.match?._id === matchId ? { ...km, match: replacement } : km,
+          ),
+        })),
+      }
+    }
+    return stage
+  })
+
+const placeParentOnTable = async (db, { event, parent, tableNumber }) => {
+  const state = await db
+    .collection(TABLE_STATE_COLLECTION)
+    .findOne({ docId: TABLE_STATE_DOC_ID })
+  const tables = state?.tables || []
+  // First clear the slot the sub-match was occupying (it may still
+  // reference the old sub).
+  let cleared = false
+  const wiped = tables.map((t) => {
+    if (
+      t.status === 'assigned' &&
+      t.match &&
+      t.match.matchId?.toString() !== parent._id?.toString() &&
+      t.tableNumber === tableNumber
+    ) {
+      cleared = true
+      return { tableNumber: t.tableNumber, status: 'available' }
+    }
+    return t
+  })
+
+  // Build the parent's MatchQueueItem-shaped payload so the table
+  // entry mirrors what assignMatchToTable would write.
+  const stageInfo = findStageInfoForParent(event.eventStages || [], parent._id)
+  const matchItem = {
+    matchId: parent._id,
+    eventId: event._id?.toString(),
+    eventName: event.eventName,
+    match: parent,
+    stageType: stageInfo?.stageType || 'group',
+    stageName: stageInfo?.stageName || '',
+    ...(stageInfo?.groupIndex != null
+      ? { groupIndex: stageInfo.groupIndex }
+      : {}),
+    matchStatus: 'not_started',
+    tableNumber,
+  }
+
+  const updated = wiped.map((t) =>
+    t.tableNumber === tableNumber
+      ? { ...t, match: matchItem, status: 'assigned' }
+      : t,
+  )
+
+  await db.collection(TABLE_STATE_COLLECTION).updateOne(
+    { docId: TABLE_STATE_DOC_ID },
+    {
+      $set: {
+        tables: updated,
+        updatedAt: new Date().toISOString(),
+      },
+    },
+    { upsert: true },
+  )
+  // Silence unused warning when no slot was cleared (parent might
+  // never have had a prior assignment, e.g. legacy data).
+  void cleared
+}
+
+const findStageInfoForParent = (eventStages, parentId) => {
+  for (const stage of eventStages) {
+    if (stage.type === 'group') {
+      for (let gi = 0; gi < (stage.groups || []).length; gi++) {
+        const g = stage.groups[gi]
+        if ((g.matches || []).some((m) => m._id === parentId)) {
+          return {
+            stageType: 'group',
+            stageName: `Group ${g.index + 1}`,
+            groupIndex: g.index,
+          }
+        }
+      }
+    } else if (stage.type === 'knockout') {
+      for (const r of stage.rounds || []) {
+        if ((r.matches || []).some((km) => km.match?._id === parentId)) {
+          return {
+            stageType: 'knockout',
+            stageName: r.name,
+          }
+        }
+      }
+    }
+  }
+  return null
+}
+
 const validateSaveTeamMatchAssignmentInput = (body) => {
   if (!body) throwError('Request body is required')
   if (!body._id) throwError('Event ID is required')

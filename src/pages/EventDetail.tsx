@@ -1143,6 +1143,21 @@ export const MatchRow = (props: MatchRowProps) => {
     void eventDetailActions.resetMatch(props.match._id, eventId)
   }
 
+  const handleResetTeamClick = async (e?: MouseEvent) => {
+    e?.stopPropagation()
+    e?.preventDefault()
+    if (
+      !(await customConfirm(
+        'Reset the team match? All sub-matches will be deleted and the parent will go back on the same table for a fresh order.',
+        { confirmColor: '#e74c3c' },
+      ))
+    ) {
+      return
+    }
+    const eventId = props.eventId ?? eventDetailState.eventId ?? undefined
+    void eventDetailActions.resetTeamMatch(props.match._id, eventId)
+  }
+
   const handleSimulateClick = (e?: MouseEvent) => {
     e?.stopPropagation()
     e?.preventDefault()
@@ -1193,6 +1208,13 @@ export const MatchRow = (props: MatchRowProps) => {
     canStartOrContinue()
   // Reset is allowed on parent team matches too (admin-only via canReset).
   const showReset = () => canReset()
+  // Reset Team: admin-only, sub-match (parentMatchId set), not started,
+  // and currently on a table.
+  const showResetTeam = () =>
+    authState.isAdmin &&
+    !!props.match.parentMatchId &&
+    !hasStarted() &&
+    assignedTable() !== undefined
   const showSimulate = () =>
     !isTeamParent() &&
     authState.isAdmin &&
@@ -1205,6 +1227,7 @@ export const MatchRow = (props: MatchRowProps) => {
     showContinue() ||
     showConfirm() ||
     showReset() ||
+    showResetTeam() ||
     showSimulate() ||
     showAssign()
 
@@ -1326,6 +1349,16 @@ export const MatchRow = (props: MatchRowProps) => {
               disabled={isResetting()}
             >
               {isResetting() ? 'Resetting...' : 'Reset'}
+            </Button>
+          </Show>
+          <Show when={showResetTeam()}>
+            <Button
+              onClick={handleResetTeamClick}
+              color="#c0392b"
+              size="small"
+              disabled={isResetting()}
+            >
+              {isResetting() ? 'Resetting...' : 'Reset Team'}
             </Button>
           </Show>
           <Show when={showSimulate()}>

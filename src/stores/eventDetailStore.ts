@@ -598,6 +598,33 @@ export const eventDetailActions = {
     }
   },
 
+  // Reset a team sub-match: drops every sub from its parent, clears
+  // the side orders, and reassigns the parent to the same table the
+  // sub-match was on.
+  resetTeamMatch: async (
+    subMatchId: string,
+    sourceEventId?: string,
+  ) => {
+    const eventId = sourceEventId ?? eventDetailState.eventId
+    if (!eventId || !subMatchId) return
+
+    setEventDetailState({ resettingMatchId: subMatchId })
+    try {
+      await apiPost('resetTeamMatch', { _id: eventId, matchId: subMatchId })
+      if (eventDetailState.eventId === eventId) {
+        await fetchEvent(eventId, true)
+      }
+      void eventActions.refreshEvents()
+    } catch (err) {
+      setEventDetailState({
+        error:
+          err instanceof Error ? err.message : 'Failed to reset team match',
+      })
+    } finally {
+      setEventDetailState({ resettingMatchId: null })
+    }
+  },
+
   getEventSummary: (): string => {
     const event = eventDetailState.data
     if (!event) return ''
