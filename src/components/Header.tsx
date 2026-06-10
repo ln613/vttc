@@ -70,14 +70,16 @@ const TopBar = () => {
 
   const handleTablePick = (t: TableAssignment) => {
     setShowTablePicker(false)
-    const m = t.match
-    if (!m) return
     const params = new URLSearchParams({
-      eventId: m.eventId,
-      matchId: m.matchId,
-      stage: m.stageType,
+      tableNumber: String(t.tableNumber),
     })
-    if (m.groupIndex != null) params.set('groupIndex', String(m.groupIndex))
+    const m = t.match
+    if (m) {
+      params.set('eventId', m.eventId)
+      params.set('matchId', m.matchId)
+      params.set('stage', m.stageType)
+      if (m.groupIndex != null) params.set('groupIndex', String(m.groupIndex))
+    }
     navigate(`/game-play?${params.toString()}`)
   }
 
@@ -112,7 +114,7 @@ const TopBar = () => {
             onClick={handleLiveScoreClick}
           >
             <Show when={authState.isTablet} fallback={<LiveScoreIcon />}>
-              Umpire
+              Tablet
             </Show>
           </button>
           <Show when={showTablePicker()}>
@@ -139,44 +141,50 @@ const TopBar = () => {
   )
 }
 
+// Tablet table picker — same visual language as the AssignTableDialog
+// on EventDetail (4-wide grid in 5,6,7,8 / 1,2,3,4 order, live-score
+// palette: green=available, red=not_started, blue=in_progress).
+// Every cell is clickable; the GamePlay page handles the no-match
+// case by showing just the big table number.
+const TABLE_GRID_ORDER = [5, 6, 7, 8, 1, 2, 3, 4]
+
 const TablePickerDialog = (props: {
   onPick: (t: TableAssignment) => void
   onClose: () => void
 }) => {
-  const assigned = () =>
-    liveScoreState.tables.filter((t) => t.status === 'assigned' && t.match)
+  const tableFor = (n: number) =>
+    liveScoreState.tables.find((t) => t.tableNumber === n)
+  const statusFor = (
+    n: number,
+  ): 'available' | 'not_started' | 'in_progress' => {
+    const t = tableFor(n)
+    if (!t || t.status === 'available') return 'available'
+    return t.match?.matchStatus === 'not_started' ? 'not_started' : 'in_progress'
+  }
+  const handleClick = (n: number) => {
+    const t = tableFor(n) ?? ({
+      tableNumber: n as TableAssignment['tableNumber'],
+      status: 'available',
+    } as TableAssignment)
+    props.onPick(t)
+  }
 
   return (
     <div style={tablePickerOverlayStyle} onClick={props.onClose}>
       <div style={tablePickerDialogStyle} onClick={(e) => e.stopPropagation()}>
-        <h3 style={tablePickerTitleStyle}>Pick a table to umpire</h3>
-        <Show
-          when={assigned().length > 0}
-          fallback={
-            <div style={tablePickerEmptyStyle}>No matches currently on tables.</div>
-          }
-        >
-          <div style={tablePickerListStyle}>
-            <For each={assigned()}>
-              {(t) => (
-                <button
-                  type="button"
-                  style={tablePickerItemStyle}
-                  onClick={() => props.onPick(t)}
-                >
-                  <span style={tablePickerNumStyle}>{t.tableNumber}</span>
-                  <span style={tablePickerMatchStyle}>
-                    {t.match?.eventName} — {t.match?.stageName}
-                  </span>
-                </button>
-              )}
-            </For>
-          </div>
-        </Show>
-        <div style={tablePickerFooterStyle}>
-          <Button color="#999" onClick={props.onClose}>
-            Cancel
-          </Button>
+        <div style={tablePickerTitleStyle}>Pick a table</div>
+        <div style={tablePickerGridStyle}>
+          <For each={TABLE_GRID_ORDER}>
+            {(n) => (
+              <button
+                type="button"
+                style={tablePickerCellStyle(statusFor(n))}
+                onClick={() => handleClick(n)}
+              >
+                {n}
+              </button>
+            )}
+          </For>
         </div>
       </div>
     </div>
@@ -200,66 +208,52 @@ const tablePickerOverlayStyle: JSX.CSSProperties = {
 const tablePickerDialogStyle: JSX.CSSProperties = {
   'background-color': '#fff',
   'border-radius': '12px',
-  padding: '20px 24px',
-  'max-width': 'min(420px, 90vw)',
-  width: '100%',
+  padding: '20px',
+  width: 'auto',
+  'max-width': '360px',
+  display: 'flex',
+  'flex-direction': 'column',
+  'align-items': 'center',
+  gap: '14px',
   'box-shadow': '0 4px 20px rgba(0, 0, 0, 0.15)',
 }
 
 const tablePickerTitleStyle: JSX.CSSProperties = {
   'font-size': '18px',
   'font-weight': 700,
-  color: '#333',
-  margin: '0 0 12px',
-}
-
-const tablePickerEmptyStyle: JSX.CSSProperties = {
-  padding: '16px',
-  color: '#888',
-  'text-align': 'center',
-}
-
-const tablePickerListStyle: JSX.CSSProperties = {
-  display: 'flex',
-  'flex-direction': 'column',
-  gap: '8px',
-  'max-height': '60vh',
-  'overflow-y': 'auto',
-}
-
-const tablePickerItemStyle: JSX.CSSProperties = {
-  display: 'flex',
-  'align-items': 'center',
-  gap: '12px',
-  padding: '10px 12px',
-  border: '1px solid #ddd',
-  'border-radius': '8px',
-  background: '#f8f9fa',
-  cursor: 'pointer',
-  'text-align': 'left',
-}
-
-const tablePickerNumStyle: JSX.CSSProperties = {
-  'font-size': '24px',
-  'font-weight': 800,
   color: '#2c3e50',
-  'min-width': '32px',
   'text-align': 'center',
 }
 
-const tablePickerMatchStyle: JSX.CSSProperties = {
-  flex: 1,
-  'font-size': '14px',
-  color: '#333',
-  overflow: 'hidden',
-  'text-overflow': 'ellipsis',
+const tablePickerGridStyle: JSX.CSSProperties = {
+  display: 'grid',
+  'grid-template-columns': 'repeat(4, 64px)',
+  'grid-auto-rows': '64px',
+  gap: '8px',
 }
 
-const tablePickerFooterStyle: JSX.CSSProperties = {
-  display: 'flex',
-  'justify-content': 'flex-end',
-  gap: '12px',
-  'margin-top': '12px',
+const tablePickerCellStyle = (
+  status: 'available' | 'not_started' | 'in_progress',
+): JSX.CSSProperties => {
+  const bg =
+    status === 'available'
+      ? '#27ae60'
+      : status === 'not_started'
+        ? '#c0392b'
+        : '#2980b9'
+  return {
+    width: '64px',
+    height: '64px',
+    'border-radius': '10px',
+    'font-size': '24px',
+    'font-weight': 900,
+    color: '#f1c40f',
+    'background-color': bg,
+    border: '3px solid transparent',
+    cursor: 'pointer',
+    'text-shadow': '2px 2px 4px rgba(0,0,0,0.3)',
+    padding: 0,
+  }
 }
 
 const LiveScoreIcon = () => (

@@ -13,7 +13,7 @@ import {
   gamePlayActions,
 } from '../stores/gamePlayStore'
 import { eventDetailActions } from '../stores/eventDetailStore'
-import { liveScoreActions } from '../stores/liveScoreStore'
+import { liveScoreActions, liveScoreState } from '../stores/liveScoreStore'
 import { customConfirm } from '../stores/confirmDialogStore'
 import { authState } from '../stores/authStore'
 import { getTeamSubMatchTitle } from './EventDetail'
@@ -52,6 +52,27 @@ const GamePlay = () => {
       })
       subscribedEventId = eventId
     }
+  })
+
+  // Tablet mode: page is sitting on a table with no match assigned.
+  // Watch live-score updates and load the match as soon as one is
+  // assigned to that table — so the tablet auto-transitions from the
+  // big-number screen to the score boxes.
+  createEffect(() => {
+    if (gamePlayState.matchId) return
+    if (gamePlayState.tableNumber == null) return
+    const tableNumber = gamePlayState.tableNumber
+    const t = liveScoreState.tables.find((x) => x.tableNumber === tableNumber)
+    const m = t?.match
+    if (!m) return
+    const params: Record<string, string> = {
+      tableNumber: String(tableNumber),
+      eventId: m.eventId,
+      matchId: m.matchId,
+      stage: m.stageType,
+    }
+    if (m.groupIndex != null) params.groupIndex = String(m.groupIndex)
+    void gamePlayActions.initializeFromUrl(params)
   })
 
   // Auto-press Start for the user's own side on entry so the player who
@@ -131,29 +152,36 @@ const GamePlay = () => {
         fallback={<LoadingSpinner />}
       >
         <Show
-          when={
-            !gamePlayActions.isTeamMatch() &&
-            gamePlayState.showInitDialog &&
-            !sessionBlocked()
-          }
+          when={!gamePlayState.matchId && gamePlayState.tableNumber != null}
           fallback={
-            <div
-              style={{
-                ...contentStyle,
-                // Landscape has no header — drop the top breathing room
-                // so the score boxes truly run edge-to-edge.
-                ...(isLandscape() ? { padding: '0' } : {}),
-                ...(sessionBlocked() ? blockedStyle : {}),
-              }}
+            <Show
+              when={
+                !gamePlayActions.isTeamMatch() &&
+                gamePlayState.showInitDialog &&
+                !sessionBlocked()
+              }
+              fallback={
+                <div
+                  style={{
+                    ...contentStyle,
+                    // Landscape has no header — drop the top breathing
+                    // room so the score boxes truly run edge-to-edge.
+                    ...(isLandscape() ? { padding: '0' } : {}),
+                    ...(sessionBlocked() ? blockedStyle : {}),
+                  }}
+                >
+                  <Show when={!isLandscape()}>
+                    <Header onExit={handleExit} />
+                  </Show>
+                  <ScoreBoxes landscape={isLandscape()} onExit={handleExit} />
+                </div>
+              }
             >
-              <Show when={!isLandscape()}>
-                <Header onExit={handleExit} />
-              </Show>
-              <ScoreBoxes landscape={isLandscape()} onExit={handleExit} />
-            </div>
+              <InitScreen />
+            </Show>
           }
         >
-          <InitScreen />
+          <NoMatchAssignedScreen />
         </Show>
       </Show>
       <Show
@@ -161,7 +189,14 @@ const GamePlay = () => {
           gamePlayActions.isTeamMatch() &&
           !gamePlayActions.bothSidesAssigned() &&
           !gamePlayState.loading &&
-          !sessionBlocked()
+          !sessionBlocked() &&
+          // Tablet is just the score-keeper — it doesn't participate
+          // in the "press Start / set order" handshake, so the team
+          // setup dialog (which would show "Waiting to start…" for
+          // both sides) is hidden. The page just shows the regular
+          // state behind it until the players finish their setup and
+          // the auto-hop effect moves to the first sub-match.
+          !authState.isTablet
         }
       >
         <TeamSetupDialog />
@@ -302,6 +337,29 @@ const createIsLandscape = () => {
   })
 
   return isLandscape
+}
+
+// Shown on the GamePlay page (tablet flow) when the user picked a
+// table that doesn't currently have a match assigned. Just a big
+// table number centered against the dark page background.
+const NoMatchAssignedScreen = () => (
+  <div style={noMatchScreenStyle}>
+    <div style={noMatchTableNumberStyle}>{gamePlayState.tableNumber}</div>
+  </div>
+)
+
+const noMatchScreenStyle: JSX.CSSProperties = {
+  flex: 1,
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'center',
+}
+
+const noMatchTableNumberStyle: JSX.CSSProperties = {
+  'font-size': 'clamp(120px, 50vh, 360px)',
+  'font-weight': 900,
+  color: '#f1c40f',
+  'line-height': 1,
 }
 
 const LoadingSpinner = () => (

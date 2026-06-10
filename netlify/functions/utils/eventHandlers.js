@@ -2656,6 +2656,15 @@ const freeTeamMatchTable = async (db, matchId) => {
 }
 
 const buildTeamSubMatches = (parent, lockedTableNumber) => {
+  // Honor an admin's manual table choice on the parent — that choice
+  // (persisted onto the parent match itself) takes priority over the
+  // parent's current tableState position so that the picked table
+  // sticks across queue rebuilds and even when it would violate the
+  // general table-assignment rules.
+  const effectiveLockedTable =
+    parent.lockedTableNumber != null
+      ? parent.lockedTableNumber
+      : lockedTableNumber
   // Legacy team matches in the DB may not have teamMatchType set; derive
   // one from the roster size + numberOfMatches when needed.
   const nop = (parent.side1 || []).length
@@ -2687,7 +2696,7 @@ const buildTeamSubMatches = (parent, lockedTableNumber) => {
     gamesWon2: 0,
     winningSide: undefined,
     parentMatchId: parent._id,
-    lockedTableNumber,
+    lockedTableNumber: effectiveLockedTable,
   }))
 }
 

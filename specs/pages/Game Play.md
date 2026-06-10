@@ -69,6 +69,10 @@ hamburger icon, show/hide the following menu:
 - show the number of games won at the top-right corner for the left score box, or the top-left corner for the right score box (it will cover part of the "+" button and part of the big point box)
 - show "T" at the top-left corner for the right score box, or the top-right corner for the left score box
 
+## No Match Assigned Screen
+
+When there is no match assigned, just show the big table number at screen center
+
 ### interaction
 
 - switch serving every 2 points

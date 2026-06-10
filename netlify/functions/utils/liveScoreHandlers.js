@@ -952,7 +952,84 @@ export const assignMatchToTable = async (body) => {
     state?.groupTableMap,
   )
 
+  // For a parent team match, also persist the admin's chosen table on
+  // the parent match itself so that sub-matches generated later inherit
+  // this table even when the parent has since been freed from
+  // tableState (and even when the choice violates the general
+  // table-assignment rules).
+  const isTeamParent = item.match?.isTeamMatch && !item.parentMatchId
+  if (isTeamParent) {
+    await persistParentTeamMatchTableChoice(
+      body._id,
+      body.matchId,
+      body.tableNumber,
+    )
+  }
+
   return { success: true }
+}
+
+const persistParentTeamMatchTableChoice = async (
+  eventId,
+  matchId,
+  tableNumber,
+) => {
+  const db = getDB()
+  const collection = db.collection('events')
+  const event = await collection.findOne({ _id: toObjectId(eventId) })
+  if (!event) return
+  let changed = false
+  const updatedStages = (event.eventStages || []).map((stage) => {
+    if (stage.type === 'group') {
+      return {
+        ...stage,
+        groups: (stage.groups || []).map((g) => ({
+          ...g,
+          matches: (g.matches || []).map((m) => {
+            if (
+              m._id === matchId &&
+              m.isTeamMatch &&
+              !m.parentMatchId &&
+              m.lockedTableNumber !== tableNumber
+            ) {
+              changed = true
+              return { ...m, lockedTableNumber: tableNumber }
+            }
+            return m
+          }),
+        })),
+      }
+    }
+    if (stage.type === 'knockout') {
+      return {
+        ...stage,
+        rounds: (stage.rounds || []).map((r) => ({
+          ...r,
+          matches: (r.matches || []).map((km) => {
+            const m = km.match
+            if (!m) return km
+            if (
+              m._id === matchId &&
+              m.isTeamMatch &&
+              !m.parentMatchId &&
+              m.lockedTableNumber !== tableNumber
+            ) {
+              changed = true
+              return { ...km, match: { ...m, lockedTableNumber: tableNumber } }
+            }
+            return km
+          }),
+        })),
+      }
+    }
+    return stage
+  })
+  if (changed) {
+    await collection.updateOne(
+      { _id: toObjectId(eventId) },
+      { $set: { eventStages: updatedStages } },
+    )
+  }
 }
 
 const freeTableForMatch = async (matchId) => {

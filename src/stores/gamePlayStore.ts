@@ -33,6 +33,10 @@ interface GamePlayState {
   stage: 'group' | 'knockout'
   groupIndex: number
   matchId: string | null
+  // Tablet/Umpire mode: table picked from the picker dialog. When
+  // matchId is null but tableNumber is set, GamePlay renders the
+  // "no match assigned" screen with just the big table number.
+  tableNumber: number | null
   currentGameIndex: number
   score1: number
   score2: number
@@ -75,6 +79,7 @@ const getInitialState = (): GamePlayState => ({
   stage: 'group',
   groupIndex: 0,
   matchId: null,
+  tableNumber: null,
   currentGameIndex: 0,
   score1: 0,
   score2: 0,
@@ -213,11 +218,6 @@ export const waitForPendingSave = (): Promise<void> =>
   pendingSavePromise ?? Promise.resolve()
 
 export { gamePlayState }
-
-const validateParams = (eventId: string | null, matchId: string | null) => {
-  if (!eventId) throw new Error('Event ID is required')
-  if (!matchId) throw new Error('Match ID is required')
-}
 
 const fetchEvent = async (eventId: string) => {
   setGamePlayState({ loading: true, error: null })
@@ -551,14 +551,23 @@ export const gamePlayActions = {
     const stage = (getStringParam(params.stage) as 'group' | 'knockout') ?? 'group'
     const groupIndex = parseInt(getStringParam(params.groupIndex) || '0', 10)
     const matchId = getStringParam(params.matchId)
+    const tableNumberRaw = getStringParam(params.tableNumber)
+    const tableNumber = tableNumberRaw ? parseInt(tableNumberRaw, 10) : null
 
-    validateParams(eventId, matchId)
+    // Tablet mode allows entry with just a tableNumber (no event/match
+    // assigned yet). Everyone else still requires both.
+    if (!matchId || !eventId) {
+      if (tableNumber == null) {
+        throw new Error('Match ID and Event ID are required')
+      }
+    }
 
     setGamePlayState({
       eventId,
       stage,
       groupIndex,
       matchId,
+      tableNumber,
       currentGameIndex: 0,
       score1: 0,
       score2: 0,
@@ -578,10 +587,14 @@ export const gamePlayActions = {
       sessionTakenOver: false,
       sessionError: null,
       matchReset: false,
+      // Tablet entry without a match has nothing to load — drop the
+      // loading flag immediately so the "No match assigned" screen
+      // shows instead of the spinner.
+      loading: !!eventId,
     })
 
     if (matchId) await acquireSession(matchId)
-    await fetchEvent(eventId!)
+    if (eventId) await fetchEvent(eventId)
   },
 
   notifyMatchReset: (matchId: string) => {
