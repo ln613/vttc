@@ -70,17 +70,11 @@ const TopBar = () => {
 
   const handleTablePick = (t: TableAssignment) => {
     setShowTablePicker(false)
-    const params = new URLSearchParams({
-      tableNumber: String(t.tableNumber),
-    })
-    const m = t.match
-    if (m) {
-      params.set('eventId', m.eventId)
-      params.set('matchId', m.matchId)
-      params.set('stage', m.stageType)
-      if (m.groupIndex != null) params.set('groupIndex', String(m.groupIndex))
-    }
-    navigate(`/game-play?${params.toString()}`)
+    // URL identifies the table only — the current match on that table
+    // is resolved reactively from live-score state by GamePlay's
+    // auto-load effect, so the URL never goes stale when the match
+    // assignment changes.
+    navigate(`/game-play?tableNumber=${t.tableNumber}`)
   }
 
   const handleEventsClick = () => {

@@ -2722,9 +2722,16 @@ export const resetTeamMatch = async (body) => {
   if (!parentInfo) throwError('Parent team match not found')
   const { parent } = parentInfo
 
-  // Remember which table the sub-match is sitting on so we can hand
-  // the same table back to the parent.
-  const tableNumber = await findTableNumberForMatch(db, matchId)
+  // Remember which table to hand the parent. Preference order:
+  //   1) The table the picked sub-match is currently on.
+  //   2) The parent's persisted lockedTableNumber (admin's choice).
+  //   3) The sub-match's lockedTableNumber (every sub shares the
+  //      parent's locked table at expansion time).
+  const sub = (parent.subMatches || []).find((s) => s._id === matchId)
+  const tableNumber =
+    (await findTableNumberForMatch(db, matchId)) ??
+    parent.lockedTableNumber ??
+    sub?.lockedTableNumber
 
   // Reset the parent: drop subMatches + side assignments + started
   // flags. Keep the persisted lockedTableNumber as-is.

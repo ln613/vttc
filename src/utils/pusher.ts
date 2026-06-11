@@ -15,6 +15,12 @@ export interface EventSubscription {
   unsubscribe: () => void
 }
 
+// Pusher channels are shared resources — multiple parts of the app
+// can subscribe to the same channel for different events. Calling
+// client.unsubscribe(name) kills the channel for EVERYONE bound to
+// it. We only unbind our own handler on teardown so other listeners
+// stay alive; the channel itself stays subscribed for the lifetime
+// of the Pusher client (cheap, since channels are pooled by name).
 export const subscribeToEventUpdates = (
   eventId: string,
   onUpdate: () => void,
@@ -23,14 +29,10 @@ export const subscribeToEventUpdates = (
   if (!client) {
     return { unsubscribe: () => {} }
   }
-  const channelName = `event-${eventId}`
-  const channel = client.subscribe(channelName)
+  const channel = client.subscribe(`event-${eventId}`)
   channel.bind('updated', onUpdate)
   return {
-    unsubscribe: () => {
-      channel.unbind('updated', onUpdate)
-      client.unsubscribe(channelName)
-    },
+    unsubscribe: () => channel.unbind('updated', onUpdate),
   }
 }
 
@@ -42,15 +44,11 @@ export const subscribeToMatchReset = (
   if (!client) {
     return { unsubscribe: () => {} }
   }
-  const channelName = `event-${eventId}`
-  const channel = client.subscribe(channelName)
+  const channel = client.subscribe(`event-${eventId}`)
   const handler = (data: { matchId: string }) => onReset(data.matchId)
   channel.bind('match-reset', handler)
   return {
-    unsubscribe: () => {
-      channel.unbind('match-reset', handler)
-      client.unsubscribe(channelName)
-    },
+    unsubscribe: () => channel.unbind('match-reset', handler),
   }
 }
 
@@ -61,13 +59,9 @@ export const subscribeToLiveScoreUpdates = (
   if (!client) {
     return { unsubscribe: () => {} }
   }
-  const channelName = 'live-score'
-  const channel = client.subscribe(channelName)
+  const channel = client.subscribe('live-score')
   channel.bind('updated', onUpdate)
   return {
-    unsubscribe: () => {
-      channel.unbind('updated', onUpdate)
-      client.unsubscribe(channelName)
-    },
+    unsubscribe: () => channel.unbind('updated', onUpdate),
   }
 }

@@ -1208,8 +1208,9 @@ export const MatchRow = (props: MatchRowProps) => {
     canStartOrContinue()
   // Reset is allowed on parent team matches too (admin-only via canReset).
   const showReset = () => canReset()
-  // Reset Team: admin-only, sub-match (parentMatchId set), not started,
-  // and currently on a table.
+  // Reset Team: admin-only, sub-match (parentMatchId set), not
+  // started, currently on a table. Queue-only sub-rows don't show
+  // it — admin uses the on-table sub-row to reset the whole team.
   const showResetTeam = () =>
     authState.isAdmin &&
     !!props.match.parentMatchId &&

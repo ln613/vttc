@@ -616,6 +616,17 @@ export const gamePlayActions = {
   notifyMatchReset: (matchId: string) => {
     if (!gamePlayState.matchId || gamePlayState.matchId !== matchId) return
     cancelPendingSave()
+    // Tablet sessions are pinned to a table, not a specific match.
+    // A regular match-reset on the SAME match (the table still holds
+    // it) leaves tableMatchId === currentMatchId, so the live-score
+    // effect won't detect a change. Drop the match locally so the
+    // effect re-loads it fresh (zeroed scores, no init state). For
+    // Reset Team, parent has already replaced the sub on the table
+    // and the same clear+reload path picks up the parent.
+    if (authState.isTablet) {
+      void gamePlayActions.clearMatchForTable()
+      return
+    }
     setGamePlayState({ matchReset: true })
   },
 
