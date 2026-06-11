@@ -90,13 +90,17 @@ When there is no match assigned, just show the big table number at screen center
 
 ## Init screen
 
-- event name (align left)
-- stage name
-- participants
-  - for singles, "{A} vs {X}"
-  - for doubles, "{A}/{B} vs {X}/{Y}"
-  - for team parent match, "{A}/{B} vs {X}/{Y}"
-  - for team sub-matches, "Team Match {n} - {A} vs {X}"
+- title row
+  - left
+    - event name (align left)
+    - stage name
+    - participants
+      - for singles, "{A} vs {X}"
+      - for doubles, "{A}/{B} vs {X}/{Y}"
+      - for team parent match, "{A}/{B} vs {X}/{Y}"
+      - for team sub-matches, "Team Match {n} - {A} vs {X}"
+  - right
+    - big table number (align top)
 - game init setting
 - Action button (full width, align bottom)
   - Start button for regular match

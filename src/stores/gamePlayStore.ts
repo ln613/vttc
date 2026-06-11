@@ -6,6 +6,7 @@ import type { Player } from '../../shared/types/Player'
 import { apiGet, apiPost } from '../utils/api'
 import { authState } from './authStore'
 import { customAlert, customConfirm } from './confirmDialogStore'
+import { liveScoreActions } from './liveScoreStore'
 import { getTeamPlayerOrderLabel } from '../pages/EventDetail'
 import {
   subscribeToLiveScoreUpdates,
@@ -228,11 +229,13 @@ export const waitForPendingSave = (): Promise<void> =>
 
 export { gamePlayState }
 
-const fetchEvent = async (eventId: string) => {
-  setGamePlayState({ loading: true, error: null })
+const fetchEvent = async (eventId: string, silent = false) => {
+  if (!silent) setGamePlayState({ loading: true, error: null })
   try {
     const data = await apiGet<Event>('event', { _id: eventId })
-    setGamePlayState({ data, loading: false, error: null })
+    // Silent refetches don't touch the loading flag at all — the
+    // caller may be holding the spinner up for a longer transition.
+    setGamePlayState(silent ? { data, error: null } : { data, loading: false, error: null })
     restoreMatchSetupIfExists()
   } catch (err) {
     setGamePlayState({
@@ -617,14 +620,18 @@ export const gamePlayActions = {
     if (!gamePlayState.matchId || gamePlayState.matchId !== matchId) return
     cancelPendingSave()
     // Tablet sessions are pinned to a table, not a specific match.
-    // A regular match-reset on the SAME match (the table still holds
-    // it) leaves tableMatchId === currentMatchId, so the live-score
-    // effect won't detect a change. Drop the match locally so the
-    // effect re-loads it fresh (zeroed scores, no init state). For
-    // Reset Team, parent has already replaced the sub on the table
-    // and the same clear+reload path picks up the parent.
+    // For a regular reset the table still holds the same match id,
+    // so clearMatchForTable + auto-load re-fetches it fresh. For
+    // Reset Team the table now holds the parent. In both cases the
+    // live-score-update pusher may still be in flight — refresh it
+    // first so the auto-load effect doesn't briefly re-load the
+    // just-cleared sub-match from stale tableState (which is what
+    // caused the team-init flash on the way in).
     if (authState.isTablet) {
-      void gamePlayActions.clearMatchForTable()
+      void (async () => {
+        await liveScoreActions.fetchLiveScore()
+        await gamePlayActions.clearMatchForTable()
+      })()
       return
     }
     setGamePlayState({ matchReset: true })
@@ -705,6 +712,38 @@ export const gamePlayActions = {
     gamePlayActions.hasSideAssignment(1) &&
     gamePlayActions.hasSideAssignment(2),
 
+  // Flip the page into the loading spinner state until the
+  // post-set-order transition (saves → live-score swap → auto-load
+  // of the first sub-match) resolves. Without this the team-init
+  // body sits visible for the whole round trip.
+  beginSetOrderTransition: () => {
+    setGamePlayState({ loading: true })
+  },
+
+  // Tablet recovery after an admin takeover: the GamePlay page
+  // observes that the matchId no longer has an active session
+  // (admin released), so we drop the overlay, acquire a fresh
+  // session, and refetch the event to pick up any state the admin
+  // wrote while in control.
+  recoverTabletSession: async () => {
+    const { matchId, eventId } = gamePlayState
+    if (!matchId || !eventId) return
+    setGamePlayState({
+      sessionTakenOver: false,
+      sessionError: null,
+      matchReset: false,
+    })
+    const ok = await acquireSession(matchId)
+    if (!ok) {
+      // Acquire failed (server still says match is busy) — flip the
+      // overlay back on so the recovery effect retries next time
+      // activeSessionMatchIds changes.
+      setGamePlayState({ sessionTakenOver: true })
+      return
+    }
+    await fetchEvent(eventId, true)
+  },
+
   saveTeamSideAssignment: async (side: 1 | 2, assignmentIds: string[]) => {
     const { eventId, matchId } = gamePlayState
     if (!eventId || !matchId) return
@@ -715,7 +754,9 @@ export const gamePlayActions = {
         side,
         assignmentIds,
       })
-      await fetchEvent(eventId)
+      // Silent refetch: stay on the team-init screen instead of
+      // flashing the loading spinner between the two side saves.
+      await fetchEvent(eventId, true)
     } catch (err) {
       setGamePlayState({
         sessionError:

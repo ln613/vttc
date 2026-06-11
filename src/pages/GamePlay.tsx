@@ -90,6 +90,25 @@ const GamePlay = () => {
     void gamePlayActions.initializeFromUrl(params)
   })
 
+  // Tablet auto-recovery: when an admin takes over the tablet's
+  // match, sessionTakenOver flips true and the overlay shows. As
+  // soon as the admin releases (their session record is deleted →
+  // the matchId disappears from activeSessionMatchIds), drop the
+  // overlay and re-acquire the session so the tablet resumes
+  // umpiring without any user interaction. .some() is used so the
+  // Solid store can track per-element access reliably.
+  createEffect(() => {
+    if (!authState.isTablet) return
+    if (!gamePlayState.sessionTakenOver) return
+    const matchId = gamePlayState.matchId
+    if (!matchId) return
+    const stillActive = liveScoreState.activeSessionMatchIds.some(
+      (id) => id === matchId,
+    )
+    if (stillActive) return
+    void gamePlayActions.recoverTabletSession()
+  })
+
   // Auto-press Start for the user's own side on entry so the player who
   // clicked Start in Schedule/EventDetail doesn't have to click again
   // before the order-of-play picker opens.
@@ -260,9 +279,15 @@ const SessionBlockedOverlay = (props: { onExit: () => void }) => {
     <div style={overlayStyle}>
       <div style={overlayCardStyle}>
         <div style={overlayMessageStyle}>{message()}</div>
-        <button style={overlayButtonStyle} onClick={props.onExit}>
-          Go Back
-        </button>
+        {/* Tablet is pinned to a table — Go Back would orphan the
+            kiosk. We auto-dismiss this overlay (and re-acquire the
+            session) when the admin exits the match, so no button is
+            needed. */}
+        <Show when={!authState.isTablet}>
+          <button style={overlayButtonStyle} onClick={props.onExit}>
+            Go Back
+          </button>
+        </Show>
       </div>
     </div>
   )
@@ -1182,9 +1207,16 @@ const InitScreen = () => {
   return (
     <div style={initScreenStyle}>
       <div style={initHeaderStyle}>
-        <div style={initEventNameStyle}>{event()?.eventName}</div>
-        <div style={initStageNameStyle}>{stageName()}</div>
-        <div style={initParticipantsStyle}>{participants()}</div>
+        <div style={initHeaderLeftStyle}>
+          <div style={initEventNameStyle}>{event()?.eventName}</div>
+          <div style={initStageNameStyle}>{stageName()}</div>
+          <div style={initParticipantsStyle}>{participants()}</div>
+        </div>
+        <Show when={gamePlayState.tableNumber != null}>
+          <div style={initHeaderTableNumberStyle}>
+            {gamePlayState.tableNumber}
+          </div>
+        </Show>
       </div>
       <Show
         when={gamePlayActions.isTeamMatch()}
@@ -1369,8 +1401,19 @@ const TeamInitBody = (props: { landscape: boolean }) => {
 
   const handleSetOrder = async () => {
     if (!allFilled()) return
-    await gamePlayActions.saveTeamSideAssignment(homeSideNum(), homeSlots())
-    await gamePlayActions.saveTeamSideAssignment(awaySideNum(), awaySlots())
+    // Snapshot the picks BEFORE the first save — fetchEvent inside
+    // saveTeamSideAssignment refreshes `data`, which retriggers the
+    // reset-on-roster-change effect and wipes the slot signals.
+    // Reading from them after the first save would send an empty
+    // assignmentIds array to the server.
+    const home = [...homeSlots()]
+    const away = [...awaySlots()]
+    // Show the spinner immediately so the team-init screen doesn't
+    // sit there while both saves + the live-score → table-swap
+    // round-trip play out.
+    gamePlayActions.beginSetOrderTransition()
+    await gamePlayActions.saveTeamSideAssignment(homeSideNum(), home)
+    await gamePlayActions.saveTeamSideAssignment(awaySideNum(), away)
   }
 
   return (
@@ -1640,13 +1683,38 @@ const initScreenStyle: JSX.CSSProperties = {
 }
 
 const initHeaderStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'row',
+  'align-items': 'flex-start',
+  'justify-content': 'space-between',
+  gap: '16px',
+}
+
+const initHeaderLeftStyle: JSX.CSSProperties = {
   'text-align': 'left',
+  'min-width': 0,
+  flex: 1,
+}
+
+const initHeaderTableNumberStyle: JSX.CSSProperties = {
+  'font-size': 'clamp(56px, 14vh, 120px)',
+  'font-weight': 900,
+  color: '#f1c40f',
+  'line-height': 1,
+  'text-shadow': '2px 2px 6px rgba(0,0,0,0.35)',
+  'flex-shrink': 0,
 }
 
 const initEventNameStyle: JSX.CSSProperties = {
   'font-size': '22px',
   'font-weight': 700,
   color: '#fff',
+  // Tighten the line box so the event name sits flush against the
+  // top of the title row instead of carrying half a line of leading
+  // above its cap height.
+  'line-height': 1,
+  margin: 0,
+  padding: 0,
 }
 
 const initStageNameStyle: JSX.CSSProperties = {
