@@ -871,6 +871,10 @@ export const postponeMatch = async (body) => {
       ...m,
       postponedUntil,
       cancelledAt: undefined,
+      // A postponed match doesn't have to come back on the same
+      // table — drop the lock so the queue allocator can place it
+      // anywhere allowed by the general rules when it reappears.
+      lockedTableNumber: undefined,
     }))
   }
 
