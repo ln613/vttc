@@ -3,6 +3,40 @@ import { MongoClient, ObjectId } from 'mongodb'
 let cachedDb = null
 let cachedClient = null
 let connectingPromise = null
+let lastActivityAt = 0
+
+// After this much idle time, verify the cached connection is still alive
+// before reusing it — Atlas drops idle sockets, leaving a stale client
+// that hangs on the next query.
+const IDLE_RECHECK_MS = 5 * 60 * 1000
+const PING_TIMEOUT_MS = 3000
+
+// Ping the cached connection, bounded by a timeout so a dead socket can't
+// hang the check itself. Returns true only if it responds in time.
+const isConnectionHealthy = async () => {
+  if (!cachedClient) return false
+  try {
+    await Promise.race([
+      cachedClient.db('admin').command({ ping: 1 }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('ping timeout')), PING_TIMEOUT_MS),
+      ),
+    ])
+    return true
+  } catch {
+    return false
+  }
+}
+
+// Drop the cached connection so the next connectDB() rebuilds it. Closing
+// is fire-and-forget — a broken client shouldn't block the new connect.
+const resetConnection = () => {
+  const client = cachedClient
+  cachedClient = null
+  cachedDb = null
+  connectingPromise = null
+  if (client) Promise.resolve(client.close()).catch(() => {})
+}
 
 /**
  * Convert string _id to ObjectId for MongoDB queries
@@ -52,7 +86,21 @@ const convertFilterIds = (filter) => {
 }
 
 export const connectDB = async () => {
-  if (cachedDb) return cachedDb
+  const now = Date.now()
+
+  if (cachedDb) {
+    // After a long idle gap the cached connection may be dead; verify it
+    // with a bounded ping and rebuild if it's stale, instead of handing
+    // back a client that will hang on the next query.
+    if (now - lastActivityAt > IDLE_RECHECK_MS && !(await isConnectionHealthy())) {
+      resetConnection()
+    }
+    if (cachedDb) {
+      lastActivityAt = now
+      return cachedDb
+    }
+  }
+
   // Concurrent callers (rapid-fire requests at cold start) must share a
   // single connection attempt — otherwise each creates its own
   // MongoClient and the pool leaks/exhausts, which manifests as requests
@@ -67,6 +115,9 @@ export const connectDB = async () => {
       // Fail fast instead of hanging when the cluster is unreachable.
       serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
+      // Proactively retire idle sockets so the pool refreshes them rather
+      // than handing out connections the server already dropped.
+      maxIdleTimeMS: 60000,
     })
     await client.connect()
 
@@ -77,7 +128,9 @@ export const connectDB = async () => {
   })()
 
   try {
-    return await connectingPromise
+    const db = await connectingPromise
+    lastActivityAt = Date.now()
+    return db
   } catch (err) {
     // Let the next request retry from scratch.
     connectingPromise = null
