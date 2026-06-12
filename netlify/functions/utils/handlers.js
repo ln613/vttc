@@ -55,6 +55,7 @@ import {
   heartbeatMatchSession,
   releaseMatchSession,
 } from './matchSessionHandlers.js'
+import { getSettings, saveSettings } from './settingsHandlers.js'
 import { notifyEventUpdate, notifyLiveScoreUpdate } from './pusher.js'
 
 const withEventNotify = (fn) => async (body) => {
@@ -75,6 +76,7 @@ export const apiHandlers = {
     event: (params) => getEvent(params),
     eventSeries: () => getEventSeries(),
     liveScore: (params) => getLiveScore(params),
+    settings: () => getSettings(),
   },
   post: {
     saveTournament: (body) => saveTournament(body),
@@ -98,6 +100,7 @@ export const apiHandlers = {
     resetMatch: withEventNotify(resetMatch),
     resetEvent: withEventNotify(resetEvent),
     deleteEvent: withEventNotify(deleteEvent),
+    saveSettings: (body) => saveSettings(body),
     registerForEvent: withEventNotify(registerForEvent),
     getPartialTeams: (body) => getPartialTeams(body),
     getPlayerUnpaidFees: (body) => getPlayerUnpaidFees(body),

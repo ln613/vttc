@@ -1,5 +1,6 @@
 import { getDB, toObjectId } from './db.js'
 import { notifyEventUpdate, notifyLiveScoreUpdate, notifyMatchReset } from './pusher.js'
+import { getSettings as readGlobalSettings } from './settingsHandlers.js'
 
 const EVENTS_COLLECTION = 'events'
 const TOURNAMENTS_COLLECTION = 'tournaments'
@@ -518,10 +519,14 @@ const countPaidParticipants = (event) =>
     (p) => p.players.length === event.nop && allPlayersPaid(event, p.players),
   ).length
 
-const isQualifiedParticipant = (event, participant) =>
-  getParticipantDisqualifyReason(event, participant) == null
+const isQualifiedParticipant = (event, participant, { ignoreUnpaid = true } = {}) =>
+  getParticipantDisqualifyReason(event, participant, { ignoreUnpaid }) == null
 
-const getParticipantDisqualifyReason = (event, participant) => {
+const getParticipantDisqualifyReason = (
+  event,
+  participant,
+  { ignoreUnpaid = true } = {},
+) => {
   const players = participant.players || []
   if (event.nop > 1 && players.length !== event.nop) {
     return `incomplete team (${players.length}/${event.nop} players)`
@@ -537,19 +542,21 @@ const getParticipantDisqualifyReason = (event, participant) => {
       return `exceeds rating limit (${event.ratingLimit})`
     }
   }
-  if (!allPlayersPaid(event, players)) {
+  if (ignoreUnpaid && !allPlayersPaid(event, players)) {
     return 'not all players have paid'
   }
   return null
 }
 
-const getQualifiedParticipants = (event) =>
-  event.participants.filter((p) => isQualifiedParticipant(event, p))
+const getQualifiedParticipants = (event, { ignoreUnpaid = true } = {}) =>
+  event.participants.filter((p) =>
+    isQualifiedParticipant(event, p, { ignoreUnpaid }),
+  )
 
-const describeUnqualifiedParticipants = (event) => {
+const describeUnqualifiedParticipants = (event, { ignoreUnpaid = true } = {}) => {
   const issues = []
   for (const p of event.participants) {
-    const reason = getParticipantDisqualifyReason(event, p)
+    const reason = getParticipantDisqualifyReason(event, p, { ignoreUnpaid })
     if (!reason) continue
     const label =
       (p.players || []).map((pl) => `${pl.firstName} ${pl.lastName}`).join('/') ||
@@ -754,13 +761,19 @@ export const generateGroups = async (body) => {
   const event = await collection.findOne({ _id: toObjectId(_id) })
   if (!event) throwError('Event not found')
 
+  // The "ignore unpaid" setting toggles whether unpaid participants
+  // count as disqualified — applies to both validation and the
+  // actual group formation.
+  const settings = await readGlobalSettings()
+  const opts = { ignoreUnpaid: settings.ignoreUnpaidInGeneration }
+
   // Validate
-  const errors = validateGenerateGroupsRules(event)
+  const errors = validateGenerateGroupsRules(event, opts)
   throwErrors(errors)
 
-  // Form groups with snake seeding using qualified participants only
+  // Form groups with snake seeding using qualified participants only.
   const groupArrays = formGroupsWithSnakeSeeding(
-    getQualifiedParticipants(event),
+    getQualifiedParticipants(event, opts),
     event.nop,
   )
 
@@ -898,16 +911,16 @@ const buildKnockoutMatchRecord = (event, top, bottom, numberOfGames) => {
   return base
 }
 
-const validateGenerateGroupsRules = (event) => {
+const validateGenerateGroupsRules = (event, { ignoreUnpaid = true } = {}) => {
   const errors = []
 
   if (event.stages.length === 0 || event.stages[0] !== 'group') {
     errors.push('Event does not have a group stage as first stage')
   }
 
-  const qualified = getQualifiedParticipants(event).length
+  const qualified = getQualifiedParticipants(event, { ignoreUnpaid }).length
   if (qualified < 4) {
-    errors.push(formatNotEnoughQualifiedError(event, qualified))
+    errors.push(formatNotEnoughQualifiedError(event, qualified, { ignoreUnpaid }))
   }
 
   const groupStage = event.eventStages.find((s) => s.type === 'group')
@@ -918,8 +931,8 @@ const validateGenerateGroupsRules = (event) => {
   return errors
 }
 
-const formatNotEnoughQualifiedError = (event, qualified) => {
-  const issues = describeUnqualifiedParticipants(event)
+const formatNotEnoughQualifiedError = (event, qualified, { ignoreUnpaid = true } = {}) => {
+  const issues = describeUnqualifiedParticipants(event, { ignoreUnpaid })
   const header = `Minimum 4 qualified participants required (found ${qualified})`
   if (issues.length === 0) return header
   return `${header}. Unqualified: ${issues.join('; ')}`
@@ -1017,8 +1030,13 @@ export const generateKnockout = async (body) => {
   const event = await collection.findOne({ _id: toObjectId(_id) })
   if (!event) throwError('Event not found')
 
+  // Read the "ignore unpaid" setting once so both validation and
+  // first-round participant filtering see the same value.
+  const settings = await readGlobalSettings()
+  const opts = { ignoreUnpaid: settings.ignoreUnpaidInGeneration }
+
   // Validate
-  const errors = validateGenerateKnockoutRules(event)
+  const errors = validateGenerateKnockoutRules(event, opts)
   throwErrors(errors)
 
   const knockoutStageIndex = event.eventStages.findIndex((s) => s.type === 'knockout')
@@ -1042,8 +1060,11 @@ export const generateKnockout = async (body) => {
         ranking: ap.ranking,
       }))
     } else {
-      // Knockout-only event - use qualified participants only
-      participants = getQualifiedParticipants(event).map((p, i) => ({
+      // Knockout-only event - first round honors the "ignore unpaid"
+      // setting (per spec).
+      participants = getQualifiedParticipants(event, {
+        ignoreUnpaid: opts.ignoreUnpaid,
+      }).map((p, i) => ({
         participant: p,
         groupIndex: 0,
         ranking: i + 1,
@@ -1059,12 +1080,18 @@ export const generateKnockout = async (body) => {
   const updatedStages = [...event.eventStages]
   updatedStages[knockoutStageIndex] = updatedKnockoutStage
 
+  // Apply partial-round generation right after the bracket is
+  // created: every adjacent pair of byes in the first round can
+  // already determine the next round's match (no need to wait for
+  // an actual round-of-N match to be confirmed).
+  generateNextRoundIfNeeded(updatedStages, event)
+
   await collection.updateOne({ _id: toObjectId(_id) }, { $set: { eventStages: updatedStages } })
 
-  return updatedKnockoutStage
+  return updatedStages[knockoutStageIndex]
 }
 
-const validateGenerateKnockoutRules = (event) => {
+const validateGenerateKnockoutRules = (event, { ignoreUnpaid = true } = {}) => {
   const errors = []
 
   const hasKnockout = event.stages.includes('knockout')
@@ -1077,9 +1104,9 @@ const validateGenerateKnockoutRules = (event) => {
   const groupStage = event.eventStages.find((s) => s.type === 'group')
 
   if (event.stages[0] === 'knockout') {
-    const qualified = getQualifiedParticipants(event).length
+    const qualified = getQualifiedParticipants(event, { ignoreUnpaid }).length
     if (qualified < 4) {
-      errors.push(formatNotEnoughQualifiedError(event, qualified))
+      errors.push(formatNotEnoughQualifiedError(event, qualified, { ignoreUnpaid }))
     }
   }
 
@@ -1249,7 +1276,44 @@ const createKnockoutMatches = (seedingList, event, roundName) => {
     })
   }
 
-  return matches
+  // The matches array above is in seeding order (entry k → seed k+1).
+  // Reorder into standard seeded-bracket layout so that adjacent
+  // pairs [2j, 2j+1] feed slot j of the next round. This produces
+  // the correct re-seeding (per spec) at every subsequent round
+  // because the next round's match-array is naturally in bracket
+  // order as well.
+  return reorderInBracketLayout(matches)
+}
+
+const reorderInBracketLayout = (matches) => {
+  const n = matches.length
+  if (n < 2 || (n & (n - 1)) !== 0) return matches
+  const order = standardBracketOrder(n)
+  return order.map((seed) => matches[seed - 1])
+}
+
+// Returns the seed at each bracket position (1-indexed seeds in a
+// 0-indexed array). The layout follows the standard "balanced"
+// tournament convention:
+//   n=4  → [1, 4, 3, 2]   (1v4, 3v2)
+//   n=8  → [1, 8, 4, 5, 3, 6, 2, 7]
+//   n=16 → [1, 16, 8, 9, 4, 13, 5, 12, 3, 14, 6, 11, 2, 15, 7, 10]
+// The n=4 base case is special-cased so the bottom pair is reversed
+// (3 above 2); all larger sizes inherit the layout via the simple
+// `[s, n+1-s]` expansion of the parent bracket order. Pairing
+// position [2j, 2j+1] then plays the seeds that would meet in slot
+// j of the next round under "1vN, 2vN-1, ..." re-seeding.
+const standardBracketOrder = (n) => {
+  if (n === 1) return [1]
+  if (n === 2) return [1, 2]
+  if (n === 4) return [1, 4, 3, 2]
+  const half = standardBracketOrder(n / 2)
+  const result = []
+  for (const s of half) {
+    result.push(s)
+    result.push(n + 1 - s)
+  }
+  return result
 }
 
 const calculateRemainingParticipants = (totalParticipants) => {
@@ -1383,6 +1447,10 @@ const advanceKnockoutRound = (stage, event) => {
     let changed = false
     for (let j = 0; j < slots; j++) {
       if (nextMatches[j]?.match) continue
+      // Previous round's matches array is in standard seeded-bracket
+      // layout (see reorderInBracketLayout), so adjacent pairs
+      // [2j, 2j+1] correctly feed slot j of the next round under the
+      // spec's "re-seed each round" rule.
       const m1 = normalizedMatches[j * 2]
       const m2 = normalizedMatches[j * 2 + 1]
       if (!isKmReadyForAdvance(m1) || !isKmReadyForAdvance(m2)) continue
@@ -3525,7 +3593,7 @@ const generateNextRoundIfNeeded = (updatedStages, event) => {
   const knockoutStageIndex = updatedStages.findIndex((s) => s.type === 'knockout')
   if (knockoutStageIndex === -1) return
 
-  const knockoutStage = updatedStages[knockoutStageIndex]
+  let knockoutStage = updatedStages[knockoutStageIndex]
   if (!knockoutStage.rounds || knockoutStage.rounds.length === 0 || isFirstRoundEmpty(knockoutStage)) {
     // No knockout rounds yet (or cleared after reset). Check if group stage is complete and knockout should start
     const groupStage = updatedStages.find((s) => s.type === 'group')
@@ -3537,8 +3605,13 @@ const generateNextRoundIfNeeded = (updatedStages, event) => {
       }))
       const newKnockoutStage = createKnockoutStage(participants, event.nop, knockoutStage.config, event)
       updatedStages[knockoutStageIndex] = newKnockoutStage
+      // Fall through to the partial-generation loop below so adjacent
+      // bye pairs in the new bracket can already produce their next-
+      // round matches.
+      knockoutStage = newKnockoutStage
+    } else {
+      return
     }
-    return
   }
 
   // Partial generation: for each round, populate next-round slots whose
@@ -3560,24 +3633,41 @@ const generateNextRoundIfNeeded = (updatedStages, event) => {
     let changed = false
     for (let j = 0; j < slots; j++) {
       if (updatedNextMatches[j]?.match) continue
-      // Consecutive pairing: slot j of the next round is fed by matches
-      // [2j] and [2j+1] of this round — matches the bracket visual and
-      // the spec example (QF1+QF2 → SF1, QF3+QF4 → SF2).
+      // Previous round's matches array is in standard seeded-bracket
+      // layout (see reorderInBracketLayout), so adjacent pairs
+      // [2j, 2j+1] correctly feed slot j of the next round under the
+      // spec's "re-seed each round" rule.
       const m1 = round.matches[j * 2]
       const m2 = round.matches[j * 2 + 1]
-      const ready =
-        m1 && m2 && isKmReadyForAdvance(m1) && isKmReadyForAdvance(m2)
-      if (!ready) continue
-      const newKm = buildPartialNextRoundMatch(
-        workingStage,
-        nextRound,
-        m1,
-        m2,
-        event,
-      )
-      if (!newKm) continue
-      updatedNextMatches[j] = newKm
-      changed = true
+      const m1Ready = m1 && isKmReadyForAdvance(m1)
+      const m2Ready = m2 && isKmReadyForAdvance(m2)
+
+      if (m1Ready && m2Ready) {
+        const newKm = buildPartialNextRoundMatch(
+          workingStage,
+          nextRound,
+          m1,
+          m2,
+          event,
+        )
+        if (!newKm) continue
+        updatedNextMatches[j] = newKm
+        changed = true
+        continue
+      }
+      // Preview the half that's known so the bracket shows the bye
+      // (or already-confirmed) participant instead of "TBD". Bracket
+      // order keeps m1's seed lower than m2's, so the known winner
+      // takes the "top" slot when m1 is the ready side.
+      if (m1Ready || m2Ready) {
+        const currentKm = updatedNextMatches[j] || makeKnockoutSlotPlaceholder()
+        const knownWinner = m1Ready ? m1.winner : m2.winner
+        const slot = m1Ready ? 'participant1' : 'participant2'
+        const existing = currentKm[slot]
+        if (existing && isSameParticipant(existing, knownWinner)) continue
+        updatedNextMatches[j] = { ...currentKm, [slot]: knownWinner }
+        changed = true
+      }
     }
 
     if (!changed) continue

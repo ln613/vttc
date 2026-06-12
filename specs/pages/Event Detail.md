@@ -20,7 +20,10 @@ Vertical
 - Generate Groups button (if no groups, only for admin)
   - exlude participants that are not qualified
 - list of groups
-- if no groups, list of participants (sort by rating/combined rating desc). for admin, show unpaid participants in red (not for the host)
+- if no groups, list of participants
+  - sort by rating/combined rating desc
+  - for team/double, show individual rating after name "{name} ({Rating})"
+  - for admin, show unpaid participants in red (not for the host)
 
 ### Group
 

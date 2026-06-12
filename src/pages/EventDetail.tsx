@@ -720,8 +720,16 @@ const isParticipantUnpaid = (participant: Participant): boolean => {
   }
   // Hosts are always treated as paid.
   return !participant.players.every(
-    (p) => isPlayerHost(p._id?.toString()) || paidIds.includes(p._id.toString()),
+    (p) => isPlayerHostObj(p) || paidIds.includes(p._id.toString()),
   )
+}
+
+// Host check that prefers the snapshot on the player object (since
+// the global players list might not be loaded on EventDetail mount)
+// and falls back to playerState only if the snapshot is missing.
+const isPlayerHostObj = (player: { _id?: string; host?: boolean }): boolean => {
+  if (player.host) return true
+  return isPlayerHost(player._id?.toString())
 }
 
 const isPlayerHost = (playerId: string | undefined): boolean => {
@@ -736,15 +744,19 @@ const ParticipantRow = (props: ParticipantRowProps) => {
   const rowBg = () => (props.index % 2 === 0 ? '#f8f9fa' : '#fff')
   const event = () => eventDetailState.data
   const paidIds = () => event()?.paidPlayerIds || []
+  // Team/doubles (nop > 1): show each player's individual rating
+  // alongside their name. Singles (nop = 1) only have one rating
+  // and it's already rendered on the right.
+  const showPlayerRatings = () => (event()?.nop ?? 1) > 1
   const sortedPlayers = () =>
     [...(props.participant.players || [])].sort(
       (a, b) => (b.rating || 0) - (a.rating || 0),
     )
-  const isPlayerInRed = (player: { _id?: string }): boolean => {
+  const isPlayerInRed = (player: { _id?: string; host?: boolean }): boolean => {
     if (!authState.isAdmin) return false
     const id = player._id?.toString()
     if (!id) return false
-    if (isPlayerHost(id)) return false
+    if (isPlayerHostObj(player)) return false
     return !paidIds().includes(id)
   }
   // Team-name display still uses the all-or-nothing red rule, but
@@ -776,6 +788,10 @@ const ParticipantRow = (props: ParticipantRowProps) => {
                     style={isPlayerInRed(player) ? { color: '#e74c3c' } : {}}
                   >
                     {player.firstName} {player.lastName}
+                    <Show when={showPlayerRatings()}>
+                      {' '}
+                      ({player.rating ?? '—'})
+                    </Show>
                   </span>
                 </>
               )}

@@ -8,6 +8,7 @@
   - Events: go to the Home/Events List page
   - Schedule: go to the schedule page
   - Players: go to the Players page
+  - Setting Icon (align right, admin only)
   - Account Icon (align right)
     - if not signed in, show sign in dialog
     - if signed in, go to account page

@@ -11,6 +11,7 @@ import Players from './pages/Players'
 import GamePlay from './pages/GamePlay'
 import LiveScore from './pages/LiveScore'
 import Account from './pages/Account'
+import Settings from './pages/Settings'
 import ConfirmDialog from './components/ConfirmDialog'
 
 const RootLayout = (props: { children?: JSX.Element }) => (
@@ -36,6 +37,7 @@ const App = () => (
     <Route path="/event/:id" component={EventDetail} />
     <Route path="/game-play" component={GamePlay} />
     <Route path="/live-score" component={LiveScore} />
+    <Route path="/settings" component={Settings} />
   </HashRouter>
 )
 
