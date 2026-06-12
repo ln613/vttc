@@ -232,6 +232,48 @@ export const eventDetailActions = {
     }
   },
 
+  // Forfeit: finish the match with the forfeiting side losing every game
+  // to nothing (e.g. 0:11, 0:11 for best of 3). Auto-confirmed since the
+  // admin is decisively ending the match.
+  forfeitMatch: async (
+    matchId: string,
+    match: {
+      config?: {
+        numberOfGames?: number
+        gameConfig?: { targetPoints?: number }
+      }
+    },
+    side: 1 | 2,
+    sourceEventId?: string,
+  ) => {
+    const eventId = sourceEventId ?? eventDetailState.eventId
+    if (!eventId) return
+    const numberOfGames = match.config?.numberOfGames ?? 5
+    const targetPoints = match.config?.gameConfig?.targetPoints ?? 11
+    const needed = Math.ceil(numberOfGames / 2)
+    const games = Array.from({ length: needed }, () =>
+      side === 1
+        ? { score1: 0, score2: targetPoints }
+        : { score1: targetPoints, score2: 0 },
+    )
+    try {
+      await apiPost('finishMatch', {
+        _id: eventId,
+        matchId,
+        confirmed: true,
+        result: games,
+      })
+      if (eventDetailState.eventId === eventId) {
+        await fetchEvent(eventId, true)
+      }
+    } catch (err) {
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Failed to forfeit match',
+      )
+    }
+  },
+
   getEventStages: (): Stage[] => eventDetailState.data?.eventStages || [],
 
   getGroupStage: () => {

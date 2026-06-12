@@ -79,6 +79,10 @@ The Total column is the total matches played so far.
       - visible to admin and Player in match
       - Show "Start" for any play who's actually in the match, show "Umpire" otherwise
       - for parent team match, admin sees "Start" button, which allows the admin to set order of play for both sides/teams
+    - Forfeit button
+      - admin only
+      - one Forfeit button for each side, before the player name(s)
+      - on click, finish the match with the forfeit side losing all games without any point. e.g., 0:11, 0:11 for best of 3
   - match in progress
     - light blue bg
     - big table number (left aligned)

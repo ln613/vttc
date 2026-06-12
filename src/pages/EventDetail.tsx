@@ -1182,6 +1182,21 @@ export const MatchRow = (props: MatchRowProps) => {
     eventDetailActions.simulateMatch(props.match._id, props.match, eventId)
   }
 
+  const handleForfeitClick = async (side: 1 | 2) => {
+    const players = side === 1 ? side1Players() : side2Players()
+    const names = formatSidePlayers(players)
+    if (
+      !(await customConfirm(
+        `Forfeit for ${names}? They will lose the match without scoring a point.`,
+        { confirmColor: '#e74c3c' },
+      ))
+    ) {
+      return
+    }
+    const eventId = props.eventId ?? eventDetailState.eventId ?? undefined
+    void eventDetailActions.forfeitMatch(props.match._id, props.match, side, eventId)
+  }
+
   // Parent team match rows only expose the Start button — sub-match
   // rows handle Continue/Confirm/Reset/Simulate via their own MatchRow.
   const isTeamParent = () => !!props.match.isTeamMatch
@@ -1231,6 +1246,13 @@ export const MatchRow = (props: MatchRowProps) => {
   const showResetTeam = () =>
     authState.isAdmin &&
     !!props.match.parentMatchId &&
+    !hasStarted() &&
+    assignedTable() !== undefined
+  // Forfeit: admin-only, shown per side before the player names while the
+  // match is on a table but not yet started (the light-red state).
+  const showForfeit = () =>
+    authState.isAdmin &&
+    !isTeamParent() &&
     !hasStarted() &&
     assignedTable() !== undefined
   const showSimulate = () =>
@@ -1310,6 +1332,8 @@ export const MatchRow = (props: MatchRowProps) => {
               winningSide={provisional().winningSide}
               markUnavailablePlayers={props.markUnavailablePlayers}
               parent={props.parent}
+              showForfeit={showForfeit()}
+              onForfeit={handleForfeitClick}
             />
           }
         >
@@ -1622,6 +1646,8 @@ interface MatchRowsTableProps {
   winningSide?: 1 | 2
   markUnavailablePlayers?: boolean
   parent?: Match
+  showForfeit?: boolean
+  onForfeit?: (side: 1 | 2) => void
 }
 
 const MatchRowsTable = (props: MatchRowsTableProps) => {
@@ -1639,6 +1665,8 @@ const MatchRowsTable = (props: MatchRowsTableProps) => {
         isWinner={side1IsWinner()}
         markUnavailablePlayers={props.markUnavailablePlayers}
         parent={props.parent}
+        showForfeit={props.showForfeit}
+        onForfeit={props.onForfeit}
       />
       <div style={matchSidesSeparatorStyle} />
       <MatchSideRow
@@ -1649,6 +1677,8 @@ const MatchRowsTable = (props: MatchRowsTableProps) => {
         isWinner={side2IsWinner()}
         markUnavailablePlayers={props.markUnavailablePlayers}
         parent={props.parent}
+        showForfeit={props.showForfeit}
+        onForfeit={props.onForfeit}
       />
     </div>
   )
@@ -1662,6 +1692,8 @@ interface MatchSideRowProps {
   isWinner: boolean
   markUnavailablePlayers?: boolean
   parent?: Match
+  showForfeit?: boolean
+  onForfeit?: (side: 1 | 2) => void
 }
 
 const MatchSideRow = (props: MatchSideRowProps) => {
@@ -1678,7 +1710,20 @@ const MatchSideRow = (props: MatchSideRowProps) => {
   const scoresContainerStyle = (): JSX.CSSProperties => matchSideScoresStyle
   return (
     <div style={matchSideRowStyle}>
-      <span style={nameStyle()}>
+      <div style={matchSideNameCellStyle}>
+        <Show when={props.showForfeit}>
+          <button
+            style={forfeitButtonStyle}
+            onClick={(e) => {
+              e.stopPropagation()
+              e.preventDefault()
+              props.onForfeit?.(props.side)
+            }}
+          >
+            Forfeit
+          </button>
+        </Show>
+        <span style={nameStyle()}>
         <Show
           when={props.markUnavailablePlayers || !!props.parent}
           fallback={formatSidePlayers(props.players)}
@@ -1707,7 +1752,8 @@ const MatchSideRow = (props: MatchSideRowProps) => {
             }}
           </For>
         </Show>
-      </span>
+        </span>
+      </div>
       <div style={scoresContainerStyle()}>
         <For each={props.games}>
           {(game, index) => {
@@ -2599,6 +2645,29 @@ const matchSideNameStyle: JSX.CSSProperties = {
   'justify-self': 'stretch',
   'word-break': 'break-word',
   'min-width': 0,
+}
+
+// Column-1 cell wrapping the optional Forfeit button (left) and the
+// right-aligned player name(s).
+const matchSideNameCellStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'flex-end',
+  gap: '8px',
+  'min-width': 0,
+}
+
+const forfeitButtonStyle: JSX.CSSProperties = {
+  flex: 'none',
+  padding: '2px 8px',
+  'font-size': '12px',
+  'font-weight': 600,
+  color: '#fff',
+  'background-color': '#e74c3c',
+  border: 'none',
+  'border-radius': '4px',
+  cursor: 'pointer',
+  'white-space': 'nowrap',
 }
 
 const matchSidePlayerUnavailableStyle: JSX.CSSProperties = {
