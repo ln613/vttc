@@ -3874,8 +3874,13 @@ const buildResetEventStages = (event) =>
 export const autoGenerateForEvent = async (event) => {
   let changed = false
 
-  if (needsGroupGeneration(event)) {
-    await autoGenerateGroups(event)
+  // Respect the global "ignore unpaid" setting so auto-start matches the
+  // manual Generate Groups / Generate Knockout behaviour.
+  const settings = await readGlobalSettings()
+  const opts = { ignoreUnpaid: settings.ignoreUnpaidInGeneration }
+
+  if (needsGroupGeneration(event, opts)) {
+    await autoGenerateGroups(event, opts)
     changed = true
   }
 
@@ -3886,8 +3891,8 @@ export const autoGenerateForEvent = async (event) => {
     freshEvent = await db.collection(EVENTS_COLLECTION).findOne({ _id: event._id })
   }
 
-  if (needsScheduleGeneration(freshEvent)) {
-    await autoGenerateSchedule(freshEvent)
+  if (needsScheduleGeneration(freshEvent, opts)) {
+    await autoGenerateSchedule(freshEvent, opts)
     changed = true
   }
 
@@ -3901,20 +3906,20 @@ export const autoGenerateForEvent = async (event) => {
 /**
  * Check if event needs group generation
  */
-const needsGroupGeneration = (event) => {
+const needsGroupGeneration = (event, opts) => {
   if (!event.stages || !event.stages.includes('group')) return false
   const groupStage = event.eventStages?.find((s) => s.type === 'group')
   if (!groupStage) return false
   return (
     groupStage.groups.length === 0 &&
-    getQualifiedParticipants(event).length >= 4
+    getQualifiedParticipants(event, opts).length >= 4
   )
 }
 
 /**
  * Check if event needs schedule generation (knockout bracket)
  */
-const needsScheduleGeneration = (event) => {
+const needsScheduleGeneration = (event, opts) => {
   if (!event.stages || !event.stages.includes('knockout')) return false
 
   const knockoutStage = event.eventStages?.find((s) => s.type === 'knockout')
@@ -3926,7 +3931,7 @@ const needsScheduleGeneration = (event) => {
 
   if (event.stages[0] === 'knockout') {
     // Knockout-only event
-    return getQualifiedParticipants(event).length >= 4
+    return getQualifiedParticipants(event, opts).length >= 4
   }
 
   // Group + Knockout event: knockout can only start if all groups complete
@@ -3943,9 +3948,9 @@ const needsScheduleGeneration = (event) => {
 /**
  * Auto-generate groups with match schedules for an event
  */
-const autoGenerateGroups = async (event) => {
+const autoGenerateGroups = async (event, opts) => {
   const groupArrays = formGroupsWithSnakeSeeding(
-    getQualifiedParticipants(event),
+    getQualifiedParticipants(event, opts),
     event.nop,
   )
   const numberOfGames = getBestOfNumber(event.groupGames)
@@ -3995,14 +4000,14 @@ const buildGroupsWithMatches = (event, groupArrays, numberOfGames) =>
 /**
  * Auto-generate knockout bracket for an event
  */
-const autoGenerateSchedule = async (event) => {
+const autoGenerateSchedule = async (event, opts) => {
   const knockoutStageIndex = event.eventStages.findIndex(
     (s) => s.type === 'knockout',
   )
   const knockoutStage = event.eventStages[knockoutStageIndex]
   const groupStage = event.eventStages.find((s) => s.type === 'group')
 
-  const participants = buildKnockoutParticipants(event, groupStage)
+  const participants = buildKnockoutParticipants(event, groupStage, opts)
   const newKnockoutStage = createKnockoutStage(
     participants,
     event.nop,
@@ -4019,7 +4024,7 @@ const autoGenerateSchedule = async (event) => {
     .updateOne({ _id: event._id }, { $set: { eventStages: updatedStages } })
 }
 
-const buildKnockoutParticipants = (event, groupStage) => {
+const buildKnockoutParticipants = (event, groupStage, opts) => {
   if (groupStage && groupStage.advancedParticipants?.length > 0) {
     return groupStage.advancedParticipants.map((ap) => ({
       participant: ap.participant,
@@ -4028,7 +4033,7 @@ const buildKnockoutParticipants = (event, groupStage) => {
     }))
   }
 
-  return getQualifiedParticipants(event).map((p, i) => ({
+  return getQualifiedParticipants(event, opts).map((p, i) => ({
     participant: p,
     groupIndex: 0,
     ranking: i + 1,
