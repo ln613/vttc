@@ -323,6 +323,12 @@ const saveTableState = async (tables, matchQueue, groupTableMap) => {
 
 const ALL_TABLES = [1, 2, 3, 4, 5, 6, 7, 8]
 const TABLE_ORDER = [6, 7, 2, 3, 5, 4, 1, 8]
+// Low-tier events: any table, preferring the worse courts first so the
+// better tables stay free for high-level events.
+const LOW_TIER_ORDER = [1, 4, 8, 2, 3, 5, 7, 6]
+// High-tier events: tables 1 and 4 never used; table 6 preferred last so
+// it stays free for the final.
+const HIGH_TIER_ORDER = [2, 3, 5, 7, 6]
 
 const createInitialTables = () =>
   ALL_TABLES.map((tableNumber) => ({
@@ -418,12 +424,9 @@ const getAllowedTables = (item, availableTables) => {
   if (isLow) {
     if (isFinal || isSemifinal) {
       // Low-tier semifinal/final prefers tables 2 or 3.
-      const preferredOrder = [2, 3, 1, 4, ...TABLE_ORDER]
-      return [...allowed].sort(
-        (a, b) => preferredOrder.indexOf(a) - preferredOrder.indexOf(b),
-      )
+      return sortByOrder(allowed, [2, 3, ...LOW_TIER_ORDER])
     }
-    return sortByPreference(allowed, true)
+    return sortByOrder(allowed, LOW_TIER_ORDER)
   }
 
   // Rule 3: For non-low-tier events, table 8 not used at all
@@ -439,28 +442,22 @@ const getAllowedTables = (item, availableTables) => {
       // Final must be on table 6. If 6 is busy, defer by returning [].
       return allowed.includes(6) ? [6] : []
     }
+    return sortByOrder(allowed, HIGH_TIER_ORDER)
   }
 
-  return sortByPreference(allowed, false)
+  // Mid-tier events: no explicit preference order, use the general
+  // court-condition order (table 8 already excluded by rule 3).
+  return sortByOrder(allowed, TABLE_ORDER)
 }
 
-const sortByPreference = (tables, isLow) => {
-  if (isLow) {
-    const preferredOrder = [1, 4, ...TABLE_ORDER]
-    return [...tables].sort(
-      (a, b) => preferredOrder.indexOf(a) - preferredOrder.indexOf(b),
-    )
+// Sort tables by an explicit preference order (tables not in the order
+// sort to the end, preserving relative order).
+const sortByOrder = (tables, order) => {
+  const rank = (t) => {
+    const i = order.indexOf(t)
+    return i === -1 ? order.length : i
   }
-
-  const canUse1or4 = tables.some((t) => t === 1 || t === 4)
-  if (canUse1or4) {
-    const order = [1, 4, ...TABLE_ORDER]
-    return [...tables].sort((a, b) => order.indexOf(a) - order.indexOf(b))
-  }
-
-  return [...tables].sort(
-    (a, b) => TABLE_ORDER.indexOf(a) - TABLE_ORDER.indexOf(b),
-  )
+  return [...tables].sort((a, b) => rank(a) - rank(b))
 }
 
 /**

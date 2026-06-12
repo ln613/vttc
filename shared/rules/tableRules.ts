@@ -109,18 +109,27 @@ export const isSemifinalMatch = (item: MatchQueueItem): boolean =>
 
 // ==================== TABLE ASSIGNMENT RULES ====================
 
+// Low-tier events: any table for any stage, preferring the worse courts
+// first so the better tables stay free for high-level events.
+const LOW_TIER_ORDER: TableNumber[] = [1, 4, 8, 2, 3, 5, 7, 6]
+// High-tier events: tables 1 and 4 are never used; table 6 is preferred
+// last so it stays free for the final.
+const HIGH_TIER_ORDER: TableNumber[] = [2, 3, 5, 7, 6]
+
 /**
  * Get allowed tables for a match based on rules (priority ordered)
  *
  * Rules (by priority):
  * 1. Table 8 should never be used for knockout matches
  * 2. Low-tier events: any table for any stage
+ *    - table preference order: 1, 4, 8, 2, 3, 5, 7, 6
+ *    - for semifinal and final, prefer table 2 or 3
  * 3. Non-low-tier events: table 8 not used at all
  * 4. High-tier events:
  *    - do not use table 1 and 4 at all
+ *    - table preference order: 2, 3, 5, 7, 6
  *    - final should be on table 6
  *    - semi final should not be on table 5
- * 5. If a match can use table 1 or 4, prefer 1 or 4 in that order
  */
 export const getAllowedTables = (
   item: MatchQueueItem,
@@ -140,7 +149,7 @@ export const getAllowedTables = (
     if (isFinal || isSemifinal) {
       return sortByLowTierKnockoutPreference(allowed)
     }
-    return sortByPreference(allowed, isLow)
+    return sortByOrder(allowed, LOW_TIER_ORDER)
   }
 
   allowed = filterByRule3(allowed)
@@ -150,9 +159,12 @@ export const getAllowedTables = (
     if (isFinal) {
       return filterForFinal(allowed)
     }
+    return sortByOrder(allowed, HIGH_TIER_ORDER)
   }
 
-  return sortByPreference(allowed, isLow)
+  // Mid-tier events: no explicit preference order, use the general
+  // court-condition order (table 8 already excluded by rule 3).
+  return sortByOrder(allowed, TABLE_ORDER)
 }
 
 /**
@@ -201,39 +213,23 @@ const filterForFinal = (tables: TableNumber[]): TableNumber[] =>
 const sortByLowTierKnockoutPreference = (
   tables: TableNumber[],
 ): TableNumber[] => {
-  const preferredOrder: TableNumber[] = [2, 3, 1, 4, ...TABLE_ORDER]
-  return [...tables].sort(
-    (a, b) => preferredOrder.indexOf(a) - preferredOrder.indexOf(b),
-  )
+  const preferredOrder: TableNumber[] = [2, 3, ...LOW_TIER_ORDER]
+  return sortByOrder(tables, preferredOrder)
 }
 
 /**
- * Rule 5: Prefer table 1, 4 in that order for low-tier matches
- * Otherwise sort by TABLE_ORDER
+ * Sort tables by an explicit preference order (tables not in the order
+ * sort to the end, preserving their relative order).
  */
-const sortByPreference = (
+const sortByOrder = (
   tables: TableNumber[],
-  isLow: boolean,
+  order: TableNumber[],
 ): TableNumber[] => {
-  if (isLow) {
-    return [...tables].sort((a, b) => {
-      const preferredOrder: TableNumber[] = [1, 4, ...TABLE_ORDER]
-      return preferredOrder.indexOf(a) - preferredOrder.indexOf(b)
-    })
+  const rank = (t: TableNumber) => {
+    const i = order.indexOf(t)
+    return i === -1 ? order.length : i
   }
-
-  // For normal matches that can use 1 or 4, prefer 1, 4 first
-  const canUse1or4 = tables.some((t) => t === 1 || t === 4)
-  if (canUse1or4) {
-    return [...tables].sort((a, b) => {
-      const order: TableNumber[] = [1, 4, ...TABLE_ORDER]
-      return order.indexOf(a) - order.indexOf(b)
-    })
-  }
-
-  return [...tables].sort(
-    (a, b) => TABLE_ORDER.indexOf(a) - TABLE_ORDER.indexOf(b),
-  )
+  return [...tables].sort((a, b) => rank(a) - rank(b))
 }
 
 // ==================== MATCH QUEUE BUILDING ====================

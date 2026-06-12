@@ -20,15 +20,16 @@ The table is ordered based on court condition for high quality matches
 Rule listed below are based on priority. A rule with lower priority cannot violate any rules with higher priority.
 
 1. Table 8 should never be used for knockout matches
-2. For the following events
+2. For the following events (low level events)
   - single event with rating limit 1000 and below
   - team event with combined rating limit 2000 and below
   - single event with max age 13 and below
   apply the following rules:
   - any table can be used for any stage
+  - table preference order: 1, 4, 8, 2, 3, 5, 7, 6
   - for semifinal and final, prefer using table 2 or 3
 3. For any other events, table 8 should not be used at all
-4. For the following events
+4. For the following events (high level events)
   - open singles
   - single event with rating limit 1500 and above
   - team event with combined rating limit 2500 and above
@@ -36,11 +37,11 @@ Rule listed below are based on priority. A rule with lower priority cannot viola
   - single event with min age 40 and above
   apply the following rules:
   - do not use table 1 and 4 at all
+  - table preference order: 2, 3, 5, 7, 6
   - final should be on table 6
   - semi final should not be on table 5
-5. If a match can use table 1 or 4, prefer using 1 or 4 in that order if available
-6. For group of 3 (single or team), assign a single table for the group, and assign each match in the group to that table one at a time, until all matches in that group are finished.
-7. For group of 4 or more (single or team), no fixed table for the group, all matches in the group will be placed in the main match queue
+5. For group of 3 (single or team), assign a single table for the group, and assign each match in the group to that table one at a time, until all matches in that group are finished.
+6. For group of 4 or more (single or team), no fixed table for the group, all matches in the group will be placed in the main match queue
 
 ## Match Queue
 
