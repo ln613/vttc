@@ -384,21 +384,6 @@ export const hasPlayerConflict = (
 }
 
 /**
- * Check if any player in a group of 3 is currently playing
- */
-export const hasGroupPlayerConflict = (
-  groupKey: string,
-  allItems: MatchQueueItem[],
-  playersOnTables: Set<string>,
-): boolean => {
-  const groupItems = allItems.filter((i) => i.groupKey === groupKey)
-  for (const item of groupItems) {
-    if (hasPlayerConflict(item, playersOnTables)) return true
-  }
-  return false
-}
-
-/**
  * Assign tables to matches from the queue
  * Returns updated tables and remaining queue
  */
@@ -417,7 +402,6 @@ export const assignTablesToMatches = (
       item,
       updatedTables,
       playersOnTables,
-      allItems,
       assignedGroupKeys,
     )
     if (!assigned) {
@@ -432,17 +416,17 @@ const tryAssignMatch = (
   item: MatchQueueItem,
   tables: TableAssignment[],
   playersOnTables: Set<string>,
-  allItems: MatchQueueItem[],
   assignedGroupKeys: Set<string>,
 ): boolean => {
-  // Group of 3: check all players in the group
+  // Group of 3 runs one match at a time on its fixed table, so only one
+  // of its matches is assigned per pass.
   if (item.groupKey && item.groupSize === 3) {
     if (assignedGroupKeys.has(item.groupKey)) return false // already assigned
-    if (hasGroupPlayerConflict(item.groupKey, allItems, playersOnTables))
-      return false
-  } else {
-    if (hasPlayerConflict(item, playersOnTables)) return false
   }
+  // A match is skipped only when one of its own two players is already
+  // playing — a busy third group member no longer blocks the match whose
+  // players are both free.
+  if (hasPlayerConflict(item, playersOnTables)) return false
 
   const availableTables = getAvailableTableNumbers(tables)
   if (availableTables.length === 0) return false

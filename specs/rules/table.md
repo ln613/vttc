@@ -62,7 +62,8 @@ When building the match queue:
 
 do the following until either no available tables or reach the end of match queue:
 - take the next match in the Match Queue
-- if any player in that match is currently playing on another table, skip the match. For group of 3, that means any player in that group
+- if any player in that match is currently playing on another table, skip the match
+- for a group of 3, only one of its matches can be on its fixed table at a time, but a match whose two players are both free can start even if the third group member is currently playing elsewhere
 - try to find a table for the match based on the Table Assigning Rules, if found, assign the table to the match and remove the match from the queue
 
 This process will be triggered when

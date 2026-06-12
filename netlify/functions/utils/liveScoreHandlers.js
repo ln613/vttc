@@ -583,17 +583,6 @@ const hasPlayerConflict = (item, playersOnTables) => {
 }
 
 /**
- * Check group player conflict (for group of 3)
- */
-const hasGroupPlayerConflict = (groupKey, allItems, playersOnTables) => {
-  const groupItems = allItems.filter((i) => i.groupKey === groupKey)
-  for (const item of groupItems) {
-    if (hasPlayerConflict(item, playersOnTables)) return true
-  }
-  return false
-}
-
-/**
  * Assign tables to matches from the queue
  */
 const assignTablesToMatches = (tables, queue, allItems, groupTableMap) => {
@@ -606,21 +595,18 @@ const assignTablesToMatches = (tables, queue, allItems, groupTableMap) => {
   for (const item of queue) {
     const isGroupOfThree = item.groupKey && item.groupSize === 3
 
-    // Group of 3: check all players in the group
-    if (isGroupOfThree) {
-      if (assignedGroupKeys.has(item.groupKey)) {
-        remainingQueue.push(item)
-        continue
-      }
-      if (hasGroupPlayerConflict(item.groupKey, allItems, playersOnTables)) {
-        remainingQueue.push(item)
-        continue
-      }
-    } else {
-      if (hasPlayerConflict(item, playersOnTables)) {
-        remainingQueue.push(item)
-        continue
-      }
+    // Group of 3 runs one match at a time on its fixed table, so only one
+    // of its matches is assigned per pass.
+    if (isGroupOfThree && assignedGroupKeys.has(item.groupKey)) {
+      remainingQueue.push(item)
+      continue
+    }
+    // A match is skipped only when one of its own two players is already
+    // playing — a busy third group member no longer blocks the match
+    // whose players are both free.
+    if (hasPlayerConflict(item, playersOnTables)) {
+      remainingQueue.push(item)
+      continue
     }
 
     // Tables reserved for other groups of 3 are off-limits to this item.
