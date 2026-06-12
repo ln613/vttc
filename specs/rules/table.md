@@ -37,7 +37,7 @@ Rule listed below are based on priority. A rule with lower priority cannot viola
   - single event with min age 40 and above
   apply the following rules:
   - do not use table 1 and 4 at all
-  - table preference order: 2, 3, 5, 7, 6
+  - table preference order: 6, 7, 2, 3, 5
   - final should be on table 6
   - semi final should not be on table 5
 5. For group of 3 (single or team), assign a single table for the group, and assign each match in the group to that table one at a time, until all matches in that group are finished.

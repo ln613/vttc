@@ -112,9 +112,9 @@ export const isSemifinalMatch = (item: MatchQueueItem): boolean =>
 // Low-tier events: any table for any stage, preferring the worse courts
 // first so the better tables stay free for high-level events.
 const LOW_TIER_ORDER: TableNumber[] = [1, 4, 8, 2, 3, 5, 7, 6]
-// High-tier events: tables 1 and 4 are never used; table 6 is preferred
-// last so it stays free for the final.
-const HIGH_TIER_ORDER: TableNumber[] = [2, 3, 5, 7, 6]
+// High-tier events: tables 1 and 4 are never used; preference follows the
+// general court-condition order.
+const HIGH_TIER_ORDER: TableNumber[] = [6, 7, 2, 3, 5]
 
 /**
  * Get allowed tables for a match based on rules (priority ordered)

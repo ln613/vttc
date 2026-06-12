@@ -326,9 +326,9 @@ const TABLE_ORDER = [6, 7, 2, 3, 5, 4, 1, 8]
 // Low-tier events: any table, preferring the worse courts first so the
 // better tables stay free for high-level events.
 const LOW_TIER_ORDER = [1, 4, 8, 2, 3, 5, 7, 6]
-// High-tier events: tables 1 and 4 never used; table 6 preferred last so
-// it stays free for the final.
-const HIGH_TIER_ORDER = [2, 3, 5, 7, 6]
+// High-tier events: tables 1 and 4 never used; preference follows the
+// general court-condition order.
+const HIGH_TIER_ORDER = [6, 7, 2, 3, 5]
 
 const createInitialTables = () =>
   ALL_TABLES.map((tableNumber) => ({
