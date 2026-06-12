@@ -351,10 +351,11 @@ const recalculateGroupStats = (event) => {
   for (const group of groupStage.groups) {
     if (!group.matches || !group.participants) continue
 
+    const activeMatches = getActiveGroupMatches(group)
     for (let i = 0; i < group.participants.length; i++) {
       group.participants[i] = {
         ...group.participants[i],
-        stats: calculateGroupStats(group.participants[i].participant, group.matches),
+        stats: calculateGroupStats(group.participants[i].participant, activeMatches),
       }
     }
   }
@@ -1589,10 +1590,9 @@ export const finishMatch = async (body) => {
         // Update group stats
         const updatedGroup = updateGroupAfterMatch(group, updatedMatch, matchIndex)
 
-        // Check if group is complete (all matches finished AND confirmed)
-        const groupComplete = updatedGroup.matches.every(
-          (m) => m.winningSide !== undefined && m.confirmed,
-        )
+        // Check if group is complete (all counting matches finished AND
+        // confirmed — defaulted participants' matches are ignored).
+        const groupComplete = isGroupComplete(updatedGroup)
 
         const updatedGroupStage = {
           ...groupStage,
@@ -1837,9 +1837,7 @@ const applyFinishToTeamSubMatch = (
           ),
         })
         const updatedGroup = updateGroupAfterMatch(group, updatedParent, pi)
-        const groupComplete = updatedGroup.matches.every(
-          (m) => m.winningSide !== undefined && m.confirmed,
-        )
+        const groupComplete = isGroupComplete(updatedGroup)
         const updatedGroupStage = {
           ...groupStage,
           groups: groupStage.groups.map((g, i) =>
@@ -1979,12 +1977,49 @@ const determineGameWinner = (score1, score2, config) => {
   return undefined
 }
 
+// Player ids belonging to participants who defaulted out of the group.
+const getDefaultedPlayerIds = (group) => {
+  const ids = new Set()
+  for (const gp of group.participants || []) {
+    if (!gp.defaulted) continue
+    for (const id of getParticipantPlayerIds(gp.participant)) ids.add(id)
+  }
+  return ids
+}
+
+const matchInvolvesDefaulted = (match, defaultedIds) => {
+  if (defaultedIds.size === 0) return false
+  const onSide = (side) =>
+    (side || []).some((p) => defaultedIds.has(p._id?.toString()))
+  return onSide(match.side1) || onSide(match.side2)
+}
+
+// Matches that still count: those not involving any defaulted participant.
+const getActiveGroupMatches = (group) => {
+  const defaultedIds = getDefaultedPlayerIds(group)
+  if (defaultedIds.size === 0) return group.matches || []
+  return (group.matches || []).filter(
+    (m) => !matchInvolvesDefaulted(m, defaultedIds),
+  )
+}
+
+// A group is complete once every match that still counts is finished and
+// confirmed. Matches involving a defaulted participant are ignored.
+const isGroupComplete = (group) => {
+  const active = getActiveGroupMatches(group)
+  return (
+    active.length > 0 &&
+    active.every((m) => m.winningSide !== undefined && m.confirmed)
+  )
+}
+
 const updateGroupAfterMatch = (group, updatedMatch, matchIndex) => {
   const updatedMatches = group.matches.map((m, i) => (i === matchIndex ? updatedMatch : m))
 
+  const activeMatches = getActiveGroupMatches({ ...group, matches: updatedMatches })
   const updatedParticipants = group.participants.map((gp) => ({
     ...gp,
-    stats: calculateGroupStats(gp.participant, updatedMatches),
+    stats: calculateGroupStats(gp.participant, activeMatches),
   }))
 
   return {
@@ -2097,6 +2132,9 @@ const resolveTiedGroup = (tied, matches, ranked, startRank) => {
 }
 
 const rankGroupParticipants = (participants, matches) => {
+  // Defaulted participants are excluded from ranking entirely — they're
+  // ranked as if they were never in the group.
+  participants = participants.filter((p) => !p.defaulted)
   const sorted = [...participants].sort((a, b) => b.stats.matchesWon - a.stats.matchesWon)
 
   const byMatchesWon = new Map()
@@ -3353,10 +3391,9 @@ export const updateGame = async (body) => {
         // Update group stats
         const updatedGroup = updateGroupAfterMatch(group, updatedMatch, matchIndex)
 
-        // Check if group is complete (all matches finished AND confirmed)
-        const groupComplete = updatedGroup.matches.every(
-          (m) => m.winningSide !== undefined && m.confirmed,
-        )
+        // Check if group is complete (counting matches only; defaulted
+        // participants' matches are ignored).
+        const groupComplete = isGroupComplete(updatedGroup)
 
         const updatedGroupStage = {
           ...groupStage,
@@ -3600,12 +3637,10 @@ const updateStageCompletionAfterConfirm = (updatedStages, event) => {
   const groupStageIndex = updatedStages.findIndex((s) => s.type === 'group')
   if (groupStageIndex !== -1) {
     const groupStage = updatedStages[groupStageIndex]
-    const updatedGroups = groupStage.groups.map((g) => {
-      const groupComplete = g.matches.every(
-        (m) => m.winningSide !== undefined && m.confirmed,
-      )
-      return { ...g, isComplete: groupComplete }
-    })
+    const updatedGroups = groupStage.groups.map((g) => ({
+      ...g,
+      isComplete: isGroupComplete(g),
+    }))
     const updatedGroupStage = { ...groupStage, groups: updatedGroups }
 
     if (updatedGroups.every((g) => g.isComplete)) {
@@ -3800,6 +3835,97 @@ const isRoundFullyComplete = (round) => {
   return round.matches.length > 0 && round.matches.every(
     (m) => m.winner && m.match?.confirmed,
   )
+}
+
+// A group match counts as "started" once it has any play recorded (a
+// result, games, an in-progress setup, or expanded team sub-matches).
+const matchHasStarted = (match) =>
+  match.winningSide != null ||
+  (Array.isArray(match.games) && match.games.length > 0) ||
+  (match.initialServingSide != null && match.leftSide != null) ||
+  (Array.isArray(match.subMatches) && match.subMatches.length > 0)
+
+const participantHasStartedMatch = (group, participant) => {
+  for (const match of group.matches || []) {
+    if (!getParticipantSideInMatch(match, participant)) continue
+    if (matchHasStarted(match)) return true
+  }
+  return false
+}
+
+/**
+ * Default (withdraw) a participant from a group. The participant stays in
+ * the group but is excluded from ranking and their matches stop counting,
+ * as if they were never in the group. Only allowed before they've started
+ * any match.
+ */
+export const setParticipantDefault = async (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body._id) throwError('Event ID is required')
+  if (body.groupIndex == null) throwError('Group index is required')
+  if (!body.participantId) throwError('Participant ID is required')
+
+  const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
+
+  const event = await collection.findOne({ _id: toObjectId(body._id) })
+  if (!event) throwError('Event not found')
+
+  const updatedStages = [...event.eventStages]
+  const groupStageIndex = updatedStages.findIndex((s) => s.type === 'group')
+  if (groupStageIndex === -1) throwError('Event has no group stage')
+  const groupStage = updatedStages[groupStageIndex]
+
+  const group = groupStage.groups?.find((g) => g.index === body.groupIndex)
+  if (!group) throwError('Group not found')
+
+  const target = group.participants.find(
+    (p) => p.participant?._id?.toString() === body.participantId.toString(),
+  )
+  if (!target) throwError('Participant not found in group')
+  if (participantHasStartedMatch(group, target.participant)) {
+    throwError('Cannot default a participant who has already started a match')
+  }
+
+  // Flag the participant, then recompute stats over the remaining
+  // counting matches and re-evaluate group completion.
+  const flagged = {
+    ...group,
+    participants: group.participants.map((p) =>
+      p === target ? { ...p, defaulted: true } : p,
+    ),
+  }
+  const activeMatches = getActiveGroupMatches(flagged)
+  const updatedGroup = {
+    ...flagged,
+    participants: flagged.participants.map((p) => ({
+      ...p,
+      stats: calculateGroupStats(p.participant, activeMatches),
+    })),
+  }
+  updatedGroup.isComplete = isGroupComplete(updatedGroup)
+
+  const updatedGroupStage = {
+    ...groupStage,
+    groups: groupStage.groups.map((g) =>
+      g.index === body.groupIndex ? updatedGroup : g,
+    ),
+  }
+  if (updatedGroupStage.groups.every((g) => g.isComplete)) {
+    updatedGroupStage.advancedParticipants =
+      calculateAdvancedParticipants(updatedGroupStage)
+  }
+  updatedStages[groupStageIndex] = updatedGroupStage
+
+  // Defaulting may complete the group and let the knockout stage start.
+  generateNextRoundIfNeeded(updatedStages, event)
+
+  await collection.updateOne(
+    { _id: toObjectId(body._id) },
+    { $set: { eventStages: updatedStages } },
+  )
+
+  return { _id: body._id }
 }
 
 /**

@@ -822,6 +822,7 @@ const GroupDisplay = (props: GroupDisplayProps) => {
     <div style={groupContainerStyle}>
       <h3 style={titleStyle()}>{getGroupName(props.group.index)}</h3>
       <GroupTable
+        group={props.group}
         participants={rankedParticipants()}
         playerColumnTitle={playerColumnTitle()}
       />
@@ -1844,6 +1845,8 @@ const getRankedParticipants = (
   participants: GroupParticipant[],
 ): GroupParticipant[] =>
   [...participants].sort((a, b) => {
+    // Defaulted participants always sink to the bottom of the table.
+    if (!!a.defaulted !== !!b.defaulted) return a.defaulted ? 1 : -1
     // Use server-computed ranking when available
     if (a.ranking != null && b.ranking != null) {
       return a.ranking - b.ranking
@@ -1869,6 +1872,7 @@ const getRankedParticipants = (
   })
 
 interface GroupTableProps {
+  group: Group
   participants: GroupParticipant[]
   playerColumnTitle: string
 }
@@ -1897,7 +1901,13 @@ const GroupTable = (props: GroupTableProps) => (
       <tbody>
         <For each={props.participants}>
           {(gp, index) => (
-            <GroupTableRow participant={gp} rank={index() + 1} />
+            <GroupTableRow
+              group={props.group}
+              participant={gp}
+              // Defaulted rows carry no rank number; non-defaulted keep
+              // their sequential position (they sort above defaulted ones).
+              rank={gp.defaulted ? undefined : index() + 1}
+            />
           )}
         </For>
       </tbody>
@@ -1906,8 +1916,9 @@ const GroupTable = (props: GroupTableProps) => (
 )
 
 interface GroupTableRowProps {
+  group: Group
   participant: GroupParticipant
-  rank: number
+  rank?: number
 }
 
 const GroupTableRow = (props: GroupTableRowProps) => {
@@ -1922,18 +1933,48 @@ const GroupTableRow = (props: GroupTableRowProps) => {
   const pointDifferenceDisplay = () =>
     formatDifference(stats().pointDifference)
 
-  const rowBg = () => (props.rank % 2 === 0 ? '#f8f9fa' : '#fff')
+  const isDefaulted = () => !!props.participant.defaulted
+  // Default button: admin only, before the names, while the participant
+  // hasn't started any of their group matches and isn't already defaulted.
+  const canDefault = () =>
+    authState.isAdmin &&
+    !isDefaulted() &&
+    !participantHasStartedGroupMatch(props.group, props.participant)
+
+  const handleDefaultClick = async () => {
+    if (
+      !(await customConfirm(
+        `Default ${playerDisplay()}? They will stay in the table but be excluded from the ranking, and their matches will no longer count.`,
+        { confirmColor: '#e74c3c' },
+      ))
+    ) {
+      return
+    }
+    void eventDetailActions.defaultParticipant(
+      props.group.index,
+      (props.participant.participant as { _id?: string })._id ?? '',
+    )
+  }
+
+  const rowBg = () =>
+    isDefaulted() ? '#f0f0f0' : (props.rank ?? 0) % 2 === 0 ? '#f8f9fa' : '#fff'
   const cellStyle = (): JSX.CSSProperties => ({
     ...tdStyle,
     'background-color': rowBg(),
+    ...(isDefaulted() ? { color: '#aaa' } : {}),
   })
 
   return (
     <tr>
-      <td style={cellStyle()}>{props.rank}</td>
+      <td style={cellStyle()}>{props.rank ?? '-'}</td>
       <td
         style={{ ...cellStyle(), 'text-align': 'left', 'font-weight': 500 }}
       >
+        <Show when={canDefault()}>
+          <button style={defaultButtonStyle} onClick={handleDefaultClick}>
+            Default
+          </button>{' '}
+        </Show>
         {playerDisplay()}
       </td>
       <td style={cellStyle()}>{total()}</td>
@@ -1956,6 +1997,34 @@ const GroupTableRow = (props: GroupTableRowProps) => {
 
 const formatDifference = (value: number): string =>
   value >= 0 ? `+${value}` : String(value)
+
+const getGroupParticipantPlayerIds = (gp: GroupParticipant): string[] => {
+  const p = gp.participant as { players?: Player[]; _id?: string }
+  if (Array.isArray(p.players)) {
+    return p.players.map((pl) => pl._id).filter((id): id is string => !!id)
+  }
+  return p._id ? [p._id] : []
+}
+
+const groupMatchHasStarted = (match: Match): boolean =>
+  match.winningSide != null ||
+  (Array.isArray(match.games) && match.games.length > 0) ||
+  (match.initialServingSide != null && match.leftSide != null) ||
+  (Array.isArray(match.subMatches) && match.subMatches.length > 0)
+
+const participantHasStartedGroupMatch = (
+  group: Group,
+  gp: GroupParticipant,
+): boolean => {
+  const ids = new Set(getGroupParticipantPlayerIds(gp))
+  if (ids.size === 0) return false
+  const onSide = (side?: Player[]) =>
+    (side || []).some((p) => p._id && ids.has(p._id))
+  return (group.matches || []).some(
+    (m) =>
+      (onSide(m.side1) || onSide(m.side2)) && groupMatchHasStarted(m),
+  )
+}
 
 const getPlayerDisplay = (gp: GroupParticipant): string => {
   const participant = gp.participant
@@ -2664,6 +2733,18 @@ const forfeitButtonStyle: JSX.CSSProperties = {
   'font-weight': 600,
   color: '#fff',
   'background-color': '#e74c3c',
+  border: 'none',
+  'border-radius': '4px',
+  cursor: 'pointer',
+  'white-space': 'nowrap',
+}
+
+const defaultButtonStyle: JSX.CSSProperties = {
+  padding: '1px 6px',
+  'font-size': '11px',
+  'font-weight': 600,
+  color: '#fff',
+  'background-color': '#e67e22',
   border: 'none',
   'border-radius': '4px',
   cursor: 'pointer',

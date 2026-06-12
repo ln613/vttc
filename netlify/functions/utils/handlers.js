@@ -33,6 +33,7 @@ import {
   resetMatch,
   resetEvent,
   deleteEvent,
+  setParticipantDefault,
 } from './eventHandlers.js'
 import {
   signIn,
@@ -102,6 +103,7 @@ export const apiHandlers = {
     resetMatch: withEventNotify(resetMatch),
     resetEvent: withEventNotify(resetEvent),
     deleteEvent: withEventNotify(deleteEvent),
+    setParticipantDefault: withEventNotify(setParticipantDefault),
     saveSettings: (body) => saveSettings(body),
     registerForEvent: withEventNotify(registerForEvent),
     getPartialTeams: (body) => getPartialTeams(body),

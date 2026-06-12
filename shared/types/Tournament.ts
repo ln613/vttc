@@ -118,6 +118,11 @@ export interface GroupParticipant {
   participant: Player | Team
   stats: GroupMatchStats
   ranking?: number
+  // Defaulted: the participant withdrew before playing. They stay in the
+  // group/ranking table (shown greyed at the bottom) but are excluded
+  // from ranking and their matches don't count — as if they were never
+  // in the group.
+  defaulted?: boolean
 }
 
 /**

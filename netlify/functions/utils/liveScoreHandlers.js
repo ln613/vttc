@@ -132,6 +132,22 @@ const buildEventSummary = (event) => ({
   stages: event.stages || [],
 })
 
+const getDefaultedGroupPlayerIds = (group) => {
+  const ids = new Set()
+  for (const gp of group.participants || []) {
+    if (!gp.defaulted) continue
+    for (const p of gp.participant?.players || []) ids.add(p._id?.toString())
+  }
+  return ids
+}
+
+const matchInvolvesDefaultedPlayer = (match, defaultedIds) => {
+  if (defaultedIds.size === 0) return false
+  const onSide = (side) =>
+    (side || []).some((p) => defaultedIds.has(p._id?.toString()))
+  return onSide(match.side1) || onSide(match.side2)
+}
+
 const extractGroupMatches = (event, eventSummary, items) => {
   const groupStage = event.eventStages?.find((s) => s.type === 'group')
   if (!groupStage || !groupStage.groups) return
@@ -145,9 +161,13 @@ const extractGroupMatches = (event, eventSummary, items) => {
         ? `${event._id.toString()}-${group.index}`
         : undefined
 
+    const defaultedIds = getDefaultedGroupPlayerIds(group)
+
     for (const match of group.matches || []) {
       if (isMatchFinishedAndConfirmed(match)) continue
       if (isMatchPostponed(match)) continue
+      // Matches involving a defaulted participant won't be played.
+      if (matchInvolvesDefaultedPlayer(match, defaultedIds)) continue
 
       // Expanded team match: emit its sub-matches instead of the parent.
       if (

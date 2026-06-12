@@ -39,6 +39,11 @@ Vertical
 
 The player column title is "Players" for double event and "Team" for team event, and the column content will show all player (order by rating desc) names joined by " / ".
 
+For players/teams who haven't started any match (no match in progress), show a Default button before their name(s), on click:
+
+- leave the player/team in the group and the group/ranking table (at the bottom row), but mark them light gray
+- do not count the player/team in the ranking, as if they do not exist in the group
+
 The Total column is the total matches played so far.
 
 "Player in match" definition: 

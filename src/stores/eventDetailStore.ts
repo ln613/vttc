@@ -274,6 +274,32 @@ export const eventDetailActions = {
     }
   },
 
+  // Default (withdraw) a participant from a group — keeps them in the
+  // table but out of the ranking, their matches no longer counting.
+  defaultParticipant: async (
+    groupIndex: number,
+    participantId: string,
+    sourceEventId?: string,
+  ) => {
+    const eventId = sourceEventId ?? eventDetailState.eventId
+    if (!eventId) return
+    try {
+      await apiPost('setParticipantDefault', {
+        _id: eventId,
+        groupIndex,
+        participantId,
+      })
+      if (eventDetailState.eventId === eventId) {
+        await fetchEvent(eventId, true)
+      }
+    } catch (err) {
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Failed to default participant',
+      )
+    }
+  },
+
   getEventStages: (): Stage[] => eventDetailState.data?.eventStages || [],
 
   getGroupStage: () => {
