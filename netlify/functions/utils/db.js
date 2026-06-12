@@ -2,6 +2,7 @@ import { MongoClient, ObjectId } from 'mongodb'
 
 let cachedDb = null
 let cachedClient = null
+let connectingPromise = null
 
 /**
  * Convert string _id to ObjectId for MongoDB queries
@@ -52,20 +53,40 @@ const convertFilterIds = (filter) => {
 
 export const connectDB = async () => {
   if (cachedDb) return cachedDb
+  // Concurrent callers (rapid-fire requests at cold start) must share a
+  // single connection attempt — otherwise each creates its own
+  // MongoClient and the pool leaks/exhausts, which manifests as requests
+  // hanging.
+  if (connectingPromise) return connectingPromise
 
   const uri = process.env.MONGODB_URI
   if (!uri) throw new Error('MONGODB_URI environment variable is not set')
 
-  const client = new MongoClient(uri)
-  await client.connect()
+  connectingPromise = (async () => {
+    const client = new MongoClient(uri, {
+      // Fail fast instead of hanging when the cluster is unreachable.
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+    })
+    await client.connect()
 
-  const env = process.env.NETLIFY_DEV ? 'dev' : (process.env.CONTEXT === 'production' ? '' : 'qa')
-  const dbName = 'vttc' // env ? `vttc-${env}` : 'vttc'
+    const dbName = 'vttc'
+    cachedClient = client
+    cachedDb = client.db(dbName)
+    return cachedDb
+  })()
 
-  cachedClient = client
-  cachedDb = client.db(dbName)
-
-  return cachedDb
+  try {
+    return await connectingPromise
+  } catch (err) {
+    // Let the next request retry from scratch.
+    connectingPromise = null
+    throw err
+  } finally {
+    // Once resolved, future calls hit the cachedDb short-circuit; clear
+    // the in-flight marker so a later reconnect can run if needed.
+    if (cachedDb) connectingPromise = null
+  }
 }
 
 export const getDB = () => {

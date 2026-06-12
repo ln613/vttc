@@ -23,34 +23,36 @@ const getClient = () => {
   return cachedClient
 }
 
-export const notifyEventUpdate = async (eventId) => {
-  if (!eventId) return
+// Realtime notifications are best-effort: they must never block or fail
+// the request. Pusher's trigger() has no built-in timeout, so a hung
+// network call would stall the whole function invocation (and the local
+// dev server behind it) indefinitely. Cap each trigger so it always
+// settles quickly.
+const TRIGGER_TIMEOUT_MS = 3000
+
+const triggerSafely = async (channel, eventName, data) => {
   const client = getClient()
   if (!client) return
   try {
-    await client.trigger(`event-${eventId}`, 'updated', {})
+    await Promise.race([
+      client.trigger(channel, eventName, data),
+      new Promise((resolve) => setTimeout(resolve, TRIGGER_TIMEOUT_MS)),
+    ])
   } catch {
-    // Realtime is best-effort; never fail the request because of it.
+    // Swallow — realtime delivery is not critical to the request.
   }
+}
+
+export const notifyEventUpdate = async (eventId) => {
+  if (!eventId) return
+  await triggerSafely(`event-${eventId}`, 'updated', {})
 }
 
 export const notifyMatchReset = async (eventId, matchId) => {
   if (!eventId || !matchId) return
-  const client = getClient()
-  if (!client) return
-  try {
-    await client.trigger(`event-${eventId}`, 'match-reset', { matchId })
-  } catch {
-    // Realtime is best-effort; never fail the request because of it.
-  }
+  await triggerSafely(`event-${eventId}`, 'match-reset', { matchId })
 }
 
 export const notifyLiveScoreUpdate = async () => {
-  const client = getClient()
-  if (!client) return
-  try {
-    await client.trigger('live-score', 'updated', {})
-  } catch {
-    // Realtime is best-effort; never fail the request because of it.
-  }
+  await triggerSafely('live-score', 'updated', {})
 }
