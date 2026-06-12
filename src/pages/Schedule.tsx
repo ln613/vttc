@@ -36,12 +36,13 @@ const Schedule = () => {
   let subscription: { unsubscribe: () => void } | null = null
 
   onMount(() => {
-    eventActions.fetchEvents()
+    // Full events (with eventStages) — the schedule renders match/game data.
+    eventActions.fetchEvents(true)
     liveScoreActions.fetchLiveScore()
     // Refetch events whenever the live-score channel pings; liveScoreActions
     // already maintains its own subscription that refreshes table/queue state.
     subscription = subscribeToLiveScoreUpdates(() => {
-      void eventActions.fetchEvents()
+      void eventActions.fetchEvents(true)
     })
   })
 

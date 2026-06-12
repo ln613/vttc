@@ -163,6 +163,8 @@ const parseTime = (
 }
 
 const isEventFinished = (event: EventOption): boolean => {
+  // Summary (list) mode omits eventStages and ships a server-computed flag.
+  if (typeof event.finished === 'boolean') return event.finished
   const stages = event.eventStages
   if (!stages || stages.length === 0) return false
   const knockout = stages.find((s) => s.type === 'knockout')

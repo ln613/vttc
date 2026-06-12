@@ -33,14 +33,16 @@ const TRIGGER_TIMEOUT_MS = 3000
 const triggerSafely = async (channel, eventName, data) => {
   const client = getClient()
   if (!client) return
-  try {
-    await Promise.race([
-      client.trigger(channel, eventName, data),
-      new Promise((resolve) => setTimeout(resolve, TRIGGER_TIMEOUT_MS)),
-    ])
-  } catch {
-    // Swallow — realtime delivery is not critical to the request.
-  }
+  // Attach the catch up front so the trigger's eventual rejection is
+  // always handled — even after the timeout wins the race and this
+  // function has already returned (avoids an unhandled rejection).
+  const attempt = Promise.resolve(client.trigger(channel, eventName, data)).catch(
+    () => {},
+  )
+  await Promise.race([
+    attempt,
+    new Promise((resolve) => setTimeout(resolve, TRIGGER_TIMEOUT_MS)),
+  ])
 }
 
 export const notifyEventUpdate = async (eventId) => {

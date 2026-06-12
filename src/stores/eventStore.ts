@@ -31,6 +31,9 @@ export interface EventOption {
   sex?: ParticipantSex
   stages?: ('group' | 'knockout')[]
   eventStages?: Stage[]
+  // Server-computed flag in summary (list) mode, where eventStages is
+  // omitted to keep the payload small.
+  finished?: boolean
 }
 
 interface EventState {
@@ -50,10 +53,15 @@ const [eventState, setEventState] = createStore<EventState>(getInitialState())
 export { eventState }
 
 export const eventActions = {
-  fetchEvents: async () => {
+  // `full` requests the complete documents (with eventStages) — needed by
+  // the Schedule page. The events list omits it for a small summary payload.
+  fetchEvents: async (full = false) => {
     setEventState({ loading: true, error: null })
     try {
-      const data = await apiGet<EventOption[]>('events')
+      const data = await apiGet<EventOption[]>(
+        'events',
+        full ? { full: 'true' } : {},
+      )
       setEventState({ data, loading: false, error: null })
     } catch (err) {
       setEventState({
@@ -63,9 +71,12 @@ export const eventActions = {
     }
   },
 
-  refreshEvents: async () => {
+  refreshEvents: async (full = false) => {
     try {
-      const data = await apiGet<EventOption[]>('events')
+      const data = await apiGet<EventOption[]>(
+        'events',
+        full ? { full: 'true' } : {},
+      )
       setEventState({ data, loading: false, error: null })
     } catch (err) {
       setEventState({

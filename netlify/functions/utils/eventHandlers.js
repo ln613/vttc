@@ -314,7 +314,13 @@ const getQualifiersCount = (qualifiers) => {
 }
 
 /**
- * Get all events
+ * Get all events.
+ *
+ * By default returns lightweight summaries with the heavy `eventStages`
+ * (every match and per-game score) stripped out — the events list only
+ * needs participant counts and a couple of derived flags. Pass
+ * `full=true` to get the complete documents (the Schedule page renders
+ * match/game data and needs them).
  */
 export const getEvents = async (params = {}) => {
   const db = getDB()
@@ -323,7 +329,52 @@ export const getEvents = async (params = {}) => {
     query.tournamentId = params.tournamentId
   }
   const events = await db.collection(EVENTS_COLLECTION).find(query).toArray()
-  return events
+  if (params.full === 'true' || params.full === true) {
+    // Full mode feeds the Schedule page, which only shows events with
+    // active (on-table/queued) matches — finished events are filtered out
+    // client-side anyway. Drop them here so completed tournaments (e.g.
+    // accumulated simulation clones) don't bloat the payload. Keep the
+    // derived flags so the shape stays a superset of the summary.
+    return events
+      .filter((e) => !isEventFinishedFromStages(e.eventStages))
+      .map((e) => ({ ...e, ...derivedEventFlags(e.eventStages) }))
+  }
+  return events.map(summarizeEvent)
+}
+
+const derivedEventFlags = (eventStages) => ({
+  finished: isEventFinishedFromStages(eventStages),
+  hasSchedule: hasScheduleFromStages(eventStages),
+})
+
+// Strip the heavy eventStages array but keep the two flags the events
+// list derives from it (finished / hasSchedule), so the list never has
+// to ship every match and game.
+const summarizeEvent = (event) => {
+  const { eventStages, ...rest } = event
+  return { ...rest, ...derivedEventFlags(eventStages) }
+}
+
+const hasScheduleFromStages = (stages) =>
+  (stages || []).some(
+    (s) =>
+      (s.type === 'group' && s.groups?.length > 0) ||
+      (s.type === 'knockout' && s.rounds?.length > 0),
+  )
+
+const isEventFinishedFromStages = (stages) => {
+  if (!stages || stages.length === 0) return false
+  const knockout = stages.find((s) => s.type === 'knockout')
+  if (knockout) {
+    if (!knockout.rounds || knockout.rounds.length === 0) return false
+    const lastRound = knockout.rounds[knockout.rounds.length - 1]
+    return lastRound.isComplete && lastRound.participantCount === 2
+  }
+  const group = stages.find((s) => s.type === 'group')
+  if (group) {
+    return group.groups.length > 0 && group.groups.every((g) => g.isComplete)
+  }
+  return false
 }
 
 /**
@@ -4023,8 +4074,10 @@ export const autoGenerateForEvent = async (event) => {
   }
 
   if (changed) {
-    await notifyEventUpdate(event._id?.toString())
-    await notifyLiveScoreUpdate()
+    // Best-effort realtime — fire without awaiting so a slow/unreachable
+    // Pusher can't delay the live-score response.
+    void notifyEventUpdate(event._id?.toString())
+    void notifyLiveScoreUpdate()
   }
   return changed
 }

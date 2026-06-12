@@ -63,8 +63,12 @@ import { notifyEventUpdate, notifyLiveScoreUpdate } from './pusher.js'
 const withEventNotify = (fn) => async (body) => {
   const result = await fn(body)
   const eventId = body?._id || result?._id
-  await notifyEventUpdate(eventId)
-  await notifyLiveScoreUpdate()
+  // Realtime notifications are best-effort and must never delay (or hang)
+  // the response. Fire them without awaiting — Pusher can be slow or
+  // unreachable, and triggerSafely already bounds each call. The response
+  // returns as soon as the DB write completes.
+  void notifyEventUpdate(eventId)
+  void notifyLiveScoreUpdate()
   return result
 }
 
