@@ -139,3 +139,4 @@ The Total column is the total matches played so far.
 ## Bracket Tab
 
 - Shows the bracket of the knockout stage
+- if preceded by group stage, the 1st round KO, name should be "{Group}{Rank} {name}", e.g., "B1 - Eric..."

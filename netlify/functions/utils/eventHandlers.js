@@ -3736,17 +3736,14 @@ const buildPartialNextRoundMatch = (stage, nextRound, m1, m2, event) => {
   const w1 = m1.winner
   const w2 = m2.winner
   if (!w1 || !w2) return undefined
-  const findSeed = (participant) => {
-    const entry = stage.seedingList?.find(
-      (e) => e.participant && isSameParticipant(e.participant, participant),
-    )
-    return entry?.seed ?? 999
-  }
-  const s1 = findSeed(w1)
-  const s2 = findSeed(w2)
-  // Lower seed number = higher seeding → participant1.
-  const top = s1 <= s2 ? w1 : w2
-  const bottom = s1 <= s2 ? w2 : w1
+  // Standard bracket positioning: the upper feeder match (m1 = the
+  // earlier slot in the bracket-ordered matches array) keeps the top
+  // slot, the lower feeder (m2) takes the bottom. This matches both the
+  // single-known-winner preview path above and the displayed bracket
+  // layout — do NOT re-sort by seed here, which would flip winners
+  // relative to their bracket position.
+  const top = w1
+  const bottom = w2
   const nextRoundNames = getKnockoutRoundName(
     nextRound.participantCount,
     stage.rounds[0].participantCount,

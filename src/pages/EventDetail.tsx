@@ -13,7 +13,7 @@ import { liveScoreActions, liveScoreState } from '../stores/liveScoreStore'
 import type { Group, GroupParticipant, Participant, KnockoutRound, KnockoutMatch as KnockoutMatchType, Stage } from '../../shared/types/Tournament'
 import type { Player } from '../../shared/types/Player'
 import { getProvisionalMatchResult } from '../../shared/rules/matchRules'
-import { getGroupName } from '../../shared/rules/tournamentRules'
+import { getGroupName, getGroupLetter } from '../../shared/rules/tournamentRules'
 import type { Match, Game } from '../../shared/types/Match'
 import { parseLocalDate } from '../utils/date'
 
@@ -2036,34 +2036,50 @@ const KnockoutMatchDisplay = (props: KnockoutMatchDisplayProps) => {
   )
 }
 
-const getKnockoutParticipantName = (participant?: {
-  participant?: { players?: Player[]; firstName?: string; lastName?: string; name?: string }
-}): string => {
+const getKnockoutParticipantName = (
+  participant?: {
+    participant?: { players?: Player[]; firstName?: string; lastName?: string; name?: string }
+    groupIndex?: number
+    ranking?: number
+  },
+  options: { showGroupRank?: boolean } = {},
+): string => {
   if (!participant) return 'TBD'
   const p = participant.participant
   if (!p) return 'TBD'
 
+  let name: string
   if ('players' in p && Array.isArray(p.players) && p.players.length > 0) {
-    return p.players
+    name = p.players
       .map((pl: Player) => `${pl.firstName} ${pl.lastName}`)
       .join(' / ')
+  } else if ('firstName' in p && p.firstName) {
+    name = `${p.firstName} ${p.lastName || ''}`
+  } else if ('name' in p && p.name) {
+    name = p.name as string
+  } else {
+    return 'TBD'
   }
 
-  if ('firstName' in p && p.firstName) {
-    return `${p.firstName} ${p.lastName || ''}`
+  if (
+    options.showGroupRank &&
+    typeof participant.groupIndex === 'number' &&
+    typeof participant.ranking === 'number'
+  ) {
+    return `${getGroupLetter(participant.groupIndex)}${participant.ranking} - ${name}`
   }
-
-  if ('name' in p && p.name) {
-    return p.name as string
-  }
-
-  return 'TBD'
+  return name
 }
 
 // ==================== BRACKET TAB ====================
 
 const BracketContent = () => {
   const rounds = () => eventDetailActions.getKnockoutRounds()
+  // The "B1 Eric ..." group-rank prefix is only meaningful on the
+  // round-of-N when there was a preceding group stage — knockout-only
+  // events don't have meaningful group letters.
+  const hasGroupStage = () =>
+    !!eventDetailState.data?.eventStages?.some((s) => s.type === 'group')
 
   return (
     <Show
@@ -2080,7 +2096,10 @@ const BracketContent = () => {
                   <For each={round.matches}>
                     {(km) => (
                       <div style={bracketMatchSlotStyle}>
-                        <BracketMatchCard knockoutMatch={km} />
+                        <BracketMatchCard
+                          knockoutMatch={km}
+                          showGroupRank={roundIndex() === 0 && hasGroupStage()}
+                        />
                       </div>
                     )}
                   </For>
@@ -2140,13 +2159,21 @@ const ConnectorPair = () => (
 
 interface BracketMatchCardProps {
   knockoutMatch: KnockoutMatchType
+  showGroupRank?: boolean
 }
 
 const BracketMatchCard = (props: BracketMatchCardProps) => {
   const isBye = () => props.knockoutMatch.isBye2 || props.knockoutMatch.isBye1
-  const p1Name = () => getKnockoutParticipantName(props.knockoutMatch.participant1)
+  const p1Name = () =>
+    getKnockoutParticipantName(props.knockoutMatch.participant1, {
+      showGroupRank: props.showGroupRank,
+    })
   const p2Name = () =>
-    isBye() ? 'BYE' : getKnockoutParticipantName(props.knockoutMatch.participant2)
+    isBye()
+      ? 'BYE'
+      : getKnockoutParticipantName(props.knockoutMatch.participant2, {
+          showGroupRank: props.showGroupRank,
+        })
   const match = () => props.knockoutMatch.match
   const isFinished = () => match()?.winningSide != null
   const p1IsWinner = () => match()?.winningSide === 1
