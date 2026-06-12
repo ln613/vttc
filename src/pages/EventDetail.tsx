@@ -3,6 +3,7 @@ import { useNavigate, useParams } from '@solidjs/router'
 import { Header } from '../components/Header'
 import Button from '../components/Button'
 import MatchConfirmDialog from '../components/MatchConfirmDialog'
+import PostponeDialog from '../components/PostponeDialog'
 import { eventDetailState, eventDetailActions } from '../stores/eventDetailStore'
 import type { StageTab } from '../stores/eventDetailStore'
 import { eventState } from '../stores/eventStore'
@@ -1071,6 +1072,7 @@ const resolveEventStages = (eventId?: string): Stage[] | undefined => {
 
 export const MatchRow = (props: MatchRowProps) => {
   const navigate = useNavigate()
+  const [postponeOpen, setPostponeOpen] = createSignal(false)
   const side1Players = () => getMatchSidePlayers(props.match.side1)
   const side2Players = () => getMatchSidePlayers(props.match.side2)
   const hasResult = () =>
@@ -1183,6 +1185,13 @@ export const MatchRow = (props: MatchRowProps) => {
     eventDetailActions.simulateMatch(props.match._id, props.match, eventId)
   }
 
+  const handlePostponeSelect = (minutes: number) => {
+    setPostponeOpen(false)
+    const eventId = props.eventId ?? eventDetailState.eventId ?? undefined
+    if (!eventId) return
+    void liveScoreActions.postponeMatch(eventId, props.match._id, minutes)
+  }
+
   const handleForfeitClick = async (side: 1 | 2) => {
     const players = side === 1 ? side1Players() : side2Players()
     const names = formatSidePlayers(players)
@@ -1256,6 +1265,10 @@ export const MatchRow = (props: MatchRowProps) => {
     !isTeamParent() &&
     !hasStarted() &&
     assignedTable() !== undefined
+  // Postpone: admin-only, while the match is on a table but not started
+  // (same behaviour as the live score page).
+  const canPostpone = () =>
+    authState.isAdmin && !hasStarted() && assignedTable() !== undefined
   const showSimulate = () =>
     !isTeamParent() &&
     authState.isAdmin &&
@@ -1269,6 +1282,7 @@ export const MatchRow = (props: MatchRowProps) => {
     showConfirm() ||
     showReset() ||
     showResetTeam() ||
+    canPostpone() ||
     showSimulate() ||
     showAssign()
 
@@ -1404,6 +1418,19 @@ export const MatchRow = (props: MatchRowProps) => {
               {isResetting() ? 'Resetting...' : 'Reset Team'}
             </Button>
           </Show>
+          <Show when={canPostpone()}>
+            <Button
+              onClick={(e?: MouseEvent) => {
+                e?.stopPropagation()
+                e?.preventDefault()
+                setPostponeOpen(true)
+              }}
+              color="#f39c12"
+              size="small"
+            >
+              Postpone
+            </Button>
+          </Show>
           <Show when={showSimulate()}>
             <Button onClick={handleSimulateClick} color="#9b59b6" size="small">
               Simulate
@@ -1425,6 +1452,12 @@ export const MatchRow = (props: MatchRowProps) => {
         }
       >
         <FinishedTeamSubMatches parent={props.match} />
+      </Show>
+      <Show when={postponeOpen()}>
+        <PostponeDialog
+          onSelect={handlePostponeSelect}
+          onClose={() => setPostponeOpen(false)}
+        />
       </Show>
     </div>
   )

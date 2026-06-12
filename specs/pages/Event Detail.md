@@ -79,6 +79,7 @@ The Total column is the total matches played so far.
       - team sub match only
       - delete all sub matches from the same parent match
       - recreate the parent match and assign it to the same table
+    - Postpone button (same as live score page)
     - Start/Umpire button
       - green bg
       - visible to admin and Player in match
