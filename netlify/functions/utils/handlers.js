@@ -7,6 +7,7 @@ import {
 import {
   saveEvent,
   simulateEvent,
+  cloneEvent,
   getEvents,
   getEvent,
   getEventSeries,
@@ -82,6 +83,7 @@ export const apiHandlers = {
     saveTournament: (body) => saveTournament(body),
     saveEvent: withEventNotify(saveEvent),
     simulateEvent: withEventNotify(simulateEvent),
+    cloneEvent: withEventNotify(cloneEvent),
     addParticipant: withEventNotify(addParticipant),
     deleteParticipant: withEventNotify(deleteParticipant),
     deletePlayerFromTeam: withEventNotify(deletePlayerFromTeam),

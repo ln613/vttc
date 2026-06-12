@@ -326,6 +326,23 @@ const DeleteIcon = () => (
   </svg>
 )
 
+const CloneIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="#9b59b6"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </svg>
+)
+
 const MultiUserIcon = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -477,6 +494,22 @@ const handleDeleteIconClick = async (e: MouseEvent, event: EventOption) => {
   }
 }
 
+const handleCloneIconClick = async (e: MouseEvent, event: EventOption) => {
+  e.stopPropagation()
+  e.preventDefault()
+  try {
+    await eventActions.cloneEvent(
+      event._id,
+      formatLocalDate(new Date()),
+      formatTimeNowPlus1Min(),
+    )
+  } catch (err) {
+    await customAlert(
+      err instanceof Error ? err.message : 'Failed to clone event',
+    )
+  }
+}
+
 const handleMultiPlayerIconClick = (e: MouseEvent, event: EventOption) => {
   e.stopPropagation()
   e.preventDefault()
@@ -554,6 +587,15 @@ const EventListItem = (props: EventListItemProps) => {
           >
             <EditIcon />
           </div>
+          <Show when={isSimulationEnabled()}>
+            <div
+              style={iconStyle}
+              class="vttc-tap"
+              onClick={(e) => handleCloneIconClick(e, props.event)}
+            >
+              <CloneIcon />
+            </div>
+          </Show>
           <div
             style={iconStyle}
             class="vttc-tap"

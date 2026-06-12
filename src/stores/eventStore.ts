@@ -83,5 +83,10 @@ export const eventActions = {
     await eventActions.refreshEvents()
   },
 
+  cloneEvent: async (eventId: string, date: string, time: string) => {
+    await apiPost('cloneEvent', { _id: eventId, date, time })
+    await eventActions.refreshEvents()
+  },
+
   reset: () => setEventState(getInitialState()),
 }

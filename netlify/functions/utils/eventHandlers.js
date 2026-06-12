@@ -241,6 +241,41 @@ export const simulateEvent = async (body) => {
   return { ...created, participants, paidPlayerIds }
 }
 
+/**
+ * Clone an event with its detail and participants. The new event gets the
+ * source name suffixed with " - test", a fresh play state (no groups /
+ * schedule), and a start date/time of "now + 1 min" (supplied by the
+ * client so it reflects the admin's local time).
+ */
+export const cloneEvent = async (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body._id) throwError('Event ID is required')
+
+  const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
+
+  const source = await collection.findOne({ _id: toObjectId(body._id) })
+  if (!source) throwError('Event not found')
+
+  const { _id, createdAt, updatedAt, ...rest } = source
+
+  const now = new Date().toISOString()
+  const clone = {
+    ...rest,
+    eventName: `${source.eventName} - test`,
+    date: body.date || source.date,
+    time: body.time || source.time,
+    eventStages: source.eventStages
+      ? buildResetEventStages(source)
+      : source.eventStages,
+    createdAt: now,
+    updatedAt: now,
+  }
+
+  const result = await collection.insertOne(clone)
+  return { ...clone, _id: result.insertedId.toString() }
+}
+
 const meetsSimulationQualification = (tournament, player) => {
   const required = tournament.sex
   if (required && required !== 'All' && required !== 'Mixed') {
