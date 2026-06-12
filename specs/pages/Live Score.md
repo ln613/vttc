@@ -46,7 +46,7 @@ Each table will show:
     - match finished but not confirmed: blue (#2980b9) bg, flashing yellow border
   - table number (yellow, big, top-center)
   - event name
-  - stage ("Group {n}", "Semifinal"...)
+  - stage ("Group {A}", "Semifinal"...)
   - for team sub-match, "Team Match {n} - BC vs YZ"
   - space
   - player1 of the match (or for team, player1/player2), followed by the game score

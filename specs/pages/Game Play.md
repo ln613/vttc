@@ -42,7 +42,7 @@ hamburger icon, show/hide the following menu:
 ## Stage Name
 
 - align left
-- for group stage: "Group {n}"
+- for group stage: "Group {A}"
 - for knockout stage: "Round of 16", "Quarterfinal", "Semifinal"...
 - for team sub-match, followed by " - Team Match {n}"
 

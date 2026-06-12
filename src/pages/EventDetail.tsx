@@ -13,6 +13,7 @@ import { liveScoreActions, liveScoreState } from '../stores/liveScoreStore'
 import type { Group, GroupParticipant, Participant, KnockoutRound, KnockoutMatch as KnockoutMatchType, Stage } from '../../shared/types/Tournament'
 import type { Player } from '../../shared/types/Player'
 import { getProvisionalMatchResult } from '../../shared/rules/matchRules'
+import { getGroupName } from '../../shared/rules/tournamentRules'
 import type { Match, Game } from '../../shared/types/Match'
 import { parseLocalDate } from '../utils/date'
 
@@ -819,7 +820,7 @@ const GroupDisplay = (props: GroupDisplayProps) => {
 
   return (
     <div style={groupContainerStyle}>
-      <h3 style={titleStyle()}>Group {props.group.index + 1}</h3>
+      <h3 style={titleStyle()}>{getGroupName(props.group.index)}</h3>
       <GroupTable
         participants={rankedParticipants()}
         playerColumnTitle={playerColumnTitle()}

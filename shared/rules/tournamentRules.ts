@@ -30,6 +30,28 @@ export const getTournamentType = (nop: number): 'single' | 'team' => {
 }
 
 /**
+ * Convert a 0-indexed group index to its letter label.
+ * 0 → 'A', 1 → 'B', …, 25 → 'Z', then wraps with double letters
+ * ('AA', 'AB', …) for the rare case of >26 groups.
+ */
+export const getGroupLetter = (index: number): string => {
+  if (index < 0) return ''
+  if (index < 26) return String.fromCharCode(65 + index)
+  // 26-letter wrap: AA, AB, … (defensive — events rarely exceed 8
+  // groups so this branch is mostly for safety).
+  const first = Math.floor(index / 26) - 1
+  const second = index % 26
+  return String.fromCharCode(65 + first) + String.fromCharCode(65 + second)
+}
+
+/**
+ * Display name for a group given its 0-indexed position. "Group A",
+ * "Group B", …
+ */
+export const getGroupName = (index: number): string =>
+  `Group ${getGroupLetter(index)}`
+
+/**
  * Calculate the number of groups based on total number of players/teams
  * - N < 6: 1 group
  * - N = 16: 4 groups

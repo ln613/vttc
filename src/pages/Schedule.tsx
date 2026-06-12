@@ -5,6 +5,7 @@ import ToggleButton from '../components/ToggleButton'
 import { eventState, eventActions, type EventOption } from '../stores/eventStore'
 import { liveScoreState, liveScoreActions } from '../stores/liveScoreStore'
 import { authState } from '../stores/authStore'
+import { getGroupName } from '../../shared/rules/tournamentRules'
 import {
   MatchRow,
   ConfirmMatchDialog,
@@ -288,7 +289,7 @@ const extractFromGroup = (
         stage: 'group',
         eventId: event._id,
         eventName: event.eventName,
-        stageLabel: `Group ${group.index + 1}`,
+        stageLabel: getGroupName(group.index),
       })
     }
   }

@@ -1,4 +1,14 @@
 import { getDB, toObjectId } from './db.js'
+
+// "Group A", "Group B", … keyed off the 0-indexed group index.
+// Inlined here so the Netlify function modules don't need to import
+// from the shared/ TS sources.
+const getGroupLetter = (i) =>
+  i < 26
+    ? String.fromCharCode(65 + i)
+    : String.fromCharCode(65 + Math.floor(i / 26) - 1) +
+      String.fromCharCode(65 + (i % 26))
+const getGroupName = (i) => `Group ${getGroupLetter(i)}`
 import { notifyEventUpdate, notifyLiveScoreUpdate, notifyMatchReset } from './pusher.js'
 import { getSettings as readGlobalSettings } from './settingsHandlers.js'
 
@@ -2964,7 +2974,7 @@ const findStageInfoForParent = (eventStages, parentId) => {
         if ((g.matches || []).some((m) => m._id === parentId)) {
           return {
             stageType: 'group',
-            stageName: `Group ${g.index + 1}`,
+            stageName: getGroupName(g.index),
             groupIndex: g.index,
           }
         }

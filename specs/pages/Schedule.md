@@ -14,7 +14,7 @@ Vertical
 
 - use the same match component as the Event Detail page
 - title for each match
-  - event name, stage name (Group 1, Semifinal...)
+  - event name, stage name (Group {A}, Semifinal...)
   - for team sub-matches, "Team Match {n} - BC vs YZ"
 - show matches on all tables first (1,2,3...)
 - show matches in queue

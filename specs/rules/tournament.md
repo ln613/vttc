@@ -17,6 +17,10 @@ The number of groups are determined by the total number of Teams/Players (N):
 - N = 32: 8 groups 
 - otherwise, Math.floor(N / 3) groups
 
+#### Group Name
+
+Group 1: A, Group 2: B, Group 3: C...
+
 #### Seeding (Rating based seeding, RBS)
 
 - nop = 1: the player's rating
@@ -29,7 +33,7 @@ The groups will be formed using the "snake seeding" method.
 
 For example, if there are totally 11 players/teams, then based on the seeding:
 
-G1    G2    G3
+A     B     C
 s1    s2    s3
 s6    s5    s4
 s7    s8    s9
@@ -69,7 +73,7 @@ The ranking of the teams/players in a group is determined based on the following
 #### Advancement
 
 - The top T players/teams in each group advance to the next stage. T = 2 by default unless specified otherwise.
-- The advanced players/teams will be marked with their group and ranking G1 - R1, G1 - R2, G2 - R1 ...
+- The advanced players/teams will be marked with their group and ranking A1, A2, B1 ...
 
 
 ### Knockout Stage
@@ -114,7 +118,7 @@ R = Math.ceil(Math.log2(N))
 
 For example, John - 1500, Peter - 1400, Tony - 1300, Sam - 1200, Joe - 1100, Tom - 1000, Phil - 900, Frank - 800, Glen - 700, and the group result/ranking is:
 
-    G1    G2    G3
+    A     B     C
 R1  Tom   Joe   Tony
 R2  John  Frank Glen
 R3  Phil  Peter Sam
@@ -152,23 +156,23 @@ In the previous example, if John beat Tony and Glen beat Frank in the first roun
 
 Q       S
 
-A --|
-    |-- A
-B --|
+a --|
+    |-- a
+b --|
 
-C --|
-    |-- D
-D --|
+c --|
+    |-- d
+d --|
 
-E --|
+e --|
     |-- 
-F --|
+f --|
 
-G --|
-    |-- G
-H --|
+g --|
+    |-- g
+h --|
 
-At this point, although the Quarterfinal round is not finished, the Semifinal match between A and D is ready, so the Semifinal round can be partially generated and the match between A and D can be put in queue
+At this point, although the Quarterfinal round is not finished, the Semifinal match between a and d is ready, so the Semifinal round can be partially generated and the match between a and d can be put in queue
 
 ## Participant Sex
 

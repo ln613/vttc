@@ -19,6 +19,7 @@ import {
   getHandicapStartingScore,
   createHandicapGameConfig,
 } from '../../shared/rules/matchRules'
+import { getGroupName } from '../../shared/rules/tournamentRules'
 
 interface GameResult {
   score1: number
@@ -956,7 +957,7 @@ export const gamePlayActions = {
   getStageName: (): string => {
     const base =
       gamePlayState.stage === 'group'
-        ? `Group ${gamePlayState.groupIndex + 1}`
+        ? getGroupName(gamePlayState.groupIndex)
         : (getKnockoutRoundName() ?? 'Knockout')
     const sub = getSubMatchSuffix()
     return sub ? `${base} - ${sub}` : base

@@ -6,6 +6,14 @@ import {
 } from './eventHandlers.js'
 import { getActiveSessionMatchIds } from './matchSessionHandlers.js'
 
+// "Group A", "Group B", … keyed off the 0-indexed group index.
+const getGroupLetter = (i) =>
+  i < 26
+    ? String.fromCharCode(65 + i)
+    : String.fromCharCode(65 + Math.floor(i / 26) - 1) +
+      String.fromCharCode(65 + (i % 26))
+const getGroupName = (i) => `Group ${getGroupLetter(i)}`
+
 const EVENTS_COLLECTION = 'events'
 const TABLE_STATE_COLLECTION = 'tableState'
 const TABLE_STATE_DOC_ID = 'current'
@@ -151,7 +159,7 @@ const extractGroupMatches = (event, eventSummary, items) => {
           eventId: event._id.toString(),
           eventName: event.eventName,
           stageType: 'group',
-          stageName: `Group ${group.index + 1}`,
+          stageName: getGroupName(group.index),
           groupIndex: group.index,
           groupSize,
           groupKey,
@@ -166,7 +174,7 @@ const extractGroupMatches = (event, eventSummary, items) => {
         eventName: event.eventName,
         match,
         stageType: 'group',
-        stageName: `Group ${group.index + 1}`,
+        stageName: getGroupName(group.index),
         groupIndex: group.index,
         groupSize,
         groupKey,
