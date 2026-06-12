@@ -778,11 +778,31 @@ export const getLiveScore = async (params = {}) => {
  */
 const autoGenerateForStartedEvents = async (events) => {
   let anyChanged = false
-  for (const event of events) {
+  for (const event of orderEventsForAutoStart(events)) {
     const changed = await autoGenerateForEvent(event)
     if (changed) anyChanged = true
   }
   return anyChanged
+}
+
+// Auto-start order: earlier start time first, and when two events share
+// the same start time, the higher-tier event is generated first.
+const orderEventsForAutoStart = (events) =>
+  [...events].sort((a, b) => {
+    const startA = eventStartKey(a)
+    const startB = eventStartKey(b)
+    if (startA !== startB) return startA < startB ? -1 : 1
+    return eventTierRank(b) - eventTierRank(a)
+  })
+
+const eventStartKey = (event) =>
+  `${event.date || ''} ${String(parseEventTime(event.time)).padStart(4, '0')}`
+
+// Higher number = higher tier (high > mid > low).
+const eventTierRank = (event) => {
+  if (isHighTierEvent(event)) return 2
+  if (isLowTierEvent(event)) return 0
+  return 1
 }
 
 const extractAllRemainingMatches = (events) => {

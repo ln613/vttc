@@ -71,7 +71,7 @@ This process will be triggered when
   - the Match Queue is empty, and
   - all tables are available, and
   - there is an event already started (today's event, the current time passed the event's start time)
-  then start the assigning process (if an already started event doesn't have groups, generate the groups, if it doesn't have schedule for the current stage/round, generate the schedule)
+  then start the assigning process (if an already started event doesn't have groups, generate the groups, if it doesn't have schedule for the current stage/round, generate the schedule. and if there are more than 1 event with the same start time, do the higher tier event first)
 
 ## Team Events
 
