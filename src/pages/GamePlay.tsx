@@ -1159,6 +1159,25 @@ const InitScreen = () => {
     return `${participant1Name()} vs ${participant2Name()}`
   }
 
+  // For a team parent match the participants render on two rows, each
+  // suffixed with the side's order labels, e.g. "Nan / Bill (AB)" /
+  // "Tom / Jack (XY)". Returns undefined for singles/doubles/sub-matches.
+  const teamParentLines = (): string[] | undefined => {
+    if (!gamePlayActions.isTeamMatch()) return undefined
+    const m = gamePlayActions.getCurrentMatch()
+    if (!m || m.parentMatchId) return undefined
+    const homeSide = m.homeSide ?? 1
+    const lineFor = (side: 1 | 2, name: string): string => {
+      const players =
+        side === 1
+          ? gamePlayActions.getSide1Players()
+          : gamePlayActions.getSide2Players()
+      const labels = side === homeSide ? HOME_LABELS : AWAY_LABELS
+      return `${name} (${labels.slice(0, players.length).join('')})`
+    }
+    return [lineFor(1, participant1Name()), lineFor(2, participant2Name())]
+  }
+
   const teamSubMatchTitle = (): string | undefined => {
     const m = gamePlayActions.getCurrentMatch()
     if (!m || !m.parentMatchId) return undefined
@@ -1210,7 +1229,14 @@ const InitScreen = () => {
         <div style={initHeaderLeftStyle}>
           <div style={initEventNameStyle}>{event()?.eventName}</div>
           <div style={initStageNameStyle}>{stageName()}</div>
-          <div style={initParticipantsStyle}>{participants()}</div>
+          <Show
+            when={teamParentLines()}
+            fallback={<div style={initParticipantsStyle}>{participants()}</div>}
+          >
+            <For each={teamParentLines()}>
+              {(line) => <div style={initParticipantsStyle}>{line}</div>}
+            </For>
+          </Show>
         </div>
         <Show when={gamePlayState.tableNumber != null}>
           <div style={initHeaderTableNumberStyle}>

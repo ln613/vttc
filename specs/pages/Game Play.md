@@ -97,7 +97,9 @@ When there is no match assigned, just show the big table number at screen center
     - participants
       - for singles, "{A} vs {X}"
       - for doubles, "{A}/{B} vs {X}/{Y}"
-      - for team parent match, "{A}/{B} vs {X}/{Y}"
+      - for team parent match, 2 rows
+        - "{A}/{B} (AB)"
+        - "{X}/{Y} (XY)"
       - for team sub-matches, "Team Match {n} - {A} vs {X}"
   - right
     - big table number (align top)
