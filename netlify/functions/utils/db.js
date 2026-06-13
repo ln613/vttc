@@ -118,6 +118,13 @@ export const connectDB = async () => {
       // Proactively retire idle sockets so the pool refreshes them rather
       // than handing out connections the server already dropped.
       maxIdleTimeMS: 60000,
+      // Each serverless instance handles one request at a time, so a
+      // single pooled connection is enough. This caps each warm container
+      // near the replica-set monitoring floor (~3-4 conns) instead of the
+      // default 100 — critical for staying under M0's 500-connection cap
+      // when many function instances run concurrently.
+      maxPoolSize: 1,
+      minPoolSize: 0,
     })
     await client.connect()
 

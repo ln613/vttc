@@ -98,7 +98,13 @@ export const apiHandlers = {
     generateKnockout: withEventNotify(generateKnockout),
     finishMatch: withEventNotify(finishMatch),
     confirmMatch: withEventNotify(confirmMatch),
-    updateGame: withEventNotify(updateGame),
+    // updateGame fires on every ~3s score save and is by far the highest
+    // frequency write. A point scored doesn't change the queue or any
+    // other table, so it deliberately does NOT broadcast — this avoids a
+    // realtime fan-out (Pusher + every client re-fetching) per point.
+    // Spectators' live scores refresh on the next queue-changing event
+    // (assign/finish/confirm), which still go through withEventNotify.
+    updateGame: (body) => updateGame(body),
     saveMatchSetup: withEventNotify(saveMatchSetup),
     startTeamMatchSide: withEventNotify(startTeamMatchSide),
     markTeamMatchSideOpened: withEventNotify(markTeamMatchSideOpened),
