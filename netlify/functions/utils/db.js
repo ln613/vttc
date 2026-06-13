@@ -118,12 +118,14 @@ export const connectDB = async () => {
       // Proactively retire idle sockets so the pool refreshes them rather
       // than handing out connections the server already dropped.
       maxIdleTimeMS: 60000,
-      // Each serverless instance handles one request at a time, so a
-      // single pooled connection is enough. This caps each warm container
-      // near the replica-set monitoring floor (~3-4 conns) instead of the
-      // default 100 — critical for staying under M0's 500-connection cap
-      // when many function instances run concurrently.
-      maxPoolSize: 1,
+      // Allow concurrency: `netlify dev` (and any single long-running
+      // server) handles many client requests in ONE process sharing this
+      // client — a pool of 1 would serialize them all behind one
+      // connection. 50 gives headroom while staying well under M0's
+      // 500-connection cap. (Deployed Lambda still uses ~1-2 per instance
+      // since each handles one request at a time, so this doesn't inflate
+      // the production connection count.)
+      maxPoolSize: 50,
       minPoolSize: 0,
     })
     await client.connect()
