@@ -328,8 +328,28 @@ export const getEvents = async (params = {}) => {
   if (params.tournamentId) {
     query.tournamentId = params.tournamentId
   }
-  const events = await db.collection(EVENTS_COLLECTION).find(query).toArray()
-  if (params.full === 'true' || params.full === true) {
+  const full = params.full === 'true' || params.full === true
+
+  // Summary mode never sends eventStages and only needs the stage
+  // completion flags from it. Project the heavy match/game arrays OUT at
+  // the query level so Atlas never even transfers them to the server —
+  // the lightweight group/round metadata (isComplete, participantCount)
+  // is enough to derive `finished`/`hasSchedule`. Full mode needs the
+  // matches, so no projection there.
+  const options = full
+    ? {}
+    : {
+        projection: {
+          'eventStages.groups.matches': 0,
+          'eventStages.rounds.matches': 0,
+        },
+      }
+  const events = await db
+    .collection(EVENTS_COLLECTION)
+    .find(query, options)
+    .toArray()
+
+  if (full) {
     // Full mode feeds the Schedule page, which only shows events with
     // active (on-table/queued) matches — finished events are filtered out
     // client-side anyway. Drop them here so completed tournaments (e.g.

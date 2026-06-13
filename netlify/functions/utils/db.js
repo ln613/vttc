@@ -155,12 +155,14 @@ export const connectDB = async () => {
       // Allow concurrency: `netlify dev` (and any single long-running
       // server) handles many client requests in ONE process sharing this
       // client — a pool of 1 would serialize them all behind one
-      // connection. 50 gives headroom while staying well under M0's
-      // 500-connection cap. (Deployed Lambda still uses ~1-2 per instance
-      // since each handles one request at a time, so this doesn't inflate
-      // the production connection count.)
+      // connection. 50 gives headroom (M10 allows ~1500 connections).
       maxPoolSize: 50,
-      minPoolSize: 0,
+      // Keep a few connections warm so a request after an idle gap doesn't
+      // pay a cold TLS reconnect (~2s) to Atlas. Without this, sporadic
+      // traffic kept letting sockets idle out (maxIdleTimeMS) and every
+      // first request reconnected — which is what made even a DB-free
+      // tablet sign-in hang behind connectDB().
+      minPoolSize: 5,
     })
     await client.connect()
 
