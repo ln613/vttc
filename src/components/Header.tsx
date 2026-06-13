@@ -166,7 +166,15 @@ const TablePickerDialog = (props: {
     if (!t || t.status === 'available') return 'available'
     return t.match?.matchStatus === 'not_started' ? 'not_started' : 'in_progress'
   }
+  // A table whose current match already has an active umpiring session is
+  // being run by another tablet/device. Disable it so picking a table can
+  // never take over (kick out) an in-progress umpire.
+  const isTakenByAnotherUmpire = (n: number): boolean => {
+    const matchId = tableFor(n)?.match?.matchId
+    return !!matchId && liveScoreActions.isMatchSessionActive(matchId.toString())
+  }
   const handleClick = (n: number) => {
+    if (isTakenByAnotherUmpire(n)) return
     const t = tableFor(n) ?? ({
       tableNumber: n as TableAssignment['tableNumber'],
       status: 'available',
@@ -180,15 +188,19 @@ const TablePickerDialog = (props: {
         <div style={tablePickerTitleStyle}>Pick a table</div>
         <div style={tablePickerGridStyle}>
           <For each={TABLE_GRID_ORDER}>
-            {(n) => (
-              <button
-                type="button"
-                style={tablePickerCellStyle(statusFor(n))}
-                onClick={() => handleClick(n)}
-              >
-                {n}
-              </button>
-            )}
+            {(n) => {
+              const taken = () => isTakenByAnotherUmpire(n)
+              return (
+                <button
+                  type="button"
+                  style={tablePickerCellStyle(statusFor(n), taken())}
+                  onClick={() => handleClick(n)}
+                  disabled={taken()}
+                >
+                  {n}
+                </button>
+              )
+            }}
           </For>
         </div>
       </div>
@@ -239,6 +251,7 @@ const tablePickerGridStyle: JSX.CSSProperties = {
 
 const tablePickerCellStyle = (
   status: 'available' | 'not_started' | 'in_progress',
+  disabled = false,
 ): JSX.CSSProperties => {
   const bg =
     status === 'available'
@@ -255,9 +268,10 @@ const tablePickerCellStyle = (
     color: '#f1c40f',
     'background-color': bg,
     border: '3px solid transparent',
-    cursor: 'pointer',
+    cursor: disabled ? 'not-allowed' : 'pointer',
     'text-shadow': '2px 2px 4px rgba(0,0,0,0.3)',
     padding: 0,
+    opacity: disabled ? 0.4 : 1,
   }
 }
 
