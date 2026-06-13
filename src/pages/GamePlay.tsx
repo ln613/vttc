@@ -903,18 +903,39 @@ interface GameEndButtonProps {
 }
 
 const GameEndButton = (props: GameEndButtonProps) => {
-  const handleClick = () => {
-    if (props.isMatchFinished) {
-      gamePlayActions.finishMatch()
-    } else {
-      gamePlayActions.nextGame()
+  // Disable + show a processing label while the (possibly slow) save runs
+  // so a double-tap can't advance/save twice.
+  const [processing, setProcessing] = createSignal(false)
+
+  const handleClick = async () => {
+    if (processing()) return
+    setProcessing(true)
+    try {
+      if (props.isMatchFinished) {
+        gamePlayActions.finishMatch()
+      } else {
+        await gamePlayActions.nextGame()
+      }
+    } finally {
+      setProcessing(false)
     }
   }
 
-  const label = () => (props.isMatchFinished ? 'Finish' : 'Next Game')
+  const label = () => {
+    if (processing()) return props.isMatchFinished ? 'Finishing...' : 'Saving...'
+    return props.isMatchFinished ? 'Finish' : 'Next Game'
+  }
 
   return (
-    <button style={gameEndButtonStyle} onClick={handleClick}>
+    <button
+      style={
+        processing()
+          ? { ...gameEndButtonStyle, opacity: 0.6, cursor: 'not-allowed' }
+          : gameEndButtonStyle
+      }
+      onClick={handleClick}
+      disabled={processing()}
+    >
       {label()}
     </button>
   )

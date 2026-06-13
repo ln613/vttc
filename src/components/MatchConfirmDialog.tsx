@@ -1,4 +1,4 @@
-import { For, type JSX } from 'solid-js'
+import { For, createSignal, type JSX } from 'solid-js'
 import Button from './Button'
 
 export interface GameResult {
@@ -18,27 +18,47 @@ interface MatchConfirmDialogProps {
   participant1Name: string
   participant2Name: string
   onCancel: () => void
-  onConfirm: () => void
+  onConfirm: () => void | Promise<void>
 }
 
-const MatchConfirmDialog = (props: MatchConfirmDialogProps) => (
-  <div style={dialogOverlayStyle}>
-    <div style={finishDialogContentStyle}>
-      <div style={finishDialogMessageStyle}>
-        Show the match result to both sides and confirm the result with them
-      </div>
-      <MatchResultPreview
-        preview={props.preview}
-        participant1Name={props.participant1Name}
-        participant2Name={props.participant2Name}
-      />
-      <div style={finishDialogButtonsStyle}>
-        <Button onClick={props.onCancel} color="#e74c3c">Cancel</Button>
-        <Button onClick={props.onConfirm} color="#27ae60">Confirm</Button>
+const MatchConfirmDialog = (props: MatchConfirmDialogProps) => {
+  // Disable + "Confirming..." while the (possibly slow) confirm runs so a
+  // double-tap can't submit the result twice.
+  const [confirming, setConfirming] = createSignal(false)
+
+  const handleConfirm = async () => {
+    if (confirming()) return
+    setConfirming(true)
+    try {
+      await Promise.resolve(props.onConfirm())
+    } finally {
+      setConfirming(false)
+    }
+  }
+
+  return (
+    <div style={dialogOverlayStyle}>
+      <div style={finishDialogContentStyle}>
+        <div style={finishDialogMessageStyle}>
+          Show the match result to both sides and confirm the result with them
+        </div>
+        <MatchResultPreview
+          preview={props.preview}
+          participant1Name={props.participant1Name}
+          participant2Name={props.participant2Name}
+        />
+        <div style={finishDialogButtonsStyle}>
+          <Button onClick={props.onCancel} color="#e74c3c" disabled={confirming()}>
+            Cancel
+          </Button>
+          <Button onClick={handleConfirm} color="#27ae60" disabled={confirming()}>
+            {confirming() ? 'Confirming...' : 'Confirm'}
+          </Button>
+        </div>
       </div>
     </div>
-  </div>
-)
+  )
+}
 
 interface MatchResultPreviewProps {
   preview: MatchPreview

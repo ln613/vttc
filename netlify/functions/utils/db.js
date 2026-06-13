@@ -38,6 +38,40 @@ const resetConnection = () => {
   if (client) Promise.resolve(client.close()).catch(() => {})
 }
 
+// Is this a connection/topology-level failure (vs. a normal app/validation
+// error)? These are the cases where the cached client is the problem — a
+// dead socket after a failover or host swap, a closed pool, a server that
+// can't be selected — and reusing it would just hang the next request too.
+const isConnectionError = (err) => {
+  if (!err) return false
+  const name = err.name || ''
+  if (
+    name === 'MongoNetworkError' ||
+    name === 'MongoNetworkTimeoutError' ||
+    name === 'MongoServerSelectionError' ||
+    name === 'MongoNotConnectedError' ||
+    name === 'MongoTopologyClosedError' ||
+    name === 'MongoPoolClearedError'
+  ) {
+    return true
+  }
+  const msg = err.message || ''
+  return /topology (was )?(closed|destroyed)|connection .*(closed|timed out)|socket|ECONNRESET|ETIMEDOUT|ENOTFOUND|EPIPE|server selection|pool (was )?cleared|not connected/i.test(
+    msg,
+  )
+}
+
+// Called from the API entry point when a handler throws. If the failure
+// was connectivity (e.g. a mid-tournament failover left the cached client
+// pointed at dead hosts), drop the connection so the NEXT request rebuilds
+// against the current topology — self-healing without a manual restart.
+// Returns whether a reset happened (so callers can log it if useful).
+export const maybeResetOnError = (err) => {
+  if (!isConnectionError(err)) return false
+  resetConnection()
+  return true
+}
+
 /**
  * Convert string _id to ObjectId for MongoDB queries
  */

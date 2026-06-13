@@ -1,4 +1,4 @@
-import { connectDB } from './utils/db.js'
+import { connectDB, maybeResetOnError } from './utils/db.js'
 import { apiHandlers } from './utils/handlers.js'
 
 export const handler = async (event) => {
@@ -32,6 +32,12 @@ export const handler = async (event) => {
     return createResponse(200, result)
   } catch (error) {
     console.error('API Error:', error)
+    // If this failed because the cached DB connection is dead (e.g. a
+    // failover or host swap left it pointed at gone nodes), drop it so the
+    // next request reconnects to the current topology instead of hanging.
+    if (maybeResetOnError(error)) {
+      console.error('DB connection reset after connectivity error')
+    }
     return createResponse(500, { error: error.message })
   }
 }
