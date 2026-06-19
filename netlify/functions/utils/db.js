@@ -119,6 +119,23 @@ const convertFilterIds = (filter) => {
   return converted
 }
 
+// Per coding standard rule 10: the dev environment uses the "-dev"
+// suffixed database so local work never touches production data. The base
+// name comes from the MONGODB_URI path (e.g. ".../vttc?..." → "vttc").
+const BASE_DB_NAME = 'vttc'
+
+// `netlify dev` exports NETLIFY_DEV=true locally; deployed production
+// functions run without it (CONTEXT === 'production').
+const isDevEnv = () =>
+  process.env.NETLIFY_DEV === 'true' || process.env.CONTEXT === 'dev'
+
+// An explicit MONGODB_DB override wins over the dev/prod auto-detection —
+// e.g. set MONGODB_DB=vttc to point the local dev server at the production
+// database during a live event.
+const getDbName = () =>
+  process.env.MONGODB_DB ||
+  (isDevEnv() ? `${BASE_DB_NAME}-dev` : BASE_DB_NAME)
+
 export const connectDB = async () => {
   const now = Date.now()
 
@@ -166,9 +183,8 @@ export const connectDB = async () => {
     })
     await client.connect()
 
-    const dbName = 'vttc'
     cachedClient = client
-    cachedDb = client.db(dbName)
+    cachedDb = client.db(getDbName())
     return cachedDb
   })()
 
