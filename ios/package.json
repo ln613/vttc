@@ -1,0 +1,18 @@
+{
+  "name": "vttc-cordova-ios",
+  "displayName": "VTTC Live",
+  "version": "1.0.0",
+  "description": "VTTC Live — Cordova iOS wrapper",
+  "main": "index.js",
+  "private": true,
+  "cordova": {
+    "platforms": [
+      "ios"
+    ],
+    "plugins": {}
+  },
+  "devDependencies": {
+    "cordova": "^13.0.0",
+    "cordova-ios": "^8.1.0"
+  }
+}

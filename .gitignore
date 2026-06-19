@@ -32,3 +32,10 @@ apk/plugins
 apk/node_modules
 apk/.cordova
 apk/.gradle
+
+# Cordova / iOS build outputs
+ios/www
+ios/platforms
+ios/plugins
+ios/node_modules
+ios/.cordova

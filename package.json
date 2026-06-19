@@ -15,7 +15,10 @@
     "apk:build": "npm run apk:sync && cd apk && npx cordova build android --no-update-notifier",
     "postapk:build": "node apk/copy-to-public.js && node apk/upload-to-gdrive.js",
     "apk:build:release": "npm run apk:sync && cd apk && npx cordova build android --release --no-update-notifier",
-    "postapk:build:release": "node apk/copy-to-public.js && node apk/upload-to-gdrive.js"
+    "postapk:build:release": "node apk/copy-to-public.js && node apk/upload-to-gdrive.js",
+    "ios:sync": "vite build && node ios/sync.mjs",
+    "ios:prepare": "npm --prefix ios install && cd ios && npx cordova platform add ios --no-update-notifier",
+    "ios:build": "npm run ios:sync && cd ios && npx cordova build ios --device --buildConfig=build.json --no-update-notifier"
   },
   "dependencies": {
     "@solidjs/router": "^0.15.3",

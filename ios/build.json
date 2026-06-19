@@ -1,0 +1,20 @@
+{
+  "ios": {
+    "debug": {
+      "automaticProvisioning": true,
+      "developmentTeam": "4LM22ZM9VZ",
+      "packageType": "development",
+      "buildFlag": [
+        "-allowProvisioningUpdates"
+      ]
+    },
+    "release": {
+      "automaticProvisioning": true,
+      "developmentTeam": "4LM22ZM9VZ",
+      "packageType": "development",
+      "buildFlag": [
+        "-allowProvisioningUpdates"
+      ]
+    }
+  }
+}

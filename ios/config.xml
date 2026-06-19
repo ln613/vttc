@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='utf-8'?>
+<widget id="com.lynqu.vttclive" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+    <name>VTTC Live</name>
+    <description>Vancouver Table Tennis Club — Live</description>
+    <author email="info@vttc.ca" href="https://vttc.ca">Vancouver Table Tennis Club</author>
+    <content src="index.html" />
+    <access origin="*" />
+    <allow-intent href="http://*/*" />
+    <allow-intent href="https://*/*" />
+    <allow-intent href="tel:*" />
+    <allow-intent href="mailto:*" />
+    <allow-intent href="geo:*" />
+    <preference name="DisallowOverscroll" value="true" />
+    <preference name="Orientation" value="default" />
+    <preference name="deployment-target" value="14.0" />
+    <platform name="ios">
+        <preference name="WKWebViewOnly" value="true" />
+        <preference name="SwiftVersion" value="5" />
+        <allow-navigation href="*" />
+        <icon src="resources/ios/icon/icon.png" width="1024" height="1024" />
+    </platform>
+</widget>
