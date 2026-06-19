@@ -2893,10 +2893,21 @@ const buildTeamSubMatches = (parent, lockedTableNumber) => {
   const teamMatchType =
     parent.teamMatchType ||
     getTeamMatchType(nop, parent.numberOfMatches || 5)
+  // The standard lineup is defined in home/away terms (home = A,B,C;
+  // away = X,Y,Z). Which physical side is "home" depends on homeSide, so
+  // map the assignments accordingly. Treating side1 as home unconditionally
+  // produces home/away-swapped pairings whenever the away team is side1
+  // (homeSide === 2) — e.g. sub-match 1 shows "B vs X" players under the
+  // "A vs Y" title.
+  const homeSide = parent.homeSide ?? 1
+  const homeAssignment =
+    homeSide === 1 ? parent.side1Assignment : parent.side2Assignment
+  const awayAssignment =
+    homeSide === 1 ? parent.side2Assignment : parent.side1Assignment
   const lineup = getTeamMatchLineupJS(
     teamMatchType,
-    parent.side1Assignment,
-    parent.side2Assignment,
+    homeAssignment,
+    awayAssignment,
   )
   const numberOfGames = parent.config?.numberOfGames || 3
   const gameConfig = parent.config?.gameConfig || {
@@ -2911,8 +2922,11 @@ const buildTeamSubMatches = (parent, lockedTableNumber) => {
       isSuddenDeath: parent.config?.isSuddenDeath ?? true,
       gameConfig,
     },
-    side1: entry.home,
-    side2: entry.away,
+    // entry.home/away are home/away-team players; map back onto the
+    // physical sides so side1 stays the side1 team (win tallies depend on
+    // sub.winningSide === 1 meaning the side1 team won).
+    side1: homeSide === 1 ? entry.home : entry.away,
+    side2: homeSide === 1 ? entry.away : entry.home,
     games: [],
     gamesWon1: 0,
     gamesWon2: 0,
