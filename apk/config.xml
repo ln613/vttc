@@ -17,7 +17,12 @@
     <preference name="MixedContentMode" value="0" />
     <preference name="AndroidWindowSplashScreenAnimatedIcon" value="resources/android/icon/icon.png" />
     <platform name="android">
-        <icon src="resources/android/icon/icon.png" />
+        <icon density="ldpi" src="resources/android/icon/icon-ldpi.png" />
+        <icon density="mdpi" src="resources/android/icon/icon-mdpi.png" />
+        <icon density="hdpi" src="resources/android/icon/icon-hdpi.png" />
+        <icon density="xhdpi" src="resources/android/icon/icon-xhdpi.png" />
+        <icon density="xxhdpi" src="resources/android/icon/icon-xxhdpi.png" />
+        <icon density="xxxhdpi" src="resources/android/icon/icon-xxxhdpi.png" />
         <allow-intent href="market:*" />
     </platform>
 </widget>
