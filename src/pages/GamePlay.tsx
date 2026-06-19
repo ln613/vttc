@@ -980,7 +980,9 @@ const FinishConfirmDialog = () => {
 const TeamSetupDialog = () => {
   const match = () => gamePlayActions.getCurrentMatch()
   const userSide = () => gamePlayActions.getUserSideInMatch()
-  const homeSide = () => match()?.homeSide
+  // Default to 1 (side1 = home) for legacy/knockout matches saved without
+  // an explicit homeSide; otherwise both panels render as "Away" / X-Y.
+  const homeSide = () => match()?.homeSide ?? 1
 
   return (
     <div style={dialogOverlayStyle}>

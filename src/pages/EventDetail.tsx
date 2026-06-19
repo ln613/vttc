@@ -325,7 +325,9 @@ export const SetOrderDialog = () => {
     if ((m.side2 || []).some((p) => p._id?.toString() === uid)) return 2
     return undefined
   }
-  const homeSide = () => match()?.homeSide
+  // Default to 1 (side1 = home) for legacy/knockout matches saved without
+  // an explicit homeSide; otherwise both sides resolve to "Away" / X-Y.
+  const homeSide = () => match()?.homeSide ?? 1
   const side1Done = () => !!match()?.side1Assignment
   const side2Done = () => !!match()?.side2Assignment
   // Both sides finished setting their orders — auto-dismiss the dialog
@@ -975,7 +977,10 @@ export const getTeamPlayerOrderLabel = (
   playerId: string | undefined,
 ): string | undefined => {
   if (!parent || !playerId) return undefined
-  const homeSide = parent.homeSide
+  // Default to 1 (side1 = home) for legacy/knockout matches saved without
+  // an explicit homeSide; otherwise neither side matches and every player
+  // gets an away (X/Y/Z) label.
+  const homeSide = parent.homeSide ?? 1
   const sides: Array<{
     assignment: Match['side1Assignment']
     isHome: boolean

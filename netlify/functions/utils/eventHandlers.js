@@ -1019,6 +1019,10 @@ const buildKnockoutMatchRecord = (event, top, bottom, numberOfGames) => {
       isTeamMatch: true,
       teamMatchType: getTeamMatchType(event.nop, numberOfMatches),
       numberOfMatches,
+      // Top seed (side1) is home, mirroring the group schedule. Without
+      // this every order-of-play check (homeSide === 1/2) falls through to
+      // "away", so both teams render with X/Y labels and no A/B.
+      homeSide: 1,
       participantIds: {
         side1: top.participant._id,
         side2: bottom.participant._id,
