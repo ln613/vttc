@@ -206,7 +206,16 @@ const GamePlay = () => {
         fallback={<LoadingSpinner />}
       >
         <Show
-          when={!gamePlayState.matchId && gamePlayState.tableNumber != null}
+          when={
+            gamePlayState.tableNumber != null &&
+            // No match loaded yet, OR (tablet) the match was just finished
+            // + confirmed: show the big table number immediately instead of
+            // leaving the finished score boxes up while the live-score swap
+            // round-trips. matchId stays set so the table-watch effect can
+            // still detect the swap and load the next match.
+            (!gamePlayState.matchId ||
+              (authState.isTablet && gamePlayState.matchSubmitted))
+          }
           fallback={
             <Show
               when={gamePlayState.showInitDialog && !sessionBlocked()}
