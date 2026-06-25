@@ -20,7 +20,9 @@ const Settings = () => {
             <div style={errorStyle}>{settingsState.error}</div>
           </Show>
           <EventSettingSection />
-          <RevenueSection />
+          <Show when={authState.isSuperAdmin}>
+            <RevenueSection />
+          </Show>
         </div>
       </Show>
     </div>

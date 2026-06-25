@@ -26,3 +26,4 @@ Vertical
 ## Revenue Section
 
 - link to revenue page
+- super admin only

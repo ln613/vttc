@@ -12,6 +12,10 @@ export interface EventEditFormData {
   time: string
   maxParticipants: string
   registrationFee: string
+  prize1: string
+  prize2: string
+  prize3: string
+  prize4: string
   name: string
   groupGames: BestOfOption
   knockoutGames: BestOfOption
@@ -39,6 +43,10 @@ const defaultFormData: EventEditFormData = {
   time: '',
   maxParticipants: 'Unlimited',
   registrationFee: '',
+  prize1: '',
+  prize2: '',
+  prize3: '',
+  prize4: '',
   name: '',
   groupGames: 'Best of 3',
   knockoutGames: 'Best of 3 before Semifinal',
@@ -73,6 +81,10 @@ const mapEventToFormData = (event: Event): EventEditFormData => ({
   maxParticipants:
     event.maxParticipants === 0 ? 'Unlimited' : String(event.maxParticipants),
   registrationFee: event.registrationFee ? String(event.registrationFee) : '',
+  prize1: event.prizes?.first ? String(event.prizes.first) : '',
+  prize2: event.prizes?.second ? String(event.prizes.second) : '',
+  prize3: event.prizes?.third ? String(event.prizes.third) : '',
+  prize4: event.prizes?.fourth ? String(event.prizes.fourth) : '',
   name: event.eventName || '',
   groupGames: event.groupGames || 'Best of 3',
   knockoutGames: event.knockoutGames || 'Best of 3 before Semifinal',
@@ -180,6 +192,9 @@ const generateEventName = (tournamentId: string): string | null => {
   return tournament.name
 }
 
+const parsePrize = (value: string): number | undefined =>
+  value ? parseInt(value, 10) : undefined
+
 const buildSavePayload = (formData: EventEditFormData) => ({
   _id: formData._id,
   eventSeries: formData.eventSeries || undefined,
@@ -193,6 +208,12 @@ const buildSavePayload = (formData: EventEditFormData) => ({
   registrationFee: formData.registrationFee
     ? parseInt(formData.registrationFee, 10)
     : undefined,
+  prizes: {
+    first: parsePrize(formData.prize1),
+    second: parsePrize(formData.prize2),
+    third: parsePrize(formData.prize3),
+    fourth: parsePrize(formData.prize4),
+  },
   name: formData.name,
   groupGames: formData.groupGames,
   knockoutGames: formData.knockoutGames,

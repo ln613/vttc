@@ -17,7 +17,6 @@ export interface EventOption {
   maxParticipants: number
   registrationFee?: number
   type: TournamentType
-  prize?: number
   topPlayersRatingEnabled: boolean
   topPlayersCount?: number
   participants: Participant[]

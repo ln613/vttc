@@ -54,13 +54,19 @@ const getHostPlayerIds = async (db) => {
   return new Set(hosts.map((h) => h._id.toString()))
 }
 
+// Total prize payout = sum of the place prizes (1st–4th).
+const getTotalPrize = (event) => {
+  const p = event.prizes || {}
+  return (p.first || 0) + (p.second || 0) + (p.third || 0) + (p.fourth || 0)
+}
+
 const computeEventRevenue = (event, hostIds) => {
   const scheduled = collectScheduledPlayerIds(event)
   let payingPlayers = 0
   for (const id of scheduled) if (!hostIds.has(id)) payingPlayers++
 
   const registrationFee = round2(payingPlayers * getPerPlayerFee(event))
-  const prize = event.prize || 0
+  const prize = getTotalPrize(event)
   return {
     _id: event._id.toString(),
     eventName: event.eventName,

@@ -66,6 +66,7 @@ export const saveEvent = async (body) => {
     time = '',
     maxParticipants = 0,
     registrationFee,
+    prizes = null,
     name,
     groupGames = 'Best of 3',
     knockoutGames = 'Best of 3 before Semifinal',
@@ -103,14 +104,16 @@ export const saveEvent = async (body) => {
     if (!existing) {
       throwError('Event not found')
     }
-    // Check no schedules have been created
+    // Once schedules exist the structural fields are locked, but the
+    // registration fee and prizes can still be adjusted — apply just those
+    // and leave everything else untouched.
     const hasSchedules = existing.eventStages?.some(
       (s) =>
         (s.type === 'group' && s.groups?.length > 0) ||
         (s.type === 'knockout' && s.rounds?.length > 0),
     )
     if (hasSchedules) {
-      throwError('Cannot edit event after schedules have been created')
+      return updateEventFeeAndPrizes(eventsCollection, _id, registrationFee, prizes)
     }
   }
 
@@ -134,6 +137,7 @@ export const saveEvent = async (body) => {
     handicapDifference,
     handicapMaxPoints,
     registrationFee: registrationFee || undefined,
+    prizes: prizes || undefined,
     participants: isEdit ? undefined : [], // Don't overwrite participants on edit
     paidPlayerIds: isEdit ? undefined : [], // Don't overwrite paidPlayerIds on edit
     eventStages: isEdit
@@ -177,6 +181,25 @@ const validateSaveEventInput = (body) => {
   if (!body) throwError('Request body is required')
   if (!body.tournamentId) throwError('Tournament ID is required')
   if (!body.date) throwError('Event date is required')
+}
+
+// Limited edit allowed once schedules exist: only the registration fee and
+// prizes. A cleared (empty) value is removed from the document.
+const updateEventFeeAndPrizes = async (collection, id, registrationFee, prizes) => {
+  const fields = {
+    registrationFee: registrationFee || undefined,
+    prizes: prizes || undefined,
+  }
+  const $set = { updatedAt: new Date().toISOString() }
+  const $unset = {}
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined) $unset[key] = ''
+    else $set[key] = value
+  }
+  const ops = Object.keys($unset).length ? { $set, $unset } : { $set }
+  await collection.updateOne({ _id: toObjectId(id) }, ops)
+  const updated = await collection.findOne({ _id: toObjectId(id) })
+  return { ...updated, _id: id }
 }
 
 /**

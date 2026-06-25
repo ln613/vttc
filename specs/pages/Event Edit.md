@@ -13,12 +13,21 @@ Vertical
 - Name: input (initial value after tournament is selected = tournament name) *
 - Max Participants: dropdown (Unlimited, 4 to 128, default Unlimited)
 - Registration Fee: dropdown (10 to 100, interval 5)
+- Prize section
 - Number of Matches section
 - Number of Games section
 - Number of Qualifiers section
 - Handicap Section
 - button "Cancel" (red)
 - button "Save" (green)
+
+## Prize Section
+
+- 1st Place prize dropdown
+- 2nd Place prize dropdown
+- 3rd Place prize dropdown
+- 4th Place prize dropdown
+- each prize dropdown (300, 250, 200, 180, 175, 150, 125, 120, 100, then 5 interval to 5)
 
 ## Number of Games Section
 

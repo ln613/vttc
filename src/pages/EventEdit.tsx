@@ -81,10 +81,21 @@ const generateRegistrationFeeOptions = () => {
   return options
 }
 
+const generatePrizeOptions = () => {
+  const options = [{ value: '', label: '' }]
+  const fixed = [300, 250, 200, 180, 175, 150, 125, 120, 100]
+  for (const v of fixed) options.push({ value: String(v), label: `$${v}` })
+  for (let i = 95; i >= 5; i -= 5) {
+    options.push({ value: String(i), label: `$${i}` })
+  }
+  return options
+}
+
 const HANDICAP_DIFFERENCE_OPTIONS = generateHandicapDifferenceOptions()
 const MAX_POINTS_GIVEN_OPTIONS = generateMaxPointsGivenOptions()
 const MAX_PARTICIPANTS_OPTIONS = generateMaxParticipantsOptions()
 const REGISTRATION_FEE_OPTIONS = generateRegistrationFeeOptions()
+const PRIZE_OPTIONS = generatePrizeOptions()
 
 interface EventEditProps {
   isEdit?: boolean
@@ -277,6 +288,7 @@ const EventEdit = (props: EventEditProps) => {
           }
           options={REGISTRATION_FEE_OPTIONS}
         />
+        <PrizeSection />
         <NumberOfMatchesSection />
         <NumberOfGamesSection />
         <QualifiersSection />
@@ -300,6 +312,40 @@ const EventEdit = (props: EventEditProps) => {
     </div>
   )
 }
+
+const PrizeSection = () => (
+  <>
+    <h3 style={sectionTitleStyle}>Prize</h3>
+    <Select
+      label="1st Place"
+      name="prize1"
+      value={eventEditState.formData.prize1}
+      onChange={(value) => eventEditActions.setField('prize1', value)}
+      options={PRIZE_OPTIONS}
+    />
+    <Select
+      label="2nd Place"
+      name="prize2"
+      value={eventEditState.formData.prize2}
+      onChange={(value) => eventEditActions.setField('prize2', value)}
+      options={PRIZE_OPTIONS}
+    />
+    <Select
+      label="3rd Place"
+      name="prize3"
+      value={eventEditState.formData.prize3}
+      onChange={(value) => eventEditActions.setField('prize3', value)}
+      options={PRIZE_OPTIONS}
+    />
+    <Select
+      label="4th Place"
+      name="prize4"
+      value={eventEditState.formData.prize4}
+      onChange={(value) => eventEditActions.setField('prize4', value)}
+      options={PRIZE_OPTIONS}
+    />
+  </>
+)
 
 const NumberOfGamesSection = () => {
   const tournament = () => eventEditActions.getSelectedTournament()
