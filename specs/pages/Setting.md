@@ -12,6 +12,7 @@ Vertical
     - edit mode: "Cancel" and "Save" icons (exit edit mode)
     - saving indicator (spinning circle, while saving)
 - Event Setting Section
+- Revenue Section
 
 ## Event Setting Section
 
@@ -21,3 +22,7 @@ Vertical
 
 - on save click: save the settings to db
 - show empty page for non-admin
+
+## Revenue Section
+
+- link to revenue page

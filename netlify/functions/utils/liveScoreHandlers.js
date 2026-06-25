@@ -35,7 +35,7 @@ const throwError = (message) => {
  */
 const CLUB_TIMEZONE = process.env.CLUB_TIMEZONE || 'America/Vancouver'
 
-const getClubDate = () =>
+export const getClubDate = () =>
   new Intl.DateTimeFormat('en-CA', {
     timeZone: CLUB_TIMEZONE,
     year: 'numeric',

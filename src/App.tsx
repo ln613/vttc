@@ -12,6 +12,7 @@ import GamePlay from './pages/GamePlay'
 import LiveScore from './pages/LiveScore'
 import Account from './pages/Account'
 import Settings from './pages/Settings'
+import Revenue from './pages/Revenue'
 import ConfirmDialog from './components/ConfirmDialog'
 import UserNotifications from './components/UserNotifications'
 import NotificationToasts from './components/NotificationToasts'
@@ -42,6 +43,7 @@ const App = () => (
     <Route path="/game-play" component={GamePlay} />
     <Route path="/live-score" component={LiveScore} />
     <Route path="/settings" component={Settings} />
+    <Route path="/revenue" component={Revenue} />
   </HashRouter>
 )
 

@@ -1,4 +1,5 @@
 import { Show, onMount, type JSX } from 'solid-js'
+import { useNavigate } from '@solidjs/router'
 import { Header } from '../components/Header'
 import { authState } from '../stores/authStore'
 import { settingsState, settingsActions } from '../stores/settingsStore'
@@ -19,8 +20,25 @@ const Settings = () => {
             <div style={errorStyle}>{settingsState.error}</div>
           </Show>
           <EventSettingSection />
+          <RevenueSection />
         </div>
       </Show>
+    </div>
+  )
+}
+
+const RevenueSection = () => {
+  const navigate = useNavigate()
+  return (
+    <div style={sectionStyle}>
+      <h4 style={sectionHeaderStyle}>Revenue</h4>
+      <button
+        type="button"
+        style={linkButtonStyle}
+        onClick={() => navigate('/revenue')}
+      >
+        Revenue
+      </button>
     </div>
   )
 }
@@ -215,6 +233,17 @@ const checkboxLabelStyle: JSX.CSSProperties = {
   'font-size': '14px',
   color: '#333',
   'line-height': '1.4',
+}
+
+const linkButtonStyle: JSX.CSSProperties = {
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  color: '#3498db',
+  'font-size': '14px',
+  'font-weight': 600,
+  cursor: 'pointer',
+  'text-decoration': 'underline',
 }
 
 const errorStyle: JSX.CSSProperties = {
