@@ -58,3 +58,11 @@ export const notifyMatchReset = async (eventId, matchId) => {
 export const notifyLiveScoreUpdate = async () => {
   await triggerSafely('live-score', 'updated', {})
 }
+
+// Notify a single player (by their player/account id) that a table has
+// been assigned to one of their matches. Delivered on a per-user channel
+// the logged-in client subscribes to.
+export const notifyTableAssigned = async (playerId, data) => {
+  if (!playerId) return
+  await triggerSafely(`user-${playerId}`, 'table-assigned', data || {})
+}

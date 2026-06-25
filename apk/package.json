@@ -10,10 +10,20 @@
     "platforms": [
       "android"
     ],
-    "plugins": {}
+    "plugins": {
+      "cordova-plugin-firebasex-messaging": {
+        "FIREBASE_FCM_AUTOINIT_ENABLED": "true",
+        "FIREBASE_MESSAGING_IMMEDIATE_PAYLOAD_DELIVERY": "false",
+        "IOS_FCM_ENABLED": "true",
+        "IOS_ENABLE_CRITICAL_ALERTS_ENABLED": "false",
+        "ANDROID_ICON_ACCENT": "#FFFFFF",
+        "ANDROID_FIREBASE_MESSAGING_VERSION": "25.0.2"
+      }
+    }
   },
   "devDependencies": {
     "cordova": "^13.0.0",
-    "cordova-android": "^15.0.0"
+    "cordova-android": "^14.0.1",
+    "cordova-plugin-firebasex-messaging": "^2.0.1"
   }
 }

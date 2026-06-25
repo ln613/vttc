@@ -13,11 +13,15 @@ import LiveScore from './pages/LiveScore'
 import Account from './pages/Account'
 import Settings from './pages/Settings'
 import ConfirmDialog from './components/ConfirmDialog'
+import UserNotifications from './components/UserNotifications'
+import NotificationToasts from './components/NotificationToasts'
 
 const RootLayout = (props: { children?: JSX.Element }) => (
   <>
     {props.children}
     <ConfirmDialog />
+    <UserNotifications />
+    <NotificationToasts />
   </>
 )
 

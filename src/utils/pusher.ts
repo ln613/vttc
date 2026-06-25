@@ -65,3 +65,26 @@ export const subscribeToLiveScoreUpdates = (
     unsubscribe: () => channel.unbind('updated', onUpdate),
   }
 }
+
+export interface TableAssignedNotification {
+  tableNumber: number
+  eventId: string
+  matchId: string
+}
+
+// Subscribe a logged-in player to their personal channel to receive
+// table-assignment push notifications for their own matches.
+export const subscribeToUserNotifications = (
+  playerId: string,
+  onTableAssigned: (data: TableAssignedNotification) => void,
+): EventSubscription => {
+  const client = getClient()
+  if (!client) {
+    return { unsubscribe: () => {} }
+  }
+  const channel = client.subscribe(`user-${playerId}`)
+  channel.bind('table-assigned', onTableAssigned)
+  return {
+    unsubscribe: () => channel.unbind('table-assigned', onTableAssigned),
+  }
+}

@@ -58,6 +58,7 @@ import {
   releaseMatchSession,
 } from './matchSessionHandlers.js'
 import { getSettings, saveSettings } from './settingsHandlers.js'
+import { savePushToken, removePushToken } from './push.js'
 import { notifyEventUpdate, notifyLiveScoreUpdate } from './pusher.js'
 
 const withEventNotify = (fn) => async (body) => {
@@ -119,6 +120,8 @@ export const apiHandlers = {
     getPartialTeams: (body) => getPartialTeams(body),
     getPlayerUnpaidFees: (body) => getPlayerUnpaidFees(body),
     changeTeam: withEventNotify(changeTeam),
+    registerPushToken: (body) => savePushToken(body),
+    unregisterPushToken: (body) => removePushToken(body),
     signIn: (body) => signIn(body),
     signUp: (body) => signUp(body),
     sendVerificationCode: (body) => sendVerificationCode(body),

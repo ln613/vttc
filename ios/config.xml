@@ -13,10 +13,15 @@
     <preference name="DisallowOverscroll" value="true" />
     <preference name="Orientation" value="default" />
     <preference name="deployment-target" value="14.0" />
+    <!-- OS-level push via FCM/APNs. Requires GoogleService-Info.plist at this
+         folder's root and an APNs auth key uploaded to Firebase (see
+         PUSH_SETUP.md). -->
+    <plugin name="cordova-plugin-firebasex-messaging" spec="^2.0.1" />
     <platform name="ios">
         <preference name="WKWebViewOnly" value="true" />
         <preference name="SwiftVersion" value="5" />
         <allow-navigation href="*" />
         <icon src="resources/ios/icon/icon.png" width="1024" height="1024" />
+        <resource-file src="GoogleService-Info.plist" />
     </platform>
 </widget>

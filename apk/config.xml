@@ -16,6 +16,9 @@
     <preference name="AndroidInsecureFileModeEnabled" value="true" />
     <preference name="MixedContentMode" value="0" />
     <preference name="AndroidWindowSplashScreenAnimatedIcon" value="resources/android/icon/icon.png" />
+    <!-- OS-level push via FCM. Requires google-services.json at this folder's
+         root (see PUSH_SETUP.md). -->
+    <plugin name="cordova-plugin-firebasex-messaging" spec="^2.0.1" />
     <platform name="android">
         <icon density="ldpi" src="resources/android/icon/icon-ldpi.png" />
         <icon density="mdpi" src="resources/android/icon/icon-mdpi.png" />
@@ -23,6 +26,7 @@
         <icon density="xhdpi" src="resources/android/icon/icon-xhdpi.png" />
         <icon density="xxhdpi" src="resources/android/icon/icon-xxhdpi.png" />
         <icon density="xxxhdpi" src="resources/android/icon/icon-xxxhdpi.png" />
+        <resource-file src="google-services.json" target="app/google-services.json" />
         <allow-intent href="market:*" />
     </platform>
 </widget>

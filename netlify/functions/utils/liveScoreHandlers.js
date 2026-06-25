@@ -5,6 +5,8 @@ import {
   createResetMatch,
 } from './eventHandlers.js'
 import { getActiveSessionMatchIds } from './matchSessionHandlers.js'
+import { notifyTableAssigned } from './pusher.js'
+import { sendTableAssignedPush } from './push.js'
 
 // "Group A", "Group B", … keyed off the 0-indexed group index.
 const getGroupLetter = (i) =>
@@ -15,6 +17,7 @@ const getGroupLetter = (i) =>
 const getGroupName = (i) => `Group ${getGroupLetter(i)}`
 
 const EVENTS_COLLECTION = 'events'
+const PLAYERS_COLLECTION = 'players'
 const TABLE_STATE_COLLECTION = 'tableState'
 const TABLE_STATE_DOC_ID = 'current'
 
@@ -769,6 +772,9 @@ export const getLiveScore = async (params = {}) => {
     result.groupTableMap,
   )
 
+  // Notify players of any match that just landed on a table.
+  await notifyNewlyAssignedMatches(savedState?.tables, result.tables)
+
   const activeSessionMatchIds = await getActiveSessionMatchIds()
 
   return {
@@ -851,6 +857,80 @@ const buildCurrentMatchMap = (matchItems) => {
     map.set(item.matchId, item)
   }
   return map
+}
+
+// ==================== TABLE-ASSIGNED NOTIFICATIONS ====================
+
+// All distinct player ids on both sides of a match. Team parent matches
+// carry the full team rosters on side1/side2, so this also covers the
+// "including team parent match" case in the spec.
+const collectMatchPlayerIds = (match) => {
+  if (!match) return []
+  const ids = []
+  for (const p of match.side1 || []) if (p?._id) ids.push(p._id.toString())
+  for (const p of match.side2 || []) if (p?._id) ids.push(p._id.toString())
+  return [...new Set(ids)]
+}
+
+// Of the given player ids, return those that have a user account — i.e. a
+// password has been set on the player document (sign-up complete).
+const filterPlayerIdsWithAccount = async (playerIds) => {
+  if (!Array.isArray(playerIds) || playerIds.length === 0) return []
+  const db = getDB()
+  const players = await db
+    .collection(PLAYERS_COLLECTION)
+    .find(
+      {
+        _id: { $in: playerIds.map(toObjectId) },
+        password: { $exists: true, $ne: null },
+      },
+      { projection: { _id: 1 } },
+    )
+    .toArray()
+  return players.map((p) => p._id.toString())
+}
+
+const getAssignedTableEntries = (tables) =>
+  (tables || []).filter((t) => t.status === 'assigned' && t.match?.matchId)
+
+const getAssignedMatchIdSet = (tables) =>
+  new Set(getAssignedTableEntries(tables).map((t) => t.match.matchId.toString()))
+
+// Push a "table assigned" notification to every account-holding player in
+// the just-assigned match.
+const notifyPlayersOfAssignment = async (tableEntry) => {
+  if (!tableEntry) return
+  const item = tableEntry.match
+  const playerIds = collectMatchPlayerIds(item?.match)
+  const accountPlayerIds = await filterPlayerIdsWithAccount(playerIds)
+  const payload = {
+    tableNumber: tableEntry.tableNumber,
+    eventId: item.eventId,
+    matchId: item.matchId?.toString(),
+  }
+  await Promise.all([
+    // In-app realtime toast (web + foreground native) via Pusher.
+    ...accountPlayerIds.map((playerId) => notifyTableAssigned(playerId, payload)),
+    // OS-level push to the native apps (delivers even when backgrounded).
+    sendTableAssignedPush(accountPlayerIds, payload),
+  ])
+}
+
+// Compare the table state before/after an assignment pass and notify the
+// players of every match that just landed on a table. Best-effort — it
+// never throws, so a notification hiccup can't break the assignment flow.
+const notifyNewlyAssignedMatches = async (prevTables, nextTables) => {
+  try {
+    const prevAssigned = getAssignedMatchIdSet(prevTables)
+    const newEntries = getAssignedTableEntries(nextTables).filter(
+      (t) => !prevAssigned.has(t.match.matchId.toString()),
+    )
+    for (const entry of newEntries) {
+      await notifyPlayersOfAssignment(entry)
+    }
+  } catch {
+    // best-effort: assignment must succeed even if notifications fail
+  }
 }
 
 const getAssignedMatchIds = (tables) => {
@@ -1032,6 +1112,9 @@ export const assignMatchToTable = async (body) => {
     state?.groupTableMap,
   )
 
+  // Notify the assigned match's players (this is the only new assignment).
+  await notifyNewlyAssignedMatches(tables, updatedTables)
+
   // For a parent team match, also persist the admin's chosen table on
   // the parent match itself so that sub-matches generated later inherit
   // this table even when the parent has since been freed from
@@ -1163,6 +1246,9 @@ export const rebuildMatchQueue = async () => {
     result.remainingQueue,
     result.groupTableMap,
   )
+
+  // Notify players of any match that just landed on a table.
+  await notifyNewlyAssignedMatches(savedState?.tables, result.tables)
 
   return { tables: result.tables, matchQueue: result.remainingQueue }
 }

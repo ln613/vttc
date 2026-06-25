@@ -74,6 +74,8 @@ This process will be triggered when
   - there is an event already started (today's event, the current time passed the event's start time)
   then start the assigning process (if an already started event doesn't have groups, generate the groups, if it doesn't have schedule for the current stage/round, generate the schedule. and if there are more than 1 event with the same start time, do the higher tier event first)
 
+Whenever a table is assigned (including team parent match), all players involved in the match should receive a push notification, if they have user accounts.
+
 ## Team Events
 
 for team events
