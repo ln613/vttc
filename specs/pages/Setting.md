@@ -27,4 +27,4 @@ Vertical
 
 - link to revenue page
 - link to revenue calculator page
-- super admin only
+- admin only

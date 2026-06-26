@@ -97,7 +97,11 @@ const Select = (props: SelectProps) => {
           {props.placeholder ?? '-- Select --'}
         </option>
         <For each={props.options}>
-          {(option) => <option value={option.value}>{option.label}</option>}
+          {(option) => (
+            <option value={option.value} selected={option.value === props.value}>
+              {option.label}
+            </option>
+          )}
         </For>
       </select>
     </div>

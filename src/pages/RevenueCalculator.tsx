@@ -30,14 +30,14 @@ const eventOptions = () => [
 
 const RevenueCalculator = () => {
   onMount(() => {
-    if (!authState.isSuperAdmin) return
+    if (!authState.isAdmin) return
     revenueCalculatorActions.init()
   })
 
   return (
     <div style={containerStyle}>
       <Header />
-      <Show when={authState.isSuperAdmin}>
+      <Show when={authState.isAdmin}>
         <div style={contentStyle}>
           <h1 style={titleStyle}>Revenue Calculator</h1>
           <ItemList />

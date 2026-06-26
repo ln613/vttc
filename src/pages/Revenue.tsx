@@ -11,14 +11,14 @@ const money = (n: number): string => `$${n.toFixed(2)}`
 
 const Revenue = () => {
   onMount(() => {
-    if (!authState.isSuperAdmin) return
+    if (!authState.isAdmin) return
     void revenueActions.init()
   })
 
   return (
     <div style={containerStyle}>
       <Header />
-      <Show when={authState.isSuperAdmin}>
+      <Show when={authState.isAdmin}>
         <div style={contentStyle}>
           <h1 style={titleStyle}>Revenue</h1>
           <EventList />
