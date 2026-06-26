@@ -6,6 +6,7 @@ import type {
   ParticipantSex,
   Participant,
   Stage,
+  EventPrizes,
 } from '../../shared/types/Tournament'
 import { apiGet, apiPost } from '../utils/api'
 
@@ -16,6 +17,7 @@ export interface EventOption {
   nop: number
   maxParticipants: number
   registrationFee?: number
+  prizes?: EventPrizes
   type: TournamentType
   topPlayersRatingEnabled: boolean
   topPlayersCount?: number

@@ -13,6 +13,7 @@ import LiveScore from './pages/LiveScore'
 import Account from './pages/Account'
 import Settings from './pages/Settings'
 import Revenue from './pages/Revenue'
+import RevenueCalculator from './pages/RevenueCalculator'
 import ConfirmDialog from './components/ConfirmDialog'
 import UserNotifications from './components/UserNotifications'
 import NotificationToasts from './components/NotificationToasts'
@@ -44,6 +45,7 @@ const App = () => (
     <Route path="/live-score" component={LiveScore} />
     <Route path="/settings" component={Settings} />
     <Route path="/revenue" component={Revenue} />
+    <Route path="/revenue-calculator" component={RevenueCalculator} />
   </HashRouter>
 )
 

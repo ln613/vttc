@@ -34,13 +34,22 @@ const RevenueSection = () => {
   return (
     <div style={sectionStyle}>
       <h4 style={sectionHeaderStyle}>Revenue</h4>
-      <button
-        type="button"
-        style={linkButtonStyle}
-        onClick={() => navigate('/revenue')}
-      >
-        Revenue
-      </button>
+      <div style={linkColumnStyle}>
+        <button
+          type="button"
+          style={linkButtonStyle}
+          onClick={() => navigate('/revenue')}
+        >
+          Revenue
+        </button>
+        <button
+          type="button"
+          style={linkButtonStyle}
+          onClick={() => navigate('/revenue-calculator')}
+        >
+          Revenue Calculator
+        </button>
+      </div>
     </div>
   )
 }
@@ -235,6 +244,13 @@ const checkboxLabelStyle: JSX.CSSProperties = {
   'font-size': '14px',
   color: '#333',
   'line-height': '1.4',
+}
+
+const linkColumnStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  'align-items': 'flex-start',
+  gap: '10px',
 }
 
 const linkButtonStyle: JSX.CSSProperties = {

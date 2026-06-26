@@ -8,6 +8,7 @@ import DatePicker from '../components/DatePicker'
 import SingleSelectTags from '../components/SingleSelectTags'
 import Toggle from '../components/Toggle'
 import Button from '../components/Button'
+import { REGISTRATION_FEE_OPTIONS, PRIZE_OPTIONS } from '../utils/eventOptions'
 import { tournamentState, tournamentActions } from '../stores/tournamentStore'
 import {
   eventEditState,
@@ -73,29 +74,10 @@ const generateMaxParticipantsOptions = () => {
   return options
 }
 
-const generateRegistrationFeeOptions = () => {
-  const options = [{ value: '', label: '' }]
-  for (let i = 10; i <= 100; i += 5) {
-    options.push({ value: String(i), label: `$${i}` })
-  }
-  return options
-}
-
-const generatePrizeOptions = () => {
-  const options = [{ value: '', label: '' }]
-  const fixed = [300, 250, 200, 180, 175, 150, 125, 120, 100]
-  for (const v of fixed) options.push({ value: String(v), label: `$${v}` })
-  for (let i = 95; i >= 5; i -= 5) {
-    options.push({ value: String(i), label: `$${i}` })
-  }
-  return options
-}
 
 const HANDICAP_DIFFERENCE_OPTIONS = generateHandicapDifferenceOptions()
 const MAX_POINTS_GIVEN_OPTIONS = generateMaxPointsGivenOptions()
 const MAX_PARTICIPANTS_OPTIONS = generateMaxParticipantsOptions()
-const REGISTRATION_FEE_OPTIONS = generateRegistrationFeeOptions()
-const PRIZE_OPTIONS = generatePrizeOptions()
 
 interface EventEditProps {
   isEdit?: boolean

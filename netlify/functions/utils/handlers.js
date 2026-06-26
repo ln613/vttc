@@ -58,7 +58,11 @@ import {
   releaseMatchSession,
 } from './matchSessionHandlers.js'
 import { getSettings, saveSettings } from './settingsHandlers.js'
-import { getRevenue } from './revenueHandlers.js'
+import {
+  getRevenue,
+  getRevenueTemplates,
+  saveRevenueTemplate,
+} from './revenueHandlers.js'
 import { savePushToken, removePushToken } from './push.js'
 import { notifyEventUpdate, notifyLiveScoreUpdate } from './pusher.js'
 
@@ -86,6 +90,7 @@ export const apiHandlers = {
     liveScore: (params) => getLiveScore(params),
     settings: () => getSettings(),
     revenue: () => getRevenue(),
+    revenueTemplates: () => getRevenueTemplates(),
   },
   post: {
     saveTournament: (body) => saveTournament(body),
@@ -124,6 +129,7 @@ export const apiHandlers = {
     changeTeam: withEventNotify(changeTeam),
     registerPushToken: (body) => savePushToken(body),
     unregisterPushToken: (body) => removePushToken(body),
+    saveRevenueTemplate: (body) => saveRevenueTemplate(body),
     signIn: (body) => signIn(body),
     signUp: (body) => signUp(body),
     sendVerificationCode: (body) => sendVerificationCode(body),

@@ -26,4 +26,5 @@ Vertical
 ## Revenue Section
 
 - link to revenue page
+- link to revenue calculator page
 - super admin only

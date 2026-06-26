@@ -3,6 +3,11 @@ import { getClubDate } from './liveScoreHandlers.js'
 
 const EVENTS_COLLECTION = 'events'
 const PLAYERS_COLLECTION = 'players'
+const REVENUE_TEMPLATES_COLLECTION = 'revenueTemplates'
+
+const throwError = (message) => {
+  throw new Error(message)
+}
 
 const round2 = (n) => Math.round(n * 100) / 100
 
@@ -91,4 +96,43 @@ export const getRevenue = async () => {
     .toArray()
   const hostIds = await getHostPlayerIds(db)
   return events.map((event) => computeEventRevenue(event, hostIds))
+}
+
+// ==================== REVENUE CALCULATOR TEMPLATES ====================
+
+// All saved calculator templates (name + items).
+export const getRevenueTemplates = async () => {
+  const db = getDB()
+  const templates = await db
+    .collection(REVENUE_TEMPLATES_COLLECTION)
+    .find({})
+    .sort({ name: 1 })
+    .toArray()
+  return templates.map((t) => ({
+    _id: t._id.toString(),
+    name: t.name,
+    items: t.items || [],
+  }))
+}
+
+// Save (upsert by name) a calculator template. Saving with an existing name
+// overrides it — the client confirms the override before calling this.
+export const saveRevenueTemplate = async (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body.name) throwError('Template name is required')
+  if (!Array.isArray(body.items)) throwError('items must be an array')
+
+  const db = getDB()
+  await db.collection(REVENUE_TEMPLATES_COLLECTION).updateOne(
+    { name: body.name },
+    {
+      $set: {
+        name: body.name,
+        items: body.items,
+        updatedAt: new Date().toISOString(),
+      },
+    },
+    { upsert: true },
+  )
+  return { success: true }
 }
