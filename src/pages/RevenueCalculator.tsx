@@ -22,7 +22,10 @@ const PARTICIPANTS_OPTIONS = [
 
 const eventOptions = () => [
   { value: '', label: '' },
-  ...(eventState.data || []).map((e) => ({ value: e._id, label: e.eventName })),
+  ...(eventState.data || []).map((e) => ({
+    value: e._id,
+    label: e.eventSeries ? `${e.eventSeries} - ${e.eventName}` : e.eventName,
+  })),
 ]
 
 const RevenueCalculator = () => {
@@ -63,7 +66,7 @@ const ItemRow = (props: { item: CalcItem }) => {
     revenueCalculatorActions.setItemField(props.item.id, field, value)
   return (
     <div style={itemStyle}>
-      <div style={fieldsStyle}>
+      <div style={eventRowStyle}>
         <Select
           label="Event"
           name="event"
@@ -74,6 +77,8 @@ const ItemRow = (props: { item: CalcItem }) => {
           options={eventOptions()}
           noMargin
         />
+      </div>
+      <div style={fieldsStyle}>
         <Select
           label="Participants"
           name="participants"
@@ -236,6 +241,10 @@ const itemStyle: JSX.CSSProperties = {
   display: 'flex',
   'flex-direction': 'column',
   gap: '12px',
+}
+
+const eventRowStyle: JSX.CSSProperties = {
+  width: '100%',
 }
 
 const fieldsStyle: JSX.CSSProperties = {

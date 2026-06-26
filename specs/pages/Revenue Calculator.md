@@ -11,8 +11,8 @@ Vertical
 ## Item List
 
 - each item:
-  - event dropdown (all events)
-  - number of participants dropdown (5, 8, 10, 12, 15, 20, 25, 30, 40, 50)
+  - event dropdown (all events, "{series name} - {event name}")
+  - (next row) number of participants dropdown (5, 8, 10, 12, 15, 20, 25, 30, 40, 50)
   - registration fee dropdown
   - 1st place prize dropdown
   - 2nd place prize dropdown
