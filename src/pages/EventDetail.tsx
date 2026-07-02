@@ -1,4 +1,4 @@
-import { Show, For, Switch, Match as MatchCase, createSignal, createEffect, onMount, onCleanup, type JSX } from 'solid-js'
+import { Show, For, Index, Switch, Match as MatchCase, createSignal, createEffect, onMount, onCleanup, type JSX } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { Header } from '../components/Header'
 import Button from '../components/Button'
@@ -13,7 +13,12 @@ import { authState } from '../stores/authStore'
 import { liveScoreActions, liveScoreState } from '../stores/liveScoreStore'
 import type { Group, GroupParticipant, Participant, KnockoutRound, KnockoutMatch as KnockoutMatchType, Stage } from '../../shared/types/Tournament'
 import type { Player } from '../../shared/types/Player'
-import { getProvisionalMatchResult } from '../../shared/rules/matchRules'
+import {
+  getProvisionalMatchResult,
+  gamesNeededToWin,
+  isValidGameScore,
+  isValidMatchScore,
+} from '../../shared/rules/matchRules'
 import { getGroupName, getGroupLetter } from '../../shared/rules/tournamentRules'
 import type { Match, Game } from '../../shared/types/Match'
 import { parseLocalDate } from '../utils/date'
@@ -119,6 +124,60 @@ const dialogTitleStyle: JSX.CSSProperties = {
   'font-weight': 700,
   color: '#2c3e50',
   'text-align': 'center',
+}
+
+const enterScoreCheckboxRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  gap: '8px',
+  'font-size': '14px',
+  color: '#2c3e50',
+  cursor: 'pointer',
+}
+
+const enterScoreGridStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '10px',
+}
+
+const enterScoreRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  gap: '8px',
+  'flex-wrap': 'wrap',
+}
+
+const enterScoreNameStyle: JSX.CSSProperties = {
+  'min-width': '140px',
+  'font-weight': 600,
+  color: '#2c3e50',
+}
+
+const enterScoreSelectStyle: JSX.CSSProperties = {
+  padding: '6px 10px',
+  'border-radius': '6px',
+  border: '1px solid #d0d7de',
+  'font-size': '15px',
+}
+
+const enterScoreGameSelectStyle: JSX.CSSProperties = {
+  padding: '4px 6px',
+  'border-radius': '6px',
+  border: '1px solid #d0d7de',
+  'font-size': '14px',
+  width: '52px',
+}
+
+const enterScoreErrorStyle: JSX.CSSProperties = {
+  color: '#c0392b',
+  'font-size': '13px',
+}
+
+const enterScoreButtonRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'justify-content': 'flex-end',
+  gap: '10px',
 }
 
 const orderSidePanelStyle: JSX.CSSProperties = {
@@ -409,6 +468,18 @@ const SetOrderForm = (props: {
     Array.from({ length: picksCount() }, () => ''),
   )
 
+  // Keep picks sized to the roster; re-init only when the set of players
+  // actually changes (not on every background refresh), so a stale/empty
+  // picks array can't make the auto slot fall back to the first player
+  // (which showed both X and Y as the same player).
+  let lastRosterKey = ''
+  createEffect(() => {
+    const key = props.players.map((p) => p._id).join(',')
+    if (key === lastRosterKey) return
+    lastRosterKey = key
+    setPicks(Array.from({ length: picksCount() }, () => ''))
+  })
+
   const optionsForSlot = (slotIndex: number) => {
     const chosen = new Set(
       picks().filter((_, i) => i !== slotIndex && picks()[i]),
@@ -431,7 +502,8 @@ const SetOrderForm = (props: {
     const chosen = new Set(picks().filter(Boolean))
     return props.players.find((p) => !chosen.has(p._id))
   }
-  const allPicked = () => picks().every(Boolean)
+  const allPicked = () =>
+    picks().length === picksCount() && picks().every(Boolean)
   const remainingLabel = () => {
     if (!allPicked()) return '(auto)'
     const r = remainingPlayer()
@@ -460,7 +532,14 @@ const SetOrderForm = (props: {
                 -- Select --
               </option>
               <For each={optionsForSlot(slotIndex)}>
-                {(opt) => <option value={opt.value}>{opt.label}</option>}
+                {(opt) => (
+                  <option
+                    value={opt.value}
+                    selected={opt.value === picks()[slotIndex]}
+                  >
+                    {opt.label}
+                  </option>
+                )}
               </For>
             </select>
           </div>
@@ -1078,6 +1157,7 @@ const resolveEventStages = (eventId?: string): Stage[] | undefined => {
 export const MatchRow = (props: MatchRowProps) => {
   const navigate = useNavigate()
   const [postponeOpen, setPostponeOpen] = createSignal(false)
+  const [enterScoreOpen, setEnterScoreOpen] = createSignal(false)
   const side1Players = () => getMatchSidePlayers(props.match.side1)
   const side2Players = () => getMatchSidePlayers(props.match.side2)
   const hasResult = () =>
@@ -1270,6 +1350,13 @@ export const MatchRow = (props: MatchRowProps) => {
     !isTeamParent() &&
     !hasStarted() &&
     assignedTable() !== undefined
+  // Enter Score: admin-only, while the match is on a table but not yet
+  // started — lets the admin record a final result without playing it out.
+  const showEnterScore = () =>
+    authState.isAdmin &&
+    !isTeamParent() &&
+    !hasStarted() &&
+    assignedTable() !== undefined
   // Postpone: admin-only, while the match is on a table but not started
   // (same behaviour as the live score page).
   const canPostpone = () =>
@@ -1289,7 +1376,8 @@ export const MatchRow = (props: MatchRowProps) => {
     showResetTeam() ||
     canPostpone() ||
     showSimulate() ||
-    showAssign()
+    showAssign() ||
+    showEnterScore()
 
   const handleAssignClick = (e?: MouseEvent) => {
     e?.stopPropagation()
@@ -1436,6 +1524,19 @@ export const MatchRow = (props: MatchRowProps) => {
               Postpone
             </Button>
           </Show>
+          <Show when={showEnterScore()}>
+            <Button
+              onClick={(e?: MouseEvent) => {
+                e?.stopPropagation()
+                e?.preventDefault()
+                setEnterScoreOpen(true)
+              }}
+              color="#3498db"
+              size="small"
+            >
+              Enter Score
+            </Button>
+          </Show>
           <Show when={showSimulate()}>
             <Button onClick={handleSimulateClick} color="#9b59b6" size="small">
               Simulate
@@ -1451,17 +1552,33 @@ export const MatchRow = (props: MatchRowProps) => {
       <Show
         when={
           isTeamParent() &&
-          hasResult() &&
           Array.isArray(props.match.subMatches) &&
           props.match.subMatches.length > 0
         }
       >
-        <FinishedTeamSubMatches parent={props.match} />
+        <TeamSubMatches parent={props.match} />
       </Show>
       <Show when={postponeOpen()}>
         <PostponeDialog
           onSelect={handlePostponeSelect}
           onClose={() => setPostponeOpen(false)}
+        />
+      </Show>
+      <Show when={enterScoreOpen()}>
+        <EnterScoreDialog
+          match={props.match}
+          side1Players={side1Players()}
+          side2Players={side2Players()}
+          onClose={() => setEnterScoreOpen(false)}
+          onSave={(games) => {
+            const eventId = props.eventId ?? eventDetailState.eventId ?? undefined
+            void eventDetailActions.submitMatchResult(
+              props.match._id,
+              games,
+              eventId,
+            )
+            setEnterScoreOpen(false)
+          }}
         />
       </Show>
     </div>
@@ -1513,8 +1630,204 @@ const finishedSubTitleStyle: JSX.CSSProperties = {
 // Collapsible list of sub-matches shown under a finalised parent team
 // match row. Cancelled sub-matches (the ones the tally skipped after
 // the team match was decided) are marked but still listed.
-const FinishedTeamSubMatches = (props: { parent: Match }) => {
+// Admin dialog to record a final match result without playing it out.
+// Auto mode: pick the match score (games won per side) and valid game
+// scores are generated. Manual mode: enter each game's points.
+const EnterScoreDialog = (props: {
+  match: Match
+  side1Players: SidePlayer[]
+  side2Players: SidePlayer[]
+  onClose: () => void
+  onSave: (games: { score1: number; score2: number }[]) => void
+}) => {
+  const numberOfGames = props.match.config?.numberOfGames ?? 5
+  const targetPoints = props.match.config?.gameConfig?.targetPoints ?? 11
+  const needed = gamesNeededToWin(numberOfGames)
+
+  const [autoGenerate, setAutoGenerate] = createSignal(true)
+  const [matchScore, setMatchScore] = createSignal<[string, string]>(['', ''])
+  const [gameScores, setGameScores] = createSignal<[string, string][]>(
+    Array.from({ length: numberOfGames }, () => ['', ''] as [string, string]),
+  )
+  const [error, setError] = createSignal('')
+
+  const matchScoreValues = Array.from({ length: needed + 1 }, (_, i) => i)
+  const gameScoreValues = Array.from({ length: 31 }, (_, i) => i)
+
+  const setMatch = (side: 0 | 1, v: string) =>
+    setMatchScore((m) => (side === 0 ? [v, m[1]] : [m[0], v]))
+  const setGame = (gi: number, side: 0 | 1, v: string) =>
+    setGameScores((gs) =>
+      gs.map((g, i) => (i === gi ? (side === 0 ? [v, g[1]] : [g[0], v]) : g)),
+    )
+
+  // Winner takes targetPoints, loser a comfortable losing score; last game
+  // is won by the match winner (the decider).
+  const buildAutoGames = (won1: number, won2: number) => {
+    const win = targetPoints
+    const lose = Math.max(0, targetPoints - 6)
+    const s1Win = { score1: win, score2: lose }
+    const s2Win = { score1: lose, score2: win }
+    const games: { score1: number; score2: number }[] = []
+    if (won1 > won2) {
+      for (let i = 0; i < won2; i++) games.push(s2Win)
+      for (let i = 0; i < won1; i++) games.push(s1Win)
+    } else {
+      for (let i = 0; i < won1; i++) games.push(s1Win)
+      for (let i = 0; i < won2; i++) games.push(s2Win)
+    }
+    return games
+  }
+
+  const handleSave = () => {
+    setError('')
+    if (autoGenerate()) {
+      const [a, b] = matchScore()
+      if (a === '' || b === '') {
+        setError('Select both match scores.')
+        return
+      }
+      const won1 = parseInt(a, 10)
+      const won2 = parseInt(b, 10)
+      if (!isValidMatchScore(won1, won2, numberOfGames)) {
+        setError(`Invalid match score for best of ${numberOfGames}.`)
+        return
+      }
+      props.onSave(buildAutoGames(won1, won2))
+      return
+    }
+    // Manual: skip empty/0:0 games, validate the rest, then require the
+    // played games to make a complete best-of-N result.
+    const played: { score1: number; score2: number }[] = []
+    for (const [as, bs] of gameScores()) {
+      const s1 = as === '' ? 0 : parseInt(as, 10)
+      const s2 = bs === '' ? 0 : parseInt(bs, 10)
+      if (s1 === 0 && s2 === 0) continue
+      if (!isValidGameScore(s1, s2, targetPoints)) {
+        setError(`Invalid game score ${s1}:${s2}.`)
+        return
+      }
+      played.push({ score1: s1, score2: s2 })
+    }
+    let won1 = 0
+    let won2 = 0
+    for (const g of played) g.score1 > g.score2 ? won1++ : won2++
+    if (!isValidMatchScore(won1, won2, numberOfGames)) {
+      setError(`Games entered don't make a complete best of ${numberOfGames} result.`)
+      return
+    }
+    props.onSave(played)
+  }
+
+  const NameCell = (p: { players: SidePlayer[] }) => (
+    <span style={enterScoreNameStyle}>{formatSidePlayers(p.players)}</span>
+  )
+
+  return (
+    <div style={dialogOverlayStyle} onClick={props.onClose}>
+      <div style={dialogContentStyle} onClick={(e) => e.stopPropagation()}>
+        <div style={dialogTitleStyle}>Enter Score</div>
+        <label style={enterScoreCheckboxRowStyle}>
+          <input
+            type="checkbox"
+            checked={autoGenerate()}
+            onChange={(e) => setAutoGenerate(e.currentTarget.checked)}
+          />
+          <span>Auto Generate Game results</span>
+        </label>
+
+        <Show
+          when={autoGenerate()}
+          fallback={
+            <div style={enterScoreGridStyle}>
+              <Index each={[props.side1Players, props.side2Players]}>
+                {(players, rowIndex) => (
+                  <div style={enterScoreRowStyle}>
+                    <NameCell players={players()} />
+                    <Index each={gameScores()}>
+                      {(_g, gi) => (
+                        <select
+                          style={enterScoreGameSelectStyle}
+                          value={gameScores()[gi][rowIndex as 0 | 1]}
+                          onChange={(e) =>
+                            setGame(gi, rowIndex as 0 | 1, e.currentTarget.value)
+                          }
+                        >
+                          <option value="">-</option>
+                          <For each={gameScoreValues}>
+                            {(v) => (
+                              <option
+                                value={String(v)}
+                                selected={
+                                  String(v) ===
+                                  gameScores()[gi][rowIndex as 0 | 1]
+                                }
+                              >
+                                {v}
+                              </option>
+                            )}
+                          </For>
+                        </select>
+                      )}
+                    </Index>
+                  </div>
+                )}
+              </Index>
+            </div>
+          }
+        >
+          <div style={enterScoreGridStyle}>
+            <Index each={[props.side1Players, props.side2Players]}>
+              {(players, rowIndex) => (
+                <div style={enterScoreRowStyle}>
+                  <NameCell players={players()} />
+                  <select
+                    style={enterScoreSelectStyle}
+                    value={matchScore()[rowIndex as 0 | 1]}
+                    onChange={(e) =>
+                      setMatch(rowIndex as 0 | 1, e.currentTarget.value)
+                    }
+                  >
+                    <option value="" disabled>
+                      --
+                    </option>
+                    <For each={matchScoreValues}>
+                      {(v) => (
+                        <option
+                          value={String(v)}
+                          selected={String(v) === matchScore()[rowIndex as 0 | 1]}
+                        >
+                          {v}
+                        </option>
+                      )}
+                    </For>
+                  </select>
+                </div>
+              )}
+            </Index>
+          </div>
+        </Show>
+
+        <Show when={error()}>
+          <div style={enterScoreErrorStyle}>{error()}</div>
+        </Show>
+        <div style={enterScoreButtonRowStyle}>
+          <Button color="#95a5a6" onClick={props.onClose}>
+            Cancel
+          </Button>
+          <Button color="#27ae60" onClick={handleSave}>
+            Save
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const TeamSubMatches = (props: { parent: Match }) => {
   const [expanded, setExpanded] = createSignal(false)
+  // Show every sub-match that's still in play (played + current + pending);
+  // cancelled subs (auto-dropped once the team match is decided) are hidden.
   const playedSubs = () =>
     (props.parent.subMatches || [])
       .map((sub, index) => ({ sub, index }))
@@ -1532,7 +1845,7 @@ const FinishedTeamSubMatches = (props: { parent: Match }) => {
         <div style={finishedTeamSubsListStyle}>
           <For each={playedSubs()}>
             {(entry) => (
-              <FinishedSubMatchRow
+              <SubMatchRow
                 parent={props.parent}
                 sub={entry.sub}
                 index={entry.index}
@@ -1545,7 +1858,7 @@ const FinishedTeamSubMatches = (props: { parent: Match }) => {
   )
 }
 
-const FinishedSubMatchRow = (props: {
+const SubMatchRow = (props: {
   parent: Match
   sub: Match
   index: number

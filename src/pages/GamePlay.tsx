@@ -1083,6 +1083,18 @@ const TeamOrderForm = (props: {
     Array.from({ length: picksCount() }, () => ''),
   )
 
+  // Keep picks sized to the roster; re-init only when the set of players
+  // actually changes (not on every background refresh), so a stale/empty
+  // picks array can't make the auto slot fall back to the first player
+  // (which showed both X and Y as the same player).
+  let lastRosterKey = ''
+  createEffect(() => {
+    const key = props.players.map((p) => p._id).join(',')
+    if (key === lastRosterKey) return
+    lastRosterKey = key
+    setPicks(Array.from({ length: picksCount() }, () => ''))
+  })
+
   const optionsForSlot = (slotIndex: number) => {
     const chosen = new Set(
       picks().filter((_, i) => i !== slotIndex && picks()[i]),
@@ -1106,7 +1118,8 @@ const TeamOrderForm = (props: {
     return props.players.find((p) => !chosen.has(p._id))
   }
 
-  const allPicked = () => picks().every(Boolean)
+  const allPicked = () =>
+    picks().length === picksCount() && picks().every(Boolean)
 
   const handleSave = () => {
     void gamePlayActions.saveTeamSideAssignment(props.side, picks())
@@ -1137,7 +1150,14 @@ const TeamOrderForm = (props: {
                 -- Select --
               </option>
               <For each={optionsForSlot(slotIndex)}>
-                {(opt) => <option value={opt.value}>{opt.label}</option>}
+                {(opt) => (
+                  <option
+                    value={opt.value}
+                    selected={opt.value === picks()[slotIndex]}
+                  >
+                    {opt.label}
+                  </option>
+                )}
               </For>
             </select>
           </div>

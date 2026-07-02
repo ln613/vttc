@@ -85,6 +85,20 @@ The Total column is the total matches played so far.
       - visible to admin and Player in match
       - Show "Start" for any play who's actually in the match, show "Umpire" otherwise
       - for parent team match, admin sees "Start" button, which allows the admin to set order of play for both sides/teams
+    - Enter Score button
+      - blue bg
+      - show the enter score dialog
+        - "Auto Generate Game results" checkbox (checked by default)
+        - if checked, 2 rows, where row r (1 or 2):
+          - player name(s) for side/team r
+          - dropdown for match score (0 to n, where n is the number of winning games needed to win the best of N match)
+        - if unchecked, 2 rows:
+          - player name(s) for side/team r
+          - N dropdowns for game score (0 to 30, where N is best of N from the match info)
+        - upon save, validate the entry for correctness and completeness
+          - match score 3:1 is valid for best of 5, where 2:1, 3:3 is not valid
+          - game score 11:4, 10:12 is valid, where 2:9, 11:10, 17:12 is not valid
+        - when save, if "Auto Generate Game results" checked, auto generate valid game scores and save
     - Forfeit button
       - admin only
       - one Forfeit button for each side, before the player name(s)

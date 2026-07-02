@@ -272,6 +272,45 @@ export const gamesNeededToWin = (numberOfGames: number): number => {
 }
 
 /**
+ * Whether a final game score is a legal, completed table-tennis game.
+ * - someone must reach targetPoints (default 11)
+ * - reached exactly targetPoints → the other side must be <= targetPoints - 2
+ * - beyond targetPoints (deuce) → the winner must lead by exactly 2
+ * e.g. 11:4 ✓, 10:12 ✓, 2:9 ✗, 11:10 ✗, 17:12 ✗
+ */
+export const isValidGameScore = (
+  score1: number,
+  score2: number,
+  targetPoints: number = 11,
+): boolean => {
+  if (score1 < 0 || score2 < 0 || score1 === score2) return false
+  const hi = Math.max(score1, score2)
+  const lo = Math.min(score1, score2)
+  if (hi < targetPoints) return false
+  if (hi === targetPoints) return lo <= targetPoints - 2
+  // hi > targetPoints: only reachable via deuce, so must win by exactly 2
+  return hi - lo === 2 && lo >= targetPoints - 1
+}
+
+/**
+ * Whether a final match score (games won by each side) is a legal, complete
+ * result for a best-of-`numberOfGames` match: exactly one side reaches the
+ * games needed to win, and the other side is below it.
+ * e.g. best of 5 → 3:1 ✓, 3:0 ✓, 3:2 ✓, 2:1 ✗, 3:3 ✗
+ */
+export const isValidMatchScore = (
+  won1: number,
+  won2: number,
+  numberOfGames: number,
+): boolean => {
+  if (won1 < 0 || won2 < 0) return false
+  const needed = gamesNeededToWin(numberOfGames)
+  const hi = Math.max(won1, won2)
+  const lo = Math.min(won1, won2)
+  return hi === needed && lo < needed
+}
+
+/**
  * Provisional match result for display: counts every game with a winningSide
  * (including the current in-progress game once the score reaches the winning
  * point), and projects the match winner if either side has enough wins.

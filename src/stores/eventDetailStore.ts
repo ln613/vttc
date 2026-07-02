@@ -274,6 +274,34 @@ export const eventDetailActions = {
     }
   },
 
+  // Enter Score: finish the match with an admin-provided set of game
+  // scores (auto-confirmed, same as Forfeit). `games` is the final list of
+  // { score1, score2 } for each played game.
+  submitMatchResult: async (
+    matchId: string,
+    games: { score1: number; score2: number }[],
+    sourceEventId?: string,
+  ) => {
+    const eventId = sourceEventId ?? eventDetailState.eventId
+    if (!eventId) return
+    try {
+      await apiPost('finishMatch', {
+        _id: eventId,
+        matchId,
+        confirmed: true,
+        result: games,
+      })
+      if (eventDetailState.eventId === eventId) {
+        await fetchEvent(eventId, true)
+      }
+    } catch (err) {
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Failed to save score',
+      )
+    }
+  },
+
   // Default (withdraw) a participant from a group — keeps them in the
   // table but out of the ranking, their matches no longer counting.
   defaultParticipant: async (
