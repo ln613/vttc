@@ -129,7 +129,18 @@ The Total column is the total matches played so far.
       - delete the next round schedule if exist
       - if the game play page for that match is opened somewhere, pop up msg saying the match has been reset, then go back (if cannot go back, go to Schedule page)
   - only Start and Reset buttons visible to parent team match
+  - match not finished/not started
+    - event is in the past, unfinished match will not show in the schedule page anymore
+    - all following buttons admin only
+    - for unfinished match/sub match (already started) in Group or Knockout tab, show Reset button
+    - for not started match/sub match (already generated but not assigned a table or not started) in Group or Knockout tab, show Enter Score button
+    - for unfinished parent match (order already set) in Group or Knockout tab, show Reset Team button
+    - for not started parent match (order not set) in Group or Knockout tab, show Set Order button
   - if admin and SIMULATION=1, show "Simulate" button (only for matches already assigned a table), which will simulate the match and submit the results
+  - for admin, show only the buttons available for the current match status (hide the unavailable ones, as before), then show a question mark icon after all visible buttons
+    - on click of the question mark icon, show a dialog listing all buttons for the match, each explaining what it does
+    - unavailable buttons are shown in a disabled style with an explanation of why they are currently unavailable
+    - the Simulate button is still hidden entirely (and omitted from the dialog) when SIMULATION is not 1
   - button row align right, if there are multiple buttons, place them in one row
   - for a team match
     - when the parent team match is assigned a table, show "Set Order" button for players in the match and admin

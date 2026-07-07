@@ -2422,6 +2422,11 @@ const validateResetMatchInput = (body) => {
   if (!body.matchId) throwError('Match ID is required')
 }
 
+// The advancing participant's id on a knockout match slot. `matchHasStarted`
+// (defined below) already treats a team match with generated sub-matches
+// (i.e. its order of play is set) as started.
+const knockoutParticipantId = (p) => p?.participant?._id?.toString()
+
 const tryResetGroupMatch = (updatedStages, groupStageIndex, matchId) => {
   const groupStage = updatedStages[groupStageIndex]
 
@@ -2503,7 +2508,24 @@ const tryResetKnockoutMatch = (updatedStages, knockoutStageIndex, matchId) => {
 
     const knockoutMatch = round.matches[matchIndex]
     validateMatchCanBeReset(knockoutMatch.match)
-    validateNoNextKnockoutRoundStarted(knockoutStage, ri)
+
+    // The participant that advanced from this match (if any) and the
+    // specific next-round match it fed into. Block the reset if that
+    // next-round match has already started; otherwise only that one match
+    // is removed — the other half of the bracket is left intact.
+    const advancedPid = knockoutParticipantId(knockoutMatch.winner)
+    const nextRound = knockoutStage.rounds[ri + 1]
+    const feederNext =
+      advancedPid && nextRound
+        ? nextRound.matches.find(
+            (m) =>
+              knockoutParticipantId(m.participant1) === advancedPid ||
+              knockoutParticipantId(m.participant2) === advancedPid,
+          )
+        : undefined
+    if (feederNext && matchHasStarted(feederNext.match)) {
+      throwError('Cannot reset match: the next round match has already started')
+    }
 
     const resetMatchObj = knockoutMatch.match.isTeamMatch
       ? createResetTeamMatch(knockoutMatch.match)
@@ -2525,9 +2547,18 @@ const tryResetKnockoutMatch = (updatedStages, knockoutStageIndex, matchId) => {
           isComplete: false,
         }
       }
-      // Delete next round schedule (clear matches)
-      if (i === ri + 1) {
-        return { ...r, matches: [], isComplete: false }
+      // Remove only the next-round match this winner fed into (if any),
+      // leaving the other half's matches untouched.
+      if (i === ri + 1 && advancedPid) {
+        return {
+          ...r,
+          matches: r.matches.filter(
+            (m) =>
+              knockoutParticipantId(m.participant1) !== advancedPid &&
+              knockoutParticipantId(m.participant2) !== advancedPid,
+          ),
+          isComplete: false,
+        }
       }
       return r
     })
@@ -2599,26 +2630,11 @@ const validateNoNextRoundStartedForGroup = (updatedStages, groupStage) => {
   if (!knockoutStage || !knockoutStage.rounds || knockoutStage.rounds.length === 0) return
 
   const firstRound = knockoutStage.rounds[0]
-  const anyFinished = firstRound.matches.some(
-    (m) => m.match && m.match.winningSide != null,
+  const anyStarted = firstRound.matches.some(
+    (m) => m.match && matchHasStarted(m.match),
   )
-  if (anyFinished) {
-    throwError('Cannot reset match: next round has already finished')
-  }
-}
-
-const validateNoNextKnockoutRoundStarted = (knockoutStage, currentRoundIndex) => {
-  const nextRoundIndex = currentRoundIndex + 1
-  if (nextRoundIndex >= knockoutStage.rounds.length) return
-
-  const nextRound = knockoutStage.rounds[nextRoundIndex]
-  if (!nextRound.matches || nextRound.matches.length === 0) return
-
-  const anyFinished = nextRound.matches.some(
-    (m) => m.match && m.match.winningSide != null,
-  )
-  if (anyFinished) {
-    throwError('Cannot reset match: next round has already finished')
+  if (anyStarted) {
+    throwError('Cannot reset match: the next round has already started')
   }
 }
 

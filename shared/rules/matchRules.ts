@@ -322,14 +322,35 @@ export const getProvisionalMatchResult = (match: {
   config?: { numberOfGames?: number }
   winningSide?: number | null
   isTeamMatch?: boolean
-  subMatches?: { winningSide?: 1 | 2 }[]
+  subMatches?: {
+    winningSide?: 1 | 2
+    games?: { winningSide?: number }[]
+    config?: { numberOfGames?: number }
+  }[]
   numberOfMatches?: number
 }): { gamesWon1: number; gamesWon2: number; winningSide: 1 | 2 | undefined } => {
   // Team match: count by sub-matches, not games.
   if (match.isTeamMatch && Array.isArray(match.subMatches)) {
     const subs = match.subMatches
-    const wins1 = subs.filter((s) => s.winningSide === 1).length
-    const wins2 = subs.filter((s) => s.winningSide === 2).length
+    // A sub counts toward the team as soon as its games decide it — even
+    // before the sub's own winningSide is persisted/confirmed — so the team
+    // score matches what the expanded sub rows already display.
+    const subWinner = (s: {
+      winningSide?: 1 | 2
+      games?: { winningSide?: number }[]
+      config?: { numberOfGames?: number }
+    }): 1 | 2 | undefined => {
+      if (s.winningSide === 1 || s.winningSide === 2) return s.winningSide
+      const g = s.games || []
+      const w1 = g.filter((x) => x.winningSide === 1).length
+      const w2 = g.filter((x) => x.winningSide === 2).length
+      const n = s.config?.numberOfGames
+      if (!n) return undefined
+      const need = gamesNeededToWin(n)
+      return w1 >= need ? 1 : w2 >= need ? 2 : undefined
+    }
+    const wins1 = subs.filter((s) => subWinner(s) === 1).length
+    const wins2 = subs.filter((s) => subWinner(s) === 2).length
     const needed = match.numberOfMatches
       ? Math.ceil(match.numberOfMatches / 2)
       : undefined

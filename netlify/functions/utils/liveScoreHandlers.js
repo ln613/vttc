@@ -64,12 +64,10 @@ const getStartedEvents = async () => {
     .find({ date: { $gte: yesterday, $lte: today } })
     .toArray()
 
-  return events.filter((e) => {
-    if (!hasEventStarted(e)) return false
-    if (e.date === today) return true
-    // Past dates: keep only events that still have unfinished matches.
-    return extractRemainingMatches(e).length > 0
-  })
+  // Only today's started events feed the schedule/queue. Once an event's
+  // date has passed, its unfinished matches drop off the schedule (admins
+  // finalise them from the Event Detail Group/Knockout tabs instead).
+  return events.filter((e) => hasEventStarted(e) && e.date === today)
 }
 
 const shiftClubDate = (yyyyMmDd, days) => {

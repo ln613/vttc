@@ -396,12 +396,11 @@ export const SetOrderDialog = () => {
       eventDetailActions.closeOrderDialog()
     }
   })
-  const sideStarted = (side: 1 | 2): boolean =>
-    !!(side === 1 ? match()?.side1Started : match()?.side2Started)
   const canAct = (side: 1 | 2): boolean => {
-    // Players can only act for their own side. Admins act as a backup
-    // for sides that no player has opened yet.
-    if (authState.isAdmin) return !sideStarted(side)
+    // Players can only act for their own side. Admins can act for any side
+    // whose order isn't locked in yet — including one a player started but
+    // never finished (which would otherwise be stuck showing "Waiting…").
+    if (authState.isAdmin) return true
     return userSide() === side
   }
   const showForm = (side: 1 | 2): boolean => {
@@ -955,6 +954,7 @@ const MatchSchedule = (props: MatchScheduleProps) => {
                       liveScoreActions.getTableForMatch(item.match._id) ===
                         undefined
                     }
+                    adminManage
                   />
                 </div>
               )}
@@ -992,6 +992,10 @@ export interface MatchRowProps {
   // For team sub-matches: the parent team match (needed to derive each
   // player's order label A/B/C/X/Y/Z).
   parent?: Match
+  // Group/Knockout tabs: let admins manage not-started/unfinished matches
+  // that aren't on a table (e.g. a past event's leftover matches) — surfaces
+  // Enter Score / Set Order / Reset Team without requiring a table.
+  adminManage?: boolean
 }
 
 // Lineup position labels per team-match type. Kept in sync with the JS
@@ -1158,6 +1162,7 @@ export const MatchRow = (props: MatchRowProps) => {
   const navigate = useNavigate()
   const [postponeOpen, setPostponeOpen] = createSignal(false)
   const [enterScoreOpen, setEnterScoreOpen] = createSignal(false)
+  const [helpOpen, setHelpOpen] = createSignal(false)
   const side1Players = () => getMatchSidePlayers(props.match.side1)
   const side2Players = () => getMatchSidePlayers(props.match.side2)
   const hasResult = () =>
@@ -1178,6 +1183,17 @@ export const MatchRow = (props: MatchRowProps) => {
   const canReset = () => {
     if (!authState.isAdmin) return false
     if (phase() === 'in_progress') return true
+    // A team parent never reports "in_progress", but once its order is set
+    // (sub-matches exist) and it hasn't finished, it's safe to reset the
+    // whole team match — no next round can exist yet.
+    if (
+      isTeamParent() &&
+      Array.isArray(props.match.subMatches) &&
+      props.match.subMatches.length > 0 &&
+      !hasResult()
+    ) {
+      return true
+    }
     return (
       isConfirmed() &&
       eventDetailActions.canResetMatch(
@@ -1236,12 +1252,10 @@ export const MatchRow = (props: MatchRowProps) => {
   const handleResetClick = async (e?: MouseEvent) => {
     e?.stopPropagation()
     e?.preventDefault()
-    if (
-      !(await customConfirm(
-        'Are you sure you want to reset this match? All game data will be deleted.',
-        { confirmColor: '#e74c3c' },
-      ))
-    ) {
+    const message = isTeamParent()
+      ? 'Reset the team match? All sub-matches and game data will be deleted.'
+      : 'Are you sure you want to reset this match? All game data will be deleted.'
+    if (!(await customConfirm(message, { confirmColor: '#e74c3c' }))) {
       return
     }
     const eventId = props.eventId ?? eventDetailState.eventId ?? undefined
@@ -1313,14 +1327,18 @@ export const MatchRow = (props: MatchRowProps) => {
     inQueue() &&
     allPlayersAvailable() &&
     anyTableAvailable()
-  const showStart = () =>
-    !hasStarted() &&
-    assignedTable() !== undefined &&
-    // Team-parent rows: only a player on either team OR an admin can
-    // press Start — admins use it to set the order for both sides.
-    (isTeamParent()
-      ? isUserInMatch(props.match) || authState.isAdmin
-      : canStartOrContinue())
+  const showStart = () => {
+    if (hasStarted()) return false
+    const onTable = assignedTable() !== undefined
+    if (isTeamParent()) {
+      // Set Order: normally on a table; also allowed off-table for admin
+      // management of not-started team matches in the Group/Knockout tabs.
+      if (!onTable && !(props.adminManage && authState.isAdmin)) return false
+      return isUserInMatch(props.match) || authState.isAdmin
+    }
+    // Regular matches are started on a table only.
+    return onTable && canStartOrContinue()
+  }
   const showContinue = () =>
     !isTeamParent() &&
     hasStarted() &&
@@ -1338,11 +1356,15 @@ export const MatchRow = (props: MatchRowProps) => {
   // Reset Team: admin-only, sub-match (parentMatchId set), not
   // started, currently on a table. Queue-only sub-rows don't show
   // it — admin uses the on-table sub-row to reset the whole team.
+  // Reset Team lives on the live (Schedule/LiveScore) on-table sub-row —
+  // used mid-play to redo the order. In the Event Detail Group/Knockout
+  // tabs (adminManage), a not-started sub-match shows only Enter Score.
   const showResetTeam = () =>
     authState.isAdmin &&
     !!props.match.parentMatchId &&
     !hasStarted() &&
-    assignedTable() !== undefined
+    assignedTable() !== undefined &&
+    !props.adminManage
   // Forfeit: admin-only, shown per side before the player names while the
   // match is on a table but not yet started (the light-red state).
   const showForfeit = () =>
@@ -1356,7 +1378,7 @@ export const MatchRow = (props: MatchRowProps) => {
     authState.isAdmin &&
     !isTeamParent() &&
     !hasStarted() &&
-    assignedTable() !== undefined
+    (assignedTable() !== undefined || props.adminManage === true)
   // Postpone: admin-only, while the match is on a table but not started
   // (same behaviour as the live score page).
   const canPostpone = () =>
@@ -1368,23 +1390,216 @@ export const MatchRow = (props: MatchRowProps) => {
     !hasResult() &&
     !provisional().winningSide &&
     liveScoreActions.getAssignedMatchIds().has(props.match._id)
-  const hasAnyAction = () =>
-    showStart() ||
-    showContinue() ||
-    showConfirm() ||
-    showReset() ||
-    showResetTeam() ||
-    canPostpone() ||
-    showSimulate() ||
-    showAssign() ||
-    showEnterScore()
-
   const handleAssignClick = (e?: MouseEvent) => {
     e?.stopPropagation()
     e?.preventDefault()
     const eventId = props.eventId ?? eventDetailState.eventId ?? undefined
     if (!eventId) return
     eventDetailActions.openAssignDialog(props.match._id, eventId)
+  }
+
+  // Non-admins only ever see the buttons they can act on right now.
+  const nonAdminHasAction = () =>
+    showStart() || showContinue() || showConfirm()
+
+  const finishedNow = () => hasResult() || !!provisional().winningSide
+
+  const resetReason = (): string => {
+    if (canReset()) return ''
+    if (isTeamParent()) {
+      if (!hasStarted()) return 'The team order has not been set'
+      if (!isConfirmed()) return 'The team match is still in progress'
+      return 'The next round has already started'
+    }
+    if (!hasStarted() && !finishedNow()) return "Match hasn't started"
+    if (finishedNow() && !isConfirmed()) return 'Confirm the match first'
+    return 'The next round has already started'
+  }
+
+  // Every applicable button for this match type. `enabled` reflects the
+  // current status; the visible row renders only enabled ones, while the
+  // "?" help dialog lists them all with a description and (when disabled)
+  // the reason it's currently unavailable.
+  const adminActionButtons = (): {
+    key: string
+    label: string
+    description: string
+    color: string
+    onClick: (e?: MouseEvent) => void
+    enabled: boolean
+    busy: boolean
+    reason: string
+  }[] => {
+    const started = hasStarted()
+    const finished = finishedNow()
+    const onTable = assignedTable() !== undefined
+    const openPostpone = (e?: MouseEvent) => {
+      e?.stopPropagation()
+      e?.preventDefault()
+      setPostponeOpen(true)
+    }
+    const openEnterScore = (e?: MouseEvent) => {
+      e?.stopPropagation()
+      e?.preventDefault()
+      setEnterScoreOpen(true)
+    }
+
+    if (isTeamParent()) {
+      return [
+        {
+          key: 'setOrder',
+          label: 'Set Order',
+          description: 'Set the order of play for both teams.',
+          color: '#27ae60',
+          onClick: handleStartClick,
+          enabled: showStart(),
+          busy: false,
+          reason: started ? 'The order is already set' : 'Assign a table first',
+        },
+        {
+          key: 'reset',
+          label: isResetting() ? 'Resetting...' : 'Reset Team',
+          description: 'Delete all sub-matches and reset the team match.',
+          color: '#e74c3c',
+          onClick: handleResetClick,
+          enabled: showReset(),
+          busy: isResetting(),
+          reason: resetReason(),
+        },
+      ]
+    }
+
+    const buttons = [
+      {
+        key: 'assign',
+        label: 'Assign',
+        description: 'Assign this match to an available table.',
+        color: '#3498db',
+        onClick: handleAssignClick,
+        enabled: showAssign(),
+        busy: false,
+        reason: onTable
+          ? 'Match is already on a table'
+          : started || finished
+            ? 'Match already started'
+            : !inQueue()
+              ? 'Match is not in the queue'
+              : !allPlayersAvailable()
+                ? 'A player is on another table'
+                : 'No table is available',
+      },
+      {
+        key: 'start',
+        label: isUserInMatch(props.match) ? 'Start' : 'Umpire',
+        description: 'Open the match and start scoring.',
+        color: '#27ae60',
+        onClick: handleStartClick,
+        enabled: showStart(),
+        busy: false,
+        reason: finished
+          ? 'Match already finished'
+          : started
+            ? 'Match already started'
+            : 'Assign a table first',
+      },
+      {
+        key: 'continue',
+        label: isUserInMatch(props.match) ? 'Continue' : 'Umpire',
+        description: 'Resume scoring an in-progress match.',
+        color: '#e67e22',
+        onClick: handleStartClick,
+        enabled: showContinue(),
+        busy: false,
+        reason: !started
+          ? 'Match has not started'
+          : finished
+            ? 'Match already finished'
+            : 'Match is not on a table',
+      },
+      {
+        key: 'enterScore',
+        label: 'Enter Score',
+        description: 'Record a final result without playing the match out.',
+        color: '#3498db',
+        onClick: openEnterScore,
+        enabled: showEnterScore(),
+        busy: false,
+        reason:
+          started || finished ? 'Match already started' : 'Assign a table first',
+      },
+      {
+        key: 'confirm',
+        label: isConfirming() ? 'Confirming...' : 'Confirm',
+        description: 'Confirm the finished match result.',
+        color: '#e74c3c',
+        onClick: handleConfirmClick,
+        enabled: showConfirm(),
+        busy: isConfirming(),
+        reason: !finished
+          ? 'Match not finished yet'
+          : isConfirmed()
+            ? 'Match already confirmed'
+            : '',
+      },
+      {
+        key: 'reset',
+        label: isResetting() ? 'Resetting...' : 'Reset',
+        description: 'Delete all game data and reset the match.',
+        color: '#e74c3c',
+        onClick: handleResetClick,
+        enabled: showReset(),
+        busy: isResetting(),
+        reason: resetReason(),
+      },
+    ]
+
+    // Reset Team on the live (Schedule/LiveScore) on-table sub-row.
+    if (props.match.parentMatchId && !props.adminManage) {
+      buttons.push({
+        key: 'resetTeam',
+        label: isResetting() ? 'Resetting...' : 'Reset Team',
+        description:
+          'Delete all sub-matches and put the team match back for a fresh order.',
+        color: '#c0392b',
+        onClick: handleResetTeamClick,
+        enabled: showResetTeam(),
+        busy: isResetting(),
+        reason: started ? 'Sub-match already started' : 'Sub-match is not on a table',
+      })
+    }
+
+    buttons.push({
+      key: 'postpone',
+      label: 'Postpone',
+      description: 'Postpone the match for a set time.',
+      color: '#f39c12',
+      onClick: openPostpone,
+      enabled: canPostpone(),
+      busy: false,
+      reason: started ? 'Match already started' : 'Match is not on a table',
+    })
+
+    // Simulate stays hidden entirely unless SIMULATION is enabled.
+    if (isSimulationEnabled()) {
+      buttons.push({
+        key: 'simulate',
+        label: 'Simulate',
+        description: 'Auto-simulate the match and submit a result.',
+        color: '#9b59b6',
+        onClick: handleSimulateClick,
+        enabled: showSimulate(),
+        busy: false,
+        reason: finished ? 'Match already finished' : 'Assign a table first',
+      })
+    }
+
+    return buttons
+  }
+
+  const openHelp = (e?: MouseEvent) => {
+    e?.stopPropagation()
+    e?.preventDefault()
+    setHelpOpen(true)
   }
 
   // Sub-matches of a team match carry a lockedTableNumber so they can
@@ -1455,98 +1670,73 @@ export const MatchRow = (props: MatchRowProps) => {
           <GameScoresDisplay games={props.match.games} />
         </Show>
       </div>
-      <Show when={hasAnyAction()}>
+      <Show
+        when={authState.isAdmin}
+        fallback={
+          <Show when={nonAdminHasAction()}>
+            <div style={matchRowActionsStyle}>
+              <Show when={showStart()}>
+                <Button
+                  onClick={handleStartClick}
+                  color="#27ae60"
+                  size="small"
+                  disabled={startContinueDisabled()}
+                >
+                  {isTeamParent()
+                    ? 'Set Order'
+                    : isUserInMatch(props.match)
+                      ? 'Start'
+                      : 'Umpire'}
+                </Button>
+              </Show>
+              <Show when={showContinue()}>
+                <Button
+                  onClick={handleStartClick}
+                  color="#e67e22"
+                  size="small"
+                  disabled={startContinueDisabled()}
+                >
+                  {isUserInMatch(props.match) ? 'Continue' : 'Umpire'}
+                </Button>
+              </Show>
+              <Show when={showConfirm()}>
+                <Button
+                  onClick={handleConfirmClick}
+                  color="#e74c3c"
+                  size="small"
+                  disabled={isConfirming()}
+                >
+                  {isConfirming() ? 'Confirming...' : 'Confirm'}
+                </Button>
+              </Show>
+            </div>
+          </Show>
+        }
+      >
+        {/* Admin: show only the buttons available now, then a "?" that opens
+            a dialog explaining every button (and why disabled ones aren't
+            available). */}
         <div style={matchRowActionsStyle}>
-          <Show when={showStart()}>
-            <Button
-              onClick={handleStartClick}
-              color="#27ae60"
-              size="small"
-              disabled={startContinueDisabled()}
-            >
-              {isTeamParent()
-                ? 'Set Order'
-                : isUserInMatch(props.match)
-                  ? 'Start'
-                  : 'Umpire'}
-            </Button>
-          </Show>
-          <Show when={showContinue()}>
-            <Button
-              onClick={handleStartClick}
-              color="#e67e22"
-              size="small"
-              disabled={startContinueDisabled()}
-            >
-              {isUserInMatch(props.match) ? 'Continue' : 'Umpire'}
-            </Button>
-          </Show>
-          <Show when={showConfirm()}>
-            <Button
-              onClick={handleConfirmClick}
-              color="#e74c3c"
-              size="small"
-              disabled={isConfirming()}
-            >
-              {isConfirming() ? 'Confirming...' : 'Confirm'}
-            </Button>
-          </Show>
-          <Show when={showReset()}>
-            <Button
-              onClick={handleResetClick}
-              color="#e74c3c"
-              size="small"
-              disabled={isResetting()}
-            >
-              {isResetting() ? 'Resetting...' : 'Reset'}
-            </Button>
-          </Show>
-          <Show when={showResetTeam()}>
-            <Button
-              onClick={handleResetTeamClick}
-              color="#c0392b"
-              size="small"
-              disabled={isResetting()}
-            >
-              {isResetting() ? 'Resetting...' : 'Reset Team'}
-            </Button>
-          </Show>
-          <Show when={canPostpone()}>
-            <Button
-              onClick={(e?: MouseEvent) => {
-                e?.stopPropagation()
-                e?.preventDefault()
-                setPostponeOpen(true)
-              }}
-              color="#f39c12"
-              size="small"
-            >
-              Postpone
-            </Button>
-          </Show>
-          <Show when={showEnterScore()}>
-            <Button
-              onClick={(e?: MouseEvent) => {
-                e?.stopPropagation()
-                e?.preventDefault()
-                setEnterScoreOpen(true)
-              }}
-              color="#3498db"
-              size="small"
-            >
-              Enter Score
-            </Button>
-          </Show>
-          <Show when={showSimulate()}>
-            <Button onClick={handleSimulateClick} color="#9b59b6" size="small">
-              Simulate
-            </Button>
-          </Show>
-          <Show when={showAssign()}>
-            <Button onClick={handleAssignClick} color="#3498db" size="small">
-              Assign
-            </Button>
-          </Show>
+          <For each={adminActionButtons().filter((b) => b.enabled)}>
+            {(btn) => (
+              <Button
+                onClick={btn.onClick}
+                color={btn.color}
+                size="small"
+                disabled={btn.busy}
+              >
+                {btn.label}
+              </Button>
+            )}
+          </For>
+          <button
+            type="button"
+            style={adminHelpIconStyle}
+            aria-label="What do these buttons do?"
+            onClick={openHelp}
+          >
+            ?
+          </button>
         </div>
       </Show>
       <Show
@@ -1556,7 +1746,12 @@ export const MatchRow = (props: MatchRowProps) => {
           props.match.subMatches.length > 0
         }
       >
-        <TeamSubMatches parent={props.match} />
+        <TeamSubMatches
+          parent={props.match}
+          stage={props.stage}
+          groupIndex={props.groupIndex}
+          eventId={props.eventId}
+        />
       </Show>
       <Show when={postponeOpen()}>
         <PostponeDialog
@@ -1580,6 +1775,47 @@ export const MatchRow = (props: MatchRowProps) => {
             setEnterScoreOpen(false)
           }}
         />
+      </Show>
+      <Show when={helpOpen()}>
+        <div style={dialogOverlayStyle} onClick={() => setHelpOpen(false)}>
+          <div style={dialogContentStyle} onClick={(e) => e.stopPropagation()}>
+            <div style={dialogTitleStyle}>Buttons</div>
+            <div style={helpListStyle}>
+              <For each={adminActionButtons()}>
+                {(btn) => (
+                  <div
+                    style={{
+                      ...helpItemStyle,
+                      ...(btn.enabled ? {} : helpItemDisabledStyle),
+                    }}
+                  >
+                    <div style={helpItemHeadStyle}>
+                      <span
+                        style={{
+                          ...helpBadgeStyle,
+                          'background-color': btn.enabled ? btn.color : '#95a5a6',
+                        }}
+                      >
+                        {btn.label}
+                      </span>
+                    </div>
+                    <div style={helpDescStyle}>{btn.description}</div>
+                    <Show when={!btn.enabled && !!btn.reason}>
+                      <div style={helpReasonStyle}>
+                        Currently unavailable: {btn.reason}
+                      </div>
+                    </Show>
+                  </div>
+                )}
+              </For>
+            </div>
+            <div style={helpFooterStyle}>
+              <Button color="#95a5a6" onClick={() => setHelpOpen(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
       </Show>
     </div>
   )
@@ -1661,20 +1897,25 @@ const EnterScoreDialog = (props: {
       gs.map((g, i) => (i === gi ? (side === 0 ? [v, g[1]] : [g[0], v]) : g)),
     )
 
-  // Winner takes targetPoints, loser a comfortable losing score; last game
-  // is won by the match winner (the decider).
+  // Winner takes targetPoints; loser gets a random valid losing score
+  // (0..targetPoints-2, e.g. 0–9 for an 11-point game). The last game is
+  // won by the match winner (the decider).
+  const randomLoserScore = () =>
+    Math.floor(Math.random() * (targetPoints - 1))
+  const winGame = (winnerSide: 1 | 2) => {
+    const lose = randomLoserScore()
+    return winnerSide === 1
+      ? { score1: targetPoints, score2: lose }
+      : { score1: lose, score2: targetPoints }
+  }
   const buildAutoGames = (won1: number, won2: number) => {
-    const win = targetPoints
-    const lose = Math.max(0, targetPoints - 6)
-    const s1Win = { score1: win, score2: lose }
-    const s2Win = { score1: lose, score2: win }
     const games: { score1: number; score2: number }[] = []
     if (won1 > won2) {
-      for (let i = 0; i < won2; i++) games.push(s2Win)
-      for (let i = 0; i < won1; i++) games.push(s1Win)
+      for (let i = 0; i < won2; i++) games.push(winGame(2))
+      for (let i = 0; i < won1; i++) games.push(winGame(1))
     } else {
-      for (let i = 0; i < won1; i++) games.push(s1Win)
-      for (let i = 0; i < won2; i++) games.push(s2Win)
+      for (let i = 0; i < won1; i++) games.push(winGame(1))
+      for (let i = 0; i < won2; i++) games.push(winGame(2))
     }
     return games
   }
@@ -1824,7 +2065,12 @@ const EnterScoreDialog = (props: {
   )
 }
 
-const TeamSubMatches = (props: { parent: Match }) => {
+const TeamSubMatches = (props: {
+  parent: Match
+  stage: 'group' | 'knockout'
+  groupIndex: number
+  eventId?: string
+}) => {
   const [expanded, setExpanded] = createSignal(false)
   // Show every sub-match that's still in play (played + current + pending);
   // cancelled subs (auto-dropped once the team match is decided) are hidden.
@@ -1849,6 +2095,9 @@ const TeamSubMatches = (props: { parent: Match }) => {
                 parent={props.parent}
                 sub={entry.sub}
                 index={entry.index}
+                stage={props.stage}
+                groupIndex={props.groupIndex}
+                eventId={props.eventId}
               />
             )}
           </For>
@@ -1858,25 +2107,30 @@ const TeamSubMatches = (props: { parent: Match }) => {
   )
 }
 
+// A sub-match shown under a parent team match — rendered as a full MatchRow
+// so admins get the same action buttons (Enter Score / Reset / Confirm …)
+// as any other match.
 const SubMatchRow = (props: {
   parent: Match
   sub: Match
   index: number
+  stage: 'group' | 'knockout'
+  groupIndex: number
+  eventId?: string
 }) => {
-  const provisional = () => getProvisionalMatchResult(props.sub)
   return (
     <div style={finishedSubRowStyle}>
       <div style={finishedSubTitleStyle}>
         {getTeamSubMatchTitle(props.parent, props.index)}
       </div>
-      <MatchRowsTable
-        side1Players={getMatchSidePlayers(props.sub.side1 || [])}
-        side2Players={getMatchSidePlayers(props.sub.side2 || [])}
-        games={props.sub.games}
-        gamesWon1={provisional().gamesWon1}
-        gamesWon2={provisional().gamesWon2}
-        winningSide={provisional().winningSide}
+      <MatchRow
+        match={props.sub}
         parent={props.parent}
+        stage={props.stage}
+        groupIndex={props.groupIndex}
+        eventId={props.eventId}
+        adminManage
+        hideQueueBadge
       />
     </div>
   )
@@ -2495,6 +2749,7 @@ const KnockoutMatchDisplay = (props: KnockoutMatchDisplayProps) => {
             match={m()}
             groupIndex={props.roundIndex}
             stage="knockout"
+            adminManage
           />
         )}
       </Show>
@@ -3037,6 +3292,74 @@ const matchRowActionsStyle: JSX.CSSProperties = {
   'justify-content': 'flex-end',
   'align-self': 'stretch',
   gap: '8px',
+}
+
+// "?" icon after the visible buttons; opens the help dialog.
+const adminHelpIconStyle: JSX.CSSProperties = {
+  width: '22px',
+  height: '22px',
+  'border-radius': '50%',
+  border: '1px solid #bdc3c7',
+  background: '#fff',
+  color: '#7f8c8d',
+  'font-size': '13px',
+  'font-weight': 700,
+  'line-height': '20px',
+  'text-align': 'center',
+  padding: '0',
+  cursor: 'pointer',
+  'flex-shrink': 0,
+}
+
+const helpListStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '12px',
+  'max-height': '60vh',
+  overflow: 'auto',
+}
+
+const helpItemStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '4px',
+  padding: '10px 12px',
+  border: '1px solid #eef1f4',
+  'border-radius': '8px',
+}
+
+const helpItemDisabledStyle: JSX.CSSProperties = {
+  opacity: 0.6,
+  background: '#f7f9fb',
+}
+
+const helpItemHeadStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+}
+
+const helpBadgeStyle: JSX.CSSProperties = {
+  display: 'inline-block',
+  padding: '3px 10px',
+  'border-radius': '6px',
+  color: '#fff',
+  'font-size': '13px',
+  'font-weight': 700,
+}
+
+const helpDescStyle: JSX.CSSProperties = {
+  'font-size': '14px',
+  color: '#2c3e50',
+}
+
+const helpReasonStyle: JSX.CSSProperties = {
+  'font-size': '13px',
+  color: '#c0392b',
+}
+
+const helpFooterStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'justify-content': 'flex-end',
 }
 
 const matchRowsTableStyle: JSX.CSSProperties = {

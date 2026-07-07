@@ -785,6 +785,23 @@ const resolveEventForMatch = (
   return undefined
 }
 
+// A match counts as "started" once it has any progress — including a team
+// match whose order of play is set (its sub-matches are generated), not only
+// one with a result. A previous-round match can't be reset if the next-round
+// match it feeds has started. Mirrors matchHasStarted on the server.
+const matchIsStarted = (m?: {
+  winningSide?: number | null
+  games?: unknown[]
+  subMatches?: unknown[]
+  initialServingSide?: number | null
+  leftSide?: number | null
+}): boolean =>
+  !!m &&
+  (m.winningSide != null ||
+    (Array.isArray(m.games) && m.games.length > 0) ||
+    (Array.isArray(m.subMatches) && m.subMatches.length > 0) ||
+    (m.initialServingSide != null && m.leftSide != null))
+
 const canResetGroupMatch = (event: { eventStages?: Stage[] }, matchId: string): boolean => {
   const groupStage = event.eventStages?.find(
     (s): s is Extract<Stage, { type: 'group' }> => s.type === 'group',
@@ -804,10 +821,10 @@ const canResetGroupMatch = (event: { eventStages?: Stage[] }, matchId: string): 
     if (!knockoutStage || knockoutStage.rounds.length === 0) return true
 
     const firstRound = knockoutStage.rounds[0]
-    const anyFinished = firstRound.matches.some(
-      (m) => m.match && m.match.winningSide != null,
+    const anyStarted = firstRound.matches.some(
+      (m) => m.match && matchIsStarted(m.match),
     )
-    return !anyFinished
+    return !anyStarted
   }
 
   return false
@@ -829,17 +846,22 @@ const canResetKnockoutMatch = (
     if (!km) continue
     if (!km.match || km.match.winningSide == null || !km.match.confirmed) return false
 
-    // Check if next round has any started matches
     const nextRoundIndex = round.index + 1
     if (nextRoundIndex >= knockoutStage.rounds.length) return true
 
     const nextRound = knockoutStage.rounds[nextRoundIndex]
     if (!nextRound.matches || nextRound.matches.length === 0) return true
 
-    const anyFinished = nextRound.matches.some(
-      (m) => m.match && m.match.winningSide != null,
+    // Block only if the specific next-round match this winner feeds has
+    // started — an unrelated started match in the other half doesn't matter.
+    const winnerPid = km.winner?.participant?._id?.toString()
+    if (!winnerPid) return true
+    const feeder = nextRound.matches.find(
+      (m) =>
+        m.participant1?.participant?._id?.toString() === winnerPid ||
+        m.participant2?.participant?._id?.toString() === winnerPid,
     )
-    return !anyFinished
+    return !(feeder?.match && matchIsStarted(feeder.match))
   }
 
   return false
