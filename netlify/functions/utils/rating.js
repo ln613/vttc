@@ -104,6 +104,7 @@ export const updateRatings = async () => {
   // object and event, plus the confirmed time for ordering.
   const items = []
   for (const event of events) {
+    if (event.simulated === true) continue // exclude test/simulated events
     walkMatches(event, (m) => {
       const res = unratedSinglesResult(m)
       if (res) {
@@ -182,6 +183,7 @@ export const getPlayerHistory = async (params) => {
 
   const rows = []
   for (const event of events) {
+    if (event.simulated === true) continue // exclude test/simulated events
     const eventLabel = [event.eventSeries, event.eventName].filter(Boolean).join(' - ')
     walkMatches(event, (m) => {
       const ri = m.ratingInfo

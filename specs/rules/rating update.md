@@ -86,6 +86,7 @@ Notes:
 - Ratings update **cumulatively within one run** — a player who wins two matches has both changes applied in sequence, and the second match uses the post-first-match rating.
 - Matches are processed in the order of confirmed time.
 - A player not appearing in any match keeps their original rating.
+- Rating update does not include test/simulated events
 
 ### Interaction: expected win, small gap
 

@@ -258,10 +258,12 @@ export const simulateEvent = async (body) => {
     .collection(EVENTS_COLLECTION)
     .updateOne(
       { _id: toObjectId(created._id) },
-      { $set: { participants, paidPlayerIds } },
+      // Flag as simulated so rating updates (and other real-data flows)
+      // can exclude test/simulated events.
+      { $set: { participants, paidPlayerIds, simulated: true } },
     )
 
-  return { ...created, participants, paidPlayerIds }
+  return { ...created, participants, paidPlayerIds, simulated: true }
 }
 
 /**
