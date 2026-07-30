@@ -5,6 +5,19 @@ import { getDB, toObjectId } from './db.js'
 
 const PLAYERS_COLLECTION = 'players'
 const EVENTS_COLLECTION = 'events'
+const CLUB_TIMEZONE = process.env.CLUB_TIMEZONE || 'America/Vancouver'
+
+// Format a confirmed timestamp as a YYYY-MM-DD date in the club's timezone.
+// A plain date (no time component) is used as-is so it isn't shifted a day.
+const clubDate = (value) => {
+  if (!value) return ''
+  const s = String(value)
+  if (!s.includes('T')) return s.slice(0, 10)
+  const d = new Date(s)
+  return Number.isNaN(d.getTime())
+    ? s.slice(0, 10)
+    : d.toLocaleDateString('en-CA', { timeZone: CLUB_TIMEZONE })
+}
 
 // ==================== TT-CAN-1 ====================
 
@@ -193,8 +206,10 @@ export const getPlayerHistory = async (params) => {
       const s2 = m.side2 || []
       const winner = m.winningSide === 1 ? s1[0] : s2[0]
       const loser = m.winningSide === 1 ? s2[0] : s1[0]
+      const confirmedAt = m.confirmedAt || event.date || ''
       rows.push({
-        date: m.confirmedAt || event.date || '',
+        sortKey: confirmedAt,
+        date: clubDate(confirmedAt),
         event: eventLabel,
         winningSide: m.winningSide,
         games: (m.games || []).map((g) => ({
@@ -211,12 +226,12 @@ export const getPlayerHistory = async (params) => {
       })
     })
   }
-  rows.sort((a, b) => String(b.date).localeCompare(String(a.date)))
+  rows.sort((a, b) => String(b.sortKey).localeCompare(String(a.sortKey)))
 
   return {
     player: player
       ? { _id: pid, name: playerName(player), rating: player.rating ?? null }
       : null,
-    rows,
+    rows: rows.map(({ sortKey: _sortKey, ...r }) => r),
   }
 }
