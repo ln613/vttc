@@ -17,6 +17,7 @@ Vertical
 - columns only for admin and above
   - email
   - phone
+  - edit icon: go to player account page
   - payment icon
     - if the player has unpaid events
     - show the payment confirm dialog
@@ -31,7 +32,7 @@ Vertical
         - send the password to the email, ask the player to log in
         - mark the player account as pending 
 - sort by rating desc
-- for admin, on player row click, go to player account page
+- on player row click, go to the history page
  
 ## Payment Confirm Dialog
 

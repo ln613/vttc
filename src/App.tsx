@@ -14,6 +14,7 @@ import Account from './pages/Account'
 import Settings from './pages/Settings'
 import Revenue from './pages/Revenue'
 import RevenueCalculator from './pages/RevenueCalculator'
+import History from './pages/History'
 import ConfirmDialog from './components/ConfirmDialog'
 import UserNotifications from './components/UserNotifications'
 import NotificationToasts from './components/NotificationToasts'
@@ -46,6 +47,7 @@ const App = () => (
     <Route path="/settings" component={Settings} />
     <Route path="/revenue" component={Revenue} />
     <Route path="/revenue-calculator" component={RevenueCalculator} />
+    <Route path="/history/:playerId" component={History} />
   </HashRouter>
 )
 

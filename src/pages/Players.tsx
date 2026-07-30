@@ -79,7 +79,9 @@ const PlayerTable = () => {
   )
 }
 
-const PublicPlayerTable = () => (
+const PublicPlayerTable = () => {
+  const navigate = useNavigate()
+  return (
   <div style={publicTableContainerStyle}>
     <table style={publicTableFixedStyle}>
       <colgroup>
@@ -99,7 +101,10 @@ const PublicPlayerTable = () => (
       <tbody>
         <For each={playerActions.filteredPlayers()}>
           {(player) => (
-            <tr style={trStyle}>
+            <tr
+              style={trClickableStyle}
+              onClick={() => navigate(`/history/${player._id}`)}
+            >
               <td style={publicTdStyle}>{player.firstName}</td>
               <td style={publicTdStyle}>{player.lastName}</td>
               <td style={publicTdStyle}>{formatSex(player.sex)}</td>
@@ -110,7 +115,8 @@ const PublicPlayerTable = () => (
       </tbody>
     </table>
   </div>
-)
+  )
+}
 
 const AdminPlayerTable = () => {
   const navigate = useNavigate()
@@ -133,7 +139,7 @@ const AdminPlayerTable = () => {
             {(player) => (
               <tr
                 style={trClickableStyle}
-                onClick={() => navigate(`/account/${player._id}`)}
+                onClick={() => navigate(`/history/${player._id}`)}
               >
                 <td style={adminTdStyle}>{player.firstName}</td>
                 <td style={adminTdStyle}>{player.lastName}</td>
@@ -143,6 +149,16 @@ const AdminPlayerTable = () => {
                 <td style={adminTdStyle}>{player.phone || ''}</td>
                 <td style={adminTdStyle} onClick={(e) => e.stopPropagation()}>
                   <div style={actionCellStyle}>
+                    <span
+                      class="vttc-tap"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        e.preventDefault()
+                        navigate(`/account/${player._id}`)
+                      }}
+                    >
+                      <EditIcon />
+                    </span>
                     <Show when={playerActions.hasUnpaidEvents(player._id)}>
                       <span
                         class="vttc-tap"
@@ -185,6 +201,21 @@ const handleRegisterClick = (player: Player) => {
   signUpActions.openAdminRegister(player)
   authActions.showSignUpDialog()
 }
+
+const EditIcon = () => (
+  <svg
+    style={registerIconStyle}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+  </svg>
+)
 
 const RegisterIcon = (props: { onClick: () => void }) => (
   <svg

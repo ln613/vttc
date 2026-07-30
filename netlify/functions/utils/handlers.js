@@ -58,6 +58,7 @@ import {
   releaseMatchSession,
 } from './matchSessionHandlers.js'
 import { getSettings, saveSettings } from './settingsHandlers.js'
+import { updateRatings, getPlayerHistory } from './rating.js'
 import {
   getRevenue,
   getRevenueTemplates,
@@ -82,6 +83,7 @@ export const apiHandlers = {
   get: {
     players: () => getPlayers(),
     playerRatingHistory: (params) => getPlayerRatingHistory(params),
+    playerHistory: (params) => getPlayerHistory(params),
     tournaments: () => getTournaments(),
     tournament: (params) => getTournament(params),
     events: (params) => getEvents(params),
@@ -123,6 +125,7 @@ export const apiHandlers = {
     deleteEvent: withEventNotify(deleteEvent),
     setParticipantDefault: withEventNotify(setParticipantDefault),
     saveSettings: (body) => saveSettings(body),
+    updateRatings: () => updateRatings(),
     registerForEvent: withEventNotify(registerForEvent),
     getPartialTeams: (body) => getPartialTeams(body),
     getPlayerUnpaidFees: (body) => getPlayerUnpaidFees(body),

@@ -21,6 +21,7 @@ const Settings = () => {
           </Show>
           <EventSettingSection />
           <RevenueSection />
+          <UpdateSection />
         </div>
       </Show>
     </div>
@@ -51,6 +52,23 @@ const RevenueSection = () => {
     </div>
   )
 }
+
+const UpdateSection = () => (
+  <div style={sectionStyle}>
+    <h4 style={sectionHeaderStyle}>Update</h4>
+    <button
+      type="button"
+      style={updateButtonStyle}
+      disabled={settingsState.updatingRating}
+      onClick={() => void settingsActions.updateRatings()}
+    >
+      {settingsState.updatingRating ? 'Updating...' : 'Update Rating'}
+    </button>
+    <Show when={settingsState.ratingResult}>
+      <div style={ratingResultStyle}>{settingsState.ratingResult}</div>
+    </Show>
+  </div>
+)
 
 const TitleRow = () => (
   <div style={titleRowStyle}>
@@ -242,6 +260,24 @@ const checkboxLabelStyle: JSX.CSSProperties = {
   'font-size': '14px',
   color: '#333',
   'line-height': '1.4',
+}
+
+const updateButtonStyle: JSX.CSSProperties = {
+  padding: '10px 18px',
+  'border-radius': '8px',
+  border: 'none',
+  background: '#3498db',
+  color: '#fff',
+  'font-size': '14px',
+  'font-weight': 600,
+  cursor: 'pointer',
+}
+
+const ratingResultStyle: JSX.CSSProperties = {
+  'margin-top': '10px',
+  'font-size': '13px',
+  color: '#27ae60',
+  'font-weight': 600,
 }
 
 const linkColumnStyle: JSX.CSSProperties = {

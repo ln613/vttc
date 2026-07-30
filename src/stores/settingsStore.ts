@@ -19,6 +19,8 @@ interface SettingsState {
   editing: boolean
   error: string | null
   loaded: boolean
+  updatingRating: boolean
+  ratingResult: string | null
 }
 
 const getInitialState = (): SettingsState => ({
@@ -29,6 +31,8 @@ const getInitialState = (): SettingsState => ({
   editing: false,
   error: null,
   loaded: false,
+  updatingRating: false,
+  ratingResult: null,
 })
 
 const [settingsState, setSettingsState] =
@@ -94,6 +98,25 @@ export const settingsActions = {
       setSettingsState({
         saving: false,
         error: err instanceof Error ? err.message : 'Failed to save settings',
+      })
+    }
+  },
+
+  updateRatings: async () => {
+    setSettingsState({ updatingRating: true, ratingResult: null, error: null })
+    try {
+      const r = await apiPost<{ matchesRated: number; playersUpdated: number }>(
+        'updateRatings',
+        {},
+      )
+      setSettingsState({
+        updatingRating: false,
+        ratingResult: `Rated ${r.matchesRated} new match(es); updated ${r.playersUpdated} player rating(s).`,
+      })
+    } catch (err) {
+      setSettingsState({
+        updatingRating: false,
+        error: err instanceof Error ? err.message : 'Failed to update ratings',
       })
     }
   },

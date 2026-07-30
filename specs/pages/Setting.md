@@ -1,5 +1,7 @@
 # Setting Page
 
+Admin only, show empty page for non-admin.
+
 ## Layout
 
 Vertical
@@ -21,10 +23,13 @@ Vertical
 ### Interaction
 
 - on save click: save the settings to db
-- show empty page for non-admin
 
 ## Revenue Section
 
 - link to revenue page
 - link to revenue calculator page
 - admin only
+
+## Update Section
+
+- Update Rating button
