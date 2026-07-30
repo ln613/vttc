@@ -763,7 +763,7 @@ const validateSignUpInput = (body) => {
   if (body.email && !isValidEmail(body.email)) errors.push('Invalid email address')
   if (!body.password) errors.push('Password is required')
   if (body.password && !isValidPasswordFormat(body.password)) errors.push('Password does not meet requirements')
-  if (body.phone && !isValidCanadianPhone(body.phone)) errors.push('Invalid phone number')
+  if (body.phone && !isValidNorthAmericanPhone(body.phone)) errors.push('Invalid phone number')
 
   if (errors.length > 0) throwError(errors.join('\n'))
 }
