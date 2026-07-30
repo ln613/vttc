@@ -9,11 +9,12 @@ import {
   type HistoryGame,
 } from '../stores/historyStore'
 
-const signed = (n: number): string => (n >= 0 ? `+${n}` : `${n}`)
-
-// "{name} ({before} +5 = {after})"
-const sideText = (s: HistorySide): string =>
-  `${s.name} (${s.before} ${signed(s.change)} = ${s.after})`
+// "{name} ({before} + 5 = {after})" for the winner (gain),
+// "{name} ({before} - 0 = {after})" for the loser (loss, incl. zero).
+const sideText = (s: HistorySide, isWinner: boolean): string => {
+  const sign = isWinner ? '+' : '-'
+  return `${s.name} (${s.before} ${sign} ${Math.abs(s.change)} = ${s.after})`
+}
 
 // The losing points of each game; bold the games the match winner won.
 const gameLoserPoints = (g: HistoryGame): number =>
@@ -79,7 +80,7 @@ const Row = (props: { row: HistoryRow }) => (
   <tr>
     <td style={tdNoWrapStyle}>{(props.row.date || '').slice(0, 10)}</td>
     <td style={tdStyle}>{props.row.event}</td>
-    <td style={{ ...tdStyle, 'font-weight': 700 }}>{sideText(props.row.winner)}</td>
+    <td style={{ ...tdStyle, 'font-weight': 700 }}>{sideText(props.row.winner, true)}</td>
     <td style={tdNoWrapStyle}>
       <For each={props.row.games}>
         {(g, i) => (
@@ -98,7 +99,7 @@ const Row = (props: { row: HistoryRow }) => (
         )}
       </For>
     </td>
-    <td style={tdStyle}>{sideText(props.row.loser)}</td>
+    <td style={tdStyle}>{sideText(props.row.loser, false)}</td>
   </tr>
 )
 
