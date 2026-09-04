@@ -157,4 +157,26 @@ avoiding.
 
 - **`netlify dev` serves a stale function bundle** — it bundles at startup, so server changes need a restart. Cost real debugging time.
 - **GDrive upload token expired** — `postapk:build` fails with `invalid_grant`; the APK still builds and copies locally.
-- **Simulation harness** (`scripts/simulate-tournament.mjs`) stalls at 28/31 matches — it can't open the next knockout round. Rounds are pre-created placeholders that only fill once the previous round is fully finished **and confirmed**.
+- **Lost update: `updateGame` can land after `finishMatch`.** `confirmFinishMatch`
+  (`src/stores/gamePlayStore.ts`) calls `cancelPendingSave()`, which clears the
+  debounce *timer* but does not await `pendingSavePromise`. A save already in
+  flight therefore commits after the finish and overwrites the finished match
+  with a partial score snapshot — leaving it `confirmed: true` with
+  `winningSide: null`, which permanently stalls the group/bracket (the match is
+  no longer playable and the round can never complete). Reproduced repeatedly
+  under load. In production the human tapping through the confirm dialog
+  normally gives the save time to land, which is why it hasn't been seen.
+  **Fix:** `await pendingSavePromise` (or a serialized save chain) before
+  calling `finishMatch`. Server-side, `finishMatch` could also stamp a version
+  and have `updateGame` write conditionally.
+
+- **Knockout rounds use different best-of counts.** `knockoutGames` values like
+  `"Best of 3 before Semifinal"` mean QF is best-of-3 while SF/Final are
+  best-of-5. Anything writing a result must read `match.config.numberOfGames`
+  from the match itself — sending a best-of-3 result to a best-of-5 match
+  confirms it with **no winner** and bricks the bracket the same way as above.
+
+- **Simulation harness** — `scripts/simulate-tournament.mjs` (the old in-process
+  driver) stalls at 28/31 because of the best-of mismatch above. Superseded by
+  `scripts/load-test.mjs`, which drives the deployed site over HTTP; see
+  `npm run load:test`.
