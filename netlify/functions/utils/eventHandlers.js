@@ -1783,7 +1783,10 @@ export const finishMatch = async (body) => {
 
   if (!matchFound) throwError('Match not found')
 
-  await collection.updateOne({ _id: toObjectId(_id) }, { $set: { eventStages: updatedStages } })
+  await collection.updateOne(
+    { _id: toObjectId(_id) },
+    { $set: setOps || { eventStages: updatedStages } },
+  )
 
   return { success: true }
 }
@@ -1796,7 +1799,14 @@ const applyUpdateGameToTeamSubMatch = (
   score,
   lastScoredSide,
 ) => {
+  // Records the single document path this update touches, so updateGame can
+  // write just that path instead of the whole eventStages array.
+  let target = null
   const writeBackGroup = (gi, pi, newParent, groupStageIndex) => {
+    target = {
+      path: `eventStages.${groupStageIndex}.groups.${gi}.matches.${pi}`,
+      value: newParent,
+    }
     const groupStage = updatedStages[groupStageIndex]
     const updatedGroups = groupStage.groups.map((g, i) =>
       i === gi
@@ -1809,6 +1819,10 @@ const applyUpdateGameToTeamSubMatch = (
     updatedStages[groupStageIndex] = { ...groupStage, groups: updatedGroups }
   }
   const writeBackKnockout = (ri, kmi, newKm, knockoutStageIndex) => {
+    target = {
+      path: `eventStages.${knockoutStageIndex}.rounds.${ri}.matches.${kmi}`,
+      value: newKm,
+    }
     const knockoutStage = updatedStages[knockoutStageIndex]
     const updatedRounds = knockoutStage.rounds.map((r, i) =>
       i === ri
@@ -1850,7 +1864,7 @@ const applyUpdateGameToTeamSubMatch = (
           ),
         })
         writeBackGroup(gi, pi, updatedParent, groupStageIndex)
-        return { match: updatedSub, numberOfGames: sub.config.numberOfGames }
+        return { match: updatedSub, numberOfGames: sub.config.numberOfGames, target }
       }
     }
   }
@@ -1895,7 +1909,7 @@ const applyUpdateGameToTeamSubMatch = (
           { ...km, match: updatedParent, winner },
           knockoutStageIndex,
         )
-        return { match: updatedSub, numberOfGames: sub.config.numberOfGames }
+        return { match: updatedSub, numberOfGames: sub.config.numberOfGames, target }
       }
     }
   }
@@ -3482,6 +3496,11 @@ export const updateGame = async (body) => {
   let updatedStages = [...event.eventStages]
   let match = null
   let numberOfGames = 0
+  // Score saves fire every few seconds per active table. Rewriting the whole
+  // eventStages array (~95KB) each time is the single heaviest write in the
+  // app, so each path below records only the document paths it actually
+  // changed. `null` falls back to the full write.
+  let setOps = null
 
   // Sub-match path (team-event)
   const subResult = applyUpdateGameToTeamSubMatch(
@@ -3495,6 +3514,7 @@ export const updateGame = async (body) => {
     matchFound = true
     match = subResult.match
     numberOfGames = subResult.numberOfGames
+    if (subResult.target) setOps = { [subResult.target.path]: subResult.target.value }
   }
 
   // Find match in group stage
@@ -3538,6 +3558,18 @@ export const updateGame = async (body) => {
         }
 
         updatedStages[groupStageIndex] = updatedGroupStage
+        // updateGroupAfterMatch only changes this match, the group's
+        // participant stats, and its isComplete flag.
+        const groupPath = `eventStages.${groupStageIndex}.groups.${gi}`
+        setOps = {
+          [`${groupPath}.matches.${matchIndex}`]: updatedMatch,
+          [`${groupPath}.participants`]: updatedGroup.participants,
+          [`${groupPath}.isComplete`]: groupComplete,
+        }
+        if (updatedGroupStage.advancedParticipants) {
+          setOps[`eventStages.${groupStageIndex}.advancedParticipants`] =
+            updatedGroupStage.advancedParticipants
+        }
         break
       }
     }
@@ -3595,6 +3627,11 @@ export const updateGame = async (body) => {
           updatedStages[knockoutStageIndex] = {
             ...knockoutStage,
             rounds: updatedRounds,
+          }
+          setOps = {
+            [`eventStages.${knockoutStageIndex}.rounds.${ri}.matches.${matchIndex}`]:
+              updatedKnockoutMatch,
+            [`eventStages.${knockoutStageIndex}.rounds.${ri}.isComplete`]: roundComplete,
           }
           break
         }

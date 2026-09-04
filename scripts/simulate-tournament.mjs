@@ -148,7 +148,12 @@ const playPending = async (eventId, isTeam, bestOf) => {
       try {
         await call('post', 'generateKnockout', { _id: eventId })
         stalls = 0
-      } catch {
+      } catch (e) {
+        // Surface why the bracket won't advance instead of silently
+        // stalling — the round only opens once the previous one is fully
+        // finished AND confirmed.
+        note(e, 'generateKnockout')
+        console.log(`    [knockout] ${String(e.message).slice(0, 140)}`)
         if (++stalls >= 2) return
       }
     } else {
