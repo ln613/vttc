@@ -93,10 +93,17 @@ const call = async (method, type, payload = {}, who = 'scorer') => {
           signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         })
       } catch (e) {
-        if (attempt === 4) throw e
+        if (attempt === 4) {
+          if (++consecutiveNetworkFailures >= NETWORK_FAILURE_LIMIT) {
+            console.error(`\n!! ${consecutiveNetworkFailures} consecutive network failures — the edge is refusing this IP. Ending run early.`)
+            deadline = 0
+          }
+          throw e
+        }
         await new Promise((r) => setTimeout(r, 400 * 2 ** attempt))
       }
     }
+    consecutiveNetworkFailures = 0
     const text = await res.text()
     const wire = Number(res.headers.get('content-length')) || text.length
     M.wireBytes += wire; M.rawBytes += text.length
@@ -443,6 +450,10 @@ const setup = async () => {
 // still holding the last claimable match, leaving the event unfinished.
 let busyTables = 0
 let deadline = Infinity
+// Sustained connect failures mean the edge has started refusing this IP.
+// Retrying harder only digs in, so end the run and report what we have.
+let consecutiveNetworkFailures = 0
+const NETWORK_FAILURE_LIMIT = 30
 // What each table is doing right now, so a stalled run says where it stuck.
 const tableState = []
 
