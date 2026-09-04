@@ -21,7 +21,7 @@
     "ios:build": "npm run ios:sync && cd ios && npx cordova build ios --device --buildConfig=build.json --no-update-notifier",
     "db:connections": "node --env-file=.env scripts/db-connections.mjs",
     "sim": "node --env-file=.env scripts/simulate-tournament.mjs",
-    "load:test": "node --env-file=.env scripts/load-test.mjs"
+    "load:test": "node --dns-result-order=ipv4first --env-file=.env scripts/load-test.mjs"
   },
   "dependencies": {
     "@solidjs/router": "^0.15.3",

@@ -82,7 +82,7 @@ const call = async (method, type, payload = {}, who = 'scorer') => {
     // A dropped connection (cold start, transient DNS) is retried; an HTTP
     // error is not, so real 4xx/5xx still surface.
     let res = null
-    for (let attempt = 0; attempt < 3 && !res; attempt++) {
+    for (let attempt = 0; attempt < 5 && !res; attempt++) {
       try {
         res = await fetch(url, {
           method: method.toUpperCase(),
@@ -93,8 +93,8 @@ const call = async (method, type, payload = {}, who = 'scorer') => {
           signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         })
       } catch (e) {
-        if (attempt === 2) throw e
-        await new Promise((r) => setTimeout(r, 300 * (attempt + 1)))
+        if (attempt === 4) throw e
+        await new Promise((r) => setTimeout(r, 400 * 2 ** attempt))
       }
     }
     const text = await res.text()
@@ -115,7 +115,7 @@ const call = async (method, type, payload = {}, who = 'scorer') => {
 // Points arrive ~1/s; the tablet debounces saves by 1s, so a save lands
 // whenever the gap between points exceeds the debounce (exactly the real
 // client's behaviour, replicated rather than approximated).
-const playOneMatch = async (eventId, matchId, numberOfGames, targetPoints = 11) => {
+const playOneMatch = async (eventId, matchId, numberOfGames, targetPoints = 11, at = () => {}) => {
   const needed = Math.ceil(numberOfGames / 2)
   const games = []
   let won1 = 0, won2 = 0
@@ -131,18 +131,27 @@ const playOneMatch = async (eventId, matchId, numberOfGames, targetPoints = 11) 
   // score snapshot -- which confirms the match with no winner and stalls
   // the bracket. (The real client has the same race; the human tapping
   // through the confirm dialog is what normally hides it.)
-  let saveChain = Promise.resolve()
-  const flush = () => {
-    if (!latest) return saveChain
-    const s = latest; latest = null
-    saveChain = saveChain.then(() =>
-      call('post', 'updateGame', s).catch((e) => note('updateGame', e)))
-    return saveChain
+  // At most ONE save is ever outstanding; newer scores overwrite the pending
+  // one rather than queueing behind it. That is what the client's 1s
+  // debounce achieves in real time, and it keeps a compressed --speed run
+  // from producing saves faster than the network can drain them (an
+  // unbounded queue there stalled the whole run).
+  let pumping = null
+  const pump = () => {
+    if (pumping) return pumping
+    pumping = (async () => {
+      while (latest) {
+        const s = latest; latest = null
+        try { await call('post', 'updateGame', s) } catch (e) { note('updateGame', e) }
+      }
+      pumping = null
+    })()
+    return pumping
   }
   const scheduleSave = (payload) => {
     latest = payload
     if (debounce) clearTimeout(debounce)
-    debounce = setTimeout(() => { debounce = null; void flush() }, SAVE_DEBOUNCE_MS / SPEED)
+    debounce = setTimeout(() => { debounce = null; void pump() }, SAVE_DEBOUNCE_MS / SPEED)
   }
 
   while (won1 < needed && won2 < needed) {
@@ -169,6 +178,7 @@ const playOneMatch = async (eventId, matchId, numberOfGames, targetPoints = 11) 
       const s1 = side1Wins ? won : lost
       const s2 = side1Wins ? lost : won
       M.points++
+      at(`${matchId.slice(-6)} g${games.length + 1} ${won}-${lost}`)
       scheduleSave({
         _id: eventId, matchId, gameNumber: games.length + 1,
         score: { score1: s1, score2: s2 },
@@ -183,9 +193,10 @@ const playOneMatch = async (eventId, matchId, numberOfGames, targetPoints = 11) 
     side1Wins ? won1++ : won2++
   }
   if (debounce) clearTimeout(debounce)
-  flush()
-  await saveChain
+  at(`${matchId.slice(-6)} draining saves`)
+  await pump()
   // The umpire tapping through the finish/confirm dialog.
+  at(`${matchId.slice(-6)} confirming`)
   await sleep(1500)
   try {
     await call('post', 'finishMatch', { _id: eventId, matchId, result: games, confirmed: true })
@@ -254,8 +265,9 @@ const findParent = (e, parentId) =>
 // One table, one team match: set the order of play, then work through the
 // sub-matches in order until the tie is decided (the app cancels the dead
 // rubbers itself).
-const playTeamMatch = async (drv, parentId) => {
+const playTeamMatch = async (drv, parentId, at = () => {}) => {
   for (let step = 0; step < 12; step++) {
+    at(`team ${parentId.slice(-6)} step${step}`)
     // Read straight from the API rather than the shared driver snapshot, so
     // the next sub is chosen from state that includes our own last finish.
     const e = await call('get', 'event', { _id: drv.id })
@@ -268,7 +280,7 @@ const playTeamMatch = async (drv, parentId) => {
     }
     const sub = (parent.subMatches || []).find(playable)
     if (!sub) return
-    await playOneMatch(drv.id, sub._id, sub.config?.numberOfGames || 3)
+    await playOneMatch(drv.id, sub._id, sub.config?.numberOfGames || 3, 11, at)
     M.subMatchesFinished++
   }
 }
@@ -431,9 +443,13 @@ const setup = async () => {
 // still holding the last claimable match, leaving the event unfinished.
 let busyTables = 0
 let deadline = Infinity
+// What each table is doing right now, so a stalled run says where it stuck.
+const tableState = []
 
 const runTable = async (tableNo, drivers) => {
   let idle = 0
+  const at = (s) => { tableState[tableNo] = s }
+  at('start')
   while (idle < 8 && Date.now() < deadline) {
     // Round-robin across events so all 8 run concurrently, like a real hall.
     let task = null, drv = null
@@ -448,6 +464,7 @@ const runTable = async (tableNo, drivers) => {
       // another table plays, new sub-matches and knockout rounds can still
       // appear. This poll is driver bookkeeping, so it is NOT scaled by
       // --speed (a compressed wait made both tables quit within a second).
+      at(`idle(${idle})`)
       idle = busyTables === 0 ? idle + 1 : 0
       // Refresh every event so newly-opened knockout rounds and
       // freshly-expanded team sub-matches become visible.
@@ -459,9 +476,11 @@ const runTable = async (tableNo, drivers) => {
     busyTables++
     try {
       if (task.kind === 'team') {
-        await playTeamMatch(drv, task.parentId)
+        at(`team ${task.parentId.slice(-6)}`)
+        await playTeamMatch(drv, task.parentId, at)
       } else {
-        await playOneMatch(drv.id, task.matchId, task.numberOfGames)
+        at(`match ${task.matchId.slice(-6)}`)
+        await playOneMatch(drv.id, task.matchId, task.numberOfGames, 11, at)
         M.matchesFinished++
       }
     } catch (e) {
@@ -471,8 +490,10 @@ const runTable = async (tableNo, drivers) => {
     } finally {
       busyTables--
     }
+    at('refresh')
     await drv.refresh()
   }
+  at('EXIT')
 }
 
 // Confirm the tournaments actually ran to completion — a match that is
@@ -615,7 +636,7 @@ const run = async () => {
   const t0 = Date.now()
   deadline = t0 + MAX_MINUTES * 60000
   const progress = setInterval(() => {
-    console.log(`  [${((Date.now() - t0) / 60000).toFixed(1)}m] matches ${M.matchesFinished} subs ${M.subMatchesFinished} | req ${M.req} (err ${M.reqErr}) | pusher ${M.pusherMsgs} | inflight-max ${M.maxInFlight}`)
+    console.log(`  [${((Date.now() - t0) / 60000).toFixed(1)}m] matches ${M.matchesFinished} subs ${M.subMatchesFinished} | req ${M.req} (err ${M.reqErr}, thrown ${M.errors.length}) | pusher ${M.pusherMsgs} | busy ${busyTables} | tables: ${tableState.join(' / ')}`)
   }, 30000)
 
   await Promise.all(Array.from({ length: TABLES }, (_, i) => runTable(i, drivers)))
