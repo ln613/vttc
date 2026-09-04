@@ -1783,10 +1783,7 @@ export const finishMatch = async (body) => {
 
   if (!matchFound) throwError('Match not found')
 
-  await collection.updateOne(
-    { _id: toObjectId(_id) },
-    { $set: setOps || { eventStages: updatedStages } },
-  )
+  await collection.updateOne({ _id: toObjectId(_id) }, { $set: { eventStages: updatedStages } })
 
   return { success: true }
 }
@@ -3641,7 +3638,12 @@ export const updateGame = async (body) => {
 
   if (!matchFound) throwError('Match not found')
 
-  await collection.updateOne({ _id: toObjectId(_id) }, { $set: { eventStages: updatedStages } })
+  // Write only the paths this update actually changed (see setOps above).
+  // Rewriting the whole eventStages array is the heaviest write in the app.
+  await collection.updateOne(
+    { _id: toObjectId(_id) },
+    { $set: setOps || { eventStages: updatedStages } },
+  )
 
   return { success: true }
 }
