@@ -23,7 +23,7 @@ Largest single `eventStages` array measured: **275 KB** (U1500 Teams).
 
 | Service | Limit | Notes |
 | --- | --- | --- |
-| MongoDB Atlas (shared tier) | **500 connections** | Verified: `current + available = 500`. NOT 100, and NOT the 1500 an old code comment claimed. |
+| MongoDB Atlas (shared tier) | **500 connections per node** | Verified on all three nodes: `current + available = 500`. NOT 100, and NOT the 1500 an old code comment claimed. |
 | Pusher Sandbox (free) | **100 concurrent connections**, 200,000 msgs/day | Connections are the binding constraint, not messages. |
 | Netlify Free / Personal | **300 / 1000 credits per month** | |
 
@@ -54,9 +54,14 @@ sub-matches + 47 dead rubbers, 17,248 points, 0 errors, 0 bricked matches**.
 
 | Service | Measured | Verdict |
 | --- | --- | --- |
-| MongoDB peak connections | **45 / 500 (9%)** | Not close to the ceiling |
-| Pusher messages published | **891 for the whole day** (19/min) | 0.4% of the 200k/day limit |
+| MongoDB peak connections | **85 / 500 per node (17%)** | Comfortable |
+| Pusher messages | 891 published → **~45k/day delivered at 50 viewers** | 22% of the 200k limit |
+| Pusher peak connections | **50 / 100** | **The binding constraint** |
 | Netlify requests | 12,274 (0 errors) | see projection below |
+
+> Both Pusher rows were corrected against the vendor dashboards after the
+> run — see "Corrections from the vendor dashboards" below. The harness
+> under-reported both.
 
 ### Projected cost of one tournament day (50 spectators)
 
@@ -116,6 +121,48 @@ tournament run itself — the rest was iterating on the harness. Six deploys
 cost five times more than a full simulated tournament day. This is the same
 conclusion the original credit analysis reached, now confirmed end to end.
 
+### Corrections from the vendor dashboards
+
+Three of the harness's own numbers were wrong, all in the optimistic
+direction. The vendor dashboards are the authority.
+
+**1. Pusher bills per delivery, not per publish.** 1,765 publishes across
+the day's runs showed up as **~17,000 messages** on the dashboard — a
+publish costs one message per subscriber. Scaling by room size:
+
+| Viewers | Messages/day | Share of the 200k cap |
+| --- | --- | --- |
+| 10 | 8,910 | 4% |
+| **50** | **44,550** | **22%** |
+| 100 | 89,100 | 45% |
+| 200 | 178,200 | 89% |
+
+**2. Pusher concurrent connections are the real ceiling.** The run peaked at
+exactly **50 of the Sandbox plan's 100**. A real tournament is 50 spectators
++ 8 tablets + admin ≈ 60, and past ~90 concurrent viewers Pusher refuses new
+connections — those clients silently stop receiving live updates while the
+site otherwise looks fine. This binds long before the message cap does, and
+it is the single most likely thing to break on a busy day.
+
+**3. MongoDB peaked at ~85 connections, not 45.** The harness sampled
+`serverStatus` through the driver, which reports only the node it is routed
+to. The ceiling is **500 per node** (confirmed on all three), so 85 is 17% —
+the conclusion is unchanged, but the measurement was low.
+
+### Atlas restarted the cluster mid-afternoon
+
+`replSetGetStatus` after the run: election **term 297**, last election
+`stepUpRequestSkipDryRun` at **12:28 PDT**, and all three nodes reporting
+~2 h uptime — an Atlas-initiated rolling restart / failover, 3.5 hours
+*after* the load test ended, so not caused by it.
+
+Two things follow. The shared tier gets restarted without warning, so this
+*will* eventually land mid-tournament; `maybeResetOnError` in `db.js` exists
+for exactly that and drops the cached client so the next request rebuilds
+against the new topology. And it explains the lopsided Atlas opcounters:
+shard-00-02 was primary during the test and shard-00-01 is primary now.
+Read preference is `primary` — there are no secondary reads.
+
 ### Caveats on these numbers
 
 - **A single IP cannot hold 50 spectator clients.** Netlify's edge starts
@@ -126,9 +173,8 @@ conclusion the original credit analysis reached, now confirmed end to end.
   was 16 in-flight requests. At 50 spectators concurrency rises roughly 3×,
   which would put connections near ~140 — still well under 500, but this is
   extrapolation, not measurement.
-- Pusher's 891 is messages *published*. If Pusher bills per delivery, a
-  50-client room is ~45k/day — still far under the limit. The binding
-  Sandbox constraint is **100 concurrent connections**, not messages.
+- Pusher's 891 publishes did bill per delivery — confirmed against the
+  dashboard, see the corrections section above.
 - Netlify compute (GB-hours) was not instrumented; read it from the
   dashboard for the 15:10–15:57 UTC window.
 
