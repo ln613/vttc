@@ -42,6 +42,64 @@ Largest single `eventStages` array measured: **275 KB** (U1500 Teams).
 
 ---
 
+## Full-day load test — measured 2026-09-04
+
+`npm run load:test` drove **vttc-live-qa** (against `vttc-dev`) over real HTTP:
+6 singles + 2 team events, 16 participants each, 8 tables at one point per
+second, 10 real Pusher spectator clients. **46.9 min wall clock**
+(15:10–15:57 UTC), a full day's match volume at true match pace.
+
+All 8 events ran to completion — **186 singles matches + 227 team
+sub-matches + 47 dead rubbers, 17,248 points, 0 errors, 0 bricked matches**.
+
+| Service | Measured | Verdict |
+| --- | --- | --- |
+| MongoDB peak connections | **45 / 500 (9%)** | Not close to the ceiling |
+| Pusher messages published | **891 for the whole day** (19/min) | 0.4% of the 200k/day limit |
+| Netlify requests | 12,274 (0 errors) | see projection below |
+
+### Projected cost of one tournament day (50 spectators)
+
+The spectator half was measured with 10 clients and scaled ×5; the scorer
+half excludes the harness's idle-polling overhead (a real tablet fetches an
+event when it picks up a match, not every 2s).
+
+| | Requests | Bandwidth | Credits |
+| --- | --- | --- | --- |
+| Scorers (8 tables) | 4,004 | 5.3 MB | 0.8 |
+| Spectators (50) | 26,330 | 199.4 MB | 9.3 |
+| **Total** | **30,334** | **204.7 MB** | **≈ 10** |
+
+Excludes compute (GB-hours) and the 15 credits per deploy. **A tournament
+day costs about the same as two-thirds of one deploy.** Deploys remain the
+thing to control, not traffic.
+
+### The one number that matters
+
+**`type=events&full=true` is 90% of all bandwidth.** With 8 events in the
+database it grew to **335 KB raw / 23 KB gzipped**, and the Schedule page
+refetches the whole thing on every broadcast. Ten of fifty spectators on
+that page account for 183 MB of the 205 MB. Deferred item 4 below is by far
+the highest-value optimization; nothing else is close.
+
+### Caveats on these numbers
+
+- **A single IP cannot hold 50 spectator clients.** Netlify's edge starts
+  refusing TCP connections — twice during this work, taking `vttc-live` and
+  `vttc-live-qa` down *for this network* (~50 min, then ~4 min). True
+  50-client fidelity needs 50 source IPs (a hosted load-test service).
+- **MongoDB's peak was measured at 10 spectators**, where peak concurrency
+  was 16 in-flight requests. At 50 spectators concurrency rises roughly 3×,
+  which would put connections near ~140 — still well under 500, but this is
+  extrapolation, not measurement.
+- Pusher's 891 is messages *published*. If Pusher bills per delivery, a
+  50-client room is ~45k/day — still far under the limit. The binding
+  Sandbox constraint is **100 concurrent connections**, not messages.
+- Netlify compute (GB-hours) was not instrumented; read it from the
+  dashboard for the 15:10–15:57 UTC window.
+
+---
+
 ## Already done (for reference)
 
 - **Removed the Pusher double-fire** — `withEventNotify` sent both `event-{id}` and `live-score`; now one broadcast carrying `eventId`. At 50 viewers this moved a tournament day from ~265k Pusher messages (over the 200k free cap) to ~132k.

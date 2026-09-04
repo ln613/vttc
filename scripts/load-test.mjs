@@ -21,6 +21,7 @@ import * as PusherNS from 'pusher-js/node.js'
 const Pusher = PusherNS.Pusher ?? PusherNS.default?.Pusher ?? PusherNS.default
 import { MongoClient, ObjectId } from 'mongodb'
 import { readFileSync, writeFileSync } from 'node:fs'
+import { gzipSync } from 'node:zlib'
 
 const arg = (name, dflt) => {
   const i = process.argv.indexOf(`--${name}`)
@@ -33,6 +34,10 @@ const HOST = arg('host', 'https://vttc-live-qa.netlify.app')
 const API = `${HOST}/.netlify/functions/api`
 const TABLES = arg('tables', 8)
 const SPECTATORS = arg('spectators', 50)
+// A real room has this many watchers; a single test IP cannot hold that
+// many without tripping the edge's abuse protection, so the spectator
+// half is measured small and scaled.
+const PROJECT = arg('project', 50)
 const SINGLES = arg('singles', 6)
 const TEAMS = arg('teams', 2)
 const PARTICIPANTS = arg('participants', 16)
@@ -55,6 +60,7 @@ const SAVE_DEBOUNCE_MS = 1000
 const REFETCH_JITTER_MS = 1500
 const POINT_INTERVAL_MS = 1000
 const REQUEST_TIMEOUT_MS = 30000
+const SPECTATOR_RAMP_MS = 1500
 
 // ---------------------------------------------------------------- metrics
 const M = {
@@ -105,7 +111,11 @@ const call = async (method, type, payload = {}, who = 'scorer') => {
     }
     consecutiveNetworkFailures = 0
     const text = await res.text()
-    const wire = Number(res.headers.get('content-length')) || text.length
+    // undici transparently decompresses and drops content-length, so the
+    // header cannot be trusted as the on-the-wire size — falling back to
+    // text.length overstated bandwidth by ~12x. Netlify gzips these
+    // responses, so gzip locally to get the billed size.
+    const wire = text ? gzipSync(text).length : 0
     M.wireBytes += wire; M.rawBytes += text.length
     bump(M.bytesByType, `${method}:${type}`, wire)
     if (!res.ok) {
@@ -355,7 +365,7 @@ const startSpectators = async (eventIds) => {
       refetch()
     })
     clients.push({ pusher, role })
-    await sleep(40) // stagger connections like arriving devices
+    await new Promise((r) => setTimeout(r, SPECTATOR_RAMP_MS)) // arrive gradually, not as a burst
   }
   const byRole = clients.reduce((a, c) => (bump(a, c.role), a), {})
   console.log(`  ${clients.length} spectators connected:`, JSON.stringify(byRole))
@@ -580,7 +590,12 @@ const report = (t0, t1, mongo, drivers, completion) => {
   console.log(`\n-- 1. NETLIFY --`)
   console.log(`  total requests        ${M.req}   (errors ${M.reqErr})`)
   console.log(`    from scorers        ${M.scorerReq}`)
-  console.log(`    from spectators     ${M.spectatorReq}`)
+  console.log(`    from spectators     ${M.spectatorReq}   (${SPECTATORS} clients)`)
+  if (PROJECT > SPECTATORS) {
+    const scale = PROJECT / SPECTATORS
+    console.log(`    projected to ${String(PROJECT).padEnd(3)}   ${Math.round(M.spectatorReq * scale)}` +
+      `   -> total ${Math.round(M.scorerReq + M.spectatorReq * scale)} requests`)
+  }
   console.log(`  bytes on the wire     ${(M.wireBytes / 1024 ** 2).toFixed(1)} MB   (uncompressed ${(M.rawBytes / 1024 ** 2).toFixed(1)} MB)`)
   console.log(`  peak concurrent reqs  ${M.maxInFlight}`)
   console.log(`  credits: requests     ${credits.requests.toFixed(2)}  (${M.req} / 5000)`)
