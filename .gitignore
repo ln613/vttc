@@ -39,3 +39,5 @@ ios/platforms
 ios/plugins
 ios/node_modules
 ios/.cordova
+
+.load-test-events.json
