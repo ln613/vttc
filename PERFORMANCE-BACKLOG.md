@@ -68,7 +68,8 @@ event when it picks up a match, not every 2s).
 | --- | --- | --- | --- |
 | Scorers (8 tables) | 4,004 | 5.3 MB | 0.8 |
 | Spectators (50) | 26,330 | 199.4 MB | 9.3 |
-| **Total** | **30,334** | **204.7 MB** | **≈ 10** |
+| **Total (as measured)** | **30,334** | **204.7 MB** | **≈ 10** |
+| **After the Schedule-payload fix** | 30,334 | **51.6 MB** | **≈ 7** |
 
 Excludes compute (GB-hours) and the 15 credits per deploy. **A tournament
 day costs about the same as two-thirds of one deploy.** Deploys remain the
@@ -76,11 +77,15 @@ thing to control, not traffic.
 
 ### The one number that matters
 
-**`type=events&full=true` is 90% of all bandwidth.** With 8 events in the
+**`type=events&full=true` was 90% of all bandwidth.** With 8 events in the
 database it grew to **335 KB raw / 23 KB gzipped**, and the Schedule page
-refetches the whole thing on every broadcast. Ten of fifty spectators on
-that page account for 183 MB of the 205 MB. Deferred item 4 below is by far
-the highest-value optimization; nothing else is close.
+refetches the whole thing on every broadcast — ten of fifty spectators on
+that page accounted for 183 MB of the 205 MB.
+
+**Fixed** (see "Already done"): the endpoint now sends only the events the
+Schedule can actually draw, cutting it ~83% and taking a projected day from
+~10 credits to ~7. The remaining bandwidth is spread thinly enough that no
+single endpoint dominates any more.
 
 ### Caveats on these numbers
 
@@ -107,6 +112,7 @@ the highest-value optimization; nothing else is close.
 - **Client jitter + in-flight dedupe** (`src/utils/refetch.ts`) — spreads the thundering herd over 0–1500 ms.
 - **Edge caching** for `liveScore` + `events` (`s-maxage=2`). Confirmed working in production (`age:` header present).
 - **Environment-aware Mongo pool** — deployed instances use `maxPoolSize 5 / minPoolSize 1` (was 50/5), ~9× more burst headroom.
+- **Schedule payload trimmed to relevant events** — `events&full=true` now applies the client's own `isEventRelevant` rule server-side (an event ships only if it, or a sibling in its series, has a match on a table or in the queue). **402 KB → 67 KB (83%)** with three events live, and what the page renders is byte-identical. Matters most over time: unfinished events accumulate, and three abandoned ones were already 334 KB of every refetch. Falls back to sending everything when no table state exists.
 - **Targeted `$set` in `updateGame`** — writes only changed paths instead of the whole `eventStages`: **79 KB → 5.1 KB average (18× mean, up to 34×)**. Verified byte-identical across group / knockout / team-sub paths.
 
 ---
@@ -139,27 +145,20 @@ Sending the changed score *in* the Pusher payload removes the refetch.
 - **Why deferred:** needs client-side state merging plus a reconciliation path for missed messages — a divergence/staleness bug surface in the live-scoring path, for headroom we don't currently need.
 - **Effort/risk:** medium / **high** (silent staleness during a live event).
 
-### 4. Shrink the Schedule payload
-`events&full=true` (4.6 KB gzip) returns all unfinished events with full stage
-data on every broadcast, even when only one event changed.
-
-- **Gain:** cheaper than #3 for a good share of the same benefit.
-- **Effort/risk:** low–medium / low. **Best next step if traffic needs trimming.**
-
-### 5. Edge-cache the event-detail endpoint
+### 4. Edge-cache the event-detail endpoint
 `type=event` is the biggest broadcast-driven refetch (9.1 KB gzip) but is
 currently `no-store`.
 
 - **Why deferred:** the acting admin refetches immediately after their own mutation, so a cache hit could briefly hide their own change. `liveScore`/`events` accept this at `s-maxage=2`; event detail is more visible.
 - **Effort/risk:** trivial / medium (staleness UX).
 
-### 6. Targeted writes for the other full-document rewrites
+### 5. Targeted writes for the other full-document rewrites
 `finishMatch`, `confirmMatch`, `resetMatch` still `$set` the whole `eventStages`.
 
 - **Why deferred:** far less frequent than `updateGame` (once per match, not every 3 s).
 - **Effort/risk:** low / low. Mechanical repeat of Option A.
 
-### 7. Netlify build-ignore rule for VTTC
+### 6. Netlify build-ignore rule for VTTC
 Stop spec/poster/doc commits from triggering a 15-credit deploy:
 
 ```toml
@@ -170,7 +169,7 @@ Stop spec/poster/doc commits from triggering a 15-credit deploy:
 - **Why deferred:** `vttc-live-qa` auto-builds from `master` on every push, which is a quiet 15 credits each. Worth doing before the next busy dev stretch.
 - **Effort/risk:** trivial / low.
 
-### 8. Spectator freshness without polling
+### 7. Spectator freshness without polling
 Only **admins** get the 60 s live-score heartbeat
 (`if (authState.isAdmin) startAutoStartHeartbeat()`). Spectators refresh only
 when a match-level event fires somewhere — during a quiet stretch their screen
