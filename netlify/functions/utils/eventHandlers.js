@@ -9,7 +9,7 @@ const getGroupLetter = (i) =>
     : String.fromCharCode(65 + Math.floor(i / 26) - 1) +
       String.fromCharCode(65 + (i % 26))
 const getGroupName = (i) => `Group ${getGroupLetter(i)}`
-import { notifyEventUpdate, notifyLiveScoreUpdate, notifyMatchReset } from './pusher.js'
+import { notifyLiveScoreUpdate, notifyMatchReset } from './pusher.js'
 import { getSettings as readGlobalSettings } from './settingsHandlers.js'
 
 const EVENTS_COLLECTION = 'events'
@@ -4155,8 +4155,7 @@ export const autoGenerateForEvent = async (event) => {
   if (changed) {
     // Best-effort realtime — fire without awaiting so a slow/unreachable
     // Pusher can't delay the live-score response.
-    void notifyEventUpdate(event._id?.toString())
-    void notifyLiveScoreUpdate()
+    void notifyLiveScoreUpdate(event._id?.toString())
   }
   return changed
 }

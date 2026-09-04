@@ -1,5 +1,5 @@
 import { HashRouter, Route } from '@solidjs/router'
-import type { JSX } from 'solid-js'
+import { Show, type JSX } from 'solid-js'
 import './App.css'
 import TournamentEdit from './pages/TournamentEdit'
 import EventEdit from './pages/EventEdit'
@@ -19,12 +19,19 @@ import ConfirmDialog from './components/ConfirmDialog'
 import UserNotifications from './components/UserNotifications'
 import NotificationToasts from './components/NotificationToasts'
 
+// Notifications are disabled for now — set VITE_NOTIFICATIONS_ENABLED=1
+// (and NOTIFICATIONS_ENABLED=true on the server) to turn them back on.
+const notificationsEnabled =
+  import.meta.env.VITE_NOTIFICATIONS_ENABLED === '1'
+
 const RootLayout = (props: { children?: JSX.Element }) => (
   <>
     {props.children}
     <ConfirmDialog />
-    <UserNotifications />
-    <NotificationToasts />
+    <Show when={notificationsEnabled}>
+      <UserNotifications />
+      <NotificationToasts />
+    </Show>
   </>
 )
 

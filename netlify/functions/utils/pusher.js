@@ -1,4 +1,5 @@
 import Pusher from 'pusher'
+import { recordPusherSent, recordPusherSuppressed } from './metrics.js'
 
 let cachedClient = null
 
@@ -36,6 +37,7 @@ const triggerSafely = async (channel, eventName, data) => {
   // Attach the catch up front so the trigger's eventual rejection is
   // always handled — even after the timeout wins the race and this
   // function has already returned (avoids an unhandled rejection).
+  recordPusherSent(channel)
   const attempt = Promise.resolve(client.trigger(channel, eventName, data)).catch(
     () => {},
   )
@@ -55,8 +57,52 @@ export const notifyMatchReset = async (eventId, matchId) => {
   await triggerSafely(`event-${eventId}`, 'match-reset', { matchId })
 }
 
-export const notifyLiveScoreUpdate = async () => {
-  await triggerSafely('live-score', 'updated', {})
+// Live-score broadcasts fan out to every connected client on the shared
+// `live-score` channel, so bursts (confirming several matches, generating a
+// round) are coalesced: the first call in a window goes out immediately and
+// any further calls inside it merge into one trailing broadcast.
+//
+// Serverless caveat: the trailing timer only fires while the instance stays
+// warm. That's best-effort by design — the client's 60s live-score heartbeat
+// is the backstop, and the leading edge means the first change is never
+// delayed.
+const LIVE_SCORE_WINDOW_MS = 1500
+const ALL_EVENTS = '*'
+let liveScoreLastSentAt = 0
+let liveScorePendingIds = null
+let liveScoreTimer = null
+
+const sendLiveScore = async (eventId) =>
+  triggerSafely('live-score', 'updated', { eventId: eventId || null })
+
+const flushLiveScore = async () => {
+  const ids = liveScorePendingIds ? [...liveScorePendingIds] : []
+  liveScorePendingIds = null
+  liveScoreTimer = null
+  liveScoreLastSentAt = Date.now()
+  // A burst spanning several events can't name one — tell every client to
+  // refetch rather than silently skipping the ones we didn't name.
+  const only = ids.length === 1 && ids[0] !== ALL_EVENTS ? ids[0] : null
+  await sendLiveScore(only)
+}
+
+export const notifyLiveScoreUpdate = async (eventId = null) => {
+  const id = eventId ? String(eventId) : null
+  const now = Date.now()
+  if (now - liveScoreLastSentAt >= LIVE_SCORE_WINDOW_MS) {
+    liveScoreLastSentAt = now
+    await sendLiveScore(id)
+    return
+  }
+  recordPusherSuppressed()
+  if (!liveScorePendingIds) liveScorePendingIds = new Set()
+  liveScorePendingIds.add(id || ALL_EVENTS)
+  if (!liveScoreTimer) {
+    const wait = Math.max(0, LIVE_SCORE_WINDOW_MS - (now - liveScoreLastSentAt))
+    liveScoreTimer = setTimeout(() => {
+      void flushLiveScore()
+    }, wait)
+  }
 }
 
 // Notify a single player (by their player/account id) that a table has

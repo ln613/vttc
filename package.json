@@ -18,7 +18,9 @@
     "postapk:build:release": "node apk/copy-to-public.js && node apk/upload-to-gdrive.js",
     "ios:sync": "vite build && node ios/sync.mjs",
     "ios:prepare": "npm --prefix ios install && cd ios && npx cordova platform add ios --no-update-notifier",
-    "ios:build": "npm run ios:sync && cd ios && npx cordova build ios --device --buildConfig=build.json --no-update-notifier"
+    "ios:build": "npm run ios:sync && cd ios && npx cordova build ios --device --buildConfig=build.json --no-update-notifier",
+    "db:connections": "node --env-file=.env scripts/db-connections.mjs",
+    "sim": "node --env-file=.env scripts/simulate-tournament.mjs"
   },
   "dependencies": {
     "@solidjs/router": "^0.15.3",

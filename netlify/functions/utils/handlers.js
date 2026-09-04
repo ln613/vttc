@@ -65,7 +65,7 @@ import {
   saveRevenueTemplate,
 } from './revenueHandlers.js'
 import { savePushToken, removePushToken } from './push.js'
-import { notifyEventUpdate, notifyLiveScoreUpdate } from './pusher.js'
+import { notifyLiveScoreUpdate } from './pusher.js'
 
 const withEventNotify = (fn) => async (body) => {
   const result = await fn(body)
@@ -74,8 +74,10 @@ const withEventNotify = (fn) => async (body) => {
   // the response. Fire them without awaiting — Pusher can be slow or
   // unreachable, and triggerSafely already bounds each call. The response
   // returns as soon as the DB write completes.
-  void notifyEventUpdate(eventId)
-  void notifyLiveScoreUpdate()
+  // One broadcast on the shared `live-score` channel, carrying the eventId.
+  // Event-detail clients filter on it, so we no longer double-fire a second
+  // message on `event-{id}` for the same change.
+  void notifyLiveScoreUpdate(eventId)
   return result
 }
 
@@ -151,13 +153,13 @@ export const apiHandlers = {
     assignMatchToTable: withEventNotify(assignMatchToTable),
     acquireMatchSession: async (body) => {
       const result = await acquireMatchSession(body)
-      await notifyLiveScoreUpdate()
+      await notifyLiveScoreUpdate(body?._id)
       return result
     },
     heartbeatMatchSession: (body) => heartbeatMatchSession(body),
     releaseMatchSession: async (body) => {
       const result = await releaseMatchSession(body)
-      await notifyLiveScoreUpdate()
+      await notifyLiveScoreUpdate(body?._id)
       return result
     },
   },

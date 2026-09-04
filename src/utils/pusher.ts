@@ -52,17 +52,24 @@ export const subscribeToMatchReset = (
   }
 }
 
+// A live-score broadcast names the event that changed, or `null` when a
+// coalesced burst spanned several events (meaning: everyone should refetch).
+export interface LiveScoreUpdate {
+  eventId?: string | null
+}
+
 export const subscribeToLiveScoreUpdates = (
-  onUpdate: () => void,
+  onUpdate: (data?: LiveScoreUpdate) => void,
 ): EventSubscription => {
   const client = getClient()
   if (!client) {
     return { unsubscribe: () => {} }
   }
   const channel = client.subscribe('live-score')
-  channel.bind('updated', onUpdate)
+  const handler = (data: LiveScoreUpdate) => onUpdate(data)
+  channel.bind('updated', handler)
   return {
-    unsubscribe: () => channel.unbind('updated', onUpdate),
+    unsubscribe: () => channel.unbind('updated', handler),
   }
 }
 

@@ -1,4 +1,10 @@
 import { MongoClient, ObjectId } from 'mongodb'
+import { recordDbConnect } from './metrics.js'
+
+// `netlify dev` runs the functions inside one long-lived process, so a
+// single MongoClient serves all concurrent requests. Deployed functions run
+// as many independent instances, each with its own client.
+const IS_SINGLE_PROCESS = process.env.NETLIFY_DEV === 'true'
 
 let cachedDb = null
 let cachedClient = null
@@ -169,19 +175,29 @@ export const connectDB = async () => {
       // Proactively retire idle sockets so the pool refreshes them rather
       // than handing out connections the server already dropped.
       maxIdleTimeMS: 60000,
-      // Allow concurrency: `netlify dev` (and any single long-running
-      // server) handles many client requests in ONE process sharing this
-      // client — a pool of 1 would serialize them all behind one
-      // connection. 50 gives headroom (M10 allows ~1500 connections).
-      maxPoolSize: 50,
-      // Keep a few connections warm so a request after an idle gap doesn't
-      // pay a cold TLS reconnect (~2s) to Atlas. Without this, sporadic
-      // traffic kept letting sockets idle out (maxIdleTimeMS) and every
+      // Pool size depends on the runtime shape (see IS_SINGLE_PROCESS):
+      //
+      // `netlify dev` is ONE long-running process serving every concurrent
+      // request through this single client — a small pool would serialize
+      // them all behind one connection, so it keeps a roomy 50.
+      //
+      // A deployed function is the opposite: many short-lived instances,
+      // each with its OWN client, each handling one request at a time. A
+      // big pool there is unusable (one request can't use 50 connections)
+      // and dangerous — every warm instance multiplies against the
+      // cluster's 500-connection ceiling (shared Atlas tier), so a burst
+      // of refetches could exhaust it mid-tournament.
+      maxPoolSize: IS_SINGLE_PROCESS ? 50 : 5,
+      // Keep at least one connection warm so a request after an idle gap
+      // doesn't pay a cold TLS reconnect (~2s) to Atlas. Without this,
+      // sporadic traffic let sockets idle out (maxIdleTimeMS) and every
       // first request reconnected — which is what made even a DB-free
-      // tablet sign-in hang behind connectDB().
-      minPoolSize: 5,
+      // tablet sign-in hang behind connectDB(). Deployed instances keep
+      // just 1 so idle instances don't hoard connections.
+      minPoolSize: IS_SINGLE_PROCESS ? 5 : 1,
     })
     await client.connect()
+    recordDbConnect()
 
     cachedClient = client
     cachedDb = client.db(getDbName())

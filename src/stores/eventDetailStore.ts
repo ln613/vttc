@@ -13,7 +13,8 @@ import type { Match } from '../../shared/types/Match'
 import type { MatchPreview } from '../components/MatchConfirmDialog'
 import { apiGet, apiPost } from '../utils/api'
 import { waitForPendingSave } from './gamePlayStore'
-import { subscribeToEventUpdates, type EventSubscription } from '../utils/pusher'
+import { subscribeToLiveScoreUpdates, type EventSubscription } from '../utils/pusher'
+import { createJitteredRefetch } from '../utils/refetch'
 import { eventState, eventActions } from './eventStore'
 import { authState } from './authStore'
 import { getProvisionalMatchResult } from '../../shared/rules/matchRules'
@@ -97,10 +98,14 @@ const unsubscribeCurrent = () => {
 
 const subscribeForEvent = (eventId: string) => {
   unsubscribeCurrent()
-  currentSubscription = subscribeToEventUpdates(eventId, () => {
-    if (eventDetailState.eventId === eventId) {
-      void fetchEvent(eventId, true)
-    }
+  // Event updates now ride the shared `live-score` broadcast instead of a
+  // second message on `event-{id}`. Refetch when the broadcast names this
+  // event, or names none (a coalesced burst covering several events).
+  const refetch = createJitteredRefetch(() => fetchEvent(eventId, true))
+  currentSubscription = subscribeToLiveScoreUpdates((data) => {
+    if (eventDetailState.eventId !== eventId) return
+    if (data?.eventId && data.eventId !== eventId) return
+    refetch()
   })
 }
 

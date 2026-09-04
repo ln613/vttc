@@ -7,6 +7,7 @@ import type {
 import type { Player } from '../../shared/types/Player'
 import { apiGet, apiPost } from '../utils/api'
 import { authState } from './authStore'
+import { createJitteredRefetch } from '../utils/refetch'
 import {
   subscribeToLiveScoreUpdates,
   type EventSubscription,
@@ -63,10 +64,14 @@ const fetchLiveScore = async (runAutoStart = false) => {
   }
 }
 
+// Broadcast-driven refetches are jittered + de-duplicated so a room full of
+// clients doesn't hit the API in the same instant.
+const refetchOnBroadcast = createJitteredRefetch(() => fetchLiveScore())
+
 const startSubscription = () => {
   stopUpdates()
   subscription = subscribeToLiveScoreUpdates(() => {
-    void fetchLiveScore()
+    refetchOnBroadcast()
   })
 }
 

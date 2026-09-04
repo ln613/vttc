@@ -8,6 +8,10 @@ import { getActiveSessionMatchIds } from './matchSessionHandlers.js'
 import { notifyTableAssigned } from './pusher.js'
 import { sendTableAssignedPush } from './push.js'
 
+// Notifications are disabled for now — set NOTIFICATIONS_ENABLED=true to
+// re-enable the table-assigned Pusher toast + OS-level push.
+const NOTIFICATIONS_ENABLED = process.env.NOTIFICATIONS_ENABLED === 'true'
+
 // "Group A", "Group B", … keyed off the 0-indexed group index.
 const getGroupLetter = (i) =>
   i < 26
@@ -897,6 +901,7 @@ const getAssignedMatchIdSet = (tables) =>
 // Push a "table assigned" notification to every account-holding player in
 // the just-assigned match.
 const notifyPlayersOfAssignment = async (tableEntry) => {
+  if (!NOTIFICATIONS_ENABLED) return
   if (!tableEntry) return
   const item = tableEntry.match
   const playerIds = collectMatchPlayerIds(item?.match)

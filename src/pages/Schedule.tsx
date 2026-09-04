@@ -1,5 +1,6 @@
 import { Show, For, createSignal, onMount, onCleanup, type JSX } from 'solid-js'
 import { subscribeToLiveScoreUpdates } from '../utils/pusher'
+import { createJitteredRefetch } from '../utils/refetch'
 import { Header } from '../components/Header'
 import ToggleButton from '../components/ToggleButton'
 import { eventState, eventActions, type EventOption } from '../stores/eventStore'
@@ -41,8 +42,9 @@ const Schedule = () => {
     liveScoreActions.fetchLiveScore()
     // Refetch events whenever the live-score channel pings; liveScoreActions
     // already maintains its own subscription that refreshes table/queue state.
+    const refetch = createJitteredRefetch(() => eventActions.fetchEvents(true))
     subscription = subscribeToLiveScoreUpdates(() => {
-      void eventActions.fetchEvents(true)
+      refetch()
     })
   })
 
