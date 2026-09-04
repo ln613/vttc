@@ -380,11 +380,83 @@ export const getEvents = async (params = {}) => {
     // client-side anyway. Drop them here so completed tournaments (e.g.
     // accumulated simulation clones) don't bloat the payload. Keep the
     // derived flags so the shape stays a superset of the summary.
-    return events
-      .filter((e) => !isEventFinishedFromStages(e.eventStages))
-      .map((e) => ({ ...e, ...derivedEventFlags(e.eventStages) }))
+    const unfinished = events.filter(
+      (e) => !isEventFinishedFromStages(e.eventStages),
+    )
+    const relevant = keepScheduleRelevant(
+      unfinished,
+      await getActiveMatchIds(db),
+    )
+    return relevant.map((e) => ({ ...e, ...derivedEventFlags(e.eventStages) }))
   }
   return events.map(summarizeEvent)
+}
+
+// Every match id in an event, team sub-matches included — the table and
+// queue address sub-matches directly for team events.
+const collectMatchIds = (event) => {
+  const ids = []
+  const add = (m) => {
+    if (!m?._id) return
+    ids.push(m._id.toString())
+    for (const sub of m.subMatches || []) {
+      if (sub?._id) ids.push(sub._id.toString())
+    }
+  }
+  for (const stage of event.eventStages || []) {
+    for (const group of stage.groups || []) {
+      for (const m of group.matches || []) add(m)
+    }
+    for (const round of stage.rounds || []) {
+      for (const slot of round.matches || []) add(slot.match)
+    }
+  }
+  return ids
+}
+
+// Match ids currently on a table or waiting in the queue, read straight
+// from the persisted table state. getLiveScore can't be reused here: it
+// assigns tables, saves state and sends push notifications as a side
+// effect, none of which belong in a GET of the event list.
+const getActiveMatchIds = async (db) => {
+  const state = await db
+    .collection(TABLE_STATE_COLLECTION)
+    .findOne({ docId: TABLE_STATE_DOC_ID })
+  const ids = new Set()
+  for (const t of state?.tables || []) {
+    if (t.status === 'assigned' && t.match?.matchId) {
+      ids.add(t.match.matchId.toString())
+    }
+  }
+  for (const item of state?.matchQueue || []) {
+    if (item?.matchId) ids.add(item.matchId.toString())
+  }
+  return ids
+}
+
+// The Schedule page — full mode's only caller — draws an event only when
+// that event, or a sibling in the same event series, has a match on a
+// table or in the queue (isEventRelevant in Schedule.tsx). Everything else
+// is sent and discarded on arrival, and abandoned events accumulate
+// forever: three stale ones measured 334 KB of EVERY refetch, and the page
+// refetches on every live-score broadcast. Applying the client's own rule
+// here means the wire carries only what actually gets drawn.
+const keepScheduleRelevant = (events, activeMatchIds) => {
+  // Nothing is running (or the table state hasn't been written yet) —
+  // send everything rather than risk an empty Schedule.
+  if (!activeMatchIds.size) return events
+
+  const hasActiveMatch = (e) =>
+    collectMatchIds(e).some((id) => activeMatchIds.has(id))
+
+  // A series runs as a unit, so a sibling event of one with an active
+  // match stays visible even before its own matches reach a table.
+  const activeSeries = new Set(
+    events.filter(hasActiveMatch).map((e) => e.eventSeries).filter(Boolean),
+  )
+  return events.filter(
+    (e) => hasActiveMatch(e) || (e.eventSeries && activeSeries.has(e.eventSeries)),
+  )
 }
 
 const derivedEventFlags = (eventStages) => ({
