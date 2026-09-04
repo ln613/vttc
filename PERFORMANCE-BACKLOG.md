@@ -64,12 +64,24 @@ The spectator half was measured with 10 clients and scaled ×5; the scorer
 half excludes the harness's idle-polling overhead (a real tablet fetches an
 event when it picks up a match, not every 2s).
 
-| | Requests | Bandwidth | Credits |
-| --- | --- | --- | --- |
-| Scorers (8 tables) | 4,004 | 5.3 MB | 0.8 |
-| Spectators (50) | 26,330 | 199.4 MB | 9.3 |
-| **Total (as measured)** | **30,334** | **204.7 MB** | **≈ 10** |
-| **After the Schedule-payload fix** | 30,334 | **51.6 MB** | **≈ 7** |
+| | Requests | Bandwidth | Compute | Credits |
+| --- | --- | --- | --- | --- |
+| Requests (30,334 @ 5,000/credit) | 6.1 | — | — | 6.1 |
+| Bandwidth, after the Schedule fix | — | 51.6 MB | — | 1.0 |
+| Compute (0.363 credits / 1,000 req) | — | — | 1.1 GB-Hours | **11.0** |
+| **Total** | | | | **≈ 18** |
+
+**Compute is the largest component — bigger than requests and bandwidth
+combined.** It was not instrumented by the harness; the rate was recovered
+afterwards from the account's credit breakdown (+11.7 compute credits over
++32,244 requests = **0.131 GB-seconds per request**, at a p50 function
+duration of 0.70 s). An earlier estimate of ~7 credits/day omitted it
+entirely.
+
+A tournament day therefore costs about **1.2 deploys**, and the Free plan's
+300 credits/month covers roughly **17 tournament days** — before deploys.
+Cutting function duration is now the highest-value lever, ahead of any
+further payload work.
 
 Excludes compute (GB-hours) and the 15 credits per deploy. **A tournament
 day costs about the same as two-thirds of one deploy.** Deploys remain the
@@ -86,6 +98,23 @@ that page accounted for 183 MB of the 205 MB.
 Schedule can actually draw, cutting it ~83% and taking a projected day from
 ~10 credits to ~7. The remaining bandwidth is spread thinly enough that no
 single endpoint dominates any more.
+
+### Where the day's credits actually went
+
+Cross-checking the account breakdown before/after all of this work:
+
+| | Delta | Credits |
+| --- | --- | --- |
+| Production deploys | 6 | **90.0** |
+| Web requests | +32,244 | 6.5 |
+| Compute | +1.17 GB-Hours | 11.7 |
+| Bandwidth | +108 MB | 2.1 |
+| **Total** | | **110.2** |
+
+**82% of it was deploys**, and only 41% of the request traffic was the
+tournament run itself — the rest was iterating on the harness. Six deploys
+cost five times more than a full simulated tournament day. This is the same
+conclusion the original credit analysis reached, now confirmed end to end.
 
 ### Caveats on these numbers
 
