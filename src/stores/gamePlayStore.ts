@@ -1018,9 +1018,17 @@ export const gamePlayActions = {
     const parent = getCurrentParentMatch()
     return players.map((p) => {
       const base = `${p.firstName} ${p.lastName}`
-      if (!parent) return base
-      const label = getTeamPlayerOrderLabel(parent, p._id?.toString())
-      return label ? `${base} (${label})` : base
+      // Rating always; in a team sub-match the order-of-play slot leads, so
+      // the umpire can tie the name back to the A/B/X/Y lineup:
+      //   team sub-match -> "Nan Li (A, 1703)"
+      //   anything else  -> "Nan Li (1703)"
+      const label = parent
+        ? getTeamPlayerOrderLabel(parent, p._id?.toString())
+        : undefined
+      const detail = [label, p.rating != null ? String(p.rating) : undefined]
+        .filter(Boolean)
+        .join(', ')
+      return detail ? `${base} (${detail})` : base
     })
   },
 
