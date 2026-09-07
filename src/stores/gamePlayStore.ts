@@ -660,7 +660,29 @@ export const gamePlayActions = {
   },
 
   confirmInitDialog: () => {
-    setGamePlayState({ showInitDialog: false })
+    // The very first game of a fresh match has to start on the handicap
+    // score. Every other entry point already does this — restoreGameProgress
+    // on reload, nextGame, resetGame, resetWholeMatch — but this one left the
+    // umpire scoring from 0:0 in a handicap event until the page was
+    // reloaded. Serving is derived from the spotted score exactly as
+    // restoreGameProgress derives it, so a reload shows the same thing.
+    const startingScores = getStartingScores()
+    const gameFirstServeSide = getGameFirstServeSide(
+      gamePlayState.initialServingSide,
+      gamePlayState.currentGameIndex,
+    )
+
+    setGamePlayState({
+      showInitDialog: false,
+      score1: startingScores.score1,
+      score2: startingScores.score2,
+      servingSide: calculateServingSide(
+        startingScores.score1,
+        startingScores.score2,
+        gameFirstServeSide,
+        11,
+      ),
+    })
     saveMatchSetup()
   },
 
