@@ -1,7 +1,7 @@
 import { createStore } from 'solid-js/store'
 import { apiGet } from '../utils/api'
 
-// Per-event revenue figures (computed server-side). One row per past event.
+// Per-event revenue figures (computed server-side). One row per event.
 export interface EventRevenue {
   _id: string
   eventName: string
@@ -11,6 +11,9 @@ export interface EventRevenue {
   registrationFee: number
   prize: number
   revenue: number
+  // True while the event has no draw yet: the fee is counted from who has
+  // paid so far, so entries still arriving will change it.
+  provisional?: boolean
 }
 
 // A series group (collapsible) or a standalone event (series === null).

@@ -75,7 +75,17 @@ const EventRow = (props: { event: EventRevenue }) => (
   <div style={eventRowStyle}>
     <div style={eventHeadStyle}>
       <span style={eventNameStyle}>{props.event.eventName}</span>
-      <span style={eventDateStyle}>{props.event.date}</span>
+      <span style={eventMetaStyle}>
+        <Show when={props.event.provisional}>
+          <span
+            style={provisionalStyle}
+            title="No draw yet — counted from the players who have paid so far"
+          >
+            provisional
+          </span>
+        </Show>
+        <span style={eventDateStyle}>{props.event.date}</span>
+      </span>
     </div>
     <div style={eventFiguresStyle}>
       <Figure label="Participants" value={String(props.event.participantCount)} />
@@ -191,6 +201,25 @@ const eventNameStyle: JSX.CSSProperties = {
 const eventDateStyle: JSX.CSSProperties = {
   'font-size': '13px',
   color: '#7f8c8d',
+}
+
+// Date and any status badge travel together on the right, so the flex
+// header keeps name-left / meta-right instead of spreading three items.
+const eventMetaStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'baseline',
+  gap: '8px',
+}
+
+const provisionalStyle: JSX.CSSProperties = {
+  'font-size': '11px',
+  'font-weight': '600',
+  color: '#b9770e',
+  background: '#fdf3e3',
+  border: '1px solid #f0d9b5',
+  'border-radius': '10px',
+  padding: '1px 7px',
+  'white-space': 'nowrap',
 }
 
 const eventFiguresStyle: JSX.CSSProperties = {

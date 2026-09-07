@@ -1,5 +1,4 @@
 import { getDB } from './db.js'
-import { getClubDate } from './liveScoreHandlers.js'
 
 const EVENTS_COLLECTION = 'events'
 const PLAYERS_COLLECTION = 'players'
@@ -65,10 +64,44 @@ const getTotalPrize = (event) => {
   return (p.first || 0) + (p.second || 0) + (p.third || 0) + (p.fourth || 0)
 }
 
-const computeEventRevenue = (event, hostIds) => {
+// Every player on the participant roster, paid or not.
+const collectRegisteredPlayerIds = (event) => {
+  const ids = new Set()
+  for (const participant of event.participants || []) {
+    for (const p of participant.players || []) {
+      if (p?._id) ids.add(p._id.toString())
+    }
+  }
+  return ids
+}
+
+// Who the registration fee is counted for.
+//
+// Once the draw exists the scheduled roster is authoritative: a player who
+// was placed in a group owes the fee whether or not they turn up, which is
+// why defaulted players stay counted.
+//
+// Before the draw there is nothing to read, so fall back to who has paid --
+// restricted to players still on the roster, so a withdrawal after payment
+// doesn't linger in the total. That figure is marked provisional: entries
+// are still arriving and it will be superseded the moment groups generate.
+const collectFeePayingPlayerIds = (event) => {
   const scheduled = collectScheduledPlayerIds(event)
+  if (scheduled.size > 0) return { ids: scheduled, provisional: false }
+
+  const registered = collectRegisteredPlayerIds(event)
+  const paid = new Set(
+    (event.paidPlayerIds || [])
+      .map((id) => id.toString())
+      .filter((id) => registered.has(id)),
+  )
+  return { ids: paid, provisional: true }
+}
+
+const computeEventRevenue = (event, hostIds) => {
+  const { ids, provisional } = collectFeePayingPlayerIds(event)
   let payingPlayers = 0
-  for (const id of scheduled) if (!hostIds.has(id)) payingPlayers++
+  for (const id of ids) if (!hostIds.has(id)) payingPlayers++
 
   const registrationFee = round2(payingPlayers * getPerPlayerFee(event))
   const prize = getTotalPrize(event)
@@ -81,6 +114,7 @@ const computeEventRevenue = (event, hostIds) => {
     registrationFee,
     prize,
     revenue: round2(registrationFee - prize),
+    provisional,
   }
 }
 
@@ -89,10 +123,9 @@ const computeEventRevenue = (event, hostIds) => {
 // excluding hosts, regardless of payment status.
 export const getRevenue = async () => {
   const db = getDB()
-  const today = getClubDate()
   const events = await db
     .collection(EVENTS_COLLECTION)
-    .find({ date: { $exists: true, $lt: today } })
+    .find({ date: { $exists: true } })
     .toArray()
   const hostIds = await getHostPlayerIds(db)
   return events.map((event) => computeEventRevenue(event, hostIds))
