@@ -6,6 +6,7 @@ import { authState } from './authStore'
 import { playerState } from './playerStore'
 import { apiPost } from '../utils/api'
 import { parseLocalDate } from '../utils/date'
+import { isEventStarted } from '../utils/eventTiming'
 
 export interface UnpaidFeeInfo {
   _id: string
@@ -135,32 +136,6 @@ const countPaidParticipants = (event: EventOption): number =>
 const isEventFull = (event: EventOption): boolean =>
   event.maxParticipants > 0 &&
   countPaidParticipants(event) >= event.maxParticipants
-
-const isEventStarted = (event: EventOption): boolean => {
-  if (!event.date) return false
-  const now = new Date()
-  const eventDate = parseLocalDate(event.date)
-  if (event.time) {
-    const timeParts = parseTime(event.time)
-    if (timeParts) {
-      eventDate.setHours(timeParts.hours, timeParts.minutes, 0, 0)
-    }
-  }
-  return now >= eventDate
-}
-
-const parseTime = (
-  timeStr: string,
-): { hours: number; minutes: number } | null => {
-  const match = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
-  if (!match) return null
-  let hours = parseInt(match[1], 10)
-  const minutes = parseInt(match[2], 10)
-  const period = match[3].toUpperCase()
-  if (period === 'PM' && hours !== 12) hours += 12
-  if (period === 'AM' && hours === 12) hours = 0
-  return { hours, minutes }
-}
 
 const isEventFinished = (event: EventOption): boolean => {
   // Summary (list) mode omits eventStages and ships a server-computed flag.

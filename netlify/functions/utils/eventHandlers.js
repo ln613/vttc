@@ -4187,7 +4187,41 @@ export const resetEvent = async (body) => {
 
   await collection.updateOne(
     { _id: toObjectId(_id) },
-    { $set: { eventStages: resetStages } },
+    // Reset removes the groups that starting depends on, so an early start
+    // is cleared with them; the event falls back to its scheduled time.
+    { $set: { eventStages: resetStages }, $unset: { startedAt: '' } },
+  )
+
+  return { success: true }
+}
+
+// Begin an event ahead of its scheduled time. "Started" is otherwise purely
+// a clock comparison, so an explicit start is recorded as a timestamp that
+// both started-checks short-circuit on (see isEventStarted here and
+// hasEventStarted in liveScoreHandlers). The advertised time is left alone:
+// it is shown to players and orders the auto-start queue.
+export const startEvent = async (body) => {
+  if (!body?._id) throwError('Event ID is required')
+
+  const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
+  const event = await collection.findOne({ _id: toObjectId(body._id) })
+  if (!event) throwError('Event not found')
+
+  const hasGroups = (event.eventStages || []).some(
+    (s) => s.type === 'group' && (s.groups || []).length > 0,
+  )
+  if (!hasGroups) throwError('Generate the groups before starting the event')
+  if (isEventStarted(event)) throwError('Event has already started')
+  // The live queue only ever picks up events dated today (getStartedEvents),
+  // so starting a future one would set the flag and change nothing visible.
+  if (event.date && event.date > getClubDate()) {
+    throwError('An event can only be started on its scheduled date')
+  }
+
+  await collection.updateOne(
+    { _id: toObjectId(body._id) },
+    { $set: { startedAt: new Date().toISOString() } },
   )
 
   return { success: true }
@@ -4905,6 +4939,9 @@ const getClubMinutesOfDay = () => {
 // runs in a different timezone (or because Date parsing of YYYY-MM-DD
 // drifts into the previous day).
 const isEventStarted = (event) => {
+  // An explicit "Start Event" wins, so an event can begin ahead of
+  // schedule without rewriting the time players were told.
+  if (event.startedAt) return true
   if (!event.date) return false
   const today = getClubDate()
   if (event.date < today) return true

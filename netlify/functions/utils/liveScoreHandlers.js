@@ -84,6 +84,8 @@ const shiftClubDate = (yyyyMmDd, days) => {
 }
 
 const hasEventStarted = (event) => {
+  // Set by an explicit "Start Event" — see startEvent in eventHandlers.
+  if (event.startedAt) return true
   if (!event.date) return true
   const today = getClubDate()
   if (event.date < today) return true

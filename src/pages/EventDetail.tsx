@@ -600,20 +600,45 @@ const EventHeader = () => {
     }
   }
 
+  const handleStartEvent = async (e?: MouseEvent) => {
+    e?.stopPropagation()
+    e?.preventDefault()
+    if (
+      await customConfirm(
+        'Start this event now? Its matches will join the table queue ahead of the scheduled start time.',
+        { confirmColor: '#27ae60' },
+      )
+    ) {
+      eventDetailActions.startEvent()
+    }
+  }
+
   return (
     <Show when={eventDetailState.data}>
       <div style={titleRowStyle}>
         <h1 style={eventNameStyle}>{eventName()}</h1>
-        <Show when={authState.isSuperAdmin}>
-          <Button
-            onClick={handleResetEvent}
-            color="#e74c3c"
-            size="small"
-            disabled={eventDetailState.resettingEvent}
-          >
-            {eventDetailState.resettingEvent ? 'Resetting...' : 'Reset Event'}
-          </Button>
-        </Show>
+        <div style={titleActionsStyle}>
+          <Show when={authState.isAdmin && eventDetailActions.canStartEvent()}>
+            <Button
+              onClick={handleStartEvent}
+              color="#27ae60"
+              size="small"
+              disabled={eventDetailState.startingEvent}
+            >
+              {eventDetailState.startingEvent ? 'Starting...' : 'Start Event'}
+            </Button>
+          </Show>
+          <Show when={authState.isSuperAdmin}>
+            <Button
+              onClick={handleResetEvent}
+              color="#e74c3c"
+              size="small"
+              disabled={eventDetailState.resettingEvent}
+            >
+              {eventDetailState.resettingEvent ? 'Resetting...' : 'Reset Event'}
+            </Button>
+          </Show>
+        </div>
       </div>
       <div style={dateStyle}>{dateDisplay()}</div>
       <Show when={timeDisplay()}>
@@ -2973,6 +2998,14 @@ const titleRowStyle: JSX.CSSProperties = {
   'align-items': 'center',
   'justify-content': 'space-between',
   gap: '16px',
+}
+
+// Keeps Start and Reset together on the right of the title row.
+const titleActionsStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  gap: '8px',
+  flex: 'none',
 }
 
 const eventNameStyle: JSX.CSSProperties = {

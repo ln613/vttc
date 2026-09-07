@@ -17,6 +17,7 @@ import { subscribeToLiveScoreUpdates, type EventSubscription } from '../utils/pu
 import { createJitteredRefetch } from '../utils/refetch'
 import { eventState, eventActions } from './eventStore'
 import { authState } from './authStore'
+import { isEventStarted } from '../utils/eventTiming'
 import { getProvisionalMatchResult } from '../../shared/rules/matchRules'
 
 export type StageTab = 'group' | 'knockout' | 'bracket'
@@ -47,6 +48,7 @@ interface EventDetailState {
   assigningTableNumber: number | null
   resettingMatchId: string | null
   resettingEvent: boolean
+  startingEvent: boolean
   toastMessage: ToastMessage | null
 }
 
@@ -80,6 +82,7 @@ const getInitialState = (): EventDetailState => ({
   resettingMatchId: null,
   toastMessage: null,
   resettingEvent: false,
+  startingEvent: false,
 })
 
 const [eventDetailState, setEventDetailState] =
@@ -747,6 +750,31 @@ export const eventDetailActions = {
       })
     } finally {
       setEventDetailState({ resettingEvent: false })
+    }
+  },
+
+  // The desk can start an event early, but only once there is something to
+  // start: without groups there are no matches for the queue to pick up.
+  canStartEvent: (): boolean => {
+    const event = eventDetailState.data
+    if (!event) return false
+    return eventDetailActions.hasGroups() && !isEventStarted(event)
+  },
+
+  startEvent: async () => {
+    const { eventId } = eventDetailState
+    if (!eventId) return
+
+    setEventDetailState({ startingEvent: true })
+    try {
+      await apiPost('startEvent', { _id: eventId })
+      await fetchEvent(eventId, false)
+    } catch (err) {
+      setEventDetailState({
+        error: err instanceof Error ? err.message : 'Failed to start event',
+      })
+    } finally {
+      setEventDetailState({ startingEvent: false })
     }
   },
 

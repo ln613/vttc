@@ -32,6 +32,7 @@ import {
   resetTeamMatch,
   resetMatch,
   resetEvent,
+  startEvent,
   deleteEvent,
   setParticipantDefault,
 } from './eventHandlers.js'
@@ -124,6 +125,7 @@ export const apiHandlers = {
     resetTeamMatch: withEventNotify(resetTeamMatch),
     resetMatch: withEventNotify(resetMatch),
     resetEvent: withEventNotify(resetEvent),
+    startEvent: withEventNotify(startEvent),
     deleteEvent: withEventNotify(deleteEvent),
     setParticipantDefault: withEventNotify(setParticipantDefault),
     saveSettings: (body) => saveSettings(body),

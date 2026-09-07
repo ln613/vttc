@@ -25,6 +25,8 @@ export interface EventOption {
   hasSchedule?: boolean
   date: string
   time?: string
+  // Set when the desk starts the event ahead of its scheduled time.
+  startedAt?: string
   paidPlayerIds: string[]
   restriction?: TournamentRestriction
   ratingLimit?: number
