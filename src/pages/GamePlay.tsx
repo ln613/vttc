@@ -1477,6 +1477,24 @@ const TeamInitBody = (props: { landscape: boolean }) => {
   const allFilled = () =>
     homeSlots().every(Boolean) && awaySlots().every(Boolean)
 
+  // Turn a lineup's slot letters ("A", "AB", "XY") into the names now
+  // sitting in those slots, so the umpire sees the actual pairings rather
+  // than having to translate the letters themselves.
+  const namesForSlots = (side: 'home' | 'away', letters: string): string => {
+    const slots = side === 'home' ? homeSlots() : awaySlots()
+    const players = side === 'home' ? homePlayers() : awayPlayers()
+    const labels: readonly string[] =
+      side === 'home' ? HOME_LABELS : AWAY_LABELS
+    return letters
+      .split('')
+      .map((letter) => {
+        const i = labels.indexOf(letter)
+        const picked = i === -1 ? undefined : playerById(players, slots[i])
+        return picked ? `${picked.firstName} ${picked.lastName}` : letter
+      })
+      .join(' / ')
+  }
+
   const handleSetOrder = async () => {
     if (!allFilled()) return
     // Snapshot the picks BEFORE the first save — fetchEvent inside
@@ -1542,6 +1560,24 @@ const TeamInitBody = (props: { landscape: boolean }) => {
           </For>
         </div>
       </div>
+
+      <Show when={allFilled()}>
+        <div style={teamInitLineupStyle}>
+          <For each={lineup()}>
+            {(e, i) => (
+              <div style={teamInitLineupRowStyle}>
+                <span style={teamInitLineupSlotStyle}>
+                  {i() + 1}. {e.home} vs {e.away}
+                </span>
+                <span style={teamInitLineupNamesStyle}>
+                  {namesForSlots('home', e.home)} vs{' '}
+                  {namesForSlots('away', e.away)}
+                </span>
+              </div>
+            )}
+          </For>
+        </div>
+      </Show>
 
       <div style={initButtonSpacerStyle} />
       <button
@@ -1869,6 +1905,37 @@ const initIconImgStyle = (active: boolean): JSX.CSSProperties => ({
   opacity: active ? 1 : 0.55,
   transition: 'filter 0.15s ease, opacity 0.15s ease',
 })
+
+// The resolved pairings, shown once every slot is filled.
+const teamInitLineupStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '4px',
+  width: '100%',
+  'margin-top': '12px',
+  'padding-top': '10px',
+  'border-top': '1px solid rgba(255,255,255,0.15)',
+}
+
+const teamInitLineupRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'baseline',
+  gap: '10px',
+  'font-size': '14px',
+  'line-height': 1.35,
+}
+
+const teamInitLineupSlotStyle: JSX.CSSProperties = {
+  flex: 'none',
+  'min-width': '76px',
+  'font-weight': 700,
+  color: 'rgba(255,255,255,0.6)',
+}
+
+const teamInitLineupNamesStyle: JSX.CSSProperties = {
+  'font-weight': 600,
+  color: 'rgba(255,255,255,0.92)',
+}
 
 const initButtonSpacerStyle: JSX.CSSProperties = {
   flex: '0 0 24px',
