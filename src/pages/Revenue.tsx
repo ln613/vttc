@@ -1,8 +1,11 @@
 import { Show, For, onMount, type JSX } from 'solid-js'
 import { Header } from '../components/Header'
+import ToggleButton from '../components/ToggleButton'
 import { authState } from '../stores/authStore'
 import {
   revenueActions,
+  revenueOf,
+  registrationFeeOf,
   type RevenueGroup,
   type EventRevenue,
 } from '../stores/revenueStore'
@@ -40,38 +43,63 @@ const EventList = () => (
   </div>
 )
 
+// The header used to be one big button. The Include-unpaid control can't
+// live inside a button, so the collapse affordance is now its own button
+// and the toggle + total sit beside it.
 const SeriesGroup = (props: { group: RevenueGroup }) => (
   <div style={groupStyle}>
-    <button
-      type="button"
-      style={groupHeaderStyle}
-      onClick={() => revenueActions.toggle(props.group.key)}
-    >
-      <span style={groupHeaderLeftStyle}>
-        <span style={caretStyle}>
-          {revenueActions.isCollapsed(props.group.key) ? '▶' : '▼'}
+    <div style={groupHeaderStyle}>
+      <button
+        type="button"
+        style={groupTitleStyle}
+        onClick={() => revenueActions.toggle(props.group.key)}
+      >
+        <span style={groupHeaderLeftStyle}>
+          <span style={caretStyle}>
+            {revenueActions.isCollapsed(props.group.key) ? '▶' : '▼'}
+          </span>
+          {props.group.series}
         </span>
-        {props.group.series}
+      </button>
+      <span style={groupHeaderRightStyle}>
+        <IncludeUnpaidToggle group={props.group} />
+        <span style={groupTotalStyle}>{money(props.group.totalRevenue)}</span>
       </span>
-      <span style={groupTotalStyle}>{money(props.group.totalRevenue)}</span>
-    </button>
+    </div>
     <Show when={!revenueActions.isCollapsed(props.group.key)}>
       <div style={groupBodyStyle}>
         <For each={props.group.events}>
-          {(event) => <EventRow event={event} />}
+          {(event) => <EventRow event={event} groupKey={props.group.key} />}
         </For>
       </div>
     </Show>
   </div>
 )
 
+// Hidden when every player has paid — there would be nothing to add.
+const IncludeUnpaidToggle = (props: { group: RevenueGroup }) => (
+  <Show when={props.group.unpaidCount > 0}>
+    <span
+      title={`${props.group.unpaidCount} player(s) have not paid — count their registration fee anyway`}
+    >
+      <ToggleButton
+        label="Include unpaid"
+        value={revenueActions.includesUnpaid(props.group.key)}
+        onChange={(v) => revenueActions.setIncludeUnpaid(props.group.key, v)}
+      />
+    </span>
+  </Show>
+)
+
 const StandaloneEvent = (props: { group: RevenueGroup }) => (
   <div style={groupStyle}>
-    <EventRow event={props.group.events[0]} />
+    <EventRow event={props.group.events[0]} groupKey={props.group.key} />
   </div>
 )
 
-const EventRow = (props: { event: EventRevenue }) => (
+const EventRow = (props: { event: EventRevenue; groupKey: string }) => {
+  const withUnpaid = () => revenueActions.includesUnpaid(props.groupKey)
+  return (
   <div style={eventRowStyle}>
     <div style={eventHeadStyle}>
       <span style={eventNameStyle}>{props.event.eventName}</span>
@@ -89,12 +117,20 @@ const EventRow = (props: { event: EventRevenue }) => (
     </div>
     <div style={eventFiguresStyle}>
       <Figure label="Participants" value={String(props.event.participantCount)} />
-      <Figure label="Registration Fee" value={money(props.event.registrationFee)} />
+      <Figure
+        label="Registration Fee"
+        value={money(registrationFeeOf(props.event, withUnpaid()))}
+      />
       <Figure label="Prize" value={money(props.event.prize)} />
-      <Figure label="Revenue" value={money(props.event.revenue)} strong />
+      <Figure
+        label="Revenue"
+        value={money(revenueOf(props.event, withUnpaid()))}
+        strong
+      />
     </div>
   </div>
-)
+  )
+}
 
 const Figure = (props: { label: string; value: string; strong?: boolean }) => (
   <div style={figureStyle}>
@@ -148,12 +184,33 @@ const groupHeaderStyle: JSX.CSSProperties = {
   gap: '12px',
   padding: '14px 18px',
   background: '#f0f3f7',
-  border: 'none',
-  cursor: 'pointer',
+  'box-sizing': 'border-box',
   'font-size': '16px',
   'font-weight': 700,
   color: '#2c3e50',
   'text-align': 'left',
+}
+
+// Carries the collapse click; styled to disappear into the header.
+const groupTitleStyle: JSX.CSSProperties = {
+  flex: '1 1 auto',
+  'min-width': 0,
+  display: 'flex',
+  'align-items': 'center',
+  padding: 0,
+  background: 'none',
+  border: 'none',
+  cursor: 'pointer',
+  font: 'inherit',
+  color: 'inherit',
+  'text-align': 'left',
+}
+
+const groupHeaderRightStyle: JSX.CSSProperties = {
+  display: 'inline-flex',
+  'align-items': 'center',
+  gap: '12px',
+  flex: 'none',
 }
 
 const groupHeaderLeftStyle: JSX.CSSProperties = {

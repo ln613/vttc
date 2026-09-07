@@ -98,12 +98,29 @@ const collectFeePayingPlayerIds = (event) => {
   return { ids: paid, provisional: true }
 }
 
+// Hosts play for free, so they never contribute a registration fee.
+const countPayingPlayers = (ids, hostIds) => {
+  let n = 0
+  for (const id of ids) if (!hostIds.has(id)) n++
+  return n
+}
+
 const computeEventRevenue = (event, hostIds) => {
   const { ids, provisional } = collectFeePayingPlayerIds(event)
-  let payingPlayers = 0
-  for (const id of ids) if (!hostIds.has(id)) payingPlayers++
 
-  const registrationFee = round2(payingPlayers * getPerPlayerFee(event))
+  // The "include unpaid" view adds everyone on the roster who isn't already
+  // counted. Before the draw that is the players who have yet to pay; after
+  // it, the registrants who were left out of the draw *because* they hadn't
+  // paid (getParticipantDisqualifyReason drops them). Union rather than
+  // replace, so a scheduled player who has since left the roster is kept.
+  const withUnpaid = new Set([...ids, ...collectRegisteredPlayerIds(event)])
+
+  const perPlayerFee = getPerPlayerFee(event)
+  const paying = countPayingPlayers(ids, hostIds)
+  const payingWithUnpaid = countPayingPlayers(withUnpaid, hostIds)
+
+  const registrationFee = round2(paying * perPlayerFee)
+  const registrationFeeWithUnpaid = round2(payingWithUnpaid * perPlayerFee)
   const prize = getTotalPrize(event)
   return {
     _id: event._id.toString(),
@@ -112,8 +129,11 @@ const computeEventRevenue = (event, hostIds) => {
     eventSeries: event.eventSeries || null,
     participantCount: (event.participants || []).length,
     registrationFee,
+    registrationFeeWithUnpaid,
     prize,
     revenue: round2(registrationFee - prize),
+    revenueWithUnpaid: round2(registrationFeeWithUnpaid - prize),
+    unpaidCount: payingWithUnpaid - paying,
     provisional,
   }
 }

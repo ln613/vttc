@@ -11,6 +11,11 @@ export interface EventRevenue {
   registrationFee: number
   prize: number
   revenue: number
+  // The same figures with players who haven't paid counted as if they had.
+  registrationFeeWithUnpaid: number
+  revenueWithUnpaid: number
+  // How many paying players the "with unpaid" figures add.
+  unpaidCount: number
   // True while the event has no draw yet: the fee is counted from who has
   // paid so far, so entries still arriving will change it.
   provisional?: boolean
@@ -22,6 +27,9 @@ export interface RevenueGroup {
   series: string | null
   date: string // series → earliest event date; standalone → the event date
   totalRevenue: number
+  // Unpaid players across the group, so the toggle can be hidden when
+  // there is nothing for it to add.
+  unpaidCount: number
   events: EventRevenue[]
 }
 
@@ -30,6 +38,8 @@ interface RevenueState {
   loading: boolean
   error: string | null
   collapsed: Record<string, boolean>
+  // Per group key: count players who haven't paid as if they had.
+  includeUnpaid: Record<string, boolean>
 }
 
 const getInitialState = (): RevenueState => ({
@@ -37,6 +47,7 @@ const getInitialState = (): RevenueState => ({
   loading: false,
   error: null,
   collapsed: {},
+  includeUnpaid: {},
 })
 
 const [revenueState, setRevenueState] = createStore<RevenueState>(
@@ -52,6 +63,19 @@ const round2 = (n: number): number => Math.round(n * 100) / 100
 const byDateDesc = <T extends { date: string }>(a: T, b: T): number =>
   a.date < b.date ? 1 : a.date > b.date ? -1 : 0
 
+// Which revenue figure a row contributes, given the group's toggle.
+export const revenueOf = (event: EventRevenue, includeUnpaid: boolean): number =>
+  includeUnpaid ? event.revenueWithUnpaid : event.revenue
+
+export const registrationFeeOf = (
+  event: EventRevenue,
+  includeUnpaid: boolean,
+): number =>
+  includeUnpaid ? event.registrationFeeWithUnpaid : event.registrationFee
+
+const sumUnpaid = (events: EventRevenue[]): number =>
+  events.reduce((sum, e) => sum + (e.unpaidCount || 0), 0)
+
 const buildSeriesGroup = (
   seriesName: string,
   events: EventRevenue[],
@@ -61,22 +85,31 @@ const buildSeriesGroup = (
     (min, e) => (e.date < min ? e.date : min),
     events[0].date,
   )
+  const key = `series:${seriesName}`
+  const includeUnpaid = !!revenueState.includeUnpaid[key]
   return {
-    key: `series:${seriesName}`,
+    key,
     series: seriesName,
     date: earliest,
-    totalRevenue: round2(sorted.reduce((sum, e) => sum + e.revenue, 0)),
+    totalRevenue: round2(
+      sorted.reduce((sum, e) => sum + revenueOf(e, includeUnpaid), 0),
+    ),
+    unpaidCount: sumUnpaid(sorted),
     events: sorted,
   }
 }
 
-const buildStandaloneGroup = (event: EventRevenue): RevenueGroup => ({
-  key: `event:${event._id}`,
-  series: null,
-  date: event.date,
-  totalRevenue: event.revenue,
-  events: [event],
-})
+const buildStandaloneGroup = (event: EventRevenue): RevenueGroup => {
+  const key = `event:${event._id}`
+  return {
+    key,
+    series: null,
+    date: event.date,
+    totalRevenue: revenueOf(event, !!revenueState.includeUnpaid[key]),
+    unpaidCount: event.unpaidCount || 0,
+    events: [event],
+  }
+}
 
 export const revenueActions = {
   init: async () => {
@@ -115,4 +148,9 @@ export const revenueActions = {
   toggle: (key: string) => setRevenueState('collapsed', key, (c) => !c),
 
   isCollapsed: (key: string): boolean => !!revenueState.collapsed[key],
+
+  setIncludeUnpaid: (key: string, value: boolean) =>
+    setRevenueState('includeUnpaid', key, value),
+
+  includesUnpaid: (key: string): boolean => !!revenueState.includeUnpaid[key],
 }
