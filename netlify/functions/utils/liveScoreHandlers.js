@@ -754,7 +754,12 @@ export const getLiveScore = async (params = {}) => {
 
   // Load persisted table state
   const savedState = await loadTableState()
-  let tables = savedState?.tables || createInitialTables()
+  // An empty array is truthy, so `|| createInitialTables()` would keep it and
+  // leave the club with zero tables — every match queued, none ever assigned,
+  // and no error anywhere. Treat empty as "not initialised".
+  let tables = savedState?.tables?.length
+    ? savedState.tables
+    : createInitialTables()
 
   // Reconcile: remove finished assignments and refresh match data on assigned tables
   tables = reconcileTableAssignments(tables, allMatchItems)
@@ -1086,7 +1091,7 @@ export const assignMatchToTable = async (body) => {
   if (!item) throwError('Match not found in the current queue')
 
   const state = await loadTableState()
-  const tables = state?.tables || createInitialTables()
+  const tables = state?.tables?.length ? state.tables : createInitialTables()
   const targetIndex = tables.findIndex(
     (t) => t.tableNumber === body.tableNumber,
   )
@@ -1230,7 +1235,12 @@ export const rebuildMatchQueue = async () => {
   const matchQueue = buildMatchQueue(allMatchItems)
 
   const savedState = await loadTableState()
-  let tables = savedState?.tables || createInitialTables()
+  // An empty array is truthy, so `|| createInitialTables()` would keep it and
+  // leave the club with zero tables — every match queued, none ever assigned,
+  // and no error anywhere. Treat empty as "not initialised".
+  let tables = savedState?.tables?.length
+    ? savedState.tables
+    : createInitialTables()
 
   // Reconcile
   tables = reconcileTableAssignments(tables, allMatchItems)
