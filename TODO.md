@@ -81,6 +81,30 @@ Still open: authorisation is role-level, not object-level. A signed-in
 player can call `updateProfile` or `changePassword` — nothing yet checks
 that the id in the body is *their own*. Worth a pass.
 
+### Take reset out of the Game Play menu, then make `resetMatch` ADMIN
+
+The menu (`src/pages/GamePlay.tsx`, the dropdown around line 528) offers
+**Reset Game** and **Reset Match** to whoever is umpiring — which includes
+a player umpiring their own match. Reset Game is client-side only, but
+Reset Match calls `resetWholeMatch`, which posts `resetMatch` and wipes the
+result server-side.
+
+That is the only reason `resetMatch` is classified USER in
+`accessPolicy.js`. Resetting is otherwise an admin action: the same control
+on the Event Detail match row is gated behind `authState.isAdmin`, so today
+the same operation needs an admin from one screen and nobody in particular
+from another.
+
+Two steps, in order:
+
+1. Remove both reset items from the Game Play menu, leaving Exit. Admins
+   keep the reset controls they already have on the Event Detail row.
+2. Change `resetMatch` from `USER` to `ADMIN` in `accessPolicy.js`.
+
+Doing them the other way round would leave a menu item that fails for
+every non-admin umpire. Check whether anything else reaches
+`resetWholeMatch` or `resetCurrentGame` before removing them.
+
 ### `dateOfBirth` still ships in event payloads
 
 By design it stays *stored* — the age limits on registration and on the
