@@ -4,6 +4,21 @@ Deferred optimizations and the measurements behind them, so none of this has
 to be re-derived. Everything here was investigated in September 2026 while
 tuning for a busy tournament day.
 
+**Start with "Real tournament day — measured 2026-09-07".** It is the only
+section based on a real event; the load-test projections that precede it in
+date order were wrong by more than 10×, and are kept only to show how.
+
+Three things worth carrying into any future work here:
+
+1. **On this cluster, cost is bytes.** Reads move at ~95 KB/s regardless of
+   index or client. Every expensive endpoint found so far was expensive for
+   that one reason, and the fix was always to fetch less — never to index.
+2. **Time endpoints individually; never average across requests.** A flat
+   "credits per 1,000 requests" rate hid a single endpoint that cost 10 s a
+   call and turned out to be the entire compute bill.
+3. **Deploys still dominate a quiet month; compute dominates a busy day.**
+   Check which kind of month it is before optimizing anything.
+
 ---
 
 ## Measured baselines
@@ -26,6 +41,11 @@ Largest single `eventStages` array measured: **275 KB** (U1500 Teams).
 | MongoDB Atlas (shared tier) | **500 connections per node** | Verified on all three nodes: `current + available = 500`. NOT 100, and NOT the 1500 an old code comment claimed. |
 | Pusher Sandbox (free) | **100 concurrent connections**, 200,000 msgs/day | Connections are the binding constraint, not messages. |
 | Netlify Free / Personal | **300 / 1000 credits per month** | |
+| Atlas shared-tier read throughput | **~95 KB/s** | Measured repeatedly, warm, from two networks. THE governing constant: query time is `bytes / 95 KB`, independent of index or client. `explain` on a 9.4 s query reported `millis: 0` — the server finds documents instantly, then crawls delivering them. |
+
+> **On this cluster, cost is bytes, not queries.** An index cannot help a
+> query that already matches on a scan; only fetching fewer bytes helps.
+> Every expensive endpoint found so far was expensive for this one reason.
 
 ### Netlify credit rates
 
@@ -39,6 +59,67 @@ Largest single `eventStages` array measured: **275 KB** (U1500 Teams).
 - 16 participants → 4 groups of 4 → 24 group + 7 knockout = **31 matches per event**
 - 8 events = **248 matches**; counting team sub-matches (mean 4.125 per tie) ≈ **442 table-matches**
 - ~6 broadcast-triggering actions per match ≈ **2,650 broadcasts/day**
+
+---
+
+## Real tournament day — measured 2026-09-07
+
+Nine events, 9:00 AM to midnight. **409 matches played, 15,215 points.**
+This is the ground truth; everything projected before it was optimistic.
+
+### What it cost
+
+| | Delta over the day | Credits |
+| --- | --- | --- |
+| **Compute** | 24.99 GB-Hours | **249.9** |
+| Web requests | +106,703 | 21.3 |
+| Bandwidth | +0.56 GB | 11.2 |
+| Deploys | 2 (one push × 2 sites) | 30.0 |
+| **Total** | | **312.5** |
+
+The month closed at **1,011.9 / 1,000 credits — budget exhausted, production
+deploys blocked** until the cycle reset. Auto-recharge was disabled, so it
+hard-stopped rather than billing on. The site itself stayed up on
+operational credits.
+
+### Predicted vs actual
+
+| | Predicted | Actual |
+| --- | --- | --- |
+| Matches played | 253 | **409** |
+| Netlify requests | 20k–43k | **106,703** |
+| Pusher messages | 29k–68k | ~39,000 ✓ |
+| Pusher peak connections | 60/100 | ~25/100 |
+| Mongo peak connections | ~100/500 | ~230/500 |
+| Credits (traffic only) | 12–25 | **282.5** |
+
+Pusher was right. Everything else was understated, credits by more than 10×.
+
+**Why the estimate failed:** compute was modelled as a flat rate per request,
+averaged over a 47-minute load test with small, still-growing documents and
+warm functions. That average is meaningless when one endpoint costs ten
+seconds a call and documents have grown to 240 KB. Measure per-endpoint
+duration; never average a long tail that is about to become the whole cost.
+
+### Where the compute went
+
+**One endpoint. `getLiveScore` took a measured 10.4 s, warm, to return 458
+bytes** — while `tournaments` on the same site took 0.5 s. Profiling put
+9.4 s of it inside a single `find()`:
+
+```
+   36 ms  countDocuments(date range)       scan only
+   38 ms  find(date range).project(date)   scan + tiny payload
+ 9398 ms  find(date range) FULL            what getStartedEvents did
+22421 ms  find({}) FULL                    whole collection (2.1 MB)
+```
+
+It re-read every started event in full — **889 KB** — on every call, and
+spectators refetch it on every broadcast. At ~10 GB-seconds per call, roughly
+9,000 calls accounts for the entire 25 GB-Hours.
+
+**And by the end of the day 100% of those 889 KB were discarded on arrival**,
+because the queue builder skips completed groups.
 
 ---
 
@@ -64,6 +145,10 @@ sub-matches + 47 dead rubbers, 17,248 points, 0 errors, 0 bricked matches**.
 > under-reported both.
 
 ### Projected cost of one tournament day (50 spectators)
+
+> ⚠️ **These projections were wrong by more than 10×.** Keep them only as a
+> record of how the estimate was built and where it broke. The real numbers
+> are in "Real tournament day" above.
 
 The spectator half was measured with 10 clients and scaled ×5; the scorer
 half excludes the harness's idle-polling overhead (a real tablet fetches an
@@ -93,6 +178,9 @@ day costs about the same as two-thirds of one deploy.** Deploys remain the
 thing to control, not traffic.
 
 ### The one number that matters
+
+> Superseded: this was the biggest item *by bandwidth*, but bandwidth turned
+> out to be a rounding error next to compute. See "Real tournament day".
 
 **`type=events&full=true` was 90% of all bandwidth.** With 8 events in the
 database it grew to **335 KB raw / 23 KB gzipped**, and the Schedule page
@@ -188,6 +276,10 @@ Read preference is `primary` — there are no secondary reads.
 - **Edge caching** for `liveScore` + `events` (`s-maxage=2`). Confirmed working in production (`age:` header present).
 - **Environment-aware Mongo pool** — deployed instances use `maxPoolSize 5 / minPoolSize 1` (was 50/5), ~9× more burst headroom.
 - **Schedule payload trimmed to relevant events** — `events&full=true` now applies the client's own `isEventRelevant` rule server-side (an event ships only if it, or a sibling in its series, has a match on a table or in the queue). **402 KB → 67 KB (83%)** with three events live, and what the page renders is byte-identical. Matters most over time: unfinished events accumulate, and three abandoned ones were already 334 KB of every refetch. Falls back to sending everything when no table state exists.
+- **Live queue served from cache instead of rebuilt** (`getLiveScore`) — the fix for the 2026-09-07 compute bill. `tableState` already persists the computed tables and queue, so reads return it directly; every mutation that can move a match through the queue marks it dirty via `withEventNotify` (`updateGame` is deliberately outside that set — scores don't change queue membership). `computedAt` is stamped with the time the rebuild *started*, so a mutation landing mid-rebuild still reads as newer and forces another. Auto-start is time-driven, so the per-client heartbeat now rebuilds at most once per 30 s instead of once per minute *per client*. **9,701 ms → 167 ms.**
+- **Event triage before fetching** (`getStartedEvents`) — a tiny projection decides "has it started, and can it still produce anything?", then only qualifying documents are pulled in full. `eventIsExhausted` is deliberately pessimistic: no stages, groups not drawn, an incomplete knockout round, or any non-bye knockout match without a confirmed winner all answer false and get fetched, so auto-start still sees everything that might need generating. Verified identical tables/queue against the old implementation at five tournament stages: **9,634 ms → 348 ms** (all finished), **9,583 ms → 1,052 ms** (two events live).
+- **`getRevenue` projected to the fields it reads** — it needs roster ids, never match bodies. Was pulling the whole 2.1 MB collection to compute a handful of sums: **22,559 ms → 1,226 ms**, byte-identical output across all 24 events.
+- **Empty stored table set rebuilds itself** — `savedState?.tables || createInitialTables()` kept an empty array (`[]` is truthy), leaving the club with zero tables: queue fills, nothing is ever assigned, no error anywhere. All three read sites now treat empty as "not initialised".
 - **Targeted `$set` in `updateGame`** — writes only changed paths instead of the whole `eventStages`: **79 KB → 5.1 KB average (18× mean, up to 34×)**. Verified byte-identical across group / knockout / team-sub paths.
 
 ---
@@ -199,7 +291,7 @@ Read preference is `primary` — there are no secondary reads.
 embedded in *every* match's `side1`/`side2` **and** in `participants`. Storing
 player **ids** and joining on read would likely take the doc from ~95 KB to ~15 KB.
 
-- **Gain:** shrinks every read, every write, *and* the 9.1 KB Event Detail refetch. The single highest-leverage change left.
+- **Gain:** shrinks every read, every write, *and* the 9.1 KB Event Detail refetch. Still the highest-leverage change left, and worth more than it looked: at ~95 KB/s every kilobyte removed is ~10 ms off every query that touches the document.
 - **Why deferred:** schema migration touching a lot of code + existing data.
 - **Effort/risk:** high / high.
 
@@ -207,8 +299,8 @@ player **ids** and joining on read would likely take the doc from ~95 KB to ~15 
 Keep in-progress game scores in a small `matchScores` collection keyed by
 `matchId`; merge into the event only on `finishMatch`.
 
-- **Gain:** score saves become ~200-byte upserts — roughly **1000× less I/O** than today.
-- **Why deferred:** Option A (targeted `$set`) already cut writes 18×; this is only needed if score-save load becomes a real bottleneck.
+- **Gain:** score saves become ~200-byte upserts — roughly **1000× less I/O** than today. Also shrinks the event document itself, which is what makes every other read slow (`games` was 46 KB of a 277 KB event).
+- **Why deferred:** Option A (targeted `$set`) already cut writes 18×, and the live-queue cache removed the reads that hurt most. Revisit together with item 1 — they touch the same documents.
 - **Effort/risk:** high / medium.
 
 ### 3. Pusher delta payloads (stop the notify-then-fetch round trip)
@@ -279,9 +371,24 @@ avoiding.
 
 | Signal | Threshold | Action |
 | --- | --- | --- |
+| **Netlify compute credits** | **> 30 in a tournament day** | An endpoint has gone slow. Time them directly — don't average across requests. |
+| Any API endpoint | **> 1 s warm** | It is fetching too many bytes. Check the projection before anything else. |
 | Mongo connections (`npm run db:connections`) | > 350 / 500 | Consider M10 (~1500 connections) |
 | Pusher concurrent connections | > 100 | Sandbox cap — paid plan needed |
 | Netlify credits | > 200 / month | Check deploy count **first** |
+
+**How to time an endpoint** (warm, so cold start isn't the story):
+
+```
+for i in 1 2 3; do
+  curl -s -o /dev/null -w "%{time_total}s\n" \
+    "https://vttc-live.netlify.app/.netlify/functions/api?type=liveScore"
+done
+```
+
+Then bisect server-side: `countDocuments` vs `.project({_id:1})` vs the full
+`find()`. If only the full fetch is slow, it is bytes, and a projection —
+not an index — is the fix.
 
 ---
 
@@ -312,3 +419,22 @@ avoiding.
   driver) stalls at 28/31 because of the best-of mismatch above. Superseded by
   `scripts/load-test.mjs`, which drives the deployed site over HTTP; see
   `npm run load:test`.
+
+- **The load-test harness under-reports.** It counts only its own API calls,
+  so it misses static asset requests entirely (Netlify bills those too), and
+  it never measured per-endpoint duration — which is exactly where the real
+  cost was hiding. Treat its output as a floor, and always cross-check
+  against the vendor dashboards afterwards.
+
+---
+
+## Credit state (2026-09-08)
+
+Billing cycle closed at **1,011.9 / 1,000 credits**. Production deploys are
+blocked; only operational credits remain, which keep published sites online
+but cannot be spent on deploys. Auto-recharge is **disabled**, which is why
+it stopped rather than billing on.
+
+The cycle resets **2026-09-12**. Until then nothing can ship, so queued work
+should be batched into as few pushes as possible — remember one push deploys
+both `vttc-live` and `vttc-live-qa`, at 15 credits each.
