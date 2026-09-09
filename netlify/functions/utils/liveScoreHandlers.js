@@ -59,20 +59,84 @@ const getClubMinutesOfDay = () => {
   return h * 60 + m
 }
 
+// Just enough of an event to decide whether its full document is worth
+// pulling: when it starts, and whether anything is left to schedule or
+// generate.
+const EVENT_TRIAGE_PROJECTION = {
+  date: 1,
+  time: 1,
+  startedAt: 1,
+  'eventStages.type': 1,
+  'eventStages.groups.isComplete': 1,
+  'eventStages.rounds.isComplete': 1,
+  'eventStages.rounds.matches.isBye1': 1,
+  'eventStages.rounds.matches.isBye2': 1,
+  'eventStages.rounds.matches.match.winningSide': 1,
+  'eventStages.rounds.matches.match.confirmed': 1,
+}
+
+// True only when an event can contribute nothing further: no match left to
+// schedule and nothing left to generate. Deliberately pessimistic — every
+// uncertain case (no stages recorded, groups not drawn yet, a knockout
+// round that exists but isn't complete) answers false and gets fetched, so
+// the worst a mistake here can do is cost a read.
+const eventIsExhausted = (event) => {
+  const stages = event.eventStages || []
+  if (!stages.length) return false
+
+  const groupStage = stages.find((s) => s.type === 'group')
+  if (groupStage) {
+    const groups = groupStage.groups || []
+    // Not drawn yet — auto-start may still need to generate it.
+    if (!groups.length) return false
+    if (!groups.every((g) => g.isComplete === true)) return false
+  }
+
+  const knockoutStage = stages.find((s) => s.type === 'knockout')
+  if (knockoutStage) {
+    const rounds = knockoutStage.rounds || []
+    // Bracket not generated yet, or a placeholder round still to fill.
+    if (!rounds.length) return false
+    if (!rounds.every((r) => r.isComplete === true)) return false
+    // Belt and braces: the same test extractKnockoutMatches applies.
+    for (const round of rounds) {
+      for (const km of round.matches || []) {
+        if (km.isBye1 || km.isBye2 || !km.match) continue
+        if (!(km.match.winningSide != null && km.match.confirmed === true)) {
+          return false
+        }
+      }
+    }
+  }
+
+  return true
+}
+
 const getStartedEvents = async () => {
   const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
   const today = getClubDate()
+
   // Only today's started events feed the schedule/queue — once an event's
   // date has passed its unfinished matches drop off the schedule (admins
-  // finalise them from the Event Detail Group/Knockout tabs instead). The
-  // query used to pull yesterday as well and discard it here, which on this
-  // cluster costs roughly a second per 100 KB.
-  const events = await db
-    .collection(EVENTS_COLLECTION)
-    .find({ date: today })
+  // finalise them from the Event Detail Group/Knockout tabs instead).
+  //
+  // Pulling all of today's events in full cost ~900 KB and ~9 s on this
+  // cluster, and most of it was thrown away: events whose start time hasn't
+  // arrived, and completed groups the queue builder skips. Triage on a tiny
+  // projection first, then fetch only the documents that can still produce
+  // something.
+  const triage = await collection
+    .find({ date: today }, { projection: EVENT_TRIAGE_PROJECTION })
     .toArray()
 
-  return events.filter(hasEventStarted)
+  const wanted = triage
+    .filter(hasEventStarted)
+    .filter((e) => !eventIsExhausted(e))
+    .map((e) => e._id)
+
+  if (!wanted.length) return []
+  return collection.find({ _id: { $in: wanted } }).toArray()
 }
 
 const hasEventStarted = (event) => {
