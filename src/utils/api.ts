@@ -55,9 +55,31 @@ const validateType = (type: string) => {
   if (!type) throw new Error('API type is required')
 }
 
+// A 401 means this device is holding a token the server won't accept — an
+// expired one, or one issued before tokens were signed. The stored session
+// is dropped so the app stops believing it is signed in and asks again,
+// instead of silently failing every action. Cleared directly rather than
+// through authStore, which imports this module.
+const AUTH_KEYS = [
+  'vttc_token',
+  'vttc_user',
+  'vttc_isAdmin',
+  'vttc_isSuperAdmin',
+  'vttc_isTablet',
+]
+
+const clearStoredSession = () => {
+  try {
+    for (const key of AUTH_KEYS) localStorage.removeItem(key)
+  } catch {
+    // Storage unavailable — nothing to clear.
+  }
+}
+
 const handleResponse = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
-    const error = await response.json()
+    if (response.status === 401) clearStoredSession()
+    const error = await response.json().catch(() => ({}))
     throw new Error(error.error || 'API request failed')
   }
   return response.json()

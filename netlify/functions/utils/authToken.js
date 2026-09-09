@@ -73,10 +73,20 @@ export const authFromHeaders = (headers = {}) => {
     headers.authorization || headers.Authorization || headers.AUTHORIZATION || ''
   const token = raw.startsWith('Bearer ') ? raw.slice(7).trim() : ''
   const payload = verifyToken(token)
-  if (!payload) return { isAdmin: false, isSuperAdmin: false, playerId: null }
+  if (!payload) {
+    return {
+      isAuthenticated: false,
+      isAdmin: false,
+      isSuperAdmin: false,
+      isTablet: false,
+      playerId: null,
+    }
+  }
   return {
+    isAuthenticated: true,
     isAdmin: !!payload.isAdmin,
     isSuperAdmin: !!payload.isSuperAdmin,
+    isTablet: !!payload.isTablet,
     playerId: payload.playerId || null,
   }
 }

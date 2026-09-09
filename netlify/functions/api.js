@@ -2,6 +2,7 @@ import { connectDB, maybeResetOnError } from './utils/db.js'
 import { apiHandlers } from './utils/handlers.js'
 import { readMetrics, resetMetrics, recordApiCall } from './utils/metrics.js'
 import { authFromHeaders } from './utils/authToken.js'
+import { policyFor, denyReason } from './utils/accessPolicy.js'
 
 // A Pusher broadcast makes every client refetch at once. Letting the CDN
 // answer that burst collapses ~N simultaneous requests into ~1 origin
@@ -63,6 +64,19 @@ export const handler = async (event) => {
     // Who is asking. Unsigned or missing tokens read as anonymous rather
     // than an error, so public reads keep working.
     const auth = authFromHeaders(event.headers || {})
+
+    // Fail closed on an endpoint nobody has classified, so a new handler
+    // can't arrive unprotected by omission.
+    const policy = policyFor(method, type)
+    if (!policy) {
+      console.error(`No access policy for ${method} ${type}`)
+      return createResponse(500, { error: 'Endpoint is not configured' })
+    }
+    const denied = denyReason(policy, auth)
+    if (denied) {
+      return createResponse(denied.status, { error: denied.error })
+    }
+
     const result = await apiHandlers[method][type](
       method === 'post' ? body : params,
       auth,

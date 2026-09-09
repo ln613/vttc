@@ -63,16 +63,23 @@ them.
 Backup of the pre-migration documents, should anything need recovering:
 `~/Desktop/vttc-backups/prod-events-before-trim-20260909T191323Z.json`
 
-### Only one endpoint checks who is calling
+### Endpoint access — done, but read the rollout note
 
-`api.js` now derives an `auth` object from the bearer token and passes it to
-handlers, but **only `type=players` reads it**. Every other endpoint,
-including every write — `finishMatch`, `resetEvent`, `deleteEvent`,
-`saveEvent`, `updateRatings` — still accepts any caller. Admin-ness in the
-UI is a localStorage flag and always has been.
+All 60 endpoints are classified in
+`netlify/functions/utils/accessPolicy.js` as PUBLIC, USER or ADMIN, and
+`api.js` enforces it. An endpoint with no policy is refused outright, so a
+new handler cannot arrive unprotected by omission.
 
-Deciding which endpoints require admin, and enforcing it, is the natural
-next step now that a verifiable token exists.
+**Rollout:** every device must sign in again after this deploys —
+pre-signing tokens cannot verify, and scoring now needs a valid one. The
+client drops its stored session on a 401 so it asks rather than failing
+silently, but a tablet left signed in on the old build will stop being able
+to score until someone signs it in. **Sign in every tablet before the first
+match.**
+
+Still open: authorisation is role-level, not object-level. A signed-in
+player can call `updateProfile` or `changePassword` — nothing yet checks
+that the id in the body is *their own*. Worth a pass.
 
 ### `dateOfBirth` still ships in event payloads
 
