@@ -12,6 +12,7 @@ const getGroupName = (i) => `Group ${getGroupLetter(i)}`
 import { notifyLiveScoreUpdate, notifyMatchReset } from './pusher.js'
 import { getSettings as readGlobalSettings } from './settingsHandlers.js'
 import { getClubTimezone } from './club.js'
+import { sanitizeForOutput, sanitizeForStorage } from './embeddedPlayers.js'
 
 const EVENTS_COLLECTION = 'events'
 const TOURNAMENTS_COLLECTION = 'tournaments'
@@ -229,7 +230,11 @@ export const simulateEvent = async (body) => {
     registrationFee: body.registrationFee,
   })
 
-  const allPlayers = await db.collection('players').find({}).toArray()
+  // Trimmed at the point they are loaded, because everything below embeds
+  // them into the event. See embeddedPlayers.js.
+  const allPlayers = (await db.collection('players').find({}).toArray()).map(
+    sanitizeForStorage,
+  )
   const qualified = allPlayers.filter((p) =>
     meetsSimulationQualification(tournament, p),
   )
@@ -391,9 +396,11 @@ export const getEvents = async (params = {}) => {
       unfinished,
       await getActiveMatchIds(db),
     )
-    return relevant.map((e) => ({ ...e, ...derivedEventFlags(e.eventStages) }))
+    return relevant.map((e) =>
+      sanitizeForOutput({ ...e, ...derivedEventFlags(e.eventStages) }),
+    )
   }
-  return events.map(summarizeEvent)
+  return events.map((e) => sanitizeForOutput(summarizeEvent(e)))
 }
 
 // Every match id in an event, team sub-matches included — the table and
@@ -511,7 +518,10 @@ export const getEvent = async (params) => {
   // Recalculate group stats from match data to ensure ranking table is always accurate
   recalculateGroupStats(event)
 
-  return event
+  // Embedded player snapshots are trimmed on the way out — see
+  // embeddedPlayers.js. Applied on read as well as on write so documents
+  // written before that existed stop leaking immediately.
+  return sanitizeForOutput(event)
 }
 
 const recalculateGroupStats = (event) => {
@@ -550,7 +560,9 @@ export const addParticipant = async (body) => {
   if (!event) throwError('Event not found')
 
   // Get players
-  const players = await playersCollection.find({ _id: { $in: playerIds.map(toObjectId) } }).toArray()
+  const players = (
+    await playersCollection.find({ _id: { $in: playerIds.map(toObjectId) } }).toArray()
+  ).map(sanitizeForStorage)
 
   if (players.length !== playerIds.length) {
     throwError('One or more players not found')
@@ -4630,7 +4642,9 @@ export const getPartialTeams = async (body) => {
   const event = await collection.findOne({ _id: toObjectId(_id) })
   if (!event) throwError('Event not found')
 
-  const player = await playersCollection.findOne({ _id: toObjectId(playerId) })
+  const player = sanitizeForStorage(
+    await playersCollection.findOne({ _id: toObjectId(playerId) }),
+  )
   if (!player) throwError('Player not found')
 
   return buildPartialTeamsList(event, player)
@@ -4723,7 +4737,9 @@ export const registerForEvent = async (body) => {
   const event = await collection.findOne({ _id: toObjectId(_id) })
   if (!event) throwError('Event not found')
 
-  const player = await playersCollection.findOne({ _id: toObjectId(playerId) })
+  const player = sanitizeForStorage(
+    await playersCollection.findOne({ _id: toObjectId(playerId) }),
+  )
   if (!player) throwError('Player not found')
 
   const errors = validateRegisterForEventRules(event, player)

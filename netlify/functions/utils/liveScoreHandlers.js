@@ -1,5 +1,6 @@
 import { getDB, toObjectId } from './db.js'
 import { getClubTimezone, getTableConfig, eventIsInTier } from './club.js'
+import { sanitizeForOutput } from './embeddedPlayers.js'
 import {
   autoGenerateForEvent,
   updateMatchInStages,
@@ -137,6 +138,9 @@ const getStartedEvents = async () => {
     .map((e) => e._id)
 
   if (!wanted.length) return []
+  // NOT sanitised here: these same documents drive auto-generation, which
+  // reads `host` and `dateOfBirth` off the snapshots. The trim happens
+  // where the data leaves — see getLiveScore.
   return collection.find({ _id: { $in: wanted } }).toArray()
 }
 
@@ -1039,12 +1043,14 @@ export const getLiveScore = async (params = {}) => {
     savedState?.groupTableMap,
     savedState?.teamTableMap,
   )
-  await saveTableState(
-    result.tables,
-    result.remainingQueue,
-    result.groupTableMap,
-    { teamTableMap: result.teamTableMap, computedAt },
-  )
+  // Tables and queue are persisted AND served to every client, so the
+  // player snapshots inside them are trimmed before either happens.
+  const publicTables = sanitizeForOutput(result.tables)
+  const publicQueue = sanitizeForOutput(result.remainingQueue)
+  await saveTableState(publicTables, publicQueue, result.groupTableMap, {
+    teamTableMap: result.teamTableMap,
+    computedAt,
+  })
 
   // Notify players of any match that just landed on a table.
   await notifyNewlyAssignedMatches(savedState?.tables, result.tables)
@@ -1052,8 +1058,8 @@ export const getLiveScore = async (params = {}) => {
   const activeSessionMatchIds = await getActiveSessionMatchIds()
 
   return {
-    tables: result.tables,
-    matchQueue: result.remainingQueue,
+    tables: publicTables,
+    matchQueue: publicQueue,
     activeSessionMatchIds,
   }
 }
