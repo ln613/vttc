@@ -62,25 +62,17 @@ const getClubMinutesOfDay = () => {
 const getStartedEvents = async () => {
   const db = getDB()
   const today = getClubDate()
-  const yesterday = shiftClubDate(today, -1)
+  // Only today's started events feed the schedule/queue — once an event's
+  // date has passed its unfinished matches drop off the schedule (admins
+  // finalise them from the Event Detail Group/Knockout tabs instead). The
+  // query used to pull yesterday as well and discard it here, which on this
+  // cluster costs roughly a second per 100 KB.
   const events = await db
     .collection(EVENTS_COLLECTION)
-    .find({ date: { $gte: yesterday, $lte: today } })
+    .find({ date: today })
     .toArray()
 
-  // Only today's started events feed the schedule/queue. Once an event's
-  // date has passed, its unfinished matches drop off the schedule (admins
-  // finalise them from the Event Detail Group/Knockout tabs instead).
-  return events.filter((e) => hasEventStarted(e) && e.date === today)
-}
-
-const shiftClubDate = (yyyyMmDd, days) => {
-  const [y, m, d] = yyyyMmDd.split('-').map(Number)
-  const dt = new Date(y, m - 1, d + days)
-  const yy = dt.getFullYear()
-  const mm = String(dt.getMonth() + 1).padStart(2, '0')
-  const dd = String(dt.getDate()).padStart(2, '0')
-  return `${yy}-${mm}-${dd}`
+  return events.filter(hasEventStarted)
 }
 
 const hasEventStarted = (event) => {
@@ -329,7 +321,7 @@ const loadTableState = async () => {
 /**
  * Save table state to DB
  */
-const saveTableState = async (tables, matchQueue, groupTableMap) => {
+const saveTableState = async (tables, matchQueue, groupTableMap, computedAt) => {
   const db = getDB()
   await db.collection(TABLE_STATE_COLLECTION).updateOne(
     { docId: TABLE_STATE_DOC_ID },
@@ -340,10 +332,45 @@ const saveTableState = async (tables, matchQueue, groupTableMap) => {
         matchQueue,
         groupTableMap: groupTableMap || {},
         updatedAt: new Date().toISOString(),
+        // Stamped with the time the rebuild STARTED, so a mutation landing
+        // mid-rebuild still reads as newer and forces another one.
+        ...(computedAt ? { computedAt } : {}),
       },
     },
     { upsert: true },
   )
+}
+
+// Every mutation that can move a match through the queue calls this, so the
+// next read knows the cached tables/queue are stale. One small document,
+// ~40 ms, against a rebuild that costs seconds.
+export const markQueueDirty = async () => {
+  const db = getDB()
+  await db.collection(TABLE_STATE_COLLECTION).updateOne(
+    { docId: TABLE_STATE_DOC_ID },
+    { $set: { docId: TABLE_STATE_DOC_ID, dirtyAt: new Date().toISOString() } },
+    { upsert: true },
+  )
+}
+
+// The persisted tables/queue stay authoritative while nothing has changed
+// since they were built.
+const cachedStateIsFresh = (state) => {
+  if (!state?.tables?.length || !state.computedAt) return false
+  return !state.dirtyAt || state.dirtyAt <= state.computedAt
+}
+
+// Auto-start is time-driven, not data-driven: it exists to open events once
+// their start time passes. The LiveScore heartbeat asks for it once a
+// minute PER CLIENT, so three admins with the page open used to force three
+// full rebuilds a minute. One rebuild in this window is enough for everyone;
+// a mutation still invalidates the cache immediately, so nothing waits on
+// this floor to become visible.
+const AUTO_START_MIN_INTERVAL_MS = 30_000
+
+const autoStartRanRecently = (state) => {
+  if (!state?.computedAt) return false
+  return Date.now() - Date.parse(state.computedAt) < AUTO_START_MIN_INTERVAL_MS
 }
 
 // ==================== TABLE ASSIGNMENT LOGIC (SERVER-SIDE) ====================
@@ -736,6 +763,25 @@ const pruneGroupTableMap = (map, allItems) => {
  * Get live score data (tables + match queue)
  */
 export const getLiveScore = async (params = {}) => {
+  // Rebuilding the queue means re-reading every started event in full —
+  // ~900 KB on a tournament day, ~9 s on this cluster — and by the end of a
+  // day all of it belongs to completed groups the builder discards.
+  // Spectators refetch this endpoint on every broadcast, so that rebuild
+  // was effectively the whole compute bill. Serve the persisted state
+  // unless a mutation has marked it dirty, or the caller is the admin
+  // heartbeat asking for auto-start.
+  const cached = await loadTableState()
+  const skipRebuild = cachedStateIsFresh(cached)
+    && (!params.runAutoStart || autoStartRanRecently(cached))
+  if (skipRebuild) {
+    return {
+      tables: cached.tables,
+      matchQueue: cached.matchQueue || [],
+      activeSessionMatchIds: await getActiveSessionMatchIds(),
+    }
+  }
+
+  const computedAt = new Date().toISOString()
   let events = await getStartedEvents()
 
   // Auto-generation only runs when the caller opts in (the LiveScore
@@ -752,8 +798,8 @@ export const getLiveScore = async (params = {}) => {
   const allMatchItems = extractAllRemainingMatches(events)
   const matchQueue = buildMatchQueue(allMatchItems)
 
-  // Load persisted table state
-  const savedState = await loadTableState()
+  // Already loaded above for the freshness check.
+  const savedState = cached
   // An empty array is truthy, so `|| createInitialTables()` would keep it and
   // leave the club with zero tables — every match queued, none ever assigned,
   // and no error anywhere. Treat empty as "not initialised".
@@ -779,6 +825,7 @@ export const getLiveScore = async (params = {}) => {
     result.tables,
     result.remainingQueue,
     result.groupTableMap,
+    computedAt,
   )
 
   // Notify players of any match that just landed on a table.

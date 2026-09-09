@@ -52,6 +52,7 @@ import {
   postponeMatch,
   cancelMatch,
   assignMatchToTable,
+  markQueueDirty,
 } from './liveScoreHandlers.js'
 import {
   acquireMatchSession,
@@ -71,6 +72,10 @@ import { notifyLiveScoreUpdate } from './pusher.js'
 const withEventNotify = (fn) => async (body) => {
   const result = await fn(body)
   const eventId = body?._id || result?._id
+  // Any of these can move a match through the queue, so the cached live
+  // tables/queue must be rebuilt on the next read. Awaited (unlike the
+  // broadcast) because the clients this wakes will read straight after.
+  await markQueueDirty()
   // Realtime notifications are best-effort and must never delay (or hang)
   // the response. Fire them without awaiting — Pusher can be slow or
   // unreachable, and triggerSafely already bounds each call. The response

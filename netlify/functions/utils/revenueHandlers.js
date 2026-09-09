@@ -143,9 +143,36 @@ const computeEventRevenue = (event, hostIds) => {
 // excluding hosts, regardless of payment status.
 export const getRevenue = async () => {
   const db = getDB()
+  // Revenue only needs rosters and fees. Fetching whole documents pulled
+  // the entire collection (2.1 MB, ~22 s on this cluster) to compute a
+  // handful of sums; the projection below brings it to ~100 KB.
   const events = await db
     .collection(EVENTS_COLLECTION)
-    .find({ date: { $exists: true } })
+    .find(
+      { date: { $exists: true } },
+      {
+        // Name every field the sums actually read. collectScheduledPlayerIds
+        // wants player ids out of the group/knockout PARTICIPANTS, never the
+        // matches — so the match bodies, games and embedded player details
+        // never have to cross the wire.
+        projection: {
+          eventName: 1,
+          date: 1,
+          eventSeries: 1,
+          type: 1,
+          nop: 1,
+          registrationFee: 1,
+          prizes: 1,
+          paidPlayerIds: 1,
+          'participants.players._id': 1,
+          'eventStages.type': 1,
+          'eventStages.groups.participants.participant.players._id': 1,
+          'eventStages.seedingList.participant.participant.players._id': 1,
+          'eventStages.rounds.matches.participant1.participant.players._id': 1,
+          'eventStages.rounds.matches.participant2.participant.players._id': 1,
+        },
+      },
+    )
     .toArray()
   const hostIds = await getHostPlayerIds(db)
   return events.map((event) => computeEventRevenue(event, hostIds))
