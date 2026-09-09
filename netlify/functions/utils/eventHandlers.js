@@ -356,18 +356,21 @@ export const getEvents = async (params = {}) => {
   }
   const full = params.full === 'true' || params.full === true
 
-  // Summary mode never sends eventStages and only needs the stage
-  // completion flags from it. Project the heavy match/game arrays OUT at
-  // the query level so Atlas never even transfers them to the server —
-  // the lightweight group/round metadata (isComplete, participantCount)
-  // is enough to derive `finished`/`hasSchedule`. Full mode needs the
-  // matches, so no projection there.
+  // Summary mode drops eventStages entirely (see summarizeEvent) — it
+  // survives the query only to derive `finished` and `hasSchedule`, which
+  // read nothing but stage type, group/round counts, isComplete and
+  // participantCount. Everything else in there is fetched and thrown away,
+  // and on this cluster that is about a second per 100 KB. Full mode needs
+  // the matches, so no projection there.
   const options = full
     ? {}
     : {
         projection: {
           'eventStages.groups.matches': 0,
+          'eventStages.groups.participants': 0,
+          'eventStages.advancedParticipants': 0,
           'eventStages.rounds.matches': 0,
+          'eventStages.seedingList': 0,
         },
       }
   const events = await db
