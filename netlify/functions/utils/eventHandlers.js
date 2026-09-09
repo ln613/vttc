@@ -11,6 +11,7 @@ const getGroupLetter = (i) =>
 const getGroupName = (i) => `Group ${getGroupLetter(i)}`
 import { notifyLiveScoreUpdate, notifyMatchReset } from './pusher.js'
 import { getSettings as readGlobalSettings } from './settingsHandlers.js'
+import { getClubTimezone } from './club.js'
 
 const EVENTS_COLLECTION = 'events'
 const TOURNAMENTS_COLLECTION = 'tournaments'
@@ -4912,7 +4913,7 @@ const validateRegisterForEventRules = (event, player) => {
   return errors
 }
 
-const CLUB_TIMEZONE = process.env.CLUB_TIMEZONE || 'America/Vancouver'
+const CLUB_TIMEZONE = getClubTimezone()
 
 const getClubDate = () =>
   new Intl.DateTimeFormat('en-CA', {

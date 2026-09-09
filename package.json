@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "start": "netlify dev",
+    "start": "node scripts/with-club.mjs netlify dev",
     "dev:client": "vite",
-    "build": "vite build",
+    "build": "node scripts/with-club.mjs vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",

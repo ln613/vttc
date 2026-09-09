@@ -7,6 +7,7 @@ import {
   type EventSubscription,
   type TableAssignedNotification,
 } from '../utils/pusher'
+import clubConfig from 'club-config'
 
 // Ask once for OS notification permission (best-effort; browsers may
 // require a user gesture, in which case this no-ops and the in-app toast
@@ -23,7 +24,7 @@ const showOsNotification = (message: string) => {
   if (typeof Notification === 'undefined') return
   if (Notification.permission !== 'granted') return
   try {
-    new Notification('VTTC Live', { body: message })
+    new Notification(clubConfig.appName, { body: message })
   } catch {
     // ignore — the in-app toast already covers delivery
   }

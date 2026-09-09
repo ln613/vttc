@@ -1,4 +1,5 @@
 import { getDB, toObjectId } from './db.js'
+import { getClubTimezone, getTableConfig, eventIsInTier } from './club.js'
 import {
   autoGenerateForEvent,
   updateMatchInStages,
@@ -37,7 +38,7 @@ const throwError = (message) => {
 /**
  * Get all events that have started today
  */
-const CLUB_TIMEZONE = process.env.CLUB_TIMEZONE || 'America/Vancouver'
+const CLUB_TIMEZONE = getClubTimezone()
 
 export const getClubDate = () =>
   new Intl.DateTimeFormat('en-CA', {
@@ -495,14 +496,19 @@ const autoStartRanRecently = (state) => {
 
 // ==================== TABLE ASSIGNMENT LOGIC (SERVER-SIDE) ====================
 
-const ALL_TABLES = [1, 2, 3, 4, 5, 6, 7, 8]
-const TABLE_ORDER = [6, 7, 2, 3, 5, 4, 1, 8]
+// The hall's layout and which tables suit which matches differ per club,
+// so both live in clubs/<slug>/config.json (see clubs/README.md).
+const TABLES = getTableConfig()
+const ALL_TABLES = TABLES.all
+const TABLE_ORDER = TABLES.order
 // Low-tier events: any table, preferring the worse courts first so the
 // better tables stay free for high-level events.
-const LOW_TIER_ORDER = [1, 4, 8, 2, 3, 5, 7, 6]
-// High-tier events: tables 1 and 4 never used; preference follows the
-// general court-condition order.
-const HIGH_TIER_ORDER = [6, 7, 2, 3, 5]
+const LOW_TIER_ORDER = TABLES.lowTierOrder
+// High-tier events: the club's excluded tables are never used; preference
+// follows the general court-condition order.
+const HIGH_TIER_ORDER = TABLES.highTierOrder
+const without = (tables, excluded) =>
+  excluded?.length ? tables.filter((t) => !excluded.includes(t)) : tables
 
 const createInitialTables = () =>
   ALL_TABLES.map((tableNumber) => ({
@@ -510,72 +516,12 @@ const createInitialTables = () =>
     status: 'available',
   }))
 
-/**
- * Check if event is low-tier
- */
-const isLowTierEvent = (event) => {
-  if (
-    event.type === 'Single' &&
-    event.restriction === 'Rated' &&
-    event.ratingLimit != null &&
-    event.ratingLimit <= 1000
-  )
-    return true
-  if (
-    event.type === 'Team' &&
-    event.restriction === 'Rated' &&
-    event.ratingLimit != null &&
-    event.ratingLimit <= 2000
-  )
-    return true
-  if (
-    event.type === 'Single' &&
-    event.restriction === 'Age' &&
-    event.ageLimitType === 'U' &&
-    event.ageLimit != null &&
-    event.ageLimit <= 13
-  )
-    return true
-  return false
-}
+// Which tier an event counts as — the thresholds are club config, since a
+// 1000-rated event is "low" at one club and not at another.
+const isLowTierEvent = (event) => eventIsInTier(event, 'low')
 
-/**
- * Check if event is high-tier
- */
-const isHighTierEvent = (event) => {
-  if (event.type === 'Single' && event.restriction === 'Open') return true
-  if (
-    event.type === 'Single' &&
-    event.restriction === 'Rated' &&
-    event.ratingLimit != null &&
-    event.ratingLimit >= 1500
-  )
-    return true
-  if (
-    event.type === 'Team' &&
-    event.restriction === 'Rated' &&
-    event.ratingLimit != null &&
-    event.ratingLimit >= 2500
-  )
-    return true
-  if (
-    event.type === 'Single' &&
-    event.restriction === 'Age' &&
-    event.ageLimitType === 'U' &&
-    event.ageLimit != null &&
-    event.ageLimit >= 15
-  )
-    return true
-  if (
-    event.type === 'Single' &&
-    event.restriction === 'Age' &&
-    event.ageLimitType === 'O' &&
-    event.ageLimit != null &&
-    event.ageLimit >= 40
-  )
-    return true
-  return false
-}
+const isHighTierEvent = (event) => eventIsInTier(event, 'high')
+
 
 /**
  * Get allowed tables for a match
@@ -590,31 +536,35 @@ const getAllowedTables = (item, availableTables) => {
 
   let allowed = [...availableTables]
 
-  // Rule 1: Table 8 should never be used for knockout matches
+  // Tables the club keeps off knockout matches.
   if (isKnockout) {
-    allowed = allowed.filter((t) => t !== 8)
+    allowed = without(allowed, TABLES.knockoutExcluded)
   }
 
   if (isLow) {
     if (isFinal || isSemifinal) {
-      // Low-tier semifinal/final prefers tables 2 or 3.
-      return sortByOrder(allowed, [2, 3, ...LOW_TIER_ORDER])
+      // A low-tier semifinal/final still gets the club's preferred tables.
+      return sortByOrder(allowed, [
+        ...(TABLES.lowTierBigMatchPreferred || []),
+        ...LOW_TIER_ORDER,
+      ])
     }
     return sortByOrder(allowed, LOW_TIER_ORDER)
   }
 
-  // Rule 3: For non-low-tier events, table 8 not used at all
-  allowed = allowed.filter((t) => t !== 8)
+  // Tables the club reserves for low-tier play only.
+  allowed = without(allowed, TABLES.generalExcluded)
 
   if (isHigh) {
-    // Rule 4: High-tier: no table 1, 4
-    allowed = allowed.filter((t) => t !== 1 && t !== 4)
+    allowed = without(allowed, TABLES.highTierExcluded)
     if (isSemifinal) {
-      allowed = allowed.filter((t) => t !== 5)
+      allowed = without(allowed, TABLES.highTierSemifinalExcluded)
     }
-    if (isFinal) {
-      // Final must be on table 6. If 6 is busy, defer by returning [].
-      return allowed.includes(6) ? [6] : []
+    const finalOnly = TABLES.highTierFinalOnly || []
+    if (isFinal && finalOnly.length) {
+      // The final belongs on one of these; if none is free, defer.
+      const free = finalOnly.filter((t) => allowed.includes(t))
+      return free.length ? free : []
     }
     return sortByOrder(allowed, HIGH_TIER_ORDER)
   }

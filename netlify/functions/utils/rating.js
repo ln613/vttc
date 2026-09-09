@@ -2,10 +2,11 @@
 // Integer ratings; the change depends on the rating gap between winner and
 // loser. Big favourite wins → small change; upset → big change.
 import { getDB, toObjectId } from './db.js'
+import { getClubTimezone } from './club.js'
 
 const PLAYERS_COLLECTION = 'players'
 const EVENTS_COLLECTION = 'events'
-const CLUB_TIMEZONE = process.env.CLUB_TIMEZONE || 'America/Vancouver'
+const CLUB_TIMEZONE = getClubTimezone()
 
 // Format a confirmed timestamp as a YYYY-MM-DD date in the club's timezone.
 // A plain date (no time component) is used as-is so it isn't shifted a day.

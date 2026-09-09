@@ -1,0 +1,120 @@
+{
+  "slug": "vttc",
+  "name": "VTTC",
+  "appName": "VTTC Live",
+  "timezone": "America/Vancouver",
+  "branding": {
+    "bannerUrl": "https://res.cloudinary.com/vttc/image/upload/v1767957616/banner.jpg",
+    "bannerAlt": "VTTC Banner",
+    "contactName": "VTTC",
+    "faviconUrl": "/images/logo.png",
+    "pageTitle": "vttc"
+  },
+  "tables": {
+    "all": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "order": [
+      6,
+      7,
+      2,
+      3,
+      5,
+      4,
+      1,
+      8
+    ],
+    "lowTierOrder": [
+      1,
+      4,
+      8,
+      2,
+      3,
+      5,
+      7,
+      6
+    ],
+    "highTierOrder": [
+      6,
+      7,
+      2,
+      3,
+      5
+    ],
+    "knockoutExcluded": [
+      8
+    ],
+    "generalExcluded": [
+      8
+    ],
+    "highTierExcluded": [
+      1,
+      4
+    ],
+    "highTierSemifinalExcluded": [
+      5
+    ],
+    "highTierFinalOnly": [
+      6
+    ],
+    "lowTierBigMatchPreferred": [
+      2,
+      3
+    ]
+  },
+  "tiers": {
+    "low": [
+      {
+        "type": "Single",
+        "restriction": "Rated",
+        "ratingLimitMax": 1000
+      },
+      {
+        "type": "Team",
+        "restriction": "Rated",
+        "ratingLimitMax": 2000
+      },
+      {
+        "type": "Single",
+        "restriction": "Age",
+        "ageLimitType": "U",
+        "ageLimitMax": 13
+      }
+    ],
+    "high": [
+      {
+        "type": "Single",
+        "restriction": "Open"
+      },
+      {
+        "type": "Single",
+        "restriction": "Rated",
+        "ratingLimitMin": 1500
+      },
+      {
+        "type": "Team",
+        "restriction": "Rated",
+        "ratingLimitMin": 2500
+      },
+      {
+        "type": "Single",
+        "restriction": "Age",
+        "ageLimitType": "U",
+        "ageLimitMin": 15
+      },
+      {
+        "type": "Single",
+        "restriction": "Age",
+        "ageLimitType": "O",
+        "ageLimitMin": 40
+      }
+    ]
+  }
+}

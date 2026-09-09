@@ -41,3 +41,7 @@ ios/node_modules
 ios/.cordova
 
 .load-test-events.json
+
+# per-club secrets
+.env.*
+!.env.example

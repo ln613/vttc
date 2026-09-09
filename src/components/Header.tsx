@@ -13,12 +13,13 @@ import Select from './Select'
 import DatePicker from './DatePicker'
 import PasswordRules from './PasswordRules'
 import { parseLocalDate, formatLocalDate } from '../utils/date'
+import clubConfig from 'club-config'
 
 export const Header = () => (
   <header>
     <img
-      src="https://res.cloudinary.com/vttc/image/upload/v1767957616/banner.jpg"
-      alt="VTTC Banner"
+      src={clubConfig.branding.bannerUrl}
+      alt={clubConfig.branding.bannerAlt}
       style={{ width: '100%', height: 'auto', display: 'block' }}
     />
     <TopBar />
@@ -518,8 +519,8 @@ const AdminRegisterSection = () => (
 const NewPlayerSuccessSection = () => (
   <>
     <div style={infoMsgStyle}>
-      Contact VTTC to get an initial rating before you can register for
-      rating-restricted events.
+      Contact {clubConfig.branding.contactName} to get an initial rating
+      before you can register for rating-restricted events.
     </div>
     <div style={buttonContainerStyle}>
       <Button onClick={signUpActions.dismissNewPlayerSuccess} color="#27ae60">
