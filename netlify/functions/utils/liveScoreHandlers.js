@@ -280,27 +280,19 @@ const countGamesWon = (match) => {
   return { side1, side2 }
 }
 
-// Whether the game now in progress could end the match. A team-mate must
-// not start a match elsewhere while this is true, because the team match
-// may need them as soon as this game finishes.
+// Whether the game now in progress could end the match — i.e. one side is
+// a single game from taking it. A team-mate must not start a match
+// elsewhere while this is true, because the tie may need them as soon as
+// this game finishes.
 //
-//   best of 3: game 1 no; games 2 and 3 yes
-//   best of 5: games 1 and 2 no; game 3 at one-all yes; games 4 and 5 yes
+//   best of 3 (first to 2): game 1 no; game 2 at 1:0 yes; game 3 at 1:1 yes
+//   best of 5 (first to 3): games 1-2 no; game 3 at 1:1 no (2:1 can't end
+//   it) but at 2:0 yes; games 4 and 5 yes
 const isPotentialMatchEndingGame = (match) => {
   const numberOfGames = match?.config?.numberOfGames ?? 3
   const needed = Math.ceil(numberOfGames / 2)
   const { side1, side2 } = countGamesWon(match)
-
-  // Either side is one game from taking the match.
-  if (Math.max(side1, side2) >= needed - 1) return true
-
-  // Best of five at one game all. Winning the third can only make it 2:1,
-  // so this is stricter than the arithmetic requires — it follows the rule
-  // as written, and erring early only costs a team-mate the chance to
-  // start elsewhere, while erring late is what left tables idle.
-  if (numberOfGames === 5 && side1 === 1 && side2 === 1) return true
-
-  return false
+  return Math.max(side1, side2) >= needed - 1
 }
 
 const collectSidePlayerIds = (match) => {
