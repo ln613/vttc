@@ -269,6 +269,52 @@ const extractGroupMatches = (event, eventSummary, items) => {
   }
 }
 
+// Games a side has actually won so far (the in-progress game has no winner).
+const countGamesWon = (match) => {
+  let side1 = 0
+  let side2 = 0
+  for (const g of match?.games || []) {
+    if (g.winningSide === 1) side1++
+    else if (g.winningSide === 2) side2++
+  }
+  return { side1, side2 }
+}
+
+// Whether the game now in progress could end the match. A team-mate must
+// not start a match elsewhere while this is true, because the team match
+// may need them as soon as this game finishes.
+//
+//   best of 3: game 1 no; games 2 and 3 yes
+//   best of 5: games 1 and 2 no; game 3 at one-all yes; games 4 and 5 yes
+const isPotentialMatchEndingGame = (match) => {
+  const numberOfGames = match?.config?.numberOfGames ?? 3
+  const needed = Math.ceil(numberOfGames / 2)
+  const { side1, side2 } = countGamesWon(match)
+
+  // Either side is one game from taking the match.
+  if (Math.max(side1, side2) >= needed - 1) return true
+
+  // Best of five at one game all. Winning the third can only make it 2:1,
+  // so this is stricter than the arithmetic requires — it follows the rule
+  // as written, and erring early only costs a team-mate the chance to
+  // start elsewhere, while erring late is what left tables idle.
+  if (numberOfGames === 5 && side1 === 1 && side2 === 1) return true
+
+  return false
+}
+
+const collectSidePlayerIds = (match) => {
+  const ids = []
+  for (const p of match?.side1 || []) if (p?._id) ids.push(p._id.toString())
+  for (const p of match?.side2 || []) if (p?._id) ids.push(p._id.toString())
+  return ids
+}
+
+// A sub-match is still to be played (in order) unless it is done, cancelled
+// as a dead rubber, or explicitly postponed by an admin.
+const subMatchIsPending = (sub) =>
+  !isMatchFinishedAndConfirmed(sub) && !sub.cancelledAt && !isMatchPostponed(sub)
+
 const pushTeamSubMatchItems = (parent, items, ctx) => {
   const parentSummary = {
     _id: parent._id,
@@ -281,12 +327,23 @@ const pushTeamSubMatchItems = (parent, items, ctx) => {
     side1Assignment: parent.side1Assignment,
     side2Assignment: parent.side2Assignment,
   }
-  parent.subMatches.forEach((sub, idx) => {
-    if (isMatchFinishedAndConfirmed(sub)) return
-    if (isMatchPostponed(sub)) return
-    // Sub-matches cancelled because the team match has already been
-    // decided are removed from the queue entirely.
-    if (sub.cancelledAt) return
+  // A team match is played in order, one sub-match at a time, so only the
+  // next pending sub-match is ever queued. Queueing them all let the table
+  // assigner pick whichever sub-match happened to have two free players,
+  // which is how a tie jumped from sub-match 1 straight to sub-match 4.
+  const pending = parent.subMatches
+    .map((sub, idx) => ({ sub, idx }))
+    .filter(({ sub }) => subMatchIsPending(sub))
+  const current = pending[0]
+  if (!current) return
+
+  // The sub-match after this one decides whether its players may start
+  // somewhere else in the meantime (see isPotentialMatchEndingGame).
+  const nextSubPlayerIds = pending[1]
+    ? collectSidePlayerIds(pending[1].sub)
+    : []
+
+  ;[current].forEach(({ sub, idx }) => {
     items.push({
       matchId: sub._id,
       eventId: ctx.eventId,
@@ -304,6 +361,7 @@ const pushTeamSubMatchItems = (parent, items, ctx) => {
       lockedTableNumber: sub.lockedTableNumber,
       parentMatchId: parent._id,
       subMatchIndex: idx,
+      nextSubPlayerIds,
       parent: parentSummary,
     })
   })
@@ -385,7 +443,12 @@ const loadTableState = async () => {
 /**
  * Save table state to DB
  */
-const saveTableState = async (tables, matchQueue, groupTableMap, computedAt) => {
+const saveTableState = async (
+  tables,
+  matchQueue,
+  groupTableMap,
+  { teamTableMap, computedAt } = {},
+) => {
   const db = getDB()
   await db.collection(TABLE_STATE_COLLECTION).updateOne(
     { docId: TABLE_STATE_DOC_ID },
@@ -395,6 +458,7 @@ const saveTableState = async (tables, matchQueue, groupTableMap, computedAt) => 
         tables,
         matchQueue,
         groupTableMap: groupTableMap || {},
+        teamTableMap: teamTableMap || {},
         updatedAt: new Date().toISOString(),
         // Stamped with the time the rebuild STARTED, so a mutation landing
         // mid-rebuild still reads as newer and forces another one.
@@ -683,12 +747,63 @@ const hasPlayerConflict = (item, playersOnTables) => {
 /**
  * Assign tables to matches from the queue
  */
-const assignTablesToMatches = (tables, queue, allItems, groupTableMap) => {
+// Which table each live team match owns. The tie keeps it for its whole
+// run, so when one sub-match ends and the next can't start yet the table is
+// held empty rather than handed to someone else.
+const pruneTeamTableMap = (map, allItems) => {
+  const liveTeams = new Set()
+  for (const it of allItems) {
+    if (it.parentMatchId) liveTeams.add(it.parentMatchId.toString())
+  }
+  const next = {}
+  for (const [key, val] of Object.entries(map)) {
+    if (liveTeams.has(key)) next[key] = val
+  }
+  return next
+}
+
+// Players a live team match may need the moment its current game ends.
+// Only collected while that game could actually end the sub-match — before
+// then the team-mate has slack and is free to play elsewhere.
+//
+// Read from every live item rather than from the tables: a sub-match that
+// is mid-game but momentarily unassigned still holds its team-mate, and
+// taking it from the tables alone also made the answer depend on whether
+// the tie happened to be processed before or after the other match.
+const collectTeamHeldPlayerIds = (items) => {
+  const held = new Set()
+  for (const item of items) {
+    if (!item.parentMatchId) continue
+    if (!isPotentialMatchEndingGame(item.match)) continue
+    for (const id of item.nextSubPlayerIds || []) held.add(id)
+  }
+  return held
+}
+
+// Rule: a player in a team match may start elsewhere only if they are not
+// in the current sub-match (already covered by playersOnTables) AND either
+// not in the next sub-match, or that sub-match cannot end this game.
+const hasTeamHoldConflict = (item, heldPlayerIds) => {
+  if (!heldPlayerIds.size) return false
+  // A team's own sub-matches are exempt — they are what the hold is for.
+  if (item.parentMatchId) return false
+  return collectSidePlayerIds(item.match).some((id) => heldPlayerIds.has(id))
+}
+
+const assignTablesToMatches = (
+  tables,
+  queue,
+  allItems,
+  groupTableMap,
+  teamTableMap,
+) => {
   const updatedTables = tables.map((t) => ({ ...t }))
   const remainingQueue = []
   const playersOnTables = getPlayersOnTables(updatedTables)
   const assignedGroupKeys = new Set()
   const updatedGroupTableMap = pruneGroupTableMap(groupTableMap || {}, allItems)
+  const updatedTeamTableMap = pruneTeamTableMap(teamTableMap || {}, allItems)
+  const heldPlayerIds = collectTeamHeldPlayerIds(allItems)
 
   for (const item of queue) {
     const isGroupOfThree = item.groupKey && item.groupSize === 3
@@ -706,16 +821,29 @@ const assignTablesToMatches = (tables, queue, allItems, groupTableMap) => {
       remainingQueue.push(item)
       continue
     }
+    // A team-mate needed for the next sub-match can't be sent elsewhere
+    // while the current one is a game from finishing.
+    if (hasTeamHoldConflict(item, heldPlayerIds)) {
+      remainingQueue.push(item)
+      continue
+    }
 
     // Tables reserved for other groups of 3 are off-limits to this item.
     const myLockedTable = isGroupOfThree
       ? updatedGroupTableMap[item.groupKey]
       : undefined
-    const reservedForOthers = new Set(
-      Object.entries(updatedGroupTableMap)
+    const myParentId = item.parentMatchId?.toString()
+    const myTeamTable = myParentId ? updatedTeamTableMap[myParentId] : undefined
+    const reservedForOthers = new Set([
+      ...Object.entries(updatedGroupTableMap)
         .filter(([key]) => key !== item.groupKey)
         .map(([, table]) => table),
-    )
+      // Tables held by other live team matches, including one sitting empty
+      // between sub-matches while it waits for a player.
+      ...Object.entries(updatedTeamTableMap)
+        .filter(([key]) => key !== myParentId)
+        .map(([, table]) => table),
+    ])
 
     // Tables locked by sub-matches of an expanded team match are
     // off-limits to anyone whose lockedTableNumber doesn't match.
@@ -753,6 +881,7 @@ const assignTablesToMatches = (tables, queue, allItems, groupTableMap) => {
         match: { ...item, tableNumber },
         status: 'assigned',
       }
+      if (myParentId) updatedTeamTableMap[myParentId] = tableNumber
       const match = item.match
       if (match) {
         for (const p of match.side1 || []) playersOnTables.add(p._id?.toString())
@@ -767,8 +896,17 @@ const assignTablesToMatches = (tables, queue, allItems, groupTableMap) => {
       continue
     }
 
-    // Group of 3 must reuse the table the group was first assigned to.
+    // A team match stays on the table it started on.
     let tableNumber = allowedTables[0]
+    if (myTeamTable != null) {
+      if (!allowedTables.includes(myTeamTable)) {
+        // Its table is busy: wait for it rather than move the tie.
+        remainingQueue.push(item)
+        continue
+      }
+      tableNumber = myTeamTable
+    }
+    // Group of 3 must reuse the table the group was first assigned to.
     if (isGroupOfThree && myLockedTable != null) {
       if (!allowedTables.includes(myLockedTable)) {
         // The group's table is currently busy (or not allowed). Defer.
@@ -799,12 +937,14 @@ const assignTablesToMatches = (tables, queue, allItems, groupTableMap) => {
       assignedGroupKeys.add(item.groupKey)
       updatedGroupTableMap[item.groupKey] = tableNumber
     }
+    if (myParentId) updatedTeamTableMap[myParentId] = tableNumber
   }
 
   return {
     tables: updatedTables,
     remainingQueue,
     groupTableMap: updatedGroupTableMap,
+    teamTableMap: updatedTeamTableMap,
   }
 }
 
@@ -884,12 +1024,13 @@ export const getLiveScore = async (params = {}) => {
     unassignedQueue,
     allMatchItems,
     savedState?.groupTableMap,
+    savedState?.teamTableMap,
   )
   await saveTableState(
     result.tables,
     result.remainingQueue,
     result.groupTableMap,
-    computedAt,
+    { teamTableMap: result.teamTableMap, computedAt },
   )
 
   // Notify players of any match that just landed on a table.
@@ -1231,6 +1372,7 @@ export const assignMatchToTable = async (body) => {
     updatedTables,
     remainingQueue,
     state?.groupTableMap,
+    { teamTableMap: state?.teamTableMap },
   )
 
   // Notify the assigned match's players (this is the only new assignment).
@@ -1336,6 +1478,7 @@ const freeTableForMatch = async (matchId) => {
       tables,
       state.matchQueue || [],
       state.groupTableMap,
+      { teamTableMap: state.teamTableMap },
     )
   }
 }
@@ -1366,11 +1509,13 @@ export const rebuildMatchQueue = async () => {
     unassignedQueue,
     allMatchItems,
     savedState?.groupTableMap,
+    savedState?.teamTableMap,
   )
   await saveTableState(
     result.tables,
     result.remainingQueue,
     result.groupTableMap,
+    { teamTableMap: result.teamTableMap },
   )
 
   // Notify players of any match that just landed on a table.
