@@ -17,7 +17,7 @@ The Vite client picks the API host as:
 
 | Build | Host source |
 | --- | --- |
-| `npm run dev:client` / `npm start` | `http://<page-host>:8888` (netlify dev) |
+| `npm run dev:client` / `npm start` | `http://<page-host>:7004` (netlify dev) |
 | Production web build with no env  | same origin (`''`) |
 | Production web build with env     | `VITE_PROD_HOST` |
 

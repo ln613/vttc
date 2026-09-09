@@ -76,7 +76,7 @@ if (isNetlifyDev) {
 
 console.log(
   `club: ${club}` +
-    (isNetlifyDev ? `  (api ${apiPort || 8888}, vite ${vitePort || 7344})` : ''),
+    (isNetlifyDev ? `  (api ${apiPort || 7004}, vite ${vitePort || 7344})` : ''),
 )
 const child = spawn(argv[0], argv.slice(1), { stdio: 'inherit', env: process.env })
 child.on('exit', (code, signal) => process.exit(signal ? 1 : (code ?? 0)))

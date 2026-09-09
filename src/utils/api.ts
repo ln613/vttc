@@ -1,7 +1,7 @@
 // Port `netlify dev` serves the functions on. Configurable because two
-// clubs can't both take 8888 — scripts/with-club.mjs passes the same value
+// clubs can't both take 7004 — scripts/with-club.mjs passes the same value
 // through to the CLI, so the two can't drift apart.
-const DEV_API_PORT = import.meta.env.VITE_DEV_API_PORT || '8888'
+const DEV_API_PORT = import.meta.env.VITE_DEV_API_PORT || '7004'
 
 // In dev → point at the local netlify dev server.
 // In a Cordova/APK build (no real origin) → use VITE_PROD_HOST so the
