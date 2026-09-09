@@ -3580,6 +3580,10 @@ export const updateGame = async (body) => {
   let matchFound = false
   let updatedStages = [...event.eventStages]
   let match = null
+  // The match AFTER this score is applied. The cached live-score state
+  // embeds a copy of each match on a table, so it has to be given the new
+  // score — see syncCachedMatch.
+  let savedMatch = null
   let numberOfGames = 0
   // Score saves fire every few seconds per active table. Rewriting the whole
   // eventStages array (~95KB) each time is the single heaviest write in the
@@ -3598,6 +3602,7 @@ export const updateGame = async (body) => {
   if (subResult) {
     matchFound = true
     match = subResult.match
+    savedMatch = subResult.match // already the updated sub-match
     numberOfGames = subResult.numberOfGames
     if (subResult.target) setOps = { [subResult.target.path]: subResult.target.value }
   }
@@ -3622,6 +3627,7 @@ export const updateGame = async (body) => {
 
         // Update match with new game score
         const updatedMatch = updateMatchWithGameScore(match, gameNumber, score, lastScoredSide)
+        savedMatch = updatedMatch
 
         // Update group stats
         const updatedGroup = updateGroupAfterMatch(group, updatedMatch, matchIndex)
@@ -3679,6 +3685,7 @@ export const updateGame = async (body) => {
 
           // Update match with new game score
           const updatedMatch = updateMatchWithGameScore(match, gameNumber, score, lastScoredSide)
+          savedMatch = updatedMatch
           const knockoutMatch = round.matches[matchIndex]
           const winner =
             updatedMatch.winningSide === 1
@@ -3734,8 +3741,9 @@ export const updateGame = async (body) => {
   )
 
   // Reported so the caller can decide whether this score change is worth a
-  // broadcast — see the updateGame entry in handlers.js.
-  return { success: true, simulated: !!event.simulated }
+  // broadcast, and can refresh the cached live-score copy of the match.
+  // handlers.js strips `match` before the response goes out.
+  return { success: true, simulated: !!event.simulated, match: savedMatch }
 }
 
 const validateUpdateGameInput = (body) => {

@@ -466,6 +466,36 @@ const saveTableState = async (
   )
 }
 
+// A score save doesn't move anything through the queue, so it doesn't make
+// the cached state stale — except that the cached tables embed a copy of
+// each match, score and all. Without refreshing that copy the Live Score
+// page keeps showing the score from the last full rebuild, which is what a
+// spectator would see freeze mid-game.
+//
+// Patched in place rather than marking the state dirty: a rebuild re-reads
+// every live event, and one per point is exactly the cost the cache exists
+// to avoid. This is a single small document write.
+export const syncCachedMatch = async (match) => {
+  if (!match?._id) return
+  const db = getDB()
+  const collection = db.collection(TABLE_STATE_COLLECTION)
+  const state = await collection.findOne({ docId: TABLE_STATE_DOC_ID })
+  const index = (state?.tables || []).findIndex(
+    (t) => t.match?.matchId === match._id,
+  )
+  if (index === -1) return // not on a table; nothing cached to refresh
+
+  await collection.updateOne(
+    { docId: TABLE_STATE_DOC_ID },
+    {
+      $set: {
+        [`tables.${index}.match.match`]: sanitizeForOutput(match),
+        [`tables.${index}.match.matchStatus`]: getMatchStatus(match),
+      },
+    },
+  )
+}
+
 // Every mutation that can move a match through the queue calls this, so the
 // next read knows the cached tables/queue are stale. One small document,
 // ~40 ms, against a rebuild that costs seconds.

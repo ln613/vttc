@@ -53,6 +53,7 @@ import {
   cancelMatch,
   assignMatchToTable,
   markQueueDirty,
+  syncCachedMatch,
 } from './liveScoreHandlers.js'
 import {
   acquireMatchSession,
@@ -131,7 +132,12 @@ export const apiHandlers = {
     // Spectators' live scores refresh on the next queue-changing event
     // (assign/finish/confirm), which still go through withEventNotify.
     updateGame: async (body) => {
-      const result = await updateGame(body)
+      const { match, ...result } = await updateGame(body)
+      // Keep the cached live-score copy of this match in step, or the
+      // score on the Live Score page stops moving until something forces
+      // a rebuild. Awaited so a client refetching on the broadcast below
+      // cannot beat the update.
+      if (match) await syncCachedMatch(match)
       if (result?.simulated) void notifyLiveScoreUpdate(body?._id)
       return result
     },
