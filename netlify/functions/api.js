@@ -1,6 +1,7 @@
 import { connectDB, maybeResetOnError } from './utils/db.js'
 import { apiHandlers } from './utils/handlers.js'
 import { readMetrics, resetMetrics, recordApiCall } from './utils/metrics.js'
+import { authFromHeaders } from './utils/authToken.js'
 
 // A Pusher broadcast makes every client refetch at once. Letting the CDN
 // answer that burst collapses ~N simultaneous requests into ~1 origin
@@ -16,8 +17,8 @@ const CACHEABLE_GET_TYPES = new Set(['liveScore', 'events'])
 // serving minutes-old scores would be worse than a brief origin hit.
 const EDGE_CACHE_SECONDS = 2
 
-const cacheControlFor = (method, type) =>
-  method === 'get' && CACHEABLE_GET_TYPES.has(type)
+const cacheControlFor = (method, type, auth) =>
+  method === 'get' && CACHEABLE_GET_TYPES.has(type) && !auth?.isAdmin
     ? `public, max-age=0, s-maxage=${EDGE_CACHE_SECONDS}`
     : 'no-store'
 
@@ -59,8 +60,14 @@ export const handler = async (event) => {
       body = JSON.parse(event.body)
     }
 
-    const result = await apiHandlers[method][type](method === 'post' ? body : params)
-    return createResponse(200, result, cacheControlFor(method, type))
+    // Who is asking. Unsigned or missing tokens read as anonymous rather
+    // than an error, so public reads keep working.
+    const auth = authFromHeaders(event.headers || {})
+    const result = await apiHandlers[method][type](
+      method === 'post' ? body : params,
+      auth,
+    )
+    return createResponse(200, result, cacheControlFor(method, type, auth))
   } catch (error) {
     console.error('API Error:', error)
     // If this failed because the cached DB connection is dead (e.g. a

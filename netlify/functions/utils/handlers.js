@@ -89,7 +89,7 @@ const withEventNotify = (fn) => async (body) => {
 
 export const apiHandlers = {
   get: {
-    players: () => getPlayers(),
+    players: (params, auth) => getPlayers(params, auth),
     playerRatingHistory: (params) => getPlayerRatingHistory(params),
     playerHistory: (params) => getPlayerHistory(params),
     tournaments: () => getTournaments(),

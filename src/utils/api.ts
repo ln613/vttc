@@ -14,11 +14,25 @@ const getApiHost = () => {
   return import.meta.env.VITE_PROD_HOST || ''
 }
 
+// Read from storage rather than authStore, which imports this module.
+// A missing token just means an anonymous request — the server treats that
+// as the public view rather than an error.
+const authHeaders = (): Record<string, string> => {
+  try {
+    const token = localStorage.getItem('vttc_token')
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  } catch {
+    return {}
+  }
+}
+
 export const api = async <T>(type: string, params: Record<string, string> = {}): Promise<T> => {
   validateType(type)
 
   const queryParams = new URLSearchParams({ type, ...params })
-  const response = await fetch(`${getApiHost()}/.netlify/functions/api?${queryParams}`)
+  const response = await fetch(`${getApiHost()}/.netlify/functions/api?${queryParams}`, {
+    headers: authHeaders(),
+  })
 
   return handleResponse<T>(response)
 }
@@ -30,7 +44,7 @@ export const apiPost = async <T>(type: string, body: unknown): Promise<T> => {
 
   const response = await fetch(`${getApiHost()}/.netlify/functions/api?type=${type}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body),
   })
 

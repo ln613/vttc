@@ -1,4 +1,5 @@
 import { getDB, save, toObjectId } from './db.js'
+import { createToken } from './authToken.js'
 import crypto from 'crypto'
 import argon2 from 'argon2'
 import { sendVerificationEmail, sendPendingPasswordEmail } from './email.js'
@@ -90,33 +91,25 @@ const verifyPassword = async (inputPassword, storedPassword) => {
 /**
  * Generate authentication token
  */
-const generateToken = (payload) => {
-  const token = crypto
-    .createHash('sha256')
-    .update(JSON.stringify(payload) + crypto.randomBytes(16).toString('hex'))
-    .digest('hex')
-  return token
-}
+// Signed so the server can verify it later — see authToken.js. The old
+// form was a random hash with no payload, which nothing could check.
+const generateToken = (payload) => createToken(payload)
 
 /**
  * Generate token for a player
  */
 const generatePlayerToken = (player) =>
   generateToken({
-    _id: player._id.toString(),
-    firstName: player.firstName,
-    lastName: player.lastName,
-    timestamp: Date.now(),
+    playerId: player._id.toString(),
+    isAdmin: !!player.isAdmin || !!player.isSuperAdmin,
+    isSuperAdmin: !!player.isSuperAdmin,
   })
 
 /**
  * Generate token for admin
  */
-const generateAdminToken = () =>
-  generateToken({
-    admin: true,
-    timestamp: Date.now(),
-  })
+const generateAdminToken = ({ isSuperAdmin = false } = {}) =>
+  generateToken({ isAdmin: true, isSuperAdmin })
 
 /**
  * Authenticate super admin user using Argon2
@@ -129,7 +122,7 @@ const authenticateSuperAdmin = async (password) => {
   const isValid = await verifyArgon2Password(password, storedHash)
   if (!isValid) throwError('Invalid password')
 
-  const token = generateAdminToken()
+  const token = generateAdminToken({ isSuperAdmin: true })
   return {
     token,
     isAdmin: true,
@@ -185,7 +178,10 @@ const authenticateTablet = (password) => {
   if (!tabletPassword) throwError('Tablet password not configured')
   if (password !== tabletPassword) throwError('Invalid password')
 
-  const token = generateAdminToken()
+  // Explicitly NOT an admin token: the tablet is read-only apart from
+  // umpiring, and the response below has always said isAdmin: false. It
+  // shared generateAdminToken() only because tokens used to carry nothing.
+  const token = generateToken({ isAdmin: false, isTablet: true })
   return {
     token,
     isAdmin: false,
