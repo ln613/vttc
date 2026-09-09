@@ -139,73 +139,6 @@ const simulateGames = (
   return games
 }
 
-// How a simulated point is paced. Slow enough to watch the score move on
-// another screen, fast enough that a best-of-5 doesn't outlast interest.
-const SIMULATED_POINT_MS = 450
-// Matches the real client's save debounce: points land faster than saves,
-// so consecutive points collapse into one request rather than one each.
-const SIMULATED_SAVE_MS = 900
-
-const simulatingMatchIds = new Set<string>()
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
-// Walk a finished game's score back into the rally that produced it: the
-// winner's points and the loser's interleaved at random, with the last
-// point going to the winner so the score is never briefly wrong.
-const rallyOrder = (winnerPoints: number, loserPoints: number): boolean[] => {
-  const seq = [
-    ...Array<boolean>(winnerPoints).fill(true),
-    ...Array<boolean>(loserPoints).fill(false),
-  ]
-  for (let i = seq.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[seq[i], seq[j]] = [seq[j], seq[i]]
-  }
-  const lastWin = seq.lastIndexOf(true)
-  ;[seq[lastWin], seq[seq.length - 1]] = [seq[seq.length - 1], seq[lastWin]]
-  return seq
-}
-
-const playSimulatedGame = async (
-  eventId: string,
-  matchId: string,
-  game: { score1: number; score2: number },
-  gameNumber: number,
-): Promise<void> => {
-  const side1Wins = game.score1 > game.score2
-  const winnerPoints = side1Wins ? game.score1 : game.score2
-  const loserPoints = side1Wins ? game.score2 : game.score1
-
-  let won = 0
-  let lost = 0
-  let lastSent = 0
-  const save = async (score1: number, score2: number, lastScoredSide: 1 | 2) => {
-    lastSent = Date.now()
-    await apiPost('updateGame', {
-      _id: eventId,
-      matchId,
-      gameNumber,
-      score: { score1, score2 },
-      lastScoredSide,
-    })
-  }
-
-  for (const winnerScores of rallyOrder(winnerPoints, loserPoints)) {
-    winnerScores ? won++ : lost++
-    const score1 = side1Wins ? won : lost
-    const score2 = side1Wins ? lost : won
-    const scoringSide: 1 | 2 = winnerScores === side1Wins ? 1 : 2
-    const isFinalPoint = won === winnerPoints && lost === loserPoints
-    // Debounced: only save once the window has passed, but always send the
-    // point that ends the game so the stored score matches the result.
-    if (isFinalPoint || Date.now() - lastSent >= SIMULATED_SAVE_MS) {
-      await save(score1, score2, scoringSide)
-    }
-    if (!isFinalPoint) await sleep(SIMULATED_POINT_MS)
-  }
-}
-
 const fetchEvent = async (eventId: string, silent: boolean) => {
   if (!silent) {
     setEventDetailState({ loading: true, error: null })
@@ -274,11 +207,6 @@ export const eventDetailActions = {
     setEventDetailState({ toastMessage: null })
   },
 
-  // Plays the match out rather than posting a finished result, so a
-  // simulated event actually behaves like one being played: points arrive
-  // over time and each save is broadcast (the server does that only for
-  // simulated events), which is what makes Live Score, Schedule and Event
-  // Detail follow along instead of waiting for the 60s heartbeat.
   simulateMatch: async (
     matchId: string,
     match: {
@@ -291,19 +219,10 @@ export const eventDetailActions = {
   ) => {
     const eventId = sourceEventId ?? eventDetailState.eventId
     if (!eventId) return
-    // Clicking Simulate twice on the same match would interleave two sets
-    // of scores into one game.
-    if (simulatingMatchIds.has(matchId)) return
-    simulatingMatchIds.add(matchId)
-
     const numberOfGames = match.config?.numberOfGames ?? 5
     const targetPoints = match.config?.gameConfig?.targetPoints ?? 11
     const games = simulateGames(numberOfGames, targetPoints)
-
     try {
-      for (let index = 0; index < games.length; index++) {
-        await playSimulatedGame(eventId, matchId, games[index], index + 1)
-      }
       await apiPost('finishMatch', {
         _id: eventId,
         matchId,
@@ -318,8 +237,6 @@ export const eventDetailActions = {
         'error',
         err instanceof Error ? err.message : 'Failed to simulate match',
       )
-    } finally {
-      simulatingMatchIds.delete(matchId)
     }
   },
 

@@ -121,11 +121,13 @@ export const apiHandlers = {
     // other table, so a real match deliberately does NOT broadcast — that
     // would mean a Pusher fan-out and every client re-fetching, per point.
     //
-    // Simulated events are the exception. They exist to demonstrate the
-    // app, so they are worth the fan-out: the Live Score, Schedule and
-    // Event Detail pages follow the score as it happens instead of waiting
-    // for the 60s heartbeat. Broadcasts are still coalesced (pusher.js),
-    // so a burst of points becomes roughly one message per 1.5s.
+    // Simulated events are the exception. They exist to try the app out —
+    // create one, then umpire it by hand — and that only demonstrates
+    // anything if the other screens keep up: Live Score, Schedule and
+    // Event Detail follow the score as it is entered instead of waiting
+    // for the 60s heartbeat. The volume is a person tapping, not a
+    // tournament, and broadcasts are still coalesced (pusher.js), so a
+    // burst of points becomes roughly one message per 1.5s.
     // Spectators' live scores refresh on the next queue-changing event
     // (assign/finish/confirm), which still go through withEventNotify.
     updateGame: async (body) => {
