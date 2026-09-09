@@ -118,11 +118,21 @@ export const apiHandlers = {
     confirmMatch: withEventNotify(confirmMatch),
     // updateGame fires on every ~3s score save and is by far the highest
     // frequency write. A point scored doesn't change the queue or any
-    // other table, so it deliberately does NOT broadcast — this avoids a
-    // realtime fan-out (Pusher + every client re-fetching) per point.
+    // other table, so a real match deliberately does NOT broadcast — that
+    // would mean a Pusher fan-out and every client re-fetching, per point.
+    //
+    // Simulated events are the exception. They exist to demonstrate the
+    // app, so they are worth the fan-out: the Live Score, Schedule and
+    // Event Detail pages follow the score as it happens instead of waiting
+    // for the 60s heartbeat. Broadcasts are still coalesced (pusher.js),
+    // so a burst of points becomes roughly one message per 1.5s.
     // Spectators' live scores refresh on the next queue-changing event
     // (assign/finish/confirm), which still go through withEventNotify.
-    updateGame: (body) => updateGame(body),
+    updateGame: async (body) => {
+      const result = await updateGame(body)
+      if (result?.simulated) void notifyLiveScoreUpdate(body?._id)
+      return result
+    },
     saveMatchSetup: withEventNotify(saveMatchSetup),
     startTeamMatchSide: withEventNotify(startTeamMatchSide),
     markTeamMatchSideOpened: withEventNotify(markTeamMatchSideOpened),

@@ -3733,7 +3733,9 @@ export const updateGame = async (body) => {
     { $set: setOps || { eventStages: updatedStages } },
   )
 
-  return { success: true }
+  // Reported so the caller can decide whether this score change is worth a
+  // broadcast — see the updateGame entry in handlers.js.
+  return { success: true, simulated: !!event.simulated }
 }
 
 const validateUpdateGameInput = (body) => {
