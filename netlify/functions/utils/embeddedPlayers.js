@@ -42,6 +42,17 @@ const looksLikePlayer = (value) =>
   '_id' in value &&
   ('firstName' in value || 'lastName' in value)
 
+// Only plain objects and arrays are walked. Anything else — ObjectId,
+// Date, Buffer — is passed through untouched: rebuilding it from
+// Object.entries() returns a lookalike that has lost its class, and an
+// ObjectId turned into { buffer: … } renders as "[object Object]" in a
+// URL, which is how this was found.
+const isPlainObject = (value) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const proto = Object.getPrototypeOf(value)
+  return proto === Object.prototype || proto === null
+}
+
 const pick = (player, fields) => {
   const out = {}
   for (const field of fields) {
@@ -58,8 +69,7 @@ export const toStoredPlayer = (player) =>
 // the leak stops without waiting for the migration.
 export const sanitizeForOutput = (value) => {
   if (Array.isArray(value)) return value.map(sanitizeForOutput)
-  if (!value || typeof value !== 'object') return value
-  if (value instanceof Date) return value
+  if (!isPlainObject(value)) return value
   if (looksLikePlayer(value)) return pick(value, PUBLIC_PLAYER_FIELDS)
 
   const out = {}
@@ -73,8 +83,7 @@ export const sanitizeForOutput = (value) => {
 // writing, and by the migration.
 export const sanitizeForStorage = (value) => {
   if (Array.isArray(value)) return value.map(sanitizeForStorage)
-  if (!value || typeof value !== 'object') return value
-  if (value instanceof Date) return value
+  if (!isPlainObject(value)) return value
   if (looksLikePlayer(value)) return pick(value, STORED_PLAYER_FIELDS)
 
   const out = {}
