@@ -62,6 +62,21 @@ if (!argv.length) {
   process.exit(1)
 }
 
-console.log(`club: ${club}`)
+// Keep the CLI, vite and the browser on the same ports. VITE_DEV_API_PORT
+// is what src/utils/api.ts calls in dev and VITE_DEV_PORT is what
+// vite.config.ts listens on, so forwarding both here is what stops them
+// drifting from netlify.toml. Only needed to run two clubs at once.
+const apiPort = process.env.VITE_DEV_API_PORT
+const vitePort = process.env.VITE_DEV_PORT
+const isNetlifyDev = argv[0] === 'netlify' && argv[1] === 'dev'
+if (isNetlifyDev) {
+  if (apiPort && !argv.includes('--port')) argv.push('--port', apiPort)
+  if (vitePort && !argv.includes('--targetPort')) argv.push('--targetPort', vitePort)
+}
+
+console.log(
+  `club: ${club}` +
+    (isNetlifyDev ? `  (api ${apiPort || 8888}, vite ${vitePort || 7344})` : ''),
+)
 const child = spawn(argv[0], argv.slice(1), { stdio: 'inherit', env: process.env })
 child.on('exit', (code, signal) => process.exit(signal ? 1 : (code ?? 0)))
