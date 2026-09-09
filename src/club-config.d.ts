@@ -23,6 +23,8 @@ declare module 'club-config' {
     }
     tables: {
       all: number[]
+      /** Physical layout, top row first. */
+      rows: number[][]
       order: number[]
       lowTierOrder: number[]
       highTierOrder: number[]

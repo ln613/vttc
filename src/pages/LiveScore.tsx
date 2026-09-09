@@ -7,6 +7,7 @@ import {
   type JSX,
 } from 'solid-js'
 import { liveScoreState, liveScoreActions } from '../stores/liveScoreStore'
+import clubConfig from 'club-config'
 import { authState } from '../stores/authStore'
 import { customConfirm } from '../stores/confirmDialogStore'
 import ToggleButton from '../components/ToggleButton'
@@ -60,8 +61,7 @@ const LiveScoreLayout = () => {
 const DesktopLayout = () => (
   <div style={desktopLayoutStyle}>
     <div style={tablesGridDesktopStyle}>
-      <TableRow tables={[5, 6, 7, 8]} />
-      <TableRow tables={[1, 2, 3, 4]} />
+      <For each={TABLE_ROWS}>{(row) => <TableRow tables={row} />}</For>
     </div>
     <div class="hide-scrollbar" style={matchQueueDesktopStyle}>
       <MatchQueue />
@@ -137,14 +137,15 @@ const MobileLayout = () => {
           style={tablesScrollContainerStyle}
           onScroll={updateScrollState}
         >
-          <div style={tablesGridMobileStyle}>
-            <TableRow tables={[5, 6]} isMobile />
-            <TableRow tables={[1, 2]} isMobile />
-          </div>
-          <div style={tablesGridMobileStyle}>
-            <TableRow tables={[7, 8]} isMobile />
-            <TableRow tables={[3, 4]} isMobile />
-          </div>
+          <For each={MOBILE_TABLE_PAGES}>
+            {(page) => (
+              <div style={tablesGridMobileStyle}>
+                <For each={page}>
+                  {(row) => <TableRow tables={row} isMobile />}
+                </For>
+              </div>
+            )}
+          </For>
         </div>
         <Show when={canScrollLeft()}>
           <div
@@ -190,6 +191,23 @@ const MatchQueueSheet = (props: {
       <MatchQueue isMobile />
     </div>
   </div>
+)
+
+// The hall's physical layout, top row first — how the tables actually sit
+// in the room, which differs per club (clubs/<slug>/config.json). Falls
+// back to a single row so a config without `rows` still renders.
+const TABLE_ROWS: number[][] =
+  clubConfig.tables.rows?.length ? clubConfig.tables.rows : [clubConfig.tables.all]
+
+// Mobile shows two columns at a time and scrolls sideways, keeping each
+// row's tables in their real left-to-right order.
+const MOBILE_COLUMNS = 2
+const MOBILE_TABLE_PAGES: number[][][] = Array.from(
+  { length: Math.ceil(Math.max(...TABLE_ROWS.map((r) => r.length)) / MOBILE_COLUMNS) },
+  (_, page) =>
+    TABLE_ROWS.map((row) =>
+      row.slice(page * MOBILE_COLUMNS, page * MOBILE_COLUMNS + MOBILE_COLUMNS),
+    ).filter((row) => row.length > 0),
 )
 
 // ==================== TABLE COMPONENTS ====================

@@ -3,7 +3,6 @@
   "name": "Example TTC",
   "appName": "Example TTC Live",
   "timezone": "America/Toronto",
-
   "branding": {
     "bannerUrl": "https://example.org/banner.jpg",
     "bannerAlt": "Example TTC Banner",
@@ -11,25 +10,81 @@
     "faviconUrl": "/images/logo.png",
     "pageTitle": "Example TTC"
   },
-
   "tables": {
-    "all": [1, 2, 3, 4, 5, 6],
-    "order": [1, 2, 3, 4, 5, 6],
-    "lowTierOrder": [5, 6, 3, 4, 1, 2],
-    "highTierOrder": [1, 2, 3, 4],
-    "knockoutExcluded": [6],
+    "all": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "rows": [
+      [
+        1,
+        2,
+        3
+      ],
+      [
+        4,
+        5,
+        6
+      ]
+    ],
+    "order": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "lowTierOrder": [
+      5,
+      6,
+      3,
+      4,
+      1,
+      2
+    ],
+    "highTierOrder": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "knockoutExcluded": [
+      6
+    ],
     "generalExcluded": [],
-    "highTierExcluded": [5, 6],
+    "highTierExcluded": [
+      5,
+      6
+    ],
     "highTierSemifinalExcluded": [],
-    "highTierFinalOnly": [1],
+    "highTierFinalOnly": [
+      1
+    ],
     "lowTierBigMatchPreferred": []
   },
-
   "tiers": {
-    "low": [{ "type": "Single", "restriction": "Rated", "ratingLimitMax": 1200 }],
+    "low": [
+      {
+        "type": "Single",
+        "restriction": "Rated",
+        "ratingLimitMax": 1200
+      }
+    ],
     "high": [
-      { "type": "Single", "restriction": "Open" },
-      { "type": "Single", "restriction": "Rated", "ratingLimitMin": 1800 }
+      {
+        "type": "Single",
+        "restriction": "Open"
+      },
+      {
+        "type": "Single",
+        "restriction": "Rated",
+        "ratingLimitMin": 1800
+      }
     ]
   }
 }
