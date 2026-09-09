@@ -100,7 +100,11 @@ const createResponse = (statusCode, data, cacheControl = 'no-store') => ({
     'Content-Type': 'application/json',
     'Cache-Control': cacheControl,
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    // Authorization must be listed: sending it makes every request
+    // preflighted, and a preflight that doesn't allow the header fails the
+    // request outright — which looks like a blanket CORS error the moment
+    // a client has a token to send.
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   },
   body: JSON.stringify(data),
