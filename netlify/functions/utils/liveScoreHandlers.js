@@ -709,6 +709,37 @@ const matchPriority = (item) => {
 /**
  * Get players on tables
  */
+// playerId -> the table they are currently playing on. Lets a waiting team
+// match tell its tablet exactly where the missing player is.
+const getPlayerTableMap = (tables) => {
+  const map = new Map()
+  for (const table of tables) {
+    if (table.status !== 'assigned' || !table.match) continue
+    const match = table.match.match
+    if (!match) continue
+    for (const p of [...(match.side1 || []), ...(match.side2 || [])]) {
+      if (p?._id) map.set(p._id.toString(), table.tableNumber)
+    }
+  }
+  return map
+}
+
+// Who this match is still waiting on, and where they are.
+const buildWaitingFor = (item, playersOnTables, playerTableMap) => {
+  const waiting = []
+  const match = item.match
+  for (const p of [...(match?.side1 || []), ...(match?.side2 || [])]) {
+    const id = p?._id?.toString()
+    if (!id || !playersOnTables.has(id)) continue
+    waiting.push({
+      playerId: id,
+      playerName: `${p.firstName || ''} ${p.lastName || ''}`.trim(),
+      tableNumber: playerTableMap.get(id) ?? null,
+    })
+  }
+  return waiting.length ? waiting : null
+}
+
 const getPlayersOnTables = (tables) => {
   const playerIds = new Set()
   for (const table of tables) {
@@ -792,6 +823,7 @@ const assignTablesToMatches = (
   const updatedTables = tables.map((t) => ({ ...t }))
   const remainingQueue = []
   const playersOnTables = getPlayersOnTables(updatedTables)
+  const playerTableMap = getPlayerTableMap(updatedTables)
   const assignedGroupKeys = new Set()
   const updatedGroupTableMap = pruneGroupTableMap(groupTableMap || {}, allItems)
   const updatedTeamTableMap = pruneTeamTableMap(teamTableMap || {}, allItems)
@@ -806,11 +838,46 @@ const assignTablesToMatches = (
       remainingQueue.push(item)
       continue
     }
+    const myParentId = item.parentMatchId?.toString()
+    const myTeamTable = myParentId ? updatedTeamTableMap[myParentId] : undefined
+
     // A match is skipped only when one of its own two players is already
     // playing — a busy third group member no longer blocks the match
     // whose players are both free.
     if (hasPlayerConflict(item, playersOnTables)) {
-      remainingQueue.push(item)
+      // Exception: a tie already holding a table keeps the next sub-match
+      // ON that table in a waiting state, rather than leaving the table
+      // empty. The tablet then shows who it is waiting for and starts by
+      // itself once they are free.
+      const waitingIndex =
+        myTeamTable != null
+          ? updatedTables.findIndex(
+              (t) => t.tableNumber === myTeamTable && t.status === 'available',
+            )
+          : -1
+      if (waitingIndex === -1) {
+        remainingQueue.push(item)
+        continue
+      }
+      updatedTables[waitingIndex] = {
+        ...updatedTables[waitingIndex],
+        match: {
+          ...item,
+          tableNumber: myTeamTable,
+          waitingFor: buildWaitingFor(item, playersOnTables, playerTableMap),
+        },
+        status: 'assigned',
+      }
+      // The team-mate who IS free is committed to this table meanwhile.
+      for (const p of [
+        ...(item.match?.side1 || []),
+        ...(item.match?.side2 || []),
+      ]) {
+        if (p?._id) {
+          playersOnTables.add(p._id.toString())
+          playerTableMap.set(p._id.toString(), myTeamTable)
+        }
+      }
       continue
     }
     // A team-mate needed for the next sub-match can't be sent elsewhere
@@ -824,8 +891,6 @@ const assignTablesToMatches = (
     const myLockedTable = isGroupOfThree
       ? updatedGroupTableMap[item.groupKey]
       : undefined
-    const myParentId = item.parentMatchId?.toString()
-    const myTeamTable = myParentId ? updatedTeamTableMap[myParentId] : undefined
     const reservedForOthers = new Set([
       ...Object.entries(updatedGroupTableMap)
         .filter(([key]) => key !== item.groupKey)
@@ -876,8 +941,11 @@ const assignTablesToMatches = (
       if (myParentId) updatedTeamTableMap[myParentId] = tableNumber
       const match = item.match
       if (match) {
-        for (const p of match.side1 || []) playersOnTables.add(p._id?.toString())
-        for (const p of match.side2 || []) playersOnTables.add(p._id?.toString())
+        for (const p of [...(match.side1 || []), ...(match.side2 || [])]) {
+          if (!p?._id) continue
+          playersOnTables.add(p._id.toString())
+          playerTableMap.set(p._id.toString(), tableNumber)
+        }
       }
       continue
     }
@@ -921,8 +989,11 @@ const assignTablesToMatches = (
     // Add players to playing set
     const match = item.match
     if (match) {
-      for (const p of match.side1 || []) playersOnTables.add(p._id?.toString())
-      for (const p of match.side2 || []) playersOnTables.add(p._id?.toString())
+      for (const p of [...(match.side1 || []), ...(match.side2 || [])]) {
+        if (!p?._id) continue
+        playersOnTables.add(p._id.toString())
+        playerTableMap.set(p._id.toString(), tableNumber)
+      }
     }
 
     if (isGroupOfThree) {

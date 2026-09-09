@@ -70,6 +70,15 @@ export interface MatchQueueItem {
   parentMatchId?: string
   subMatchIndex?: number
   lockedTableNumber?: TableNumber
+  // Set when a team match holds this table but its next sub-match cannot
+  // start yet: who it is waiting for, and where they are playing.
+  waitingFor?: WaitingForPlayer[] | null
+}
+
+export interface WaitingForPlayer {
+  playerId: string
+  playerName: string
+  tableNumber: number | null
 }
 
 /**

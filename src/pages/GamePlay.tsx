@@ -23,6 +23,7 @@ import {
 } from './EventDetail'
 import { subscribeToMatchReset, type EventSubscription } from '../utils/pusher'
 import type { Player } from '../../shared/types/Player'
+import type { WaitingForPlayer } from '../../shared/types/Table'
 import Button from '../components/Button'
 import MatchConfirmDialog from '../components/MatchConfirmDialog'
 import serveIconUrl from '../assets/serve.png'
@@ -199,6 +200,19 @@ const GamePlay = () => {
 
   const isLandscape = createIsLandscape()
 
+  // The tie holds this table, but a player is still finishing elsewhere.
+  // Read off the live table entry rather than the event, because it is the
+  // assigner that knows who is where.
+  const waitingForPlayers = () => {
+    const matchId = gamePlayState.matchId
+    if (!matchId) return null
+    const table = liveScoreState.tables.find(
+      (t) => t.match?.matchId === matchId,
+    )
+    const waiting = table?.match?.waitingFor
+    return waiting && waiting.length ? waiting : null
+  }
+
   return (
     <div ref={containerRef} style={containerStyle}>
       <Show
@@ -259,6 +273,9 @@ const GamePlay = () => {
         }
       >
         <TeamSetupDialog />
+      </Show>
+      <Show when={waitingForPlayers()}>
+        {(waiting) => <WaitingForPlayerOverlay waiting={waiting()} />}
       </Show>
       <Show when={gamePlayState.showFinishDialog && !sessionBlocked()}>
         <FinishConfirmDialog />
@@ -982,6 +999,36 @@ const FinishConfirmDialog = () => {
     />
   )
 }
+
+// Shown while a team match owns the table but its next sub-match can't
+// start because a player is still finishing elsewhere. Deliberately has no
+// way to dismiss it: the umpire shouldn't be able to start scoring, and it
+// clears itself as soon as the assigner sees that player free.
+const WaitingForPlayerOverlay = (props: { waiting: WaitingForPlayer[] }) => (
+  <div style={waitingOverlayStyle}>
+    <div style={waitingCardStyle}>
+      <div style={waitingTitleStyle}>Waiting for the next match</div>
+      <For each={props.waiting}>
+        {(w) => (
+          <div style={waitingPlayerStyle}>
+            <span style={waitingNameStyle}>{w.playerName}</span>
+            <Show
+              when={w.tableNumber != null}
+              fallback={<span> is still playing.</span>}
+            >
+              <span> is playing on table </span>
+              <span style={waitingTableStyle}>{w.tableNumber}</span>
+            </Show>
+          </div>
+        )}
+      </For>
+      <div style={waitingHintStyle}>
+        This match starts automatically once they finish. The table stays
+        reserved — don't assign anything else to it.
+      </div>
+    </div>
+  </div>
+)
 
 // Unified team-match setup dialog. Each side independently moves
 // through "press Start" → "pick order" → "order locked in". The user
@@ -1907,6 +1954,55 @@ const initIconImgStyle = (active: boolean): JSX.CSSProperties => ({
 })
 
 // The resolved pairings, shown once every slot is filled.
+const waitingOverlayStyle: JSX.CSSProperties = {
+  position: 'fixed',
+  inset: '0',
+  background: 'rgba(0,0,0,0.82)',
+  display: 'grid',
+  'place-items': 'center',
+  padding: '24px',
+  'z-index': 9000,
+}
+
+const waitingCardStyle: JSX.CSSProperties = {
+  'max-width': '520px',
+  width: '100%',
+  background: '#fff',
+  'border-radius': '14px',
+  padding: '28px 26px',
+  'text-align': 'center',
+  'box-shadow': '0 12px 40px rgba(0,0,0,0.35)',
+}
+
+const waitingTitleStyle: JSX.CSSProperties = {
+  'font-size': '20px',
+  'font-weight': 700,
+  color: '#2c3e50',
+  'margin-bottom': '14px',
+}
+
+const waitingPlayerStyle: JSX.CSSProperties = {
+  'font-size': '17px',
+  color: '#2c3e50',
+  'line-height': 1.5,
+  'margin-bottom': '6px',
+}
+
+const waitingNameStyle: JSX.CSSProperties = { 'font-weight': 700 }
+
+const waitingTableStyle: JSX.CSSProperties = {
+  'font-weight': 800,
+  'font-size': '20px',
+  color: '#e67e22',
+}
+
+const waitingHintStyle: JSX.CSSProperties = {
+  'margin-top': '16px',
+  'font-size': '14px',
+  color: '#7f8c8d',
+  'line-height': 1.5,
+}
+
 const teamInitLineupStyle: JSX.CSSProperties = {
   display: 'flex',
   'flex-direction': 'column',
