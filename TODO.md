@@ -121,10 +121,6 @@ The club is configuration now (`clubs/<slug>/config.json`, selected by
 `CLUB`), covering branding, timezone, hall layout and tier rules. Still
 outstanding:
 
-- **GVTTC's banner.** `clubs/gvttc/config.json` has a `REPLACE_ME`
-  placeholder for `branding.bannerUrl`. Upload the banner to Cloudinary and
-  paste the URL in. There are no Cloudinary credentials in this repo, so it
-  can't be scripted from here.
 - **GVTTC's table preferences and tier rules.** The layout is set (6 tables,
   rows 1-2-3 over 4-5-6) but `order`/`lowTierOrder`/`highTierOrder` are just
   1..6 and both tier lists are empty, so every event counts as mid-tier and

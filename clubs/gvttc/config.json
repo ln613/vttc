@@ -5,7 +5,7 @@
   "timezone": "America/Vancouver",
 
   "branding": {
-    "bannerUrl": "REPLACE_ME: upload the GVTTC banner to Cloudinary and paste its URL here",
+    "bannerUrl": "https://res.cloudinary.com/vttc/image/upload/v1788991105/gvttc-banner_jqdjmc.jpg",
     "bannerAlt": "GVTTC Banner",
     "contactName": "GVTTC",
     "faviconUrl": "/images/logo.png",
