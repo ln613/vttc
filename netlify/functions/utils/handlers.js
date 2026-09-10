@@ -77,14 +77,19 @@ const withEventNotify = (fn) => async (body) => {
   // tables/queue must be rebuilt on the next read. Awaited (unlike the
   // broadcast) because the clients this wakes will read straight after.
   await markQueueDirty()
-  // Realtime notifications are best-effort and must never delay (or hang)
-  // the response. Fire them without awaiting — Pusher can be slow or
-  // unreachable, and triggerSafely already bounds each call. The response
-  // returns as soon as the DB write completes.
+  // Awaited, not fired and forgotten. These run on Lambda: once the handler
+  // returns, the instance is frozen and any promise still in flight is
+  // suspended until the same instance happens to serve another request. On
+  // a busy site that is soon enough to go unnoticed; on a quiet one the
+  // next request is the 60s heartbeat, so the broadcast arrives with it and
+  // the app looks like it has no realtime at all.
+  //
+  // triggerSafely already bounds this at 3s and swallows failures, so the
+  // response can be delayed but never blocked.
   // One broadcast on the shared `live-score` channel, carrying the eventId.
   // Event-detail clients filter on it, so we no longer double-fire a second
   // message on `event-{id}` for the same change.
-  void notifyLiveScoreUpdate(eventId)
+  await notifyLiveScoreUpdate(eventId)
   return result
 }
 
@@ -138,7 +143,10 @@ export const apiHandlers = {
       // a rebuild. Awaited so a client refetching on the broadcast below
       // cannot beat the update.
       if (match) await syncCachedMatch(match)
-      if (result?.simulated) void notifyLiveScoreUpdate(body?._id)
+      // Awaited for the same reason as withEventNotify: a promise left in
+      // flight when the Lambda returns is frozen, and on a quiet site it
+      // only resumes on the next request — which is the heartbeat.
+      if (result?.simulated) await notifyLiveScoreUpdate(body?._id)
       return result
     },
     saveMatchSetup: withEventNotify(saveMatchSetup),
