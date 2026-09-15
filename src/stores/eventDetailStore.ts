@@ -15,12 +15,22 @@ import { apiGet, apiPost } from '../utils/api'
 import { waitForPendingSave } from './gamePlayStore'
 import { subscribeToLiveScoreUpdates, type EventSubscription } from '../utils/pusher'
 import { createJitteredRefetch } from '../utils/refetch'
+import { countCall } from '../utils/counters' // TEMP diagnostic
 import { eventState, eventActions } from './eventStore'
+import { leagueActions } from './leagueStore'
 import { authState } from './authStore'
+import { liveScoreActions } from './liveScoreStore'
 import { isEventStarted } from '../utils/eventTiming'
 import { getProvisionalMatchResult } from '../../shared/rules/matchRules'
 
-export type StageTab = 'group' | 'knockout' | 'bracket'
+export type StageTab =
+  | 'group'
+  | 'knockout'
+  | 'bracket'
+  // League rounds show these instead (specs/pages/Event Detail.md).
+  | 'matches'
+  | 'teams'
+  | 'standing'
 
 interface EventDetailState {
   data: Event | null
@@ -31,6 +41,10 @@ interface EventDetailState {
   generatingGroups: boolean
   generatingNextRound: boolean
   expandedMatchSchedules: Record<number, boolean>
+  // Keyed by parent match id, not by position: a refetch replaces the match
+  // objects, so anything held inside the row component is lost every time a
+  // score is entered.
+  expandedTeamSubMatches: Record<string, boolean>
   scrollPosition: number
   confirmingMatchId: string | null
   showConfirmDialog: boolean
@@ -66,6 +80,7 @@ const getInitialState = (): EventDetailState => ({
   generatingGroups: false,
   generatingNextRound: false,
   expandedMatchSchedules: {},
+  expandedTeamSubMatches: {},
   scrollPosition: 0,
   confirmingMatchId: null,
   showConfirmDialog: false,
@@ -106,8 +121,14 @@ const subscribeForEvent = (eventId: string) => {
   // event, or names none (a coalesced burst covering several events).
   const refetch = createJitteredRefetch(() => fetchEvent(eventId, true))
   currentSubscription = subscribeToLiveScoreUpdates((data) => {
+    countCall('broadcast→eventDetail') // TEMP diagnostic
     if (eventDetailState.eventId !== eventId) return
     if (data?.eventId && data.eventId !== eventId) return
+    // A league round's tabs render from the league store, which has its own
+    // subscription. The event document only supplies the header — name,
+    // start date, time — none of which change while matches are played, so
+    // refetching it here is 20 KB that changes nothing on screen.
+    if (eventDetailState.data?.eventType === 'league') return
     refetch()
   })
 }
@@ -140,18 +161,31 @@ const simulateGames = (
 }
 
 const fetchEvent = async (eventId: string, silent: boolean) => {
+  countCall('fetchEvent') // TEMP diagnostic
   if (!silent) {
     setEventDetailState({ loading: true, error: null })
   }
   try {
     const data = await apiGet<Event>('event', { _id: eventId })
     setEventDetailState({ data, loading: false, error: null })
+    snapToVisibleTab()
+    // A league round is a window onto the whole league — the tabs show every
+    // week's fixtures and the season standings, not just this event.
+    if (data.eventType === 'league') await leagueActions.load(data)
   } catch (err) {
     setEventDetailState({
       loading: false,
       error: err instanceof Error ? err.message : 'Failed to fetch event',
     })
   }
+}
+
+// The stored tab may belong to the previous event — a tournament's Group
+// when a league round just loaded. Fall back to the first visible one.
+const snapToVisibleTab = () => {
+  const tabs = eventDetailActions.getVisibleTabs()
+  if (tabs.length === 0 || tabs.includes(eventDetailState.activeStageTab)) return
+  setEventDetailState({ activeStageTab: tabs[0] })
 }
 
 export const eventDetailActions = {
@@ -180,6 +214,15 @@ export const eventDetailActions = {
 
   isMatchScheduleExpanded: (groupIndex: number): boolean =>
     eventDetailState.expandedMatchSchedules[groupIndex] ?? false,
+
+  toggleTeamSubMatches: (parentMatchId: string) => {
+    const current =
+      eventDetailState.expandedTeamSubMatches[parentMatchId] ?? false
+    setEventDetailState('expandedTeamSubMatches', parentMatchId, !current)
+  },
+
+  isTeamSubMatchesExpanded: (parentMatchId: string): boolean =>
+    eventDetailState.expandedTeamSubMatches[parentMatchId] ?? false,
 
   saveScrollPosition: (position: number) => {
     setEventDetailState({ scrollPosition: position })
@@ -365,6 +408,7 @@ export const eventDetailActions = {
   getVisibleTabs: (): StageTab[] => {
     const event = eventDetailState.data
     if (!event) return []
+    if (event.eventType === 'league') return ['matches', 'teams', 'standing']
     const stagesArray = event.stages || []
     const tabs: StageTab[] = []
     if (stagesArray.includes('group')) tabs.push('group')
@@ -379,6 +423,8 @@ export const eventDetailActions = {
     const tabs = eventDetailActions.getVisibleTabs()
     return tabs.length > 0 ? tabs[0] : 'group'
   },
+
+  isLeague: (): boolean => eventDetailState.data?.eventType === 'league',
 
   /**
    * Check if the "Generate Next Round" button should be visible in knockout tab.
@@ -729,6 +775,23 @@ export const eventDetailActions = {
     }
   },
 
+  // Pull a pending league sub-match forward so it plays next; whatever was
+  // on the table goes back in the queue.
+  playSubMatchNow: async (matchId: string, sourceEventId?: string) => {
+    const eventId = sourceEventId ?? eventDetailState.eventId
+    if (!eventId) return
+    try {
+      await apiPost('playLeagueSubMatchNow', { _id: eventId, matchId })
+      await fetchEvent(eventId, true)
+      await liveScoreActions.fetchLiveScore()
+    } catch (err) {
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Failed to play that match now',
+      )
+    }
+  },
+
   getEventSummary: (): string => {
     const event = eventDetailState.data
     if (!event) return ''
@@ -789,6 +852,7 @@ export const eventDetailActions = {
 
   reset: () => {
     unsubscribeCurrent()
+    leagueActions.reset()
     setEventDetailState(getInitialState())
   },
 }

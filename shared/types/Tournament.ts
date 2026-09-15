@@ -1,5 +1,11 @@
 import type { Player } from './Player'
 import type { Match } from './Match'
+import type {
+  EventType,
+  LeagueConfig,
+  LeaguePairing,
+  LeagueRoundSelection,
+} from './League'
 
 export interface Team {
   _id: string
@@ -221,10 +227,15 @@ export interface Tournament {
 }
 
 /**
- * Event - a tournament on a specific date with specific participants
+ * Event - either a tournament on a specific date, or one round/week of a
+ * league (see specs/api/tournament.md). A league round is a full event in
+ * its own right: it carries the same participants as its siblings, its own
+ * match schedule, and the league config every round shares.
+ *
  * The event's `id` field (inherited from Tournament) is the unique event identifier.
  */
 export interface Event extends Tournament {
+  eventType?: EventType // Absent on events saved before leagues existed = 'tournament'
   tournamentId: string
   eventSeries?: string // Optional event series name for grouping events
   date: string
@@ -244,6 +255,22 @@ export interface Event extends Tournament {
   participants: Participant[]
   eventStages: Stage[]
   paidPlayerIds: string[] // Player IDs that have paid for this event
+
+  // ----- League rounds only -----
+  /** The root round's _id, shared by every round/week of the league. */
+  leagueId?: string
+  /** The league's name; each round event is named "{leagueName} - Week {n}". */
+  leagueName?: string
+  /** 0-based position across all phases. */
+  roundIndex?: number
+  /** The "format" fields, copied onto every round of the league. */
+  league?: LeagueConfig
+  /** Who plays whom this week, and on which table. */
+  leaguePairings?: LeaguePairing[]
+  /** The team that sits this week out, when the team count is odd. */
+  leagueByeParticipantId?: string
+  /** The players each team fields this week. */
+  leagueSelections?: LeagueRoundSelection[]
 }
 
 /**

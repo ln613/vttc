@@ -11,8 +11,14 @@ const getGroupLetter = (i) =>
 const getGroupName = (i) => `Group ${getGroupLetter(i)}`
 import { notifyLiveScoreUpdate, notifyMatchReset } from './pusher.js'
 import { getSettings as readGlobalSettings } from './settingsHandlers.js'
-import { getClubTimezone } from './club.js'
+import { club, getClubTimezone } from './club.js'
 import { sanitizeForOutput, sanitizeForStorage } from './embeddedPlayers.js'
+import {
+  getRoundRobinSinglesLineup,
+  getLeagueSubMatchCount,
+  getTotalRounds,
+  getRoundsPerPhase,
+} from '../../../shared/rules/leagueSchedule.js'
 
 const EVENTS_COLLECTION = 'events'
 const TOURNAMENTS_COLLECTION = 'tournaments'
@@ -36,7 +42,7 @@ const throwErrors = (errors) => {
 /**
  * Generate unique ID
  */
-const generateId = () => {
+export const generateId = () => {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 }
 
@@ -58,6 +64,9 @@ export const getEventSeries = async () => {
  * Save event (create or update)
  */
 export const saveEvent = async (body) => {
+  if (!body) throwError('Request body is required')
+  if (body.eventType === 'league') return saveLeagueEvent(body)
+
   validateSaveEventInput(body)
 
   const {
@@ -185,6 +194,268 @@ const validateSaveEventInput = (body) => {
   if (!body.date) throwError('Event date is required')
 }
 
+// ==================== League events ====================
+
+/**
+ * A league is saved as its first round/week. The remaining rounds are
+ * created later by generateLeagueSchedule, once the teams are known — the
+ * number of rounds depends on how many teams registered.
+ *
+ * Every round carries the same `league` config, so any round document
+ * describes the whole league (specs/api/tournament.md, "Save event").
+ */
+const saveLeagueEvent = async (body) => {
+  const input = readLeagueInput(body)
+  validateLeagueInput(input)
+
+  const db = getDB()
+  const eventsCollection = db.collection(EVENTS_COLLECTION)
+  const isEdit = body._id != null
+
+  if (isEdit) return updateLeagueRound(eventsCollection, body._id, input)
+
+  const existing = await eventsCollection.findOne({
+    eventType: 'league',
+    leagueName: input.name,
+    date: input.startDate,
+  })
+  if (existing) {
+    throwError('A league with the same name and start date already exists')
+  }
+
+  const round = buildLeagueRound(input, { roundIndex: 0, date: input.startDate })
+  round.createdAt = new Date().toISOString()
+  const result = await eventsCollection.insertOne(round)
+  const _id = result.insertedId.toString()
+
+  // The root round's id names the whole league.
+  await eventsCollection.updateOne(
+    { _id: result.insertedId },
+    { $set: { leagueId: _id } },
+  )
+  return { ...round, _id, leagueId: _id }
+}
+
+const readLeagueInput = (body) => ({
+  name: body.name,
+  format: body.format,
+  dayOfWeek: body.dayOfWeek,
+  time: body.time,
+  startDate: body.startDate || body.date,
+  teamSize: body.teamSize,
+  numOfPhases: body.numOfPhases ?? 1,
+  allowPlayerSharing: body.allowPlayerSharing ?? false,
+  roundGames: body.roundGames || 'Best of 5',
+  sex: body.sex || 'All',
+  rated: !!body.ratingLimit,
+  ratingLimit: body.ratingLimit,
+  topPlayersRatingEnabled: body.topPlayersRatingEnabled ?? false,
+  topPlayersCount: body.topPlayersCount,
+  topPlayersRatingLimit: body.topPlayersRatingLimit,
+  maxParticipants: body.maxParticipants ?? 0,
+  registrationFee: body.registrationFee,
+  prizes: body.prizes || null,
+  handicapEnabled: body.handicapEnabled ?? false,
+  handicapDifference: body.handicapDifference ?? 200,
+  handicapMaxPoints: body.handicapMaxPoints ?? 5,
+  eventSeries: body.eventSeries,
+})
+
+const validateLeagueInput = (input) => {
+  const errors = []
+  if (!input.name) errors.push('League name is required')
+  if (!input.format) errors.push('Format is required')
+  if (input.dayOfWeek == null) errors.push('Day of week is required')
+  if (!input.time) errors.push('Time is required')
+  if (!input.startDate) errors.push('Start date is required')
+  if (!input.teamSize) errors.push('Team size is required')
+  if (input.startDate && input.dayOfWeek != null) {
+    const [y, m, d] = input.startDate.split('-').map(Number)
+    if (new Date(y, m - 1, d).getDay() !== Number(input.dayOfWeek)) {
+      errors.push('Start date must fall on the league day of the week')
+    }
+  }
+  throwErrors(errors)
+}
+
+// A league round is a Team event whose matches live in a single group, so
+// every existing path — table assignment, the queue, game play, live score
+// — works on it unchanged.
+const buildLeagueRound = (input, { roundIndex, date, leagueId }) => {
+  const teamSize = Number(input.teamSize)
+  const round = {
+    eventType: 'league',
+    leagueId,
+    leagueName: input.name,
+    roundIndex,
+    league: {
+      format: input.format,
+      dayOfWeek: Number(input.dayOfWeek),
+      startDate: input.startDate,
+      numOfPhases: Number(input.numOfPhases) || 1,
+      allowPlayerSharing: !!input.allowPlayerSharing,
+      roundGames: input.roundGames,
+      roundsPerPhase: 0, // Filled in once the teams are known
+      totalRounds: 0,
+    },
+    eventName: leagueRoundName(input.name, roundIndex),
+    eventSeries: input.eventSeries || input.name,
+    date,
+    time: input.time,
+    // Tournament-shaped fields, so the rest of the app treats a round like
+    // any other team event.
+    tournamentId: undefined,
+    name: input.name,
+    sex: input.sex,
+    type: 'Team',
+    teamSize,
+    nop: teamSize,
+    restriction: input.rated ? 'Rated' : 'Open',
+    ratingLimit: input.rated ? input.ratingLimit : undefined,
+    topPlayersRatingEnabled: !!input.topPlayersRatingEnabled,
+    topPlayersCount: input.topPlayersCount,
+    topPlayersRatingLimit: input.topPlayersRatingLimit,
+    stages: ['group'],
+    stagesType: 'Group Only (Big Round Robin)',
+    groupGames: input.roundGames,
+    knockoutGames: input.roundGames,
+    groupMatches: `Best of ${getLeagueSubMatchCount(input.format, teamSize)}`,
+    qualifiers: 'All',
+    maxParticipants: input.maxParticipants,
+    registrationFee: input.registrationFee || undefined,
+    prizes: input.prizes || undefined,
+    handicapEnabled: input.handicapEnabled,
+    handicapDifference: input.handicapDifference,
+    handicapMaxPoints: input.handicapMaxPoints,
+    participants: [],
+    paidPlayerIds: [],
+    leaguePairings: [],
+    leagueSelections: [],
+    eventStages: [
+      {
+        type: 'group',
+        config: { advancingCount: 0 },
+        groups: [],
+        advancedParticipants: [],
+      },
+    ],
+    updatedAt: new Date().toISOString(),
+  }
+  Object.keys(round).forEach((key) => {
+    if (round[key] === undefined) delete round[key]
+  })
+  return round
+}
+
+export const leagueRoundName = (leagueName, roundIndex) =>
+  `${leagueName} - Week ${roundIndex + 1}`
+
+// Editing a league edits the whole league: the format fields live on every
+// round, so a change has to reach all of them. Rounds that already have a
+// match schedule keep their structural settings (same rule as tournaments).
+const updateLeagueRound = async (collection, _id, input) => {
+  const event = await collection.findOne({ _id: toObjectId(_id) })
+  if (!event) throwError('Event not found')
+  const leagueId = event.leagueId || _id.toString()
+
+  const rounds = await collection.find({ leagueId }).toArray()
+  if (rounds.some((r) => hasScheduleFromStages(r.eventStages))) {
+    return updateEventFeeAndPrizes(
+      collection,
+      _id,
+      input.registrationFee,
+      input.prizes,
+    )
+  }
+
+  const teamSize = Number(input.teamSize)
+  await collection.updateMany(
+    { leagueId },
+    {
+      $set: {
+        leagueName: input.name,
+        name: input.name,
+        time: input.time,
+        sex: input.sex,
+        teamSize,
+        nop: teamSize,
+        restriction: input.rated ? 'Rated' : 'Open',
+        topPlayersRatingEnabled: !!input.topPlayersRatingEnabled,
+        maxParticipants: input.maxParticipants,
+        handicapEnabled: input.handicapEnabled,
+        handicapDifference: input.handicapDifference,
+        handicapMaxPoints: input.handicapMaxPoints,
+        groupGames: input.roundGames,
+        groupMatches: `Best of ${getLeagueSubMatchCount(input.format, teamSize)}`,
+        'league.format': input.format,
+        'league.allowPlayerSharing': !!input.allowPlayerSharing,
+        'league.roundGames': input.roundGames,
+        'league.numOfPhases': Number(input.numOfPhases) || 1,
+        updatedAt: new Date().toISOString(),
+      },
+    },
+  )
+  const updated = await collection.findOne({ _id: toObjectId(_id) })
+  return sanitizeForOutput(updated)
+}
+
+/**
+ * Build the round/week events after round 0. Used by generateLeagueSchedule,
+ * which is the only thing that knows how many rounds there are.
+ */
+export const buildLeagueRoundsFrom = (rootEvent, plans) =>
+  plans.slice(1).map((plan) => {
+    const round = buildLeagueRound(
+      {
+        ...rootEvent.league,
+        name: rootEvent.leagueName,
+        time: rootEvent.time,
+        teamSize: rootEvent.nop,
+        sex: rootEvent.sex,
+        rated: rootEvent.restriction === 'Rated',
+        ratingLimit: rootEvent.ratingLimit,
+        topPlayersRatingEnabled: rootEvent.topPlayersRatingEnabled,
+        topPlayersCount: rootEvent.topPlayersCount,
+        topPlayersRatingLimit: rootEvent.topPlayersRatingLimit,
+        maxParticipants: rootEvent.maxParticipants,
+        registrationFee: rootEvent.registrationFee,
+        prizes: rootEvent.prizes,
+        handicapEnabled: rootEvent.handicapEnabled,
+        handicapDifference: rootEvent.handicapDifference,
+        handicapMaxPoints: rootEvent.handicapMaxPoints,
+        eventSeries: rootEvent.eventSeries,
+        numOfPhases: rootEvent.league?.numOfPhases,
+      },
+      {
+        roundIndex: plan.roundIndex,
+        date: plan.date,
+        leagueId: rootEvent.leagueId || rootEvent._id.toString(),
+      },
+    )
+    return {
+      ...round,
+      // Rounds share the roster; only the fixtures differ.
+      participants: rootEvent.participants || [],
+      paidPlayerIds: rootEvent.paidPlayerIds || [],
+      // A simulated league is simulated every week — rating updates exclude
+      // simulated events, and Auto Select is offered on any round.
+      ...(rootEvent.simulated ? { simulated: true } : {}),
+      league: {
+        ...round.league,
+        roundsPerPhase: getRoundsPerPhase(
+          (rootEvent.participants || []).length,
+        ),
+        totalRounds: getTotalRounds(
+          (rootEvent.participants || []).length,
+          rootEvent.league?.numOfPhases || 1,
+        ),
+      },
+      leaguePairings: plan.pairings,
+      leagueByeParticipantId: plan.byeParticipantId,
+      createdAt: new Date().toISOString(),
+    }
+  })
+
 // Limited edit allowed once schedules exist: only the registration fee and
 // prizes. A cleared (empty) value is removed from the document.
 const updateEventFeeAndPrizes = async (collection, id, registrationFee, prizes) => {
@@ -210,6 +481,7 @@ const updateEventFeeAndPrizes = async (collection, id, registrationFee, prizes) 
  */
 export const simulateEvent = async (body) => {
   if (!body) throwError('Request body is required')
+  if (body.eventType === 'league') return simulateLeague(body)
   if (!body.tournamentId) throwError('Tournament ID is required')
   if (!body.date) throwError('Event date is required')
   if (!body.name) throwError('Event name is required')
@@ -307,6 +579,133 @@ export const cloneEvent = async (body) => {
   return { ...clone, _id: result.insertedId.toString() }
 }
 
+/**
+ * Simulate a league: create it starting today, then fill it with teams.
+ *
+ * Rosters are deliberately uneven — a team fields {teamSize} players on a
+ * match day but may carry up to two more — and a few players appear on two
+ * rosters, so the shared-player and roster-larger-than-line-up rules in
+ * league.md get exercised rather than just being implemented.
+ */
+const simulateLeague = async (body) => {
+  if (!body.date) throwError('Event date is required')
+  if (!body.format) throwError('Format is required')
+
+  const db = getDB()
+  const teamSize = Number(body.teamSize) || 3
+  const [year, month, day] = body.date.split('-').map(Number)
+
+  const created = await saveEvent({
+    eventType: 'league',
+    name: await uniqueSimulatedLeagueName(db, body.format, body.date),
+    format: body.format,
+    teamSize,
+    // The league day follows from the start date, which is today.
+    dayOfWeek: new Date(year, month - 1, day).getDay(),
+    startDate: body.date,
+    time: body.time || '',
+    numOfPhases: 1,
+    // Shared players are part of what's being simulated, so allow them.
+    allowPlayerSharing: true,
+    roundGames: 'Best of 5',
+    eventSeries: body.eventSeries,
+    maxParticipants: 0,
+    registrationFee: body.registrationFee,
+  })
+
+  const players = shuffleArray(
+    (await db.collection('players').find({}).toArray()).map(sanitizeForStorage),
+  )
+  const rosters = buildSimulatedRosters(players, teamSize, {
+    requested: body.maxParticipants,
+    tableCount: (club.tables?.all || []).length,
+  })
+  if (rosters.length < 2) throwError('Not enough players to fill two teams')
+  addSharedPlayers(rosters, Math.max(1, Math.floor(rosters.length / 3)))
+
+  const participants = rosters.map((roster, i) => ({
+    _id: generateId(),
+    players: roster,
+    teamName: `Team ${getGroupLetter(i)}`,
+    rating: calculateParticipantRating(roster, teamSize),
+  }))
+  const paidPlayerIds = [
+    ...new Set(
+      participants.flatMap((p) => p.players.map((pl) => pl._id.toString())),
+    ),
+  ]
+
+  await db
+    .collection(EVENTS_COLLECTION)
+    .updateOne(
+      { _id: toObjectId(created._id) },
+      { $set: { participants, paidPlayerIds, simulated: true } },
+    )
+
+  return { ...created, participants, paidPlayerIds, simulated: true }
+}
+
+// Simulating the same format twice in a day is normal while testing, and
+// the name + start date have to stay unique.
+const uniqueSimulatedLeagueName = async (db, format, date) => {
+  const base = `${format} League - test`
+  const taken = new Set(
+    (
+      await db
+        .collection(EVENTS_COLLECTION)
+        .find(
+          { eventType: 'league', date },
+          { projection: { leagueName: 1 } },
+        )
+        .toArray()
+    ).map((e) => e.leagueName),
+  )
+  if (!taken.has(base)) return base
+  for (let n = 2; ; n++) {
+    if (!taken.has(`${base} ${n}`)) return `${base} ${n}`
+  }
+}
+
+const randomInt = (max) => Math.floor(Math.random() * (max + 1))
+
+/**
+ * Deal the shuffled players into rosters of {teamSize} plus 0, 1 or 2 extra.
+ *
+ * The team count is capped at twice the number of tables: league.md assumes
+ * T = n/2 (or (n-1)/2), so a bigger league could never be scheduled here.
+ */
+const buildSimulatedRosters = (players, teamSize, { requested, tableCount }) => {
+  const byTables = tableCount > 0 ? tableCount * 2 : Infinity
+  const wanted = Math.min(requested > 0 ? requested : 8, byTables)
+
+  const rosters = []
+  let next = 0
+  while (rosters.length < wanted && next + teamSize <= players.length) {
+    const size = Math.min(teamSize + randomInt(2), players.length - next)
+    rosters.push(players.slice(next, next + size))
+    next += size
+  }
+  return rosters
+}
+
+/** Put a handful of players on a second roster as well as their own. */
+const addSharedPlayers = (rosters, count) => {
+  for (let i = 0; i < count; i++) {
+    const fromIndex = randomInt(rosters.length - 1)
+    // Step forward a random distance so the target is never the same
+    // roster — with only two teams, drawing twice would usually match.
+    const toIndex =
+      (fromIndex + 1 + randomInt(rosters.length - 2)) % rosters.length
+    const from = rosters[fromIndex]
+    const to = rosters[toIndex]
+    const player = from[randomInt(from.length - 1)]
+    const alreadyThere = to.some(
+      (p) => p._id.toString() === player._id.toString(),
+    )
+    if (!alreadyThere) to.push(player)
+  }
+}
+
 const meetsSimulationQualification = (tournament, player) => {
   const required = tournament.sex
   if (required && required !== 'All' && required !== 'Mixed') {
@@ -361,6 +760,17 @@ export const getEvents = async (params = {}) => {
   }
   const full = params.full === 'true' || params.full === true
 
+  // Full mode feeds the Schedule page, which draws an event only when it
+  // (or a sibling in its series) has a match on a table or in the queue —
+  // and the queue is built from today's started events alone. So anything
+  // not dated today is fetched in full, shipped, and discarded on arrival.
+  // On this cluster that read is about a second per 100 KB, and it was
+  // every event the club has ever run.
+  if (full) query.date = getClubDate()
+
+  // Summary mode keeps every event: the events list is a history, and it
+  // is already cheap because the projection below drops the matches.
+  //
   // Summary mode drops eventStages entirely (see summarizeEvent) — it
   // survives the query only to derive `finished` and `hasSchedule`, which
   // read nothing but stage type, group/round counts, isComplete and
@@ -595,6 +1005,8 @@ const validateAddParticipantInput = (body) => {
   }
 }
 
+const isLeagueEvent = (event) => event?.eventType === 'league'
+
 const validateAddParticipantRules = (event, players) => {
   const errors = []
 
@@ -602,13 +1014,15 @@ const validateAddParticipantRules = (event, players) => {
     errors.push('At least one player required')
     return errors
   }
-  if (players.length > event.nop) {
+  // A league roster may be larger than the number of players a team fields
+  // on a match day (league.md, "Players"), so only tournaments cap it.
+  if (!isLeagueEvent(event) && players.length > event.nop) {
     errors.push(`Expected at most ${event.nop} player(s), got ${players.length}`)
   }
 
   // Partial team save is allowed; rules that may still be satisfied
   // by adding more players are deferred until the team is full.
-  const isFullTeam = players.length === event.nop
+  const isFullTeam = players.length >= event.nop
 
   // Check for duplicate players in input
   const playerIds = new Set()
@@ -627,8 +1041,7 @@ const validateAddParticipantRules = (event, players) => {
 
   // Check rating requirement (combined sum can only grow; flag now if over)
   if (event.restriction === 'Rated' && event.ratingLimit) {
-    const ratingErrors = validateRatingRequirement(event, players)
-    errors.push(...ratingErrors)
+    errors.push(...validateParticipantRating(event, players))
   }
 
   // Check age requirement (ignore players without dateOfBirth on file)
@@ -648,17 +1061,42 @@ const validateAddParticipantRules = (event, players) => {
   // Sex requirement: defer mixed-team / mixed-double checks until full
   validatePartialSexRequirement(event, players, isFullTeam, errors)
 
-  // Check if player is already in event
-  for (const player of players) {
-    const existing = event.participants.find((p) =>
-      p.players.some((pl) => pl._id.toString() === player._id.toString()),
-    )
-    if (existing) {
-      errors.push(`Player ${player.firstName} ${player.lastName} is already in the event`)
+  // Check if player is already in event. A shared-player league lets a
+  // player sit on several rosters — they just can't play for two teams on
+  // the same match day, which is enforced when the week's players are
+  // picked (league.md, "Players").
+  if (!(isLeagueEvent(event) && event.league?.allowPlayerSharing)) {
+    for (const player of players) {
+      const existing = event.participants.find((p) =>
+        p.players.some((pl) => pl._id.toString() === player._id.toString()),
+      )
+      if (existing) {
+        errors.push(`Player ${player.firstName} ${player.lastName} is already in the event`)
+      }
     }
   }
 
   return errors
+}
+
+/**
+ * A league team registers a roster, not a line-up, so the rating limits
+ * apply to the {nop} players it could field — reject only when no
+ * combination of them can satisfy the limits. The cheapest combination is
+ * always the {nop} lowest-rated players: any swap for a higher-rated player
+ * raises both the combined total and the top-N total, so checking that one
+ * combination settles it.
+ */
+const validateParticipantRating = (event, players) => {
+  if (!isLeagueEvent(event) || players.length <= event.nop) {
+    return validateRatingRequirement(event, players)
+  }
+  const lowest = [...players]
+    .sort((a, b) => (a.rating || 0) - (b.rating || 0))
+    .slice(0, event.nop)
+  return validateRatingRequirement(event, lowest).map((error) =>
+    `${error} — no ${event.nop} players on this roster can meet the limit`,
+  )
 }
 
 const validatePartialSexRequirement = (event, players, isFullTeam, errors) => {
@@ -744,9 +1182,14 @@ const allPlayersPaid = (event, players) => {
   )
 }
 
+const hasFullRoster = (event, players) =>
+  isLeagueEvent(event)
+    ? players.length >= event.nop
+    : players.length === event.nop
+
 const countPaidParticipants = (event) =>
   event.participants.filter(
-    (p) => p.players.length === event.nop && allPlayersPaid(event, p.players),
+    (p) => hasFullRoster(event, p.players) && allPlayersPaid(event, p.players),
   ).length
 
 const isQualifiedParticipant = (event, participant, { ignoreUnpaid = true } = {}) =>
@@ -758,7 +1201,7 @@ const getParticipantDisqualifyReason = (
   { ignoreUnpaid = true } = {},
 ) => {
   const players = participant.players || []
-  if (event.nop > 1 && players.length !== event.nop) {
+  if (event.nop > 1 && !hasFullRoster(event, players)) {
     return `incomplete team (${players.length}/${event.nop} players)`
   }
   if (!meetsSexRequirement(event, players)) {
@@ -990,6 +1433,9 @@ export const generateGroups = async (body) => {
 
   const event = await collection.findOne({ _id: toObjectId(_id) })
   if (!event) throwError('Event not found')
+  if (isLeagueEvent(event)) {
+    throwError('A league round is scheduled from its fixtures, not groups')
+  }
 
   // The "ignore unpaid" setting toggles whether unpaid participants
   // count as disqualified — applies to both validation and the
@@ -1051,7 +1497,7 @@ export const generateGroups = async (body) => {
   return groups
 }
 
-const getBestOfNumber = (bestOfOption) => {
+export const getBestOfNumber = (bestOfOption) => {
   if (bestOfOption === 'Best of 3') return 3
   if (bestOfOption === 'Best of 5') return 5
   if (bestOfOption.includes('Best of 3')) return 3
@@ -1098,7 +1544,7 @@ const buildGroupMatchRecord = (event, schedule, numberOfGames) => {
   }
 }
 
-const getTeamMatchType = (nop, numberOfMatches) => {
+export const getTeamMatchType = (nop, numberOfMatches) => {
   if (nop === 2 && numberOfMatches === 3) return 'type1'
   if (nop === 2 && numberOfMatches === 5) return 'type2'
   if (nop === 3 && numberOfMatches === 5) return 'type3'
@@ -3021,7 +3467,7 @@ const freeTeamMatchTable = async (db, matchId) => {
     )
 }
 
-const buildTeamSubMatches = (parent, lockedTableNumber) => {
+export const buildTeamSubMatches = (parent, lockedTableNumber) => {
   // Honor an admin's manual table choice on the parent — that choice
   // (persisted onto the parent match itself) takes priority over the
   // parent's current tableState position so that the picked table
@@ -3307,7 +3753,14 @@ const validateSaveTeamMatchAssignmentInput = (body) => {
 
 // Per match.md "Team Match Schedules". Kept in sync with the TS helper
 // in shared/rules/matchRules.ts.
-const getTeamMatchLineupJS = (type, home, away) => {
+//
+// League events add the "rr{n}" types: RR Singles, where every player of one
+// team plays every player of the other (league.md, "Format"). Those are
+// generated rather than listed, so any team size works.
+export const getTeamMatchLineupJS = (type, home, away) => {
+  if (typeof type === 'string' && type.startsWith('rr')) {
+    return getRoundRobinSinglesLineupJS(Number(type.slice(2)), home, away)
+  }
   const { A, B, C } = home
   const { A: X, B: Y, C: Z } = away
   if (type === 'type1') {
@@ -3337,6 +3790,20 @@ const getTeamMatchLineupJS = (type, home, away) => {
     ]
   }
   throwError(`Unknown team match type: ${type}`)
+}
+
+const ASSIGNMENT_SLOTS = ['A', 'B', 'C', 'D']
+
+const getRoundRobinSinglesLineupJS = (teamSize, home, away) => {
+  if (!teamSize || teamSize < 2) throwError('RR Singles needs a team size')
+  const slots = ASSIGNMENT_SLOTS.slice(0, teamSize)
+  const missing = slots.find((slot) => !home[slot] || !away[slot])
+  if (missing) throwError(`RR Singles requires ${teamSize} players per team`)
+  return getRoundRobinSinglesLineup(teamSize).map((entry) => ({
+    home: entry.homeSlots.map((i) => home[slots[i]]),
+    away: entry.awaySlots.map((i) => away[slots[i]]),
+    isDoubles: entry.homeSlots.length > 1,
+  }))
 }
 
 const buildTeamAssignment = (match, side, assignmentIds) => {
@@ -3511,43 +3978,87 @@ export const updateMatchInStages = (eventStages, matchId, updateFn) => {
 // Re-tally a team match after a sub-match changed. Drives both the
 // finalise (one side hits the win threshold) and un-finalise (a reset
 // pulls counts back below the threshold) transitions.
+// Who has won the team match, and whether the rest still need playing.
+//
+// A tournament tie is sudden death: first to ceil(MS/2) wins and the
+// remaining sub-matches are cancelled (match.md, "Team Match"). A league
+// round is not — its standings are ranked on total matches and games won
+// across the season, and the spec's own example (a round won "6:3", nine
+// sub-matches) can only happen if every one is played.
+// Once a sudden-death tie is decided the sub-matches that won't be played
+// are cancelled; a reset that pulls the tally back below the threshold
+// brings them into play again.
+const applySuddenDeathCancellations = (
+  parent,
+  { finalizedNow, unfinalizedNow, now },
+) => {
+  if (finalizedNow) {
+    return parent.subMatches.map((s) =>
+      s.winningSide == null && !s.cancelledAt ? { ...s, cancelledAt: now } : s,
+    )
+  }
+  if (unfinalizedNow) {
+    return parent.subMatches.map((s) =>
+      s.cancelledAt && s.winningSide == null
+        ? { ...s, cancelledAt: undefined }
+        : s,
+    )
+  }
+  return parent.subMatches
+}
+
+// RR Singles only exists in a league, and a league round plays every
+// sub-match — so a tie of that shape counts even if it was generated before
+// the flag existed, and heals itself instead of needing a migration.
+const playsAllSubMatches = (parent) =>
+  parent.playAllMatches === true ||
+  (parent.teamMatchType || '').startsWith('rr')
+
+// Bring back sub-matches an earlier sudden-death tally dropped: in a league
+// every one of them still has to be played.
+const restoreTallyCancelled = (parent) =>
+  parent.subMatches.some((s) => s.cancelledAt && s.winningSide == null)
+    ? parent.subMatches.map((s) =>
+        s.cancelledAt && s.winningSide == null
+          ? { ...s, cancelledAt: undefined }
+          : s,
+      )
+    : parent.subMatches
+
+const decideTeamMatch = (parent, wins1, wins2) => {
+  if (playsAllSubMatches(parent)) {
+    const decided = parent.subMatches.filter((s) => s.winningSide && s.confirmed)
+    if (decided.length < parent.subMatches.length) return undefined
+    // An even number of sub-matches can be drawn; neither side takes the
+    // round, and the standings still count the matches and games.
+    return wins1 > wins2 ? 1 : wins2 > wins1 ? 2 : undefined
+  }
+  const needed = Math.ceil((parent.numberOfMatches || 0) / 2)
+  if (needed <= 0) return undefined
+  return wins1 >= needed ? 1 : wins2 >= needed ? 2 : undefined
+}
+
 const tallyTeamMatch = (parent) => {
   if (!Array.isArray(parent.subMatches) || parent.subMatches.length === 0) {
     return parent
   }
-  const needed = Math.ceil((parent.numberOfMatches || 0) / 2)
   const wins1 = parent.subMatches.filter(
     (s) => s.winningSide === 1 && s.confirmed,
   ).length
   const wins2 = parent.subMatches.filter(
     (s) => s.winningSide === 2 && s.confirmed,
   ).length
-  const winningSide =
-    needed > 0 && wins1 >= needed
-      ? 1
-      : needed > 0 && wins2 >= needed
-        ? 2
-        : undefined
+  const winningSide = decideTeamMatch(parent, wins1, wins2)
   const wasFinal = parent.winningSide != null
   const isFinal = winningSide != null
   const finalizedNow = !wasFinal && isFinal
   const unfinalizedNow = wasFinal && !isFinal
   const now = new Date().toISOString()
-  let subMatches = parent.subMatches
-  if (finalizedNow) {
-    // Decided just now — cancel the sub-matches that won't be played.
-    subMatches = parent.subMatches.map((s) =>
-      s.winningSide == null && !s.cancelledAt
-        ? { ...s, cancelledAt: now }
-        : s,
-    )
-  } else if (unfinalizedNow) {
-    // A reset pulled the tally back below the threshold — bring the
-    // tally-cancelled sub-matches back into play.
-    subMatches = parent.subMatches.map((s) =>
-      s.cancelledAt && s.winningSide == null ? { ...s, cancelledAt: undefined } : s,
-    )
-  }
+  // Cancelling only applies to sudden death. A league round plays every
+  // sub-match, so there is never anything to drop or bring back.
+  const subMatches = playsAllSubMatches(parent)
+    ? restoreTallyCancelled(parent)
+    : applySuddenDeathCancellations(parent, { finalizedNow, unfinalizedNow, now })
   return {
     ...parent,
     subMatches,
@@ -4261,10 +4772,27 @@ export const deleteEvent = async (body) => {
 
   const db = getDB()
   const collection = db.collection(EVENTS_COLLECTION)
+
+  const event = await collection.findOne(
+    { _id: toObjectId(body._id) },
+    { projection: { eventType: 1, leagueId: 1 } },
+  )
+  if (!event) throwError('Event not found')
+
+  // A league's weeks are separate events but one thing to the user — the
+  // list shows a single row for the league — so deleting it takes every
+  // round with it. Leaving the others behind would orphan them: their
+  // fixtures name teams that only the root round still holds.
+  if (event.eventType === 'league') {
+    const leagueId = event.leagueId || event._id.toString()
+    const result = await collection.deleteMany({ leagueId })
+    return { success: true, deletedCount: result.deletedCount }
+  }
+
   const result = await collection.deleteOne({ _id: toObjectId(body._id) })
   if (result.deletedCount === 0) throwError('Event not found')
 
-  return { success: true }
+  return { success: true, deletedCount: result.deletedCount }
 }
 
 const validateResetEventInput = (body) => {
@@ -4299,6 +4827,13 @@ const buildResetEventStages = (event) =>
  * Returns true if any changes were made.
  */
 export const autoGenerateForEvent = async (event) => {
+  // A league round's matches come from its own fixtures and the players
+  // each team fields that week — never from snake seeding. Without this
+  // the live-score auto-start quietly fills the round's group with
+  // tournament-style team matches carrying whole rosters, and the week can
+  // no longer be generated properly.
+  if (isLeagueEvent(event)) return false
+
   let changed = false
 
   // Respect the global "ignore unpaid" setting so auto-start matches the
@@ -4584,11 +5119,11 @@ const validateEditParticipantRules = (event, players, currentParticipantId) => {
     errors.push('At least one player required')
     return errors
   }
-  if (players.length > event.nop) {
+  if (!isLeagueEvent(event) && players.length > event.nop) {
     errors.push(`Expected at most ${event.nop} player(s), got ${players.length}`)
   }
 
-  const isFullTeam = players.length === event.nop
+  const isFullTeam = players.length >= event.nop
 
   const playerIds = new Set()
   for (const player of players) {
@@ -4601,8 +5136,7 @@ const validateEditParticipantRules = (event, players, currentParticipantId) => {
 
   // Check rating requirement
   if (event.restriction === 'Rated' && event.ratingLimit) {
-    const ratingErrors = validateRatingRequirement(event, players)
-    errors.push(...ratingErrors)
+    errors.push(...validateParticipantRating(event, players))
   }
 
   // Check age requirement (ignore players without dateOfBirth on file)
@@ -4622,15 +5156,18 @@ const validateEditParticipantRules = (event, players, currentParticipantId) => {
   // Sex requirement: defer mixed-team / mixed-double checks until full
   validatePartialSexRequirement(event, players, isFullTeam, errors)
 
-  // Check if player is already in a different participant
-  for (const player of players) {
-    const existing = event.participants.find(
-      (p) =>
-        p._id !== currentParticipantId &&
-        p.players.some((pl) => pl._id.toString() === player._id.toString()),
-    )
-    if (existing) {
-      errors.push(`Player ${player.firstName} ${player.lastName} is already in another team`)
+  // Check if player is already in a different participant. Shared-player
+  // leagues allow it (league.md, "Players").
+  if (!(isLeagueEvent(event) && event.league?.allowPlayerSharing)) {
+    for (const player of players) {
+      const existing = event.participants.find(
+        (p) =>
+          p._id !== currentParticipantId &&
+          p.players.some((pl) => pl._id.toString() === player._id.toString()),
+      )
+      if (existing) {
+        errors.push(`Player ${player.firstName} ${player.lastName} is already in another team`)
+      }
     }
   }
 

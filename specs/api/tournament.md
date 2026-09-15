@@ -39,13 +39,20 @@ return the new tournament
 
 ## Save event
 
-An event is a tournament on a specific date with specific max participants.
+An event is:
+
+1. a tournament on a specific date with specific max participants, or
+
+2. a round/week in a league on a specific league day of the week where each team will play one opponent (some teams may have a bye)
 
 ### input
 
 - event id = null
+- event type (tournament or league) *
+
+for tournament
 - tournament id *
-- date *
+- date/time *
 - max participants = unlimited
 - name = {tournament name} - {date}
 - groupGames = best of 3
@@ -53,6 +60,22 @@ An event is a tournament on a specific date with specific max participants.
 - groupMatches = best of 3
 - knockoutMatches = best of 3 before semifinal
 - qualifiers = 2
+
+for league
+- name *
+- format *
+- day of week *
+- time *
+- startDate *
+- teamSize *
+- numOfPhases = 1
+- allowPlayerSharing = false
+- roundGames = best of 5
+- ratingLimit
+- topPlayersRatingEnabled
+- topPlayersCount
+- topPlayersRatingLimit
+
 - handicapEnabled = false
 - handicapDifference = 200
 - handicapMaxPoints = 5
@@ -63,14 +86,17 @@ An event is a tournament on a specific date with specific max participants.
 
 ### Prerequisite
 
-- if !isEdit, no event with the same name and date exists
+- if !isEdit, no event with the same name and date (startDate for league) exists
 - if IsEdit
   - event with id exists
   - no schedules have been created
 
 ### Action
 
-- event is a sub class of tournament, copy the tournament fields (ecept id and name) to the new event object
+- for tournament, event is a sub class of tournament, copy the tournament fields (ecept id and name) to the new event object
+- for league
+  - generate 1 event for the first round/week 
+  - copy the "format" fields to each event
 - save to db
 
 ### Output

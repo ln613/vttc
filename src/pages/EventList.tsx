@@ -4,6 +4,8 @@ import { useNavigate } from '@solidjs/router'
 import { Header } from '../components/Header'
 import ToggleButton from '../components/ToggleButton'
 import Select from '../components/Select'
+import SingleSelectTags from '../components/SingleSelectTags'
+import Toggle from '../components/Toggle'
 import Button from '../components/Button'
 import FeeInfoDialog from '../components/FeeInfoDialog'
 import TeammateSelectDialog from '../components/TeammateSelectDialog'
@@ -18,6 +20,9 @@ import {
 } from '../stores/tournamentStore'
 import { apiGet, apiPost } from '../utils/api'
 import { eventActions, type EventOption } from '../stores/eventStore'
+import type { EventType, LeagueFormat } from '../../shared/types/League'
+import { LEAGUE_FORMATS } from '../../shared/types/League'
+import { getSupportedTeamSizes } from '../../shared/rules/leagueRules'
 
 const EventList = () => {
   const navigate = useNavigate()
@@ -130,8 +135,21 @@ const SimulateEventDialog = (props: { onClose: () => void }) => {
   const [selectedSeries, setSelectedSeries] = createSignal('')
   const [selectedTournamentId, setSelectedTournamentId] = createSignal('')
   const [maxParticipants, setMaxParticipants] = createSignal('16')
+  const [eventType, setEventType] = createSignal<EventType>('tournament')
+  const [format, setFormat] = createSignal<LeagueFormat>('RR Singles')
+  const [teamSize, setTeamSize] = createSignal('3')
+  const [autoGenerateSchedule, setAutoGenerateSchedule] = createSignal(true)
   const [saving, setSaving] = createSignal(false)
   const [error, setError] = createSignal<string | null>(null)
+
+  const isLeague = () => eventType() === 'league'
+
+  // Not every format has a schedule for every team size.
+  const handleFormatChange = (value: string) => {
+    setFormat(value as LeagueFormat)
+    const sizes = getSupportedTeamSizes(value as LeagueFormat)
+    if (!sizes.includes(teamSize())) setTeamSize(sizes[sizes.length - 1])
+  }
 
   onMount(async () => {
     tournamentActions.fetchTournaments()
@@ -149,30 +167,56 @@ const SimulateEventDialog = (props: { onClose: () => void }) => {
   const seriesOptions = () =>
     seriesList().map((s) => ({ value: s, label: s }))
 
-  const handleSave = async () => {
-    const tournamentId = selectedTournamentId()
-    if (!tournamentId) {
-      setError('Please select a tournament')
-      return
+  // A simulated event starts today, a minute from now, so it can be
+  // umpired straight away.
+  const commonPayload = () => ({
+    maxParticipants:
+      maxParticipants() === 'Unlimited' ? 0 : parseInt(maxParticipants(), 10),
+    date: formatLocalDate(new Date()),
+    time: formatTimeNowPlus1Min(),
+    registrationFee: 30,
+  })
+
+  const buildPayload = (): Record<string, unknown> | null => {
+    if (isLeague()) {
+      return {
+        ...commonPayload(),
+        eventType: 'league',
+        format: format(),
+        teamSize: parseInt(teamSize(), 10),
+      }
     }
-    const tournament = tournamentActions.getTournamentById(tournamentId)
+    const tournament = tournamentActions.getTournamentById(
+      selectedTournamentId(),
+    )
     if (!tournament) {
-      setError('Tournament not found')
-      return
+      setError(
+        selectedTournamentId()
+          ? 'Tournament not found'
+          : 'Please select a tournament',
+      )
+      return null
     }
-    setSaving(true)
+    return {
+      ...commonPayload(),
+      eventSeries: selectedSeries() || undefined,
+      tournamentId: selectedTournamentId(),
+      name: `${tournament.name} - test`,
+    }
+  }
+
+  const handleSave = async () => {
     setError(null)
+    const payload = buildPayload()
+    if (!payload) return
+    setSaving(true)
     try {
-      await apiPost('simulateEvent', {
-        tournamentId,
-        eventSeries: selectedSeries() || undefined,
-        maxParticipants:
-          maxParticipants() === 'Unlimited' ? 0 : parseInt(maxParticipants(), 10),
-        name: `${tournament.name} - test`,
-        date: formatLocalDate(new Date()),
-        time: formatTimeNowPlus1Min(),
-        registrationFee: 30,
-      })
+      const created = await apiPost<{ _id: string }>('simulateEvent', payload)
+      // Saves clicking through Generate League Schedule on a league that
+      // only exists to be tried out.
+      if (isLeague() && autoGenerateSchedule()) {
+        await apiPost('generateLeagueSchedule', { _id: created._id })
+      }
       await eventListActions.fetchEvents()
       props.onClose()
     } catch (err) {
@@ -185,13 +229,47 @@ const SimulateEventDialog = (props: { onClose: () => void }) => {
     <div style={dialogOverlayStyle} onClick={props.onClose}>
       <div style={dialogStyle} onClick={(e) => e.stopPropagation()}>
         <h2 style={dialogTitleStyle}>Simulate Event</h2>
-        <Select
-          label="Event Series"
-          name="simSeries"
-          value={selectedSeries()}
-          onChange={setSelectedSeries}
-          options={seriesOptions()}
+        <SingleSelectTags
+          label="Event Type"
+          options={['Tournament', 'League']}
+          selectedValue={isLeague() ? 'League' : 'Tournament'}
+          onChange={(value) =>
+            setEventType(value === 'League' ? 'league' : 'tournament')
+          }
         />
+        <Show when={!isLeague()}>
+          <Select
+            label="Event Series"
+            name="simSeries"
+            value={selectedSeries()}
+            onChange={setSelectedSeries}
+            options={seriesOptions()}
+          />
+        </Show>
+        <Show when={isLeague()}>
+          <Select
+            label="Format"
+            name="simFormat"
+            value={format()}
+            onChange={handleFormatChange}
+            options={LEAGUE_FORMATS.map((f) => ({ value: f, label: f }))}
+          />
+          <SingleSelectTags
+            label="Team Size"
+            options={getSupportedTeamSizes(format())}
+            selectedValue={teamSize()}
+            onChange={setTeamSize}
+          />
+          <div style={simToggleRowStyle}>
+            <Toggle
+              label="Auto Generate League Schedule"
+              value={autoGenerateSchedule()}
+              onChange={setAutoGenerateSchedule}
+              noMargin
+            />
+          </div>
+        </Show>
+        <Show when={!isLeague()}>
         <div style={tournamentGroupsContainerStyle}>
           <TournamentGroup
             title="Open Singles"
@@ -218,8 +296,9 @@ const SimulateEventDialog = (props: { onClose: () => void }) => {
             onSelect={setSelectedTournamentId}
           />
         </div>
+        </Show>
         <Select
-          label="Max Participants"
+          label={isLeague() ? 'Number of Teams' : 'Max Participants'}
           name="simMax"
           value={maxParticipants()}
           onChange={setMaxParticipants}
@@ -239,6 +318,11 @@ const SimulateEventDialog = (props: { onClose: () => void }) => {
       </div>
     </div>
   )
+}
+
+const simToggleRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'margin-bottom': '16px',
 }
 
 const TournamentGroup = (props: {
@@ -474,12 +558,19 @@ const handleFeeIconClick = (e: MouseEvent, event: EventOption) => {
   eventListActions.showFeeInfo(event)
 }
 
+// The list shows one row per league, and deleting it removes every week —
+// say so, since the row names the league and not the weeks.
+const describeLeagueDeletion = (event: EventOption): string =>
+  event.eventType === 'league'
+    ? ' Every week of this league will be deleted.'
+    : ''
+
 const handleDeleteIconClick = async (e: MouseEvent, event: EventOption) => {
   e.stopPropagation()
   e.preventDefault()
   if (
     !(await customConfirm(
-      `Delete "${event.eventName}"? This cannot be undone.`,
+      `Delete "${event.eventName}"?${describeLeagueDeletion(event)} This cannot be undone.`,
       { confirmColor: '#e74c3c' },
     ))
   ) {

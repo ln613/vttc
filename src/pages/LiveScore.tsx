@@ -293,11 +293,12 @@ const AssignedTable = (props: AssignedTableProps) => {
   const side2IsWinner = () => provisional().winningSide === 2
   const [showPostpone, setShowPostpone] = createSignal(false)
   const showActionButton = () => !!props.isMobile && authState.isAdmin
+  const isLeague = () => props.matchItem.event?.eventType === 'league'
   const subMatchLabel = (): string | undefined => {
     const parent = props.matchItem.parent
     const idx = props.matchItem.subMatchIndex
     if (!parent || idx == null) return undefined
-    return getTeamSubMatchTitle(parent, idx)
+    return getTeamSubMatchTitle(parent, idx, isLeague())
   }
 
   const handleCancel = async (e?: MouseEvent) => {
@@ -334,8 +335,23 @@ const AssignedTable = (props: AssignedTableProps) => {
       )}
     >
       <div style={tableNumberAssignedStyle}>{props.tableNumber}</div>
-      <div style={eventNameTableStyle}>{props.matchItem.eventName}</div>
-      <div style={stageNameTableStyle}>{props.matchItem.stageName}</div>
+      <Show
+        when={props.matchItem.teamNames}
+        fallback={
+          <>
+            <div style={eventNameTableStyle}>{props.matchItem.eventName}</div>
+            <div style={stageNameTableStyle}>{props.matchItem.stageName}</div>
+          </>
+        }
+      >
+        {(teams) => (
+          <>
+            <div style={eventNameTableStyle}>{teams().side1}</div>
+            <div style={teamVsTableStyle}>vs</div>
+            <div style={eventNameTableStyle}>{teams().side2}</div>
+          </>
+        )}
+      </Show>
       <Show when={subMatchLabel()}>
         {(label) => <div style={subMatchTableLabelStyle}>{label()}</div>}
       </Show>
@@ -599,11 +615,15 @@ const MatchQueueRow = (props: MatchQueueRowProps) => {
   return (
     <div style={{ ...queueRowStyle, ...m(queueRowMobileStyle) }}>
       <div style={{ ...queueEventNameStyle, ...m(queueEventNameMobileStyle) }}>
-        {props.item.eventName}
+        {props.item.teamNames
+          ? `${props.item.teamNames.side1} vs ${props.item.teamNames.side2}`
+          : props.item.eventName}
       </div>
-      <div style={{ ...queueStageStyle, ...m(queueStageMobileStyle) }}>
-        {props.item.stageName}
-      </div>
+      <Show when={!props.item.teamNames}>
+        <div style={{ ...queueStageStyle, ...m(queueStageMobileStyle) }}>
+          {props.item.stageName}
+        </div>
+      </Show>
       <div style={{ ...queueMatchStyle, ...m(queueMatchMobileStyle) }}>
         <SidePlayersDisplay players={match()?.side1 || []} />
         <span style={{ ...queueVsStyle, ...m(queueVsMobileStyle) }}> vs </span>
@@ -940,6 +960,16 @@ const eventNameTableStyle: JSX.CSSProperties = {
   // get clipped by `overflow: hidden` (which is needed for ellipsis).
   'line-height': 1.4,
   padding: '2px 0',
+}
+
+// The "vs" between the two team names — smaller and dimmer, so the names
+// read as the heading and this only separates them.
+const teamVsTableStyle: JSX.CSSProperties = {
+  'font-size': 'clamp(9px, 4cqh, 13px)',
+  'font-weight': 600,
+  color: 'rgba(255,255,255,0.75)',
+  'text-align': 'center',
+  'line-height': 1.2,
 }
 
 const stageNameTableStyle: JSX.CSSProperties = {

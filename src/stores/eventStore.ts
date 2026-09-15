@@ -8,12 +8,19 @@ import type {
   Stage,
   EventPrizes,
 } from '../../shared/types/Tournament'
+import type { EventType, LeagueConfig } from '../../shared/types/League'
 import { apiGet, apiPost } from '../utils/api'
 
 export interface EventOption {
   _id: string
   eventName: string
   eventSeries?: string
+  // League rounds: a roster may exceed nop, and players may be shared.
+  eventType?: EventType
+  leagueId?: string
+  leagueName?: string
+  roundIndex?: number
+  league?: LeagueConfig
   nop: number
   maxParticipants: number
   registrationFee?: number

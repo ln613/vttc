@@ -59,7 +59,11 @@ export interface Match {
   // expanded; that happens after both sides pick their order of play.
   isTeamMatch?: boolean
   teamMatchType?: TeamMatchType
-  numberOfMatches?: 3 | 5 // Best-of-N team sub-matches
+  numberOfMatches?: number // Best-of-N team sub-matches
+  // League rounds: play every sub-match rather than stopping once the tie
+  // is decided, because the standings rank on total matches and games won
+  // across the season (specs/pages/Event Detail.md, Standing tab).
+  playAllMatches?: boolean
   participantIds?: { side1: string; side2: string }
   // Handshake: which sides have clicked "Start" (team events only).
   side1Started?: boolean
@@ -74,6 +78,10 @@ export interface Match {
   // they must run on.
   parentMatchId?: string
   lockedTableNumber?: number
+  // Set by an admin's "Play Now" on an RR Singles league round: this pending
+  // sub-match is the one the queue offers next. Purely about scheduling —
+  // the sub-matches keep their listed order and numbering.
+  playNextAt?: string
   cancelledAt?: string
   postponedUntil?: string
   confirmedAt?: string

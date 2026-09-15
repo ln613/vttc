@@ -1,3 +1,4 @@
 export * from './tournamentRules'
 export * from './matchRules'
+export * from './leagueRules'
 export * from './tableRules'

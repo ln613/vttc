@@ -56,6 +56,11 @@ Vertical
 - button "Cancel" (red)
 - button "Save" (green)
 
+For league event
+- no nop restriction, a team can have more than nop players. So add a "Add Player" button below the last row of players, which add another row, but still start with nop rows.
+- if allowPlayerSharing is true, then allow players to be added to different teams
+- if event is rated, only reject if no combination of n (nop) players can satisfy the rating and/or top players rating requirements
+
 ### interaction
 
 - on save: call add participant API

@@ -13,11 +13,18 @@ import { tournamentState, tournamentActions } from '../stores/tournamentStore'
 import {
   eventEditState,
   eventEditActions,
+  getLeagueMatchesText,
   hasGroupStage,
   hasKnockoutStage,
   type EventEditFormData,
 } from '../stores/eventEditStore'
-import type { BestOfOption, QualifiersCount } from '../../shared/types'
+import type {
+  BestOfOption,
+  QualifiersCount,
+  LeagueFormat,
+} from '../../shared/types'
+import { DAY_NAMES, LEAGUE_FORMATS } from '../../shared/types'
+import { getSupportedTeamSizes } from '../../shared/rules/leagueRules'
 import { customConfirm } from '../stores/confirmDialogStore'
 
 const GROUP_GAMES_OPTIONS: BestOfOption[] = ['Best of 3', 'Best of 5']
@@ -28,17 +35,23 @@ const KNOCKOUT_GAMES_OPTIONS: BestOfOption[] = [
   'Best of 5',
 ]
 const QUALIFIERS_OPTIONS: QualifiersCount[] = ['Top 1', 'Top 2', 'Top 3', 'All']
+const EVENT_TYPE_OPTIONS = ['Tournament', 'League']
+const LEAGUE_GAMES_OPTIONS: BestOfOption[] = ['Best of 3', 'Best of 5']
+const PHASES_OPTIONS = ['1', '2', '3']
 
+const isLeague = () => eventEditState.formData.eventType === 'league'
+
+// 6AM to 10PM, half hour interval.
 const generateTimeOptions = () => {
   const options = []
-  for (let hour = 8; hour <= 18; hour++) {
+  for (let hour = 6; hour <= 22; hour++) {
     const period = hour >= 12 ? 'PM' : 'AM'
     const displayHour = hour > 12 ? hour - 12 : hour
     options.push({
       value: `${displayHour}:00 ${period}`,
       label: `${displayHour}:00 ${period}`,
     })
-    if (hour < 18) {
+    if (hour < 22) {
       options.push({
         value: `${displayHour}:30 ${period}`,
         label: `${displayHour}:30 ${period}`,
@@ -61,6 +74,24 @@ const generateHandicapDifferenceOptions = () => {
 const generateMaxPointsGivenOptions = () => {
   const options = []
   for (let i = 1; i <= 10; i++) {
+    options.push({ value: String(i), label: String(i) })
+  }
+  return options
+}
+
+const generateRatingOptions = () => {
+  const options = []
+  for (let i = 100; i <= 6000; i += 50) {
+    options.push({ value: String(i), label: String(i) })
+  }
+  return options
+}
+
+const RATING_OPTIONS = generateRatingOptions()
+
+const generateTopPlayersCountOptions = (teamSize: string) => {
+  const options = []
+  for (let i = 1; i <= (parseInt(teamSize, 10) || 3); i++) {
     options.push({ value: String(i), label: String(i) })
   }
   return options
@@ -216,42 +247,22 @@ const EventEdit = (props: EventEditProps) => {
       </Show>
       <div style={contentStyle}>
         <h1 style={titleStyle}>{props.isEdit ? 'Edit Event' : 'Add Event'}</h1>
-        <InputDropdown
-          label="Event Series"
-          name="eventSeries"
-          value={eventEditState.formData.eventSeries}
-          onChange={(value) => eventEditActions.setField('eventSeries', value)}
-          options={eventEditState.eventSeriesList}
-          placeholder="Select or enter new series"
-        />
-        <Select
-          label="Tournament"
-          name="tournament"
-          value={eventEditState.formData.tournamentId}
-          onChange={(value) => eventEditActions.setField('tournamentId', value)}
-          options={tournamentOptions()}
-        />
-        <DatePicker
-          label="Date"
-          value={eventEditState.formData.date}
-          onChange={(value) => eventEditActions.setField('date', value)}
-          minYear={new Date().getFullYear() - 5}
-          maxYear={new Date().getFullYear() + 5}
-        />
-        <Select
-          label="Time"
-          name="time"
-          value={eventEditState.formData.time}
-          onChange={(value) => eventEditActions.setField('time', value)}
-          options={TIME_OPTIONS}
-        />
-        <Input
-          label="Name"
-          name="name"
-          value={eventEditState.formData.name}
-          onChange={(value) => eventEditActions.setField('name', value)}
-          required
-        />
+        <Show when={!props.isEdit}>
+          <SingleSelectTags
+            label="Event Type"
+            options={EVENT_TYPE_OPTIONS}
+            selectedValue={isLeague() ? 'League' : 'Tournament'}
+            onChange={(value) =>
+              eventEditActions.setField(
+                'eventType',
+                value === 'League' ? 'league' : 'tournament',
+              )
+            }
+          />
+        </Show>
+        <Show when={!isLeague()} fallback={<LeagueFields />}>
+          <TournamentFields tournamentOptions={tournamentOptions()} />
+        </Show>
         <Select
           label="Max Participants"
           name="maxParticipants"
@@ -273,7 +284,9 @@ const EventEdit = (props: EventEditProps) => {
         <PrizeSection />
         <NumberOfMatchesSection />
         <NumberOfGamesSection />
-        <QualifiersSection />
+        <Show when={!isLeague()}>
+          <QualifiersSection />
+        </Show>
         <HandicapSection />
         <Show when={eventEditState.error}>
           <div style={errorMessageStyle}>{eventEditState.error}</div>
@@ -294,6 +307,219 @@ const EventEdit = (props: EventEditProps) => {
     </div>
   )
 }
+
+const TournamentFields = (props: {
+  tournamentOptions: { value: string; label: string }[]
+}) => (
+  <>
+    <InputDropdown
+      label="Event Series"
+      name="eventSeries"
+      value={eventEditState.formData.eventSeries}
+      onChange={(value) => eventEditActions.setField('eventSeries', value)}
+      options={eventEditState.eventSeriesList}
+      placeholder="Select or enter new series"
+    />
+    <Select
+      label="Tournament"
+      name="tournament"
+      value={eventEditState.formData.tournamentId}
+      onChange={(value) => eventEditActions.setField('tournamentId', value)}
+      options={props.tournamentOptions}
+    />
+    <DatePicker
+      label="Date"
+      value={eventEditState.formData.date}
+      onChange={(value) => eventEditActions.setField('date', value)}
+      minYear={new Date().getFullYear() - 5}
+      maxYear={new Date().getFullYear() + 5}
+    />
+    <Select
+      label="Time"
+      name="time"
+      value={eventEditState.formData.time}
+      onChange={(value) => eventEditActions.setField('time', value)}
+      options={TIME_OPTIONS}
+    />
+    <Input
+      label="Name"
+      name="name"
+      value={eventEditState.formData.name}
+      onChange={(value) => eventEditActions.setField('name', value)}
+      required
+    />
+  </>
+)
+
+const LeagueFields = () => (
+  <>
+    <Input
+      label="Name"
+      name="name"
+      value={eventEditState.formData.name}
+      onChange={(value) => eventEditActions.setField('name', value)}
+      required
+    />
+    <SingleSelectTags
+      label="On"
+      options={[...DAY_NAMES]}
+      selectedValue={
+        eventEditState.formData.dayOfWeek === ''
+          ? null
+          : DAY_NAMES[Number(eventEditState.formData.dayOfWeek)]
+      }
+      onChange={(value) =>
+        eventEditActions.setField(
+          'dayOfWeek',
+          String(DAY_NAMES.indexOf(value as (typeof DAY_NAMES)[number])),
+        )
+      }
+    />
+    <Select
+      label="Time"
+      name="time"
+      value={eventEditState.formData.time}
+      onChange={(value) => eventEditActions.setField('time', value)}
+      options={TIME_OPTIONS}
+      required
+    />
+    <StartDatePicker />
+    <SingleSelectTags
+      label="Team Size"
+      options={getSupportedTeamSizes(eventEditState.formData.format)}
+      selectedValue={eventEditState.formData.teamSize}
+      onChange={(value) => eventEditActions.setField('teamSize', value)}
+    />
+    <Select
+      label="Format"
+      name="format"
+      value={eventEditState.formData.format}
+      onChange={(value) =>
+        eventEditActions.setField('format', value as LeagueFormat)
+      }
+      options={LEAGUE_FORMATS.map((f) => ({ value: f, label: f }))}
+      required
+    />
+    <SingleSelectTags
+      label="Number of Phases"
+      options={PHASES_OPTIONS}
+      selectedValue={eventEditState.formData.numOfPhases}
+      onChange={(value) => eventEditActions.setField('numOfPhases', value)}
+    />
+    <div style={inlineRowStyle}>
+      <Toggle
+        label="Allow Player Sharing"
+        value={eventEditState.formData.allowPlayerSharing}
+        onChange={(value) =>
+          eventEditActions.setField('allowPlayerSharing', value)
+        }
+        noMargin
+      />
+      <span style={noteStyle}>
+        Players can represent multiple teams, but a player can only play for 1
+        team on a match day
+      </span>
+    </div>
+    <div style={inlineRowStyle}>
+      <Toggle
+        label="Rated"
+        value={eventEditState.formData.rated}
+        onChange={(value) => eventEditActions.setField('rated', value)}
+        noMargin
+      />
+    </div>
+    <LeagueRatingSection />
+  </>
+)
+
+// The start date has to fall on the league's day of the week: pick Sunday
+// and the league can only start on a Sunday.
+const StartDatePicker = () => {
+  const day = () => eventEditState.formData.dayOfWeek
+
+  const handleChange = (value: Date | null) => {
+    if (value && day() !== '' && value.getDay() !== Number(day())) {
+      eventEditActions.setField('startDate', null)
+      return
+    }
+    eventEditActions.setField('startDate', value)
+  }
+
+  return (
+    <>
+      <DatePicker
+        label="Start Date"
+        value={eventEditState.formData.startDate}
+        onChange={handleChange}
+        minYear={new Date().getFullYear()}
+        maxYear={new Date().getFullYear() + 5}
+      />
+      <Show when={day() !== '' && !eventEditState.formData.startDate}>
+        <div style={noteStyle}>
+          Pick a {DAY_NAMES[Number(day())]} — the league plays every{' '}
+          {DAY_NAMES[Number(day())]}.
+        </div>
+      </Show>
+    </>
+  )
+}
+
+// The Rating Section of the Tournament Edit page, for a rated league.
+const LeagueRatingSection = () => (
+  <Show when={eventEditState.formData.rated}>
+    <h3 style={sectionTitleStyle}>Rating</h3>
+    <div style={inlineRowMiddleStyle}>
+      <span style={{ 'font-weight': 500 }}>Under</span>
+      <Select
+        label=""
+        name="ratingLimit"
+        value={eventEditState.formData.ratingLimit}
+        onChange={(value) => eventEditActions.setField('ratingLimit', value)}
+        options={RATING_OPTIONS}
+        noMargin
+      />
+    </div>
+    <h3 style={sectionTitleStyle}>Top Players Rating</h3>
+    <div style={inlineRowMiddleStyle}>
+      <Toggle
+        label=""
+        value={eventEditState.formData.topPlayersRatingEnabled}
+        onChange={(value) =>
+          eventEditActions.setField('topPlayersRatingEnabled', value)
+        }
+        noMargin
+      />
+      <Show when={eventEditState.formData.topPlayersRatingEnabled}>
+        <span style={{ 'font-weight': 500 }}>
+          The combined rating of the top
+        </span>
+        <Select
+          label=""
+          name="topPlayersCount"
+          value={eventEditState.formData.topPlayersCount}
+          onChange={(value) =>
+            eventEditActions.setField('topPlayersCount', value)
+          }
+          options={generateTopPlayersCountOptions(
+            eventEditState.formData.teamSize,
+          )}
+          noMargin
+        />
+        <span style={{ 'font-weight': 500 }}>players must be under</span>
+        <Select
+          label=""
+          name="topPlayersRatingLimit"
+          value={eventEditState.formData.topPlayersRatingLimit}
+          onChange={(value) =>
+            eventEditActions.setField('topPlayersRatingLimit', value)
+          }
+          options={RATING_OPTIONS}
+          noMargin
+        />
+      </Show>
+    </div>
+  </Show>
+)
 
 const PrizeSection = () => (
   <>
@@ -333,7 +559,8 @@ const NumberOfGamesSection = () => {
   const tournament = () => eventEditActions.getSelectedTournament()
 
   return (
-    <Show when={tournament()}>
+    <Show when={!isLeague()} fallback={<LeagueGamesSection />}>
+      <Show when={tournament()}>
       {(t) => (
         <>
           <h3 style={sectionTitleStyle}>Number of Games</h3>
@@ -359,15 +586,41 @@ const NumberOfGamesSection = () => {
           </Show>
         </>
       )}
+      </Show>
     </Show>
   )
 }
+
+const LeagueGamesSection = () => (
+  <>
+    <h3 style={sectionTitleStyle}>Number of Games</h3>
+    <SingleSelectTags
+      options={LEAGUE_GAMES_OPTIONS}
+      selectedValue={eventEditState.formData.roundGames}
+      onChange={(value) =>
+        eventEditActions.setField('roundGames', value as BestOfOption)
+      }
+    />
+  </>
+)
+
+// For a league the number of matches follows from the format: RR Singles
+// with a team of 3 is all nine pairings, Singles and Doubles is best of 5.
+const LeagueMatchesSection = () => (
+  <>
+    <h3 style={sectionTitleStyle}>Number of Matches</h3>
+    <div style={noteStyle}>
+      {getLeagueMatchesText(eventEditState.formData)} — set by the format
+    </div>
+  </>
+)
 
 const NumberOfMatchesSection = () => {
   const tournament = () => eventEditActions.getSelectedTournament()
 
   return (
-    <Show when={tournament()?.type === 'Team' && tournament()}>
+    <Show when={!isLeague()} fallback={<LeagueMatchesSection />}>
+      <Show when={tournament()?.type === 'Team' && tournament()}>
       {(t) => (
         <>
           <h3 style={sectionTitleStyle}>Number of Matches</h3>
@@ -396,6 +649,7 @@ const NumberOfMatchesSection = () => {
           </Show>
         </>
       )}
+      </Show>
     </Show>
   )
 }
@@ -421,6 +675,21 @@ const inlineRowStyle: JSX.CSSProperties = {
   display: 'flex',
   'align-items': 'center',
   gap: '12px',
+  'margin-bottom': '16px',
+}
+
+const inlineRowMiddleStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  gap: '12px',
+  'margin-bottom': '16px',
+  'flex-wrap': 'wrap',
+}
+
+const noteStyle: JSX.CSSProperties = {
+  'font-size': '13px',
+  color: '#666',
+  'text-align': 'left',
   'margin-bottom': '16px',
 }
 

@@ -18,7 +18,7 @@ import { customConfirm } from '../stores/confirmDialogStore'
 import { authState } from '../stores/authStore'
 import {
   getTeamSubMatchTitle,
-  TEAM_SUB_MATCH_LABELS,
+  getTeamMatchLineupLabels,
   deriveTeamMatchType,
 } from './EventDetail'
 import { subscribeToMatchReset, type EventSubscription } from '../utils/pusher'
@@ -654,6 +654,9 @@ const LandscapeInfoBox = (_props: { onExit: () => void }) => {
   const subMatchLabel = (): string | undefined => {
     const m = match()
     if (!m || !m.parentMatchId) return undefined
+    // The stage name above is already "{teams} - Match {n}" for a league,
+    // and there is no lineup pair left to add.
+    if (gamePlayActions.isLeagueEvent()) return undefined
     const ev = event()
     if (!ev) return undefined
     for (const stage of ev.eventStages || []) {
@@ -1280,6 +1283,9 @@ const InitScreen = () => {
   const teamSubMatchTitle = (): string | undefined => {
     const m = gamePlayActions.getCurrentMatch()
     if (!m || !m.parentMatchId) return undefined
+    // For a league the stage name carries "Match {n}", so this line is
+    // better spent on who is actually at the table.
+    if (gamePlayActions.isLeagueEvent()) return undefined
     const ev = event()
     if (!ev) return undefined
     for (const stage of ev.eventStages || []) {
@@ -1448,18 +1454,12 @@ const TeamInitBody = (props: { landscape: boolean }) => {
   const awayPlayers = (): Player[] =>
     awaySideNum() === 1 ? match()?.side1 || [] : match()?.side2 || []
   const nop = () => homePlayers().length
-  const teamType = (): keyof typeof TEAM_SUB_MATCH_LABELS | undefined => {
+  const teamType = (): string | undefined => {
     const m = match()
     if (!m) return undefined
-    return (
-      (m.teamMatchType as keyof typeof TEAM_SUB_MATCH_LABELS | undefined) ||
-      deriveTeamMatchType(m)
-    )
+    return m.teamMatchType || deriveTeamMatchType(m)
   }
-  const lineup = () => {
-    const t = teamType()
-    return t ? TEAM_SUB_MATCH_LABELS[t] || [] : []
-  }
+  const lineup = () => getTeamMatchLineupLabels(teamType())
 
   // homeSlots[i] / awaySlots[i] hold the playerId in slot i (label
   // HOME_LABELS[i] / AWAY_LABELS[i]). Empty string = unassigned.

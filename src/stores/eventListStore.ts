@@ -83,9 +83,44 @@ const sortedEvents = (): EventOption[] => {
   let events = eventState.data
   if (eventListState.myEventsOnly) events = filterMyEvents(events)
   if (eventListState.todayOnly) events = events.filter(isToday)
-  return [...events].sort(
+  return [...collapseLeagueRounds(events)].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
   )
+}
+
+/**
+ * A league's weeks are separate events, but the list shows one row per
+ * league — the week is picked on the Event Detail page.
+ *
+ * The row stands for the week still to be played (the earliest unfinished
+ * one), so a league playing today sorts and filters as today's fixture, and
+ * opening it lands on the week that matters.
+ */
+const collapseLeagueRounds = (events: EventOption[]): EventOption[] => {
+  const byLeague = new Map<string, EventOption[]>()
+  const rest: EventOption[] = []
+  for (const event of events) {
+    const leagueId = event.eventType === 'league' ? event.leagueId : undefined
+    if (!leagueId) {
+      rest.push(event)
+      continue
+    }
+    byLeague.set(leagueId, [...(byLeague.get(leagueId) || []), event])
+  }
+  for (const rounds of byLeague.values()) {
+    rest.push(representativeRound(rounds))
+  }
+  return rest
+}
+
+const representativeRound = (rounds: EventOption[]): EventOption => {
+  const ordered = [...rounds].sort(
+    (a, b) => (a.roundIndex ?? 0) - (b.roundIndex ?? 0),
+  )
+  const round = ordered.find((r) => !r.finished) || ordered[ordered.length - 1]
+  // The row is the league, so it carries the league's name rather than
+  // "… - Week 3".
+  return { ...round, eventName: round.leagueName || round.eventName }
 }
 
 const isToday = (event: EventOption): boolean => {

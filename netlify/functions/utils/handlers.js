@@ -56,6 +56,16 @@ import {
   syncCachedMatch,
 } from './liveScoreHandlers.js'
 import {
+  getLeague,
+  generateLeagueSchedule,
+  saveLeagueRoundPlayers,
+  autoSelectLeagueRoundPlayers,
+  generateLeagueRoundMatches,
+  playLeagueSubMatchNow,
+  resetLeagueRound,
+  syncLeagueRoster,
+} from './leagueHandlers.js'
+import {
   acquireMatchSession,
   heartbeatMatchSession,
   releaseMatchSession,
@@ -69,6 +79,15 @@ import {
 } from './revenueHandlers.js'
 import { savePushToken, removePushToken } from './push.js'
 import { notifyLiveScoreUpdate } from './pusher.js'
+
+// Every round/week of a league shares one roster, and registration writes to
+// whichever round was open. Copy the result across the siblings before the
+// clients are told to refetch.
+const withLeagueRosterSync = (fn) => async (body) => {
+  const result = await fn(body)
+  await syncLeagueRoster(body?._id)
+  return result
+}
 
 const withEventNotify = (fn) => async (body) => {
   const result = await fn(body)
@@ -104,6 +123,7 @@ export const apiHandlers = {
     event: (params) => getEvent(params),
     eventSeries: () => getEventSeries(),
     liveScore: (params) => getLiveScore(params),
+    league: (params) => getLeague(params),
     settings: () => getSettings(),
     revenue: () => getRevenue(),
     revenueTemplates: () => getRevenueTemplates(),
@@ -113,13 +133,19 @@ export const apiHandlers = {
     saveEvent: withEventNotify(saveEvent),
     simulateEvent: withEventNotify(simulateEvent),
     cloneEvent: withEventNotify(cloneEvent),
-    addParticipant: withEventNotify(addParticipant),
-    deleteParticipant: withEventNotify(deleteParticipant),
-    deletePlayerFromTeam: withEventNotify(deletePlayerFromTeam),
-    editParticipant: withEventNotify(editParticipant),
-    paymentReceived: withEventNotify(paymentReceived),
+    addParticipant: withEventNotify(withLeagueRosterSync(addParticipant)),
+    deleteParticipant: withEventNotify(withLeagueRosterSync(deleteParticipant)),
+    deletePlayerFromTeam: withEventNotify(withLeagueRosterSync(deletePlayerFromTeam)),
+    editParticipant: withEventNotify(withLeagueRosterSync(editParticipant)),
+    paymentReceived: withEventNotify(withLeagueRosterSync(paymentReceived)),
     generateGroups: withEventNotify(generateGroups),
     generateKnockout: withEventNotify(generateKnockout),
+    generateLeagueSchedule: withEventNotify(generateLeagueSchedule),
+    saveLeagueRoundPlayers: withEventNotify(saveLeagueRoundPlayers),
+    autoSelectLeagueRoundPlayers: withEventNotify(autoSelectLeagueRoundPlayers),
+    generateLeagueRoundMatches: withEventNotify(generateLeagueRoundMatches),
+    playLeagueSubMatchNow: withEventNotify(playLeagueSubMatchNow),
+    resetLeagueRound: withEventNotify(resetLeagueRound),
     finishMatch: withEventNotify(finishMatch),
     confirmMatch: withEventNotify(confirmMatch),
     // updateGame fires on every ~3s score save and is by far the highest
@@ -161,10 +187,10 @@ export const apiHandlers = {
     setParticipantDefault: withEventNotify(setParticipantDefault),
     saveSettings: (body) => saveSettings(body),
     updateRatings: () => updateRatings(),
-    registerForEvent: withEventNotify(registerForEvent),
+    registerForEvent: withEventNotify(withLeagueRosterSync(registerForEvent)),
     getPartialTeams: (body) => getPartialTeams(body),
     getPlayerUnpaidFees: (body) => getPlayerUnpaidFees(body),
-    changeTeam: withEventNotify(changeTeam),
+    changeTeam: withEventNotify(withLeagueRosterSync(changeTeam)),
     registerPushToken: (body) => savePushToken(body),
     unregisterPushToken: (body) => removePushToken(body),
     saveRevenueTemplate: (body) => saveRevenueTemplate(body),

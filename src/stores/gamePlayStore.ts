@@ -12,6 +12,7 @@ import {
   subscribeToLiveScoreUpdates,
   type EventSubscription,
 } from '../utils/pusher'
+import { createJitteredRefetch } from '../utils/refetch'
 import {
   validateGameScore,
   determineGameWinner,
@@ -178,10 +179,30 @@ const unsubscribeLiveScore = () => {
   }
 }
 
+// A team match still waiting on its order of play has no local scoring
+// state to lose, so it is safe to refresh from a broadcast. Once play
+// starts we deliberately leave the page alone: the score is client-owned
+// until it saves, and refetching under it would fight the debounced save.
+const isAwaitingTeamOrder = (): boolean => {
+  const match = gamePlayActions.getCurrentMatch()
+  if (!match?.isTeamMatch) return false
+  return !match.side1Assignment || !match.side2Assignment
+}
+
+const refetchWhileSettingUp = createJitteredRefetch(() => {
+  const { eventId } = gamePlayState
+  if (!eventId) return undefined
+  return fetchEvent(eventId, true)
+})
+
 const subscribeLiveScore = () => {
   unsubscribeLiveScore()
   liveScoreSubscription = subscribeToLiveScoreUpdates(() => {
     void checkSessionOnce()
+    // The other side — or an admin on Event Detail — may have just set the
+    // order. Without this the tablet sits on the order screen for ever,
+    // because nothing else refetches the match here.
+    if (isAwaitingTeamOrder()) refetchWhileSettingUp()
   })
 }
 
@@ -482,6 +503,34 @@ const getCurrentParentMatch = (): Match | undefined => {
   return undefined
 }
 
+const isLeagueEvent = (): boolean =>
+  gamePlayState.data?.eventType === 'league'
+
+// A league week is identified by who is playing, not by the event or the
+// group it is stored in.
+const getTeamsLabel = (): string | undefined => {
+  if (!isLeagueEvent()) return undefined
+  // On the setup screen the current match IS the team match; once it has
+  // been expanded the sub-match points back at its parent.
+  const parent =
+    getCurrentParentMatch() ?? gamePlayActions.getCurrentMatch()
+  const ids = parent?.participantIds
+  if (!ids) return undefined
+  const name = (participantId: string): string => {
+    const participant = gamePlayState.data?.participants?.find(
+      (p) => p._id === participantId,
+    )
+    if (!participant) return 'Unknown'
+    return (
+      participant.teamName ||
+      participant.players
+        .map((pl) => `${pl.firstName} ${pl.lastName}`)
+        .join('/')
+    )
+  }
+  return `${name(ids.side1)} vs ${name(ids.side2)}`
+}
+
 const getSubMatchSuffix = (): string | undefined => {
   const parent = getCurrentParentMatch()
   if (!parent) return undefined
@@ -489,7 +538,8 @@ const getSubMatchSuffix = (): string | undefined => {
   const cur = gamePlayState.matchId
   const idx = subMatches.findIndex((s) => s._id === cur)
   if (idx === -1) return undefined
-  return `Team Match ${idx + 1}`
+  // Everything in a league is a team match, so "Team" says nothing.
+  return `${isLeagueEvent() ? 'Match' : 'Team Match'} ${idx + 1}`
 }
 
 const isHandicapEnabled = (): boolean => {
@@ -976,11 +1026,14 @@ export const gamePlayActions = {
       ? gamePlayActions.getSide2Players()
       : gamePlayActions.getSide1Players(),
 
+  isLeagueEvent,
+
   getStageName: (): string => {
     const base =
-      gamePlayState.stage === 'group'
+      getTeamsLabel() ??
+      (gamePlayState.stage === 'group'
         ? getGroupName(gamePlayState.groupIndex)
-        : (getKnockoutRoundName() ?? 'Knockout')
+        : (getKnockoutRoundName() ?? 'Knockout'))
     const sub = getSubMatchSuffix()
     return sub ? `${base} - ${sub}` : base
   },

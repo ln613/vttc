@@ -8,14 +8,19 @@ Vertical
 - Title row
   - Event name (h1, align left)
   - Reset Event button (red bg, only for super admin)
-- Date
+- Date ("Start Date" for league)
 - Time
+
+for tournament
 - Summary
   - "Best of 3 in group, Best of 5 in knockout, Handicap (200)"...
   - if knockout stage is Best of 3 before Semifinal/Quarterfinal, then there is no need to show "Best of 3 in group"
-- Group, Knockout, bracket (tab visibility based on stages type)
+- tabs: Group, Knockout, bracket (tab visibility based on stages type)
 
-## Group Stage Tab
+for league
+- tabs: Matches, Teams, Standing
+
+## Group Stage Tab (tournament)
 
 - Generate Groups button (if no groups, only for admin)
   - exlude participants that are not qualified
@@ -160,7 +165,7 @@ The Total column is the total matches played so far.
 - on Reset Event button click: delete all schedules, matches and groups, keep the participants. confirm before reset
 - the detail page should use websocket to receive update, such as grouping/schedule generated, score changed, and update the page
 
-## Knockout Stage Tab
+## Knockout Stage Tab (tournament)
 
 - Generate Next Round button (if previous round/groups already complete, and current round is still not generated, only for admin)
   - if the knockout stage is the first stage in an event, when generating the first round, exlude participants that are not qualified
@@ -171,7 +176,36 @@ The Total column is the total matches played so far.
 - title "Round of {n}" (n = 16, 32...), or "Quarterfinals", "Semifinals", "Final"
 - the match schedule of the round
 
-## Bracket Tab
+## Bracket Tab (tournament)
 
 - Shows the bracket of the knockout stage
 - if preceded by group stage, the 1st round KO, name should be "{Group}{Rank} {name}", e.g., "B1 - Eric..."
+
+## Matches Tab (league)
+- if League Schedule has not been generated
+  - "Generate League Schedule" button
+- otherwise
+  - Round/Week: dropdown, the schedule for each week "Week {r}, {date}"
+  - when a round/week is selected
+    - if the match schedule is not generated
+      - list of selected players of each team for this round/week. last column of each row is the "Select Players" button, which opens a dialog with all players (name and rating) in the team, each one is a toggle button, where a max of n players can be selected (n is team size). If the league is a rated event, show error when selected players violate combined rating or top players combined rating if topPlayersRatingEnabled is true
+      - "Generate Match Schedule" button, enabled when n players are selected for every team
+    - otherwise
+      - the list of matches in that round/week (use the Match component for teams)
+
+### interaction
+
+- on Generate League Schedule click: based on the number of teams, phases, generate schedule for all rounds/weeks according to the rules in the scheduling section in rules/league.md. For each round/week, generate the schedule for team matchs (which team is going to play which team, which team is going to have a buy)
+
+## Teams Tab (league)
+- list of all teams (with team name column) with their members
+
+## Standing Tab (league)
+- list of teams based on the following order (show these columns following the rank and name of the teams)
+
+1. Number of rounds won (RW)
+2. When RW is tied
+  - Number of total matches won (MW, R1 win 6:3, R2 lost 4:5, then MW = 10, ML = 8)
+  - Number of total matches lost (ML, lower the better, it is redundant if all teams play every week (no byes))
+  - Number of total games won (GW)
+  - Number of total games lost (GL, lower the better)

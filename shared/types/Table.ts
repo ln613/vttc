@@ -53,6 +53,9 @@ export interface MatchQueueItem {
   matchId: string
   eventId: string
   eventName: string
+  // League matches only: the two teams, shown in place of the event and
+  // group name, which say nothing useful for a league.
+  teamNames?: { side1: string; side2: string }
   match: Match
   stageType: MatchStageType
   stageName: string // "Group 1", "Semifinal", "Final"...
@@ -96,6 +99,7 @@ export interface EventSummary {
   date: string
   time: string
   stages: ('group' | 'knockout')[]
+  eventType?: 'tournament' | 'league'
 }
 
 /**

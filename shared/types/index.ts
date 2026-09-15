@@ -1,4 +1,5 @@
 export * from './Player'
 export * from './Tournament'
+export * from './League'
 export * from './Match'
 export * from './Table'

@@ -30,6 +30,7 @@ export const ACCESS = {
     event: PUBLIC,
     eventSeries: PUBLIC,
     liveScore: PUBLIC,
+    league: PUBLIC, // the league's rounds, standings and fixtures
     settings: PUBLIC, // read on app start, before anyone has signed in
 
     // Money.
@@ -85,6 +86,12 @@ export const ACCESS = {
     paymentReceived: ADMIN,
     generateGroups: ADMIN,
     generateKnockout: ADMIN,
+    generateLeagueSchedule: ADMIN,
+    saveLeagueRoundPlayers: ADMIN,
+    autoSelectLeagueRoundPlayers: ADMIN,
+    generateLeagueRoundMatches: ADMIN,
+    playLeagueSubMatchNow: ADMIN,
+    resetLeagueRound: ADMIN,
     resetEvent: ADMIN,
     resetTeamMatch: ADMIN,
     startEvent: ADMIN,

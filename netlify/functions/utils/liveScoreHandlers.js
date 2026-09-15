@@ -198,7 +198,35 @@ const buildEventSummary = (event) => ({
   date: event.date,
   time: event.time || '',
   stages: event.stages || [],
+  eventType: event.eventType,
 })
+
+// A league match is identified by who is playing, not by which event or
+// group it sits in: the "event" is one week of the league and the group is
+// an implementation detail. Returns undefined for tournaments, which keep
+// showing the event and group name.
+//
+// The two names travel separately so each surface can lay them out to fit —
+// stacked on a table card, on one line in the queue.
+const getTeamNames = (event, match) => {
+  if (event.eventType !== 'league' || !match.participantIds) return undefined
+  const name = (participantId) => {
+    const participant = (event.participants || []).find(
+      (p) => p._id === participantId,
+    )
+    if (!participant) return 'Unknown'
+    return (
+      participant.teamName ||
+      (participant.players || [])
+        .map((pl) => `${pl.firstName} ${pl.lastName}`)
+        .join('/')
+    )
+  }
+  return {
+    side1: name(match.participantIds.side1),
+    side2: name(match.participantIds.side2),
+  }
+}
 
 const getDefaultedGroupPlayerIds = (group) => {
   const ids = new Set()
@@ -246,6 +274,7 @@ const extractGroupMatches = (event, eventSummary, items) => {
         pushTeamSubMatchItems(match, items, {
           eventId: event._id.toString(),
           eventName: event.eventName,
+          teamNames: getTeamNames(event, match),
           stageType: 'group',
           stageName: getGroupName(group.index),
           groupIndex: group.index,
@@ -260,6 +289,7 @@ const extractGroupMatches = (event, eventSummary, items) => {
         matchId: match._id,
         eventId: event._id.toString(),
         eventName: event.eventName,
+        teamNames: getTeamNames(event, match),
         match,
         stageType: 'group',
         stageName: getGroupName(group.index),
@@ -269,6 +299,12 @@ const extractGroupMatches = (event, eventSummary, items) => {
         matchStatus: getMatchStatus(match),
         cancelledAt: match.cancelledAt,
         event: eventSummary,
+        // A match already tied to a table — a league fixture's rotated
+        // table, or an admin's assignment — has to be placed there and
+        // nowhere else. Without this the assigner picks a table by tier
+        // order, and the sub-matches then jump to the locked one the
+        // moment the order of play is set.
+        lockedTableNumber: match.lockedTableNumber,
       })
     }
   }
@@ -331,20 +367,36 @@ const pushTeamSubMatchItems = (parent, items, ctx) => {
   const pending = parent.subMatches
     .map((sub, idx) => ({ sub, idx }))
     .filter(({ sub }) => subMatchIsPending(sub))
-  const current = pending[0]
+  // Normally the earliest pending sub-match is next. An admin can pull a
+  // different one forward (playLeagueSubMatchNow) — that only changes which
+  // is queued, never the order they are listed or numbered in.
+  const chosen = pending.findIndex(({ sub }) => sub.playNextAt)
+  const current = chosen === -1 ? pending[0] : pending[chosen]
   if (!current) return
+
+  // Sub-matches inherit the tie's table, so one pinned to a different table
+  // was put there deliberately by an admin (RR Singles only — see
+  // pinSubMatchToTable). It has to stay in the item list or the next rebuild
+  // would reconcile it straight off that table again.
+  const tieTable = parent.lockedTableNumber
+  const pinned = pending.filter(
+    ({ sub, idx }) =>
+      idx !== current.idx &&
+      sub.lockedTableNumber != null &&
+      sub.lockedTableNumber !== tieTable,
+  )
 
   // The sub-match after this one decides whether its players may start
   // somewhere else in the meantime (see isPotentialMatchEndingGame).
-  const nextSubPlayerIds = pending[1]
-    ? collectSidePlayerIds(pending[1].sub)
-    : []
+  const following = pending.find(({ idx }) => idx !== current.idx)
+  const nextSubPlayerIds = following ? collectSidePlayerIds(following.sub) : []
 
-  ;[current].forEach(({ sub, idx }) => {
+  ;[current, ...pinned].forEach(({ sub, idx }) => {
     items.push({
       matchId: sub._id,
       eventId: ctx.eventId,
       eventName: ctx.eventName,
+      ...(ctx.teamNames ? { teamNames: ctx.teamNames } : {}),
       match: sub,
       stageType: ctx.stageType,
       stageName: ctx.stageName,
@@ -404,6 +456,7 @@ const extractKnockoutMatches = (event, eventSummary, items) => {
         matchStatus: getMatchStatus(km.match),
         cancelledAt: km.match.cancelledAt,
         event: eventSummary,
+        lockedTableNumber: km.match.lockedTableNumber,
       })
     }
   }
@@ -1153,6 +1206,22 @@ const reconcileTableAssignments = (tables, currentMatchItems) => {
       return { ...table, match: undefined, status: 'available' }
     }
 
+    // A match pinned elsewhere — a league fixture's rotated table, or an
+    // admin's assignment — must not keep squatting on this one. It gets
+    // here when the assignment was made before the pin existed, and it
+    // deadlocks the table it is blocking: whatever IS locked to this table
+    // can never be placed, so its sub-matches queue for ever.
+    //
+    // Only released before play starts. Moving a match that is already
+    // under way would take a live game off its table.
+    if (
+      freshItem.lockedTableNumber != null &&
+      freshItem.lockedTableNumber !== table.tableNumber &&
+      getMatchStatus(freshItem.match) === 'not_started'
+    ) {
+      return { ...table, match: undefined, status: 'available' }
+    }
+
     // Update the table's match data with fresh data (games, scores, matchStatus)
     return {
       ...table,
@@ -1385,10 +1454,20 @@ export const assignMatchToTable = async (body) => {
   if (body.tableNumber == null) throwError('tableNumber is required')
 
   const events = await getStartedEvents()
-  const allMatchItems = extractAllRemainingMatches(events)
-  const item = allMatchItems.find(
-    (m) => m.matchId?.toString() === body.matchId.toString(),
-  )
+  let allMatchItems = extractAllRemainingMatches(events)
+  const findItem = (items) =>
+    items.find((m) => m.matchId?.toString() === body.matchId.toString())
+
+  let item = findItem(allMatchItems)
+  if (!item) {
+    // A tie offers one sub-match at a time, so the rest are not in the
+    // queue. An admin may still pull one onto a free table when the order
+    // carries no meaning — pin it first, then re-extract so it appears as
+    // an item like any other.
+    await pinSubMatchToTable(body._id, body.matchId, body.tableNumber)
+    allMatchItems = extractAllRemainingMatches(await getStartedEvents())
+    item = findItem(allMatchItems)
+  }
   if (!item) throwError('Match not found in the current queue')
 
   const state = await loadTableState()
@@ -1442,6 +1521,51 @@ export const assignMatchToTable = async (body) => {
   }
 
   return { success: true }
+}
+
+/**
+ * Pin one pending sub-match of an RR Singles tie to a table of its own, so
+ * it can be played alongside the sub-match the tie is already running.
+ *
+ * RR Singles only. Every player meets every opponent there, so nothing
+ * depends on the order and two pairings with no player in common can run at
+ * once. Singles and Doubles follows the fixed schedule in match.md, and a
+ * tournament tie is played strictly in order — pulling one out of sequence
+ * is the bug the one-at-a-time rule exists to prevent.
+ */
+const pinSubMatchToTable = async (eventId, matchId, tableNumber) => {
+  const db = getDB()
+  const collection = db.collection('events')
+  const event = await collection.findOne({ _id: toObjectId(eventId) })
+  if (!event) throwError('Event not found')
+
+  const parent = findParentOfSubMatch(event, matchId)
+  if (!parent) throwError('Match not found in the current queue')
+  if (!(parent.teamMatchType || '').startsWith('rr')) {
+    throwError('This team match is played one sub-match at a time')
+  }
+  const sub = parent.subMatches.find((m) => m._id === matchId)
+  if (!subMatchIsPending(sub)) throwError('That match has already started')
+
+  const updatedStages = updateMatchInStages(event.eventStages, matchId, (m) => ({
+    ...m,
+    lockedTableNumber: tableNumber,
+  }))
+  await collection.updateOne(
+    { _id: toObjectId(eventId) },
+    { $set: { eventStages: updatedStages } },
+  )
+}
+
+const findParentOfSubMatch = (event, matchId) => {
+  for (const stage of event.eventStages || []) {
+    for (const group of stage.groups || []) {
+      for (const m of group.matches || []) {
+        if ((m.subMatches || []).some((s) => s._id === matchId)) return m
+      }
+    }
+  }
+  return null
 }
 
 const persistParentTeamMatchTableChoice = async (
@@ -1507,7 +1631,7 @@ const persistParentTeamMatchTableChoice = async (
   }
 }
 
-const freeTableForMatch = async (matchId) => {
+export const freeTableForMatch = async (matchId) => {
   const state = await loadTableState()
   if (!state?.tables) return
   let changed = false

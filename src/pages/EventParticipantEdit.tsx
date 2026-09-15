@@ -28,6 +28,8 @@ import {
   calculateTopNCombinedRating,
   isPlayerPaid,
   buildSlotSelectableFilter,
+  getInitialSlotCount,
+  canAddPlayerSlot,
 } from '../stores/eventParticipantEditStore'
 
 // ==================== Styles ====================
@@ -206,6 +208,11 @@ const playerSlotRowStyle: JSX.CSSProperties = {
 
 const playerSlotSelectStyle: JSX.CSSProperties = {
   flex: 1,
+}
+
+const addPlayerRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'margin-top': '8px',
 }
 
 const playerSlotIconStyle: JSX.CSSProperties = {
@@ -654,15 +661,24 @@ const ParticipantDialog = (props: {
   const isEditMode = () => props.editingParticipant !== null
 
   const getInitialPlayerIds = (): string[] => {
-    if (props.editingParticipant) {
-      return props.editingParticipant.players.map((p) => p._id)
-    }
-    return Array(props.event.nop).fill('')
+    const ids: string[] = Array(
+      getInitialSlotCount(props.event, props.editingParticipant),
+    ).fill('')
+    props.editingParticipant?.players.forEach((p, i) => {
+      ids[i] = p._id
+    })
+    return ids
   }
 
   const [selectedPlayerIds, setSelectedPlayerIds] = createSignal<string[]>(
     getInitialPlayerIds(),
   )
+
+  const slotCount = () => selectedPlayerIds().length
+
+  // A league roster can grow past the number of players a team fields.
+  const handleAddPlayer = () =>
+    setSelectedPlayerIds([...selectedPlayerIds(), ''])
 
   const handlePlayerChange = (index: number, playerId: string) => {
     const newIds = [...selectedPlayerIds()]
@@ -693,7 +709,7 @@ const ParticipantDialog = (props: {
   const slotOptions = createMemo(() => {
     const ids = selectedPlayerIds()
     const all = sortedPlayers()
-    return Array.from({ length: props.event.nop }, (_, slotIndex) => {
+    return Array.from({ length: ids.length }, (_, slotIndex) => {
       const isSelectable = buildSlotSelectableFilter(
         props.event,
         ids,
@@ -713,7 +729,7 @@ const ParticipantDialog = (props: {
         <h2 style={dialogTitleStyle}>
           {isEditMode() ? 'Edit Participant' : 'Add Participant'}
         </h2>
-        <For each={Array.from({ length: props.event.nop }, (_, i) => i)}>
+        <For each={Array.from({ length: slotCount() }, (_, i) => i)}>
           {(index) => (
             <div style={playerSlotRowStyle}>
               <div style={playerSlotSelectStyle}>
@@ -726,7 +742,7 @@ const ParticipantDialog = (props: {
                   noMargin
                 />
               </div>
-              <Show when={props.event.nop > 1 && selectedPlayerIds()[index]}>
+              <Show when={slotCount() > 1 && selectedPlayerIds()[index]}>
                 <div
                   class="vttc-tap"
                   style={playerSlotIconStyle}
@@ -742,6 +758,13 @@ const ParticipantDialog = (props: {
             </div>
           )}
         </For>
+        <Show when={canAddPlayerSlot(props.event)}>
+          <div style={addPlayerRowStyle}>
+            <Button size="small" onClick={handleAddPlayer}>
+              Add Player
+            </Button>
+          </div>
+        </Show>
         <div style={buttonContainerStyle}>
           <Button
             color="#e74c3c"

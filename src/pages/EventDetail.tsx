@@ -20,6 +20,12 @@ import {
   isValidMatchScore,
 } from '../../shared/rules/matchRules'
 import { getGroupName, getGroupLetter } from '../../shared/rules/tournamentRules'
+import Select from '../components/Select'
+import ToggleButton from '../components/ToggleButton'
+import SingleSelectTags from '../components/SingleSelectTags'
+import { leagueState, leagueActions, describeTeam, formatRoundLabel } from '../stores/leagueStore'
+import type { LeagueStandingRow } from '../../shared/types/League'
+import { getRoundRobinSinglesLineup } from '../../shared/rules/leagueRules'
 import type { Match, Game } from '../../shared/types/Match'
 import { parseLocalDate } from '../utils/date'
 
@@ -145,20 +151,42 @@ const enterScoreRowStyle: JSX.CSSProperties = {
   display: 'flex',
   'align-items': 'center',
   gap: '8px',
-  'flex-wrap': 'wrap',
+  // The games belong on one line; the dialog sizes itself to fit them
+  // rather than wrapping a game onto a row of its own.
+  'flex-wrap': 'nowrap',
+}
+
+// Sized to its content instead of a fixed 480px, so a best-of-7 row of
+// game dropdowns still fits on one line. Capped at the viewport.
+const enterScoreDialogStyle: JSX.CSSProperties = {
+  ...dialogContentStyle,
+  width: 'max-content',
+  'max-width': 'min(95vw, 900px)',
+}
+
+const enterScoreResultBlockStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '10px',
+}
+
+const enterScoreResultNamesStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'center',
+  gap: '8px',
+  'white-space': 'nowrap',
+}
+
+const enterScoreVsStyle: JSX.CSSProperties = {
+  color: '#7f8c8d',
+  'font-size': '13px',
 }
 
 const enterScoreNameStyle: JSX.CSSProperties = {
   'min-width': '140px',
   'font-weight': 600,
   color: '#2c3e50',
-}
-
-const enterScoreSelectStyle: JSX.CSSProperties = {
-  padding: '6px 10px',
-  'border-radius': '6px',
-  border: '1px solid #d0d7de',
-  'font-size': '15px',
+  'white-space': 'nowrap',
 }
 
 const enterScoreGameSelectStyle: JSX.CSSProperties = {
@@ -582,8 +610,17 @@ export const ConfirmMatchDialog = () => {
 }
 
 const EventHeader = () => {
-  const eventName = () => eventDetailState.data?.eventName || ''
-  const dateDisplay = () => formatDate(eventDetailState.data?.date)
+  const eventName = () =>
+    (eventDetailActions.isLeague()
+      ? eventDetailState.data?.leagueName
+      : eventDetailState.data?.eventName) || ''
+  // A league is dated by when it starts, not by the week being viewed.
+  const dateDisplay = () =>
+    formatDate(
+      eventDetailActions.isLeague()
+        ? eventDetailState.data?.league?.startDate
+        : eventDetailState.data?.date,
+    )
   const timeDisplay = () => eventDetailState.data?.time || ''
   const summary = () => eventDetailActions.getEventSummary()
 
@@ -640,11 +677,14 @@ const EventHeader = () => {
           </Show>
         </div>
       </div>
-      <div style={dateStyle}>{dateDisplay()}</div>
+      <div style={dateStyle}>
+        <Show when={eventDetailActions.isLeague()}>Start Date: </Show>
+        {dateDisplay()}
+      </div>
       <Show when={timeDisplay()}>
         <div style={timeStyle}>{timeDisplay()}</div>
       </Show>
-      <Show when={summary()}>
+      <Show when={!eventDetailActions.isLeague() && summary()}>
         <div style={summaryStyle}>{summary()}</div>
       </Show>
     </Show>
@@ -677,6 +717,9 @@ const TAB_LABELS: Record<StageTab, string> = {
   group: 'Group',
   knockout: 'Knockout',
   bracket: 'Bracket',
+  matches: 'Matches',
+  teams: 'Teams',
+  standing: 'Standing',
 }
 
 const StageTabs = () => {
@@ -747,6 +790,15 @@ const StageContent = () => (
     </MatchCase>
     <MatchCase when={eventDetailState.activeStageTab === 'bracket'}>
       <BracketContent />
+    </MatchCase>
+    <MatchCase when={eventDetailState.activeStageTab === 'matches'}>
+      <LeagueMatchesContent />
+    </MatchCase>
+    <MatchCase when={eventDetailState.activeStageTab === 'teams'}>
+      <LeagueTeamsContent />
+    </MatchCase>
+    <MatchCase when={eventDetailState.activeStageTab === 'standing'}>
+      <LeagueStandingContent />
     </MatchCase>
   </Switch>
 )
@@ -1021,6 +1073,14 @@ export interface MatchRowProps {
   // that aren't on a table (e.g. a past event's leftover matches) — surfaces
   // Enter Score / Set Order / Reset Team without requiring a table.
   adminManage?: boolean
+  // League rounds: the two teams, shown above their players.
+  teamNames?: { side1?: string; side2?: string }
+  // Everything in a league week is a team match, which changes how
+  // sub-matches are titled ("Match 1", not "Team Match 1 - A vs Y").
+  isLeague?: boolean
+  // Sub-matches run on the table their parent holds, so the parent's row
+  // carries the number and repeating it on every sub-match is noise.
+  hideTableBadge?: boolean
 }
 
 // Lineup position labels per team-match type. Kept in sync with the JS
@@ -1064,7 +1124,11 @@ export const deriveTeamMatchType = (
 export const getTeamSubMatchTitle = (
   parent: Match,
   subMatchIndex: number,
+  // A league week is nothing but team matches, so "Team" adds nothing and
+  // the lineup pair is already shown against each player's name.
+  isLeague = false,
 ): string => {
+  if (isLeague) return `Match ${subMatchIndex + 1}`
   const type =
     (parent.teamMatchType as keyof typeof TEAM_SUB_MATCH_LABELS | undefined) ||
     deriveTeamMatchType(parent)
@@ -1075,6 +1139,28 @@ export const getTeamSubMatchTitle = (
 
 const HOME_SLOT_LABELS = ['A', 'B', 'C', 'D'] as const
 const AWAY_SLOT_LABELS = ['X', 'Y', 'Z', 'W'] as const
+
+/**
+ * The order of play a team-match type produces, as slot labels: "A vs X",
+ * "B vs Y"…
+ *
+ * The tournament types are listed in TEAM_SUB_MATCH_LABELS. A league's RR
+ * Singles ("rr3") is generated instead — every player meets every opponent,
+ * so the list is teamSize² long and grows with the team size rather than
+ * being one of a handful of fixed schedules.
+ */
+export const getTeamMatchLineupLabels = (
+  type: string | undefined,
+): { home: string; away: string }[] => {
+  if (!type) return []
+  if (!type.startsWith('rr')) return TEAM_SUB_MATCH_LABELS[type] || []
+  const teamSize = Number(type.slice(2))
+  if (!Number.isFinite(teamSize) || teamSize < 2) return []
+  return getRoundRobinSinglesLineup(teamSize).map((entry) => ({
+    home: entry.homeSlots.map((i) => HOME_SLOT_LABELS[i]).join(''),
+    away: entry.awaySlots.map((i) => AWAY_SLOT_LABELS[i]).join(''),
+  }))
+}
 const ASSIGNMENT_KEYS: Array<'A' | 'B' | 'C' | 'D'> = ['A', 'B', 'C', 'D']
 
 // Look up the order label (A/B/C or X/Y/Z) for a given player in the
@@ -1239,12 +1325,72 @@ export const MatchRow = (props: MatchRowProps) => {
     !authState.isAdmin && sessionActive()
   const phase = (): 'not_started' | 'in_progress' | 'finished' => {
     if (hasResult()) return 'finished'
-    // Parent team match never enters "in progress" — once it expands
-    // into sub-matches the queue extractor replaces it with them, so
-    // the parent row itself stays in the not-started visual state.
-    if (props.match.isTeamMatch) return 'not_started'
+    // A parent team match used to be replaced by its sub-matches in the
+    // schedule, so it never needed a progress state of its own. As a group
+    // header it stays on screen throughout, and a tie whose order is set
+    // and whose sub-matches exist is plainly under way.
+    if (props.match.isTeamMatch) {
+      return (props.match.subMatches?.length ?? 0) > 0
+        ? 'in_progress'
+        : 'not_started'
+    }
     if (hasStarted()) return 'in_progress'
     return 'not_started'
+  }
+
+  // Only the next pending sub-match is ever queued, but the ones behind it
+  // are waiting their turn on the same table — not unscheduled. Colour them
+  // as pending rather than leaving them blank.
+  const isPendingSubMatch = () =>
+    !!props.parent && phase() === 'not_started'
+
+  // RR Singles has no meaningful order — every player meets every opponent —
+  // so an admin may pull any pending pairing forward. Singles and Doubles
+  // follows the fixed schedule in match.md, where the order is the format.
+  const isRoundRobinSubMatch = () =>
+    !!props.parent && (props.parent.teamMatchType || '').startsWith('rr')
+
+  const pendingSubMatches = () =>
+    (props.parent?.subMatches || []).filter(
+      (sub) =>
+        !sub.cancelledAt &&
+        sub.winningSide == null &&
+        (sub.games?.length ?? 0) === 0,
+    )
+
+  const currentSubMatch = () => {
+    const pending = pendingSubMatches()
+    return pending.find((sub) => sub.playNextAt) ?? pending[0]
+  }
+
+  const isCurrentSubMatch = () => currentSubMatch()?._id === props.match._id
+
+  // Swapping is only safe while the match holding the table hasn't begun.
+  const canPlayNow = () => {
+    const current = currentSubMatch()
+    if (!current) return false
+    return liveScoreActions.getTableForMatch(current._id) !== undefined
+  }
+
+  const showPlayNow = () =>
+    isRoundRobinSubMatch() &&
+    phase() === 'not_started' &&
+    !isCurrentSubMatch() &&
+    assignedTable() === undefined
+
+  const handlePlayNowClick = async (e?: MouseEvent) => {
+    e?.stopPropagation()
+    e?.preventDefault()
+    if (
+      !(await customConfirm(
+        'Play this match now? The match currently on the table goes back in the queue.',
+        { confirmColor: '#f39c12' },
+      ))
+    ) {
+      return
+    }
+    const eventId = props.eventId ?? eventDetailState.eventId ?? undefined
+    void eventDetailActions.playSubMatchNow(props.match._id, eventId)
   }
   const canStartOrContinue = () =>
     authState.isAdmin ||
@@ -1345,11 +1491,18 @@ export const MatchRow = (props: MatchRowProps) => {
   }
   const anyTableAvailable = () =>
     liveScoreActions.getAvailableTables().length > 0
+  // A tie queues one sub-match at a time, so the rest are never "in the
+  // queue". In RR Singles the order carries no meaning and two pairings with
+  // no player in common can run at once, so an admin may still put one on a
+  // free table by hand.
+  const isAssignableSubMatch = () =>
+    inQueue() || (isRoundRobinSubMatch() && phase() === 'not_started')
+
   const showAssign = () =>
     authState.isAdmin &&
     !hasStarted() &&
     assignedTable() === undefined &&
-    inQueue() &&
+    isAssignableSubMatch() &&
     allPlayersAvailable() &&
     anyTableAvailable()
   const showStart = () => {
@@ -1507,7 +1660,7 @@ export const MatchRow = (props: MatchRowProps) => {
           ? 'Match is already on a table'
           : started || finished
             ? 'Match already started'
-            : !inQueue()
+            : !isAssignableSubMatch()
               ? 'Match is not in the queue'
               : !allPlayersAvailable()
                 ? 'A player is on another table'
@@ -1578,8 +1731,12 @@ export const MatchRow = (props: MatchRowProps) => {
       },
     ]
 
-    // Reset Team on the live (Schedule/LiveScore) on-table sub-row.
-    if (props.match.parentMatchId && !props.adminManage) {
+    // Reset Team on the live (Schedule/LiveScore) on-table sub-row. Those
+    // pages never draw the parent for a tournament tie — the schedule
+    // replaces it with its sub-matches — so the sub-row is the only place
+    // the action can live. A league round does show the parent, as the
+    // group header on the Matches tab, so it belongs there instead.
+    if (props.match.parentMatchId && !props.adminManage && !props.isLeague) {
       buttons.push({
         key: 'resetTeam',
         label: isResetting() ? 'Resetting...' : 'Reset Team',
@@ -1593,16 +1750,36 @@ export const MatchRow = (props: MatchRowProps) => {
       })
     }
 
-    buttons.push({
-      key: 'postpone',
-      label: 'Postpone',
-      description: 'Postpone the match for a set time.',
-      color: '#f39c12',
-      onClick: openPostpone,
-      enabled: canPostpone(),
-      busy: false,
-      reason: started ? 'Match already started' : 'Match is not on a table',
-    })
+    if (showPlayNow()) {
+      buttons.push({
+        key: 'playNow',
+        label: 'Play Now',
+        description:
+          'Play this match next. The one on the table goes back in the queue; the listed order does not change.',
+        // Postpone's orange is free here: Play Now only appears on a league
+        // sub-match, and Postpone is hidden for those.
+        color: '#f39c12',
+        onClick: (e) => void handlePlayNowClick(e),
+        enabled: canPlayNow(),
+        busy: false,
+        reason: 'The match on the table has already started',
+      })
+    }
+
+    // A league week is a fixed set of fixtures played on the night — there
+    // is no later slot to postpone into.
+    if (!props.isLeague) {
+      buttons.push({
+        key: 'postpone',
+        label: 'Postpone',
+        description: 'Postpone the match for a set time.',
+        color: '#f39c12',
+        onClick: openPostpone,
+        enabled: canPostpone(),
+        busy: false,
+        reason: started ? 'Match already started' : 'Match is not on a table',
+      })
+    }
 
     // Simulate stays hidden entirely unless SIMULATION is enabled.
     if (isSimulationEnabled()) {
@@ -1634,11 +1811,16 @@ export const MatchRow = (props: MatchRowProps) => {
     assignedTable() === undefined ? props.match.lockedTableNumber : undefined
   // Finished rows don't need any table/queue badge — they're history.
   const showAssignedBadge = () =>
-    assignedTable() !== undefined && phase() !== 'finished'
+    !props.hideTableBadge &&
+    assignedTable() !== undefined &&
+    phase() !== 'finished'
   const showLockedBadge = () =>
-    lockedTable() !== undefined && phase() !== 'finished'
+    !props.hideTableBadge &&
+    lockedTable() !== undefined &&
+    phase() !== 'finished'
   const showQueueBadge = () =>
     !props.hideQueueBadge &&
+    !props.hideTableBadge &&
     assignedTable() === undefined &&
     lockedTable() === undefined &&
     inQueue() &&
@@ -1650,9 +1832,13 @@ export const MatchRow = (props: MatchRowProps) => {
       style={getMatchRowStyle(
         phase(),
         assignedTable() !== undefined,
-        inQueue(),
+        inQueue() || isPendingSubMatch(),
       )}
     >
+      {/* The row's own header — badge, players, actions. Kept in its own
+          positioned box so the table number centres on this and not on the
+          expanded sub-match list that follows it. */}
+      <div style={matchRowHeaderStyle}>
       <Show when={showAssignedBadge()}>
         <div style={matchRowTableNumberStyle}>{assignedTable()}</div>
       </Show>
@@ -1682,6 +1868,7 @@ export const MatchRow = (props: MatchRowProps) => {
               parent={props.parent}
               showForfeit={showForfeit()}
               onForfeit={handleForfeitClick}
+              teamNames={props.teamNames}
             />
           }
         >
@@ -1764,6 +1951,7 @@ export const MatchRow = (props: MatchRowProps) => {
           </button>
         </div>
       </Show>
+      </div>
       <Show
         when={
           isTeamParent() &&
@@ -1776,6 +1964,7 @@ export const MatchRow = (props: MatchRowProps) => {
           stage={props.stage}
           groupIndex={props.groupIndex}
           eventId={props.eventId}
+          isLeague={props.isLeague}
         />
       </Show>
       <Show when={postponeOpen()}>
@@ -1912,11 +2101,24 @@ const EnterScoreDialog = (props: {
   )
   const [error, setError] = createSignal('')
 
-  const matchScoreValues = Array.from({ length: needed + 1 }, (_, i) => i)
   const gameScoreValues = Array.from({ length: 31 }, (_, i) => i)
 
-  const setMatch = (side: 0 | 1, v: string) =>
-    setMatchScore((m) => (side === 0 ? [v, m[1]] : [m[0], v]))
+  // Every result a best-of-N can end in: the winner always reaches
+  // `needed`, the loser anywhere from 0 to needed-1. Listed from a side-1
+  // whitewash through to a side-2 one, so the row reads as a spectrum.
+  const resultOptions = (): string[] => [
+    ...Array.from({ length: needed }, (_, i) => `${needed}:${i}`),
+    ...Array.from({ length: needed }, (_, i) => `${needed - 1 - i}:${needed}`),
+  ]
+  const selectedResult = (): string | null => {
+    const [a, b] = matchScore()
+    return a === '' || b === '' ? null : `${a}:${b}`
+  }
+  const pickResult = (value: string) => {
+    const [a, b] = value.split(':')
+    setMatchScore([a, b])
+  }
+
   const setGame = (gi: number, side: 0 | 1, v: string) =>
     setGameScores((gs) =>
       gs.map((g, i) => (i === gi ? (side === 0 ? [v, g[1]] : [g[0], v]) : g)),
@@ -1991,7 +2193,7 @@ const EnterScoreDialog = (props: {
 
   return (
     <div style={dialogOverlayStyle} onClick={props.onClose}>
-      <div style={dialogContentStyle} onClick={(e) => e.stopPropagation()}>
+      <div style={enterScoreDialogStyle} onClick={(e) => e.stopPropagation()}>
         <div style={dialogTitleStyle}>Enter Score</div>
         <label style={enterScoreCheckboxRowStyle}>
           <input
@@ -2042,35 +2244,20 @@ const EnterScoreDialog = (props: {
             </div>
           }
         >
-          <div style={enterScoreGridStyle}>
-            <Index each={[props.side1Players, props.side2Players]}>
-              {(players, rowIndex) => (
-                <div style={enterScoreRowStyle}>
-                  <NameCell players={players()} />
-                  <select
-                    style={enterScoreSelectStyle}
-                    value={matchScore()[rowIndex as 0 | 1]}
-                    onChange={(e) =>
-                      setMatch(rowIndex as 0 | 1, e.currentTarget.value)
-                    }
-                  >
-                    <option value="" disabled>
-                      --
-                    </option>
-                    <For each={matchScoreValues}>
-                      {(v) => (
-                        <option
-                          value={String(v)}
-                          selected={String(v) === matchScore()[rowIndex as 0 | 1]}
-                        >
-                          {v}
-                        </option>
-                      )}
-                    </For>
-                  </select>
-                </div>
-              )}
-            </Index>
+          {/* Auto mode only needs the final result, so offer the handful
+              that are possible rather than two independent dropdowns that
+              can be combined into impossible scores. */}
+          <div style={enterScoreResultBlockStyle}>
+            <div style={enterScoreResultNamesStyle}>
+              <NameCell players={props.side1Players} />
+              <span style={enterScoreVsStyle}>vs</span>
+              <NameCell players={props.side2Players} />
+            </div>
+            <SingleSelectTags
+              options={resultOptions()}
+              selectedValue={selectedResult()}
+              onChange={pickResult}
+            />
           </div>
         </Show>
 
@@ -2095,8 +2282,18 @@ const TeamSubMatches = (props: {
   stage: 'group' | 'knockout'
   groupIndex: number
   eventId?: string
+  isLeague?: boolean
 }) => {
-  const [expanded, setExpanded] = createSignal(false)
+  // Held in the store, keyed by parent match id: entering a score refetches
+  // the event, which replaces every match object and would otherwise
+  // collapse the list the moment it is used.
+  const expanded = () =>
+    eventDetailActions.isTeamSubMatchesExpanded(props.parent._id)
+  // Only drop the sub-matches' table badges when the parent's own row is
+  // showing one — otherwise the number would disappear entirely.
+  const parentShowsTable = () =>
+    props.parent.lockedTableNumber != null ||
+    liveScoreActions.getTableForMatch(props.parent._id) !== undefined
   // Show every sub-match that's still in play (played + current + pending);
   // cancelled subs (auto-dropped once the team match is decided) are hidden.
   const playedSubs = () =>
@@ -2107,7 +2304,7 @@ const TeamSubMatches = (props: {
     <div style={finishedTeamSubsContainerStyle}>
       <button
         style={finishedTeamSubsToggleStyle}
-        onClick={() => setExpanded(!expanded())}
+        onClick={() => eventDetailActions.toggleTeamSubMatches(props.parent._id)}
       >
         <span>{expanded() ? '▼' : '▶'}</span>
         <span>Matches</span>
@@ -2123,6 +2320,8 @@ const TeamSubMatches = (props: {
                 stage={props.stage}
                 groupIndex={props.groupIndex}
                 eventId={props.eventId}
+                isLeague={props.isLeague}
+                hideTableBadge={parentShowsTable()}
               />
             )}
           </For>
@@ -2140,13 +2339,15 @@ const SubMatchRow = (props: {
   sub: Match
   index: number
   stage: 'group' | 'knockout'
-  groupIndex: number
   eventId?: string
+  groupIndex: number
+  isLeague?: boolean
+  hideTableBadge?: boolean
 }) => {
   return (
     <div style={finishedSubRowStyle}>
       <div style={finishedSubTitleStyle}>
-        {getTeamSubMatchTitle(props.parent, props.index)}
+        {getTeamSubMatchTitle(props.parent, props.index, props.isLeague)}
       </div>
       <MatchRow
         match={props.sub}
@@ -2156,6 +2357,8 @@ const SubMatchRow = (props: {
         eventId={props.eventId}
         adminManage
         hideQueueBadge
+        hideTableBadge={props.hideTableBadge}
+        isLeague={props.isLeague}
       />
     </div>
   )
@@ -2279,6 +2482,7 @@ interface MatchRowsTableProps {
   parent?: Match
   showForfeit?: boolean
   onForfeit?: (side: 1 | 2) => void
+  teamNames?: { side1?: string; side2?: string }
 }
 
 const MatchRowsTable = (props: MatchRowsTableProps) => {
@@ -2298,6 +2502,7 @@ const MatchRowsTable = (props: MatchRowsTableProps) => {
         parent={props.parent}
         showForfeit={props.showForfeit}
         onForfeit={props.onForfeit}
+        teamName={props.teamNames?.side1}
       />
       <div style={matchSidesSeparatorStyle} />
       <MatchSideRow
@@ -2310,6 +2515,7 @@ const MatchRowsTable = (props: MatchRowsTableProps) => {
         parent={props.parent}
         showForfeit={props.showForfeit}
         onForfeit={props.onForfeit}
+        teamName={props.teamNames?.side2}
       />
     </div>
   )
@@ -2325,6 +2531,9 @@ interface MatchSideRowProps {
   parent?: Match
   showForfeit?: boolean
   onForfeit?: (side: 1 | 2) => void
+  // League matches: the team the players are turning out for, shown on a
+  // line of its own above them.
+  teamName?: string
 }
 
 const MatchSideRow = (props: MatchSideRowProps) => {
@@ -2339,6 +2548,10 @@ const MatchSideRow = (props: MatchSideRowProps) => {
     color: props.isWinner ? '#e6a700' : '#f1c40f',
   })
   const scoresContainerStyle = (): JSX.CSSProperties => matchSideScoresStyle
+  const teamNameStyle = (): JSX.CSSProperties => ({
+    ...matchSideTeamNameStyle,
+    color: props.isWinner ? '#2c3e50' : '#555',
+  })
   return (
     <div style={matchSideRowStyle}>
       <div style={matchSideNameCellStyle}>
@@ -2353,6 +2566,10 @@ const MatchSideRow = (props: MatchSideRowProps) => {
           >
             Forfeit
           </button>
+        </Show>
+        <div style={matchSideNameStackStyle}>
+        <Show when={props.teamName}>
+          <span style={teamNameStyle()}>{props.teamName}</span>
         </Show>
         <span style={nameStyle()}>
         <Show
@@ -2384,6 +2601,7 @@ const MatchSideRow = (props: MatchSideRowProps) => {
           </For>
         </Show>
         </span>
+        </div>
       </div>
       <div style={scoresContainerStyle()}>
         <For each={props.games}>
@@ -2982,6 +3200,461 @@ const BracketMatchCard = (props: BracketMatchCardProps) => {
 
 // ==================== STYLES ====================
 
+// ==================== League tabs ====================
+
+// A league round shows the whole league: every week's fixtures, the teams,
+// and the season standings (specs/pages/Event Detail.md).
+
+const LeagueMatchesContent = () => (
+  <Show when={!leagueState.loading} fallback={<div>Loading...</div>}>
+    <Show when={leagueState.error}>
+      <div style={leagueErrorStyle}>{leagueState.error}</div>
+    </Show>
+    <Show
+      when={leagueActions.isScheduleGenerated()}
+      fallback={<GenerateLeagueScheduleSection />}
+    >
+      <RoundPicker />
+      <Show
+        when={leagueActions.hasRoundMatches()}
+        fallback={<RoundPlayerSelection />}
+      >
+        <RoundMatches />
+      </Show>
+    </Show>
+  </Show>
+)
+
+const GenerateLeagueScheduleSection = () => (
+  <div>
+    <Show when={authState.isAdmin}>
+      <div style={generateGroupsStyle}>
+        <Button
+          onClick={() => void leagueActions.generateSchedule()}
+          disabled={leagueState.generatingSchedule}
+        >
+          {leagueState.generatingSchedule
+            ? 'Generating...'
+            : 'Generate League Schedule'}
+        </Button>
+      </div>
+    </Show>
+    <div style={leagueNoteStyle}>
+      {leagueActions.getParticipants().length} team(s) registered. The schedule
+      covers every round of every phase.
+    </div>
+  </div>
+)
+
+const RoundPicker = () => {
+  const handleReset = async (e?: MouseEvent) => {
+    e?.stopPropagation()
+    e?.preventDefault()
+    const confirmed = await customConfirm(
+      "Clear this week's matches and player selections so it can be built again?",
+      { confirmColor: '#e74c3c' },
+    )
+    if (confirmed) void leagueActions.resetRound()
+  }
+
+  return (
+    <div style={roundPickerRowStyle}>
+      <div style={roundPickerStyle}>
+        <Select
+          label="Round/Week"
+          name="leagueRound"
+          value={String(leagueState.selectedRoundIndex)}
+          onChange={(value) => leagueActions.setSelectedRound(Number(value))}
+          options={leagueActions.getRounds().map((round) => ({
+            value: String(round.roundIndex),
+            label: formatRoundLabel(round),
+          }))}
+          noMargin
+        />
+      </div>
+      <Show when={authState.isAdmin && leagueActions.hasRoundMatches()}>
+        <Button
+          color="#e74c3c"
+          size="small"
+          onClick={handleReset}
+          disabled={leagueState.resettingRound}
+        >
+          {leagueState.resettingRound ? 'Resetting...' : 'Reset Week'}
+        </Button>
+      </Show>
+    </div>
+  )
+}
+
+// Before a week is generated, each team picks the players it fields.
+const RoundPlayerSelection = () => {
+  const teamSize = () => leagueActions.getTeamSize()
+  const byeTeam = () => leagueActions.getSelectedRound()?.byeParticipantId
+
+  return (
+    <div>
+      <div style={tableWrapperStyle}>
+        <table style={tableStyle}>
+          <thead>
+            <tr>
+              <th style={thStyle}>Team</th>
+              <th style={thStyle}>Selected Players</th>
+              <th style={thStyle} />
+            </tr>
+          </thead>
+          <tbody>
+            <For each={leagueActions.getPlayingParticipantIds()}>
+              {(participantId, index) => (
+                <RoundSelectionRow
+                  participantId={participantId}
+                  index={index()}
+                  teamSize={teamSize()}
+                />
+              )}
+            </For>
+          </tbody>
+        </table>
+      </div>
+      <Show when={byeTeam()}>
+        <div style={leagueNoteStyle}>
+          {leagueActions.getTeamName(byeTeam()!)} has a bye this week.
+        </div>
+      </Show>
+      <Show when={authState.isAdmin}>
+        <div style={leagueActionsRowStyle}>
+          <Show when={leagueActions.isSimulated()}>
+            <Button
+              color="#8e44ad"
+              onClick={() => void leagueActions.autoSelectPlayers()}
+              disabled={leagueState.savingSelection}
+            >
+              {leagueState.savingSelection ? 'Selecting...' : 'Auto Select'}
+            </Button>
+          </Show>
+          <Button
+            onClick={() => void leagueActions.generateRoundMatches()}
+            disabled={
+              !leagueActions.canGenerateRoundMatches() ||
+              leagueState.generatingMatches
+            }
+          >
+            {leagueState.generatingMatches
+              ? 'Generating...'
+              : 'Generate Match Schedule'}
+          </Button>
+        </div>
+      </Show>
+      <Show when={leagueState.selectDialogParticipantId}>
+        {(participantId) => (
+          <SelectPlayersDialog participantId={participantId()} />
+        )}
+      </Show>
+    </div>
+  )
+}
+
+const RoundSelectionRow = (props: {
+  participantId: string
+  index: number
+  teamSize: number
+}) => {
+  const selected = () => leagueActions.getSelectedPlayers(props.participantId)
+
+  return (
+    <tr style={{ 'background-color': getRowBackground(props.index) }}>
+      <td style={tdStyle}>{leagueActions.getTeamName(props.participantId)}</td>
+      <td style={tdStyle}>
+        <Show
+          when={selected().length > 0}
+          fallback={<span style={leagueMutedStyle}>None selected</span>}
+        >
+          {selected()
+            .map((p) => `${p.firstName} ${p.lastName} (${p.rating || 0})`)
+            .join(', ')}
+        </Show>
+      </td>
+      <td style={tdStyle}>
+        <Show when={authState.isAdmin}>
+          <Button
+            size="small"
+            onClick={() => leagueActions.openSelectDialog(props.participantId)}
+          >
+            Select Players
+          </Button>
+        </Show>
+      </td>
+    </tr>
+  )
+}
+
+/**
+ * Pick this week's players from the team's roster. A team fields exactly
+ * `teamSize` of them, and for a rated league the combined rating of the
+ * picked line-up has to stay within the limits.
+ */
+const SelectPlayersDialog = (props: { participantId: string }) => {
+  const [picked, setPicked] = createSignal<string[]>(
+    leagueActions.getSelectedPlayers(props.participantId).map((p) => p._id),
+  )
+
+  const roster = () =>
+    [
+      ...(leagueActions.getParticipant(props.participantId)?.players || []),
+    ].sort((a, b) => (b.rating || 0) - (a.rating || 0))
+
+  const teamSize = () => leagueActions.getTeamSize()
+  const isPicked = (playerId: string) => picked().includes(playerId)
+
+  const toggle = (playerId: string) => {
+    if (isPicked(playerId)) {
+      setPicked(picked().filter((id) => id !== playerId))
+      return
+    }
+    if (picked().length >= teamSize()) return
+    setPicked([...picked(), playerId])
+  }
+
+  const ratingError = () =>
+    describeLineupRatingError(
+      picked()
+        .map((id) => roster().find((p) => p._id === id))
+        .filter((p): p is Player => !!p),
+    )
+
+  return (
+    <div style={dialogOverlayStyle}>
+      <div style={dialogContentStyle}>
+        <h2 style={dialogTitleStyle}>
+          {leagueActions.getTeamName(props.participantId)} — pick {teamSize()}
+        </h2>
+        <div style={pickerListStyle}>
+          <For each={roster()}>
+            {(player) => (
+              <ToggleButton
+                label={`${player.firstName} ${player.lastName} - ${player.rating || 0}`}
+                value={isPicked(player._id)}
+                onChange={() => toggle(player._id)}
+              />
+            )}
+          </For>
+        </div>
+        <Show when={ratingError() || leagueState.selectionError}>
+          <div style={leagueErrorStyle}>
+            {ratingError() || leagueState.selectionError}
+          </div>
+        </Show>
+        <div style={enterScoreButtonRowStyle}>
+          <Button color="#e74c3c" onClick={leagueActions.closeSelectDialog}>
+            Cancel
+          </Button>
+          <Button
+            color="#27ae60"
+            disabled={!!ratingError() || leagueState.savingSelection}
+            onClick={() =>
+              void leagueActions.saveSelection(props.participantId, picked())
+            }
+          >
+            Save
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Only a full line-up can break a rating rule; a partial pick may still
+// come good once the rest are chosen.
+const describeLineupRatingError = (players: Player[]): string | null => {
+  const league = leagueState.data
+  if (!league || league.restriction !== 'Rated' || !league.ratingLimit)
+    return null
+  if (players.length < leagueActions.getTeamSize()) return null
+
+  const combined = players.reduce((sum, p) => sum + (p.rating || 0), 0)
+  if (combined > league.ratingLimit) {
+    return `Combined rating (${combined}) exceeds the limit (${league.ratingLimit})`
+  }
+  if (
+    league.topPlayersRatingEnabled &&
+    league.topPlayersCount &&
+    league.topPlayersRatingLimit
+  ) {
+    const top = [...players]
+      .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+      .slice(0, league.topPlayersCount)
+      .reduce((sum, p) => sum + (p.rating || 0), 0)
+    if (top > league.topPlayersRatingLimit) {
+      return `Top ${league.topPlayersCount} combined rating (${top}) exceeds the limit (${league.topPlayersRatingLimit})`
+    }
+  }
+  return null
+}
+
+const RoundMatches = () => {
+  const round = () => leagueActions.getSelectedRound()
+
+  return (
+    <div style={groupsListStyle}>
+      <Show when={round()?.byeParticipantId}>
+        <div style={leagueNoteStyle}>
+          {leagueActions.getTeamName(round()!.byeParticipantId!)} has a bye this
+          week.
+        </div>
+      </Show>
+      {/* One row per fixture. The parent is the group header — it carries
+          the teams and the table — and its own "Matches" toggle opens the
+          sub-matches beneath it. */}
+      <For each={round()?.matches || []}>
+        {(match) => (
+          <div style={matchScheduleItemStyle}>
+            <MatchRow
+              match={match}
+              groupIndex={0}
+              stage="group"
+              eventId={round()?._id}
+              teamNames={roundTeamNames(match)}
+              isLeague
+              adminManage
+            />
+          </div>
+        )}
+      </For>
+    </div>
+  )
+}
+
+const roundTeamNames = (match: Match) => {
+  const ids = match.participantIds
+  if (!ids) return undefined
+  return {
+    side1: leagueActions.getTeamName(ids.side1),
+    side2: leagueActions.getTeamName(ids.side2),
+  }
+}
+
+const LeagueTeamsContent = () => (
+  <div style={tableWrapperStyle}>
+    <table style={tableStyle}>
+      <thead>
+        <tr>
+          <th style={thStyle}>Team</th>
+          <th style={thStyle}>Players</th>
+        </tr>
+      </thead>
+      <tbody>
+        <For each={leagueActions.getParticipants()}>
+          {(participant, index) => (
+            <tr style={{ 'background-color': getRowBackground(index()) }}>
+              <td style={tdStyle}>
+                {participant.teamName || `Team ${index() + 1}`}
+              </td>
+              <td style={tdStyle}>
+                {[...participant.players]
+                  .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+                  .map((p) => `${p.firstName} ${p.lastName} (${p.rating || 0})`)
+                  .join(', ')}
+              </td>
+            </tr>
+          )}
+        </For>
+      </tbody>
+    </table>
+  </div>
+)
+
+type StandingStat = Extract<
+  keyof LeagueStandingRow,
+  'roundsWon' | 'matchesWon' | 'matchesLost' | 'gamesWon' | 'gamesLost'
+>
+
+const STANDING_COLUMNS: { key: StandingStat; label: string }[] = [
+  { key: 'roundsWon', label: 'RW' },
+  { key: 'matchesWon', label: 'MW' },
+  { key: 'matchesLost', label: 'ML' },
+  { key: 'gamesWon', label: 'GW' },
+  { key: 'gamesLost', label: 'GL' },
+]
+
+const LeagueStandingContent = () => (
+  <div style={tableWrapperStyle}>
+    <table style={tableStyle}>
+      <thead>
+        <tr>
+          <th style={thStyle}>#</th>
+          <th style={thStyle}>Team</th>
+          <For each={STANDING_COLUMNS}>
+            {(column) => <th style={thStyle}>{column.label}</th>}
+          </For>
+        </tr>
+      </thead>
+      <tbody>
+        <For each={leagueActions.getStandings()}>
+          {(row, index) => (
+            <tr style={{ 'background-color': getRowBackground(index()) }}>
+              <td style={tdStyle}>{index() + 1}</td>
+              <td style={tdStyle}>
+                {row.teamName || describeTeam(row.players)}
+              </td>
+              <For each={STANDING_COLUMNS}>
+                {(column) => <td style={tdStyle}>{row[column.key]}</td>}
+              </For>
+            </tr>
+          )}
+        </For>
+      </tbody>
+    </table>
+  </div>
+)
+
+// Alternating white / lavender, matching the participants tables.
+const getRowBackground = (index: number): string =>
+  index % 2 === 0 ? '#ffffff' : '#f3f0ff'
+
+const leagueErrorStyle: JSX.CSSProperties = {
+  color: '#e74c3c',
+  'font-size': '14px',
+  'font-weight': 500,
+  margin: '12px 0',
+  'text-align': 'left',
+}
+
+const leagueNoteStyle: JSX.CSSProperties = {
+  'font-size': '13px',
+  color: '#666',
+  margin: '12px 0',
+  'text-align': 'left',
+}
+
+const leagueMutedStyle: JSX.CSSProperties = {
+  color: '#999',
+}
+
+const leagueActionsRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  gap: '12px',
+  margin: '16px 0',
+}
+
+const roundPickerRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'flex-end',
+  'justify-content': 'space-between',
+  gap: '12px',
+  margin: '16px 0',
+}
+
+const roundPickerStyle: JSX.CSSProperties = {
+  flex: '1 1 auto',
+  'max-width': '320px',
+}
+
+const pickerListStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-wrap': 'wrap',
+  gap: '8px',
+  margin: '8px 0 16px',
+}
+
 const containerStyle: JSX.CSSProperties = {
   'min-height': '100vh',
   'background-color': '#f5f5f5',
@@ -3289,9 +3962,21 @@ const getMatchRowStyle = (
   'box-shadow': '0 1px 4px rgba(0, 0, 0, 0.08)',
 })
 
+// The header box starts at the row's content edge, so the badge sits flush
+// against it at left: 0 (it was 16px when positioned against the row itself,
+// whose padding box starts one border-width earlier).
+const matchRowHeaderStyle: JSX.CSSProperties = {
+  position: 'relative',
+  width: '100%',
+  display: 'flex',
+  'flex-direction': 'column',
+  'align-items': 'center',
+  gap: '10px',
+}
+
 const matchRowTableNumberStyle: JSX.CSSProperties = {
   position: 'absolute',
-  left: '16px',
+  left: '0',
   top: '50%',
   transform: 'translateY(-50%)',
   'font-size': '48px',
@@ -3419,6 +4104,23 @@ const matchSideNameStyle: JSX.CSSProperties = {
   'font-size': '14px',
   'text-align': 'right',
   'justify-self': 'stretch',
+  'word-break': 'break-word',
+  'min-width': 0,
+}
+
+// Team name over player names, both hard right against the score.
+const matchSideNameStackStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  'align-items': 'flex-end',
+  gap: '2px',
+  'min-width': 0,
+}
+
+const matchSideTeamNameStyle: JSX.CSSProperties = {
+  'font-size': '14px',
+  'font-weight': 700,
+  'text-align': 'right',
   'word-break': 'break-word',
   'min-width': 0,
 }

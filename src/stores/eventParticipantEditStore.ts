@@ -303,6 +303,22 @@ export const eventParticipantEditActions = {
 export const canShowDeleteColumn = (event: EventOption): boolean =>
   !event.hasSchedule
 
+/**
+ * A league team registers a roster, not a line-up: it may carry more than
+ * the {nop} players it fields on a match day (specs/rules/league.md).
+ */
+export const isLeagueEvent = (event: EventOption | undefined): boolean =>
+  event?.eventType === 'league'
+
+/** The dialog opens with nop rows either way; a league can add more. */
+export const getInitialSlotCount = (
+  event: EventOption,
+  participant: Participant | null,
+): number => Math.max(event.nop, participant?.players.length ?? 0)
+
+export const canAddPlayerSlot = (event: EventOption): boolean =>
+  isLeagueEvent(event)
+
 // Hosts are always treated as paid; team participants count as paid
 // only when every non-host player is in paidPlayerIds.
 const isHostPlayer = (playerId: string): boolean =>
@@ -314,7 +330,9 @@ const countPaidParticipants = (event: EventOption): number => {
   const paidIds = event.paidPlayerIds || []
   return event.participants.filter(
     (p) =>
-      p.players.length === event.nop &&
+      (isLeagueEvent(event)
+        ? p.players.length >= event.nop
+        : p.players.length === event.nop) &&
       p.players.every(
         (pl) =>
           isHostPlayer(pl._id.toString()) ||
@@ -411,6 +429,10 @@ export const buildSlotSelectableFilter = (
   slotIndex: number,
   allPlayers: Player[],
 ): ((player: Player) => boolean) => {
+  // A league roster isn't a line-up, so the rules that only make sense for
+  // a full team — "the last slot must be a woman" — don't apply to it. The
+  // server checks the roster can produce a legal line-up.
+  const isRoster = isLeagueEvent(event)
   const playerById = new Map<string, Player>(
     allPlayers.map((p) => [p._id, p]),
   )
@@ -454,6 +476,7 @@ export const buildSlotSelectableFilter = (
       // Need at least 1 female. If no female yet and this would be the
       // last slot, only females are selectable.
       if (
+        !isRoster &&
         !othersHaveFemale &&
         remainingSlotsIfPicked === 0 &&
         playerSex !== 'female'

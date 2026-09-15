@@ -29,6 +29,8 @@ interface MatchEntry {
   // sub-match's index within parent.subMatches[].
   parent?: Match
   subMatchIndex?: number
+  // League rounds are named by who is playing, not by event and group.
+  isLeague?: boolean
 }
 
 const Schedule = () => {
@@ -140,6 +142,7 @@ const Section = (props: {
                 hideQueueBadge={props.hideQueueBadge}
                 markUnavailablePlayers={props.markUnavailablePlayers}
                 parent={e.parent}
+                isLeague={e.isLeague}
               />
             </div>
           )}
@@ -291,8 +294,11 @@ const extractFromGroup = (
         groupIndex: group.index,
         stage: 'group',
         eventId: event._id,
-        eventName: event.eventName,
-        stageLabel: getGroupName(group.index),
+        eventName: leagueTeamsLabel(event, match) || event.eventName,
+        stageLabel: leagueTeamsLabel(event, match)
+          ? ''
+          : getGroupName(group.index),
+        isLeague: event.eventType === 'league',
       })
     }
   }
@@ -346,9 +352,27 @@ const pushTeamAwareEntries = (
   entries.push({ ...ctx, match })
 }
 
+// "{home team} vs {away team}" for a league team match; undefined for a
+// tournament, which keeps its event and group name.
+const leagueTeamsLabel = (
+  event: EventOption,
+  match: Match,
+): string | undefined => {
+  if (event.eventType !== 'league' || !match.participantIds) return undefined
+  const name = (participantId: string): string => {
+    const participant = event.participants?.find((p) => p._id === participantId)
+    if (!participant) return 'Unknown'
+    return (
+      participant.teamName ||
+      participant.players.map((pl) => `${pl.firstName} ${pl.lastName}`).join('/')
+    )
+  }
+  return `${name(match.participantIds.side1)} vs ${name(match.participantIds.side2)}`
+}
+
 const subMatchTitle = (entry: MatchEntry): string | undefined => {
   if (!entry.parent || entry.subMatchIndex == null) return undefined
-  return getTeamSubMatchTitle(entry.parent, entry.subMatchIndex)
+  return getTeamSubMatchTitle(entry.parent, entry.subMatchIndex, entry.isLeague)
 }
 
 const isUserInEntry = (entry: MatchEntry): boolean => {
