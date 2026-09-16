@@ -5,6 +5,7 @@
 //   npm run ratings:sync -- --club gvttc                  BC, with history
 //   npm run ratings:sync -- --club gvttc --prov ON
 //   npm run ratings:sync -- --club gvttc --national
+//   npm run ratings:sync -- --club gvttc --activity ALL   every player on record
 //   npm run ratings:sync -- --club gvttc --no-history     ratings only, fast
 //   npm run ratings:sync -- --club gvttc --dry-run        report, write nothing
 //
@@ -28,7 +29,7 @@ const USER_AGENT =
 
 // ==================== input ====================
 
-const VALUE_FLAGS = ['club', 'prov', 'period', 'delay', 'out']
+const VALUE_FLAGS = ['club', 'prov', 'period', 'delay', 'out', 'activity']
 
 const parseArgs = (argv) => {
   const values = {}
@@ -44,6 +45,10 @@ const parseArgs = (argv) => {
     // Empty province means the national list.
     province: values.national ? '' : (values.prov ?? 'BC'),
     period: values.period ?? '',
+    // The site defaults to 24 months, which quietly hides anyone who hasn't
+    // played recently — half the BC list. 60 brings them back; ALL is wider
+    // still, reaching to players last rated in the 1990s.
+    activity: values.activity ?? '60',
     withHistory: !values['no-history'],
     dryRun: !!values['dry-run'],
     delayMs: Number(values.delay ?? 400),
@@ -112,8 +117,8 @@ const fetchPage = async (url, { attempts = 4 } = {}) => {
 // Every parameter the site's own pagination links carry. Sending a subset
 // loses the filter — asking for page 2 of BC with only Prov set returns the
 // national list instead.
-const listUrl = ({ province, period, page }) =>
-  `${LIST}?activity=&Category_code=1&Full_Name=&Period_Issued=${period}` +
+const listUrl = ({ province, period, activity, page }) =>
+  `${LIST}?activity=${activity}&Category_code=1&Full_Name=&Period_Issued=${period}` +
   `&Prov=${province}&Reg=&Region=&Sex=&Formv_ctta_ratings_Page=${page}`
 
 // ==================== parsing ====================
@@ -267,15 +272,17 @@ const toPlayerFields = (scraped, detail) => {
 
 // ==================== steps ====================
 
-const scrapeList = async ({ province, period, delayMs }) => {
-  let html = await fetchPage(listUrl({ province, period, page: 1 }))
+const scrapeList = async ({ province, period, activity, delayMs }) => {
+  let html = await fetchPage(listUrl({ province, period, activity, page: 1 }))
   // An unspecified period means "All Periods"; resolve it to the current one
   // and start again, or every player comes back once per period.
   const resolved = period || currentPeriodId(html)
   if (resolved !== period) {
     console.log(`period: ${periodLabel(html, resolved)} (${resolved})`)
     await sleep(delayMs)
-    html = await fetchPage(listUrl({ province, period: resolved, page: 1 }))
+    html = await fetchPage(
+      listUrl({ province, period: resolved, activity, page: 1 }),
+    )
   }
 
   const pages = lastPageNumber(html)
@@ -285,7 +292,7 @@ const scrapeList = async ({ province, period, delayMs }) => {
   for (let page = 2; page <= pages; page++) {
     await sleep(delayMs)
     const more = parseListPage(
-      await fetchPage(listUrl({ province, period: resolved, page })),
+      await fetchPage(listUrl({ province, period: resolved, activity, page })),
     )
     players.push(...more)
     console.log(`  page ${page}/${pages}: ${more.length} players`)
@@ -348,7 +355,9 @@ const run = async () => {
 
   console.log(`TTCan ratings -> ${args.club} (${target.dbName})`)
   console.log(
-    `scope: ${where}${args.period ? `, period ${args.period}` : ', current period'}\n`,
+    `scope: ${where}` +
+      `${args.period ? `, period ${args.period}` : ', current period'}` +
+      `, active within ${args.activity === 'ALL' ? 'any time' : args.activity + ' months'}\n`,
   )
 
   const players = await scrapeList(args)

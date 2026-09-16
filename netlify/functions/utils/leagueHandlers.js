@@ -555,6 +555,48 @@ const withChosenSubMatch = (parent, matchId) => ({
   ),
 })
 
+/**
+ * Swap the tables of two fixtures in a week that hasn't been generated yet.
+ *
+ * Before the matches exist the table lives on the fixture itself, so there is
+ * nothing on a table to move — switchMatchTables handles it from the point
+ * the matches are created onwards.
+ */
+export const switchLeagueFixtureTable = async (body) => {
+  if (!body?._id) throwError('Event ID is required')
+  if (!body.homeParticipantId) throwError('Fixture is required')
+  if (body.tableNumber == null) throwError('tableNumber is required')
+
+  const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
+  const event = await loadRound(collection, body._id)
+  if (getRoundMatches(event).length > 0) {
+    throwError('This week already has matches — switch the match instead')
+  }
+
+  const pairings = [...(event.leaguePairings || [])]
+  const mine = pairings.findIndex(
+    (p) => p.homeParticipantId === body.homeParticipantId,
+  )
+  if (mine === -1) throwError('Fixture not found in this round')
+  const fromTable = pairings[mine].tableNumber
+  if (fromTable === body.tableNumber) throwError('Already on that table')
+
+  const theirs = pairings.findIndex(
+    (p, i) => i !== mine && p.tableNumber === body.tableNumber,
+  )
+  pairings[mine] = { ...pairings[mine], tableNumber: body.tableNumber }
+  if (theirs !== -1) {
+    pairings[theirs] = { ...pairings[theirs], tableNumber: fromTable }
+  }
+
+  await collection.updateOne(
+    { _id: event._id },
+    { $set: { leaguePairings: pairings, updatedAt: new Date().toISOString() } },
+  )
+  return { success: true }
+}
+
 // ==================== Generating a round's matches ====================
 
 /**

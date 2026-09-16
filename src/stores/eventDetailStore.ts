@@ -59,7 +59,7 @@ interface EventDetailState {
   showAssignDialog: boolean
   // 'assign' puts a queued match on a free table; 'switch' moves one that is
   // already on a table, swapping with whatever is on the target.
-  assignDialogMode: 'assign' | 'switch'
+  assignDialogMode: 'assign' | 'switch' | 'fixture'
   // The table the match being switched is currently on or pinned to, so the
   // dialog can grey it out. Before an event starts there is no table state
   // to look it up from.
@@ -575,6 +575,18 @@ export const eventDetailActions = {
     })
   },
 
+  // A league fixture before its week is generated: the table is on the
+  // fixture, so the dialog acts on that rather than on a match.
+  openFixtureTableDialog: (homeParticipantId: string, currentTable?: number) => {
+    setEventDetailState({
+      showAssignDialog: true,
+      assignDialogMode: 'fixture',
+      assignDialogCurrentTable: currentTable ?? null,
+      assignDialogMatchId: homeParticipantId,
+      assignDialogEventId: eventDetailState.eventId,
+    })
+  },
+
   openSwitchTableDialog: (
     matchId: string,
     currentTable: number | undefined,
@@ -623,6 +635,24 @@ export const eventDetailActions = {
     } finally {
       setEventDetailState({
         showAssignDialog: false,
+        assignDialogMatchId: null,
+        assignDialogEventId: null,
+        assigningTableNumber: null,
+      })
+    }
+  },
+
+  switchFixtureTable: async (tableNumber: number) => {
+    const homeParticipantId = eventDetailState.assignDialogMatchId
+    if (!homeParticipantId) return
+    setEventDetailState({ assigningTableNumber: tableNumber })
+    try {
+      await leagueActions.switchFixtureTable(homeParticipantId, tableNumber)
+    } finally {
+      setEventDetailState({
+        showAssignDialog: false,
+        assignDialogMode: 'assign',
+        assignDialogCurrentTable: null,
         assignDialogMatchId: null,
         assignDialogEventId: null,
         assigningTableNumber: null,

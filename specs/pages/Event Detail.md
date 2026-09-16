@@ -201,7 +201,15 @@ The Total column is the total matches played so far.
   - Round/Week: dropdown, the schedule for each week "Week {r}, {date}"
   - when a round/week is selected
     - if the match schedule is not generated
-      - list of selected players of each team for this round/week. last column of each row is the "Select Players" button, which opens a dialog with all players (name and rating) in the team, each one is a toggle button, where a max of n players can be selected (n is team size). If the league is a rated event, show error when selected players violate combined rating or top players combined rating if topPlayersRatingEnabled is true
+      - who plays whom is already fixed by the league schedule, so show one
+        row per fixture with three columns:
+        - Team 1: team name, the selected players (one per row) below it, and
+          a "Select Players" button
+        - Table: the fixture's table number, and a "Switch Table" button
+          (admin only) that opens the same tables dialog; picking another
+          table swaps the two fixtures' tables
+        - Team 2: same as Team 1
+      - "Select Players" opens a dialog with all players (name and rating) in the team, each one is a toggle button, where a max of n players can be selected (n is team size). If the league is a rated event, show error when selected players violate combined rating or top players combined rating if topPlayersRatingEnabled is true
       - "Generate Match Schedule" button, enabled when n players are selected for every team
     - otherwise
       - the list of matches in that round/week (use the Match component for teams)

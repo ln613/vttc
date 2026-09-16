@@ -63,6 +63,7 @@ import {
   autoSelectLeagueRoundPlayers,
   generateLeagueRoundMatches,
   playLeagueSubMatchNow,
+  switchLeagueFixtureTable,
   resetLeagueRound,
   syncLeagueRoster,
 } from './leagueHandlers.js'
@@ -146,6 +147,7 @@ export const apiHandlers = {
     autoSelectLeagueRoundPlayers: withEventNotify(autoSelectLeagueRoundPlayers),
     generateLeagueRoundMatches: withEventNotify(generateLeagueRoundMatches),
     playLeagueSubMatchNow: withEventNotify(playLeagueSubMatchNow),
+    switchLeagueFixtureTable: withEventNotify(switchLeagueFixtureTable),
     resetLeagueRound: withEventNotify(resetLeagueRound),
     finishMatch: withEventNotify(finishMatch),
     confirmMatch: withEventNotify(confirmMatch),

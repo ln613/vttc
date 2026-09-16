@@ -91,6 +91,7 @@ export const ACCESS = {
     autoSelectLeagueRoundPlayers: ADMIN,
     generateLeagueRoundMatches: ADMIN,
     playLeagueSubMatchNow: ADMIN,
+    switchLeagueFixtureTable: ADMIN,
     resetLeagueRound: ADMIN,
     resetEvent: ADMIN,
     resetTeamMatch: ADMIN,

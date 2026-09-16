@@ -204,6 +204,29 @@ export const leagueActions = {
     return ok
   },
 
+  // Before a week is generated the table belongs to the fixture, so this is
+  // the swap; once matches exist, switchMatchTables handles it.
+  switchFixtureTable: async (
+    homeParticipantId: string,
+    tableNumber: number,
+  ): Promise<boolean> => {
+    const round = leagueActions.getSelectedRound()
+    if (!round) return false
+    return withBusy('savingSelection', () =>
+      apiPost('switchLeagueFixtureTable', {
+        _id: round._id,
+        homeParticipantId,
+        tableNumber,
+      }),
+    )
+  },
+
+  getFixtureTable: (homeParticipantId: string): number | undefined =>
+    leagueActions
+      .getSelectedRound()
+      ?.pairings.find((p) => p.homeParticipantId === homeParticipantId)
+      ?.tableNumber,
+
   // Simulated leagues only — fills in every team's line-up at once.
   autoSelectPlayers: async (): Promise<boolean> => {
     const round = leagueActions.getSelectedRound()

@@ -373,7 +373,7 @@ export const AssignTableDialog = () => {
   const isAvailable = (n: number) => tableState(n)?.status === 'available'
   const isAssigning = (n: number) =>
     eventDetailState.assigningTableNumber === n
-  const isSwitching = () => eventDetailState.assignDialogMode === 'switch'
+  const isSwitching = () => eventDetailState.assignDialogMode !== 'assign'
   const currentTable = () =>
     eventDetailState.assignDialogCurrentTable ??
     tables().find(
@@ -409,8 +409,13 @@ export const AssignTableDialog = () => {
     e.preventDefault()
     if (!isSelectable(n) || eventDetailState.assigningTableNumber != null) return
     if (!(await customConfirm(confirmText(n)))) return
-    if (isSwitching()) await eventDetailActions.switchMatchTables(n)
-    else await eventDetailActions.assignMatchToTable(n)
+    if (eventDetailState.assignDialogMode === 'fixture') {
+      await eventDetailActions.switchFixtureTable(n)
+    } else if (isSwitching()) {
+      await eventDetailActions.switchMatchTables(n)
+    } else {
+      await eventDetailActions.assignMatchToTable(n)
+    }
   }
 
   return (
@@ -3387,9 +3392,11 @@ const RoundPicker = () => {
 }
 
 // Before a week is generated, each team picks the players it fields.
+// Who plays whom is already fixed by the schedule, so the week reads as its
+// fixtures: each side with its line-up, the table between them.
 const RoundPlayerSelection = () => {
-  const teamSize = () => leagueActions.getTeamSize()
   const byeTeam = () => leagueActions.getSelectedRound()?.byeParticipantId
+  const pairings = () => leagueActions.getSelectedRound()?.pairings || []
 
   return (
     <div>
@@ -3397,19 +3404,44 @@ const RoundPlayerSelection = () => {
         <table style={tableStyle}>
           <thead>
             <tr>
-              <th style={thStyle}>Team</th>
-              <th style={thStyle}>Selected Players</th>
-              <th style={thStyle} />
+              <th style={thStyle}>Team 1</th>
+              <th style={{ ...thStyle, 'text-align': 'center' }}>Table</th>
+              <th style={thStyle}>Team 2</th>
             </tr>
           </thead>
           <tbody>
-            <For each={leagueActions.getPlayingParticipantIds()}>
-              {(participantId, index) => (
-                <RoundSelectionRow
-                  participantId={participantId}
-                  index={index()}
-                  teamSize={teamSize()}
-                />
+            <For each={pairings()}>
+              {(pairing, index) => (
+                <tr style={{ 'background-color': getRowBackground(index()) }}>
+                  <td style={fixtureCellStyle}>
+                    <FixtureTeam participantId={pairing.homeParticipantId} />
+                  </td>
+                  <td style={fixtureTableCellStyle}>
+                    <div style={fixtureTableNumberStyle}>
+                      {leagueActions.getFixtureTable(pairing.homeParticipantId) ??
+                        '-'}
+                    </div>
+                    <Show when={authState.isAdmin}>
+                      <Button
+                        color="#f39c12"
+                        size="small"
+                        onClick={() =>
+                          eventDetailActions.openFixtureTableDialog(
+                            pairing.homeParticipantId,
+                            leagueActions.getFixtureTable(
+                              pairing.homeParticipantId,
+                            ),
+                          )
+                        }
+                      >
+                        Switch Table
+                      </Button>
+                    </Show>
+                  </td>
+                  <td style={fixtureCellStyle}>
+                    <FixtureTeam participantId={pairing.awayParticipantId} />
+                  </td>
+                </tr>
               )}
             </For>
           </tbody>
@@ -3453,37 +3485,41 @@ const RoundPlayerSelection = () => {
   )
 }
 
-const RoundSelectionRow = (props: {
-  participantId: string
-  index: number
-  teamSize: number
-}) => {
+// One side of a fixture: the team, its line-up once picked, and the button
+// to pick it.
+const FixtureTeam = (props: { participantId: string }) => {
   const selected = () => leagueActions.getSelectedPlayers(props.participantId)
 
   return (
-    <tr style={{ 'background-color': getRowBackground(props.index) }}>
-      <td style={tdStyle}>{leagueActions.getTeamName(props.participantId)}</td>
-      <td style={tdStyle}>
-        <Show
-          when={selected().length > 0}
-          fallback={<span style={leagueMutedStyle}>None selected</span>}
-        >
-          {selected()
-            .map((p) => `${p.firstName} ${p.lastName} (${p.rating || 0})`)
-            .join(', ')}
-        </Show>
-      </td>
-      <td style={tdStyle}>
-        <Show when={authState.isAdmin}>
+    <div style={fixtureTeamStyle}>
+      <div style={fixtureTeamNameStyle}>
+        {leagueActions.getTeamName(props.participantId)}
+      </div>
+      <Show
+        when={selected().length > 0}
+        fallback={<div style={leagueMutedStyle}>None selected</div>}
+      >
+        <For each={selected()}>
+          {(player) => (
+            <div style={fixturePlayerStyle}>
+              {player.firstName} {player.lastName} ({player.rating || 0})
+            </div>
+          )}
+        </For>
+      </Show>
+      <Show when={authState.isAdmin}>
+        <div style={fixtureButtonRowStyle}>
           <Button
             size="small"
-            onClick={() => leagueActions.openSelectDialog(props.participantId)}
+            onClick={() =>
+              leagueActions.openSelectDialog(props.participantId)
+            }
           >
             Select Players
           </Button>
-        </Show>
-      </td>
-    </tr>
+        </div>
+      </Show>
+    </div>
   )
 }
 
@@ -3986,6 +4022,48 @@ const tdStyle: JSX.CSSProperties = {
   'text-align': 'center',
   'border-bottom': '1px solid #f0f0f0',
   color: '#444',
+}
+
+const fixtureCellStyle: JSX.CSSProperties = {
+  ...tdStyle,
+  'vertical-align': 'top',
+  width: '40%',
+}
+
+const fixtureTableCellStyle: JSX.CSSProperties = {
+  ...tdStyle,
+  'text-align': 'center',
+  'vertical-align': 'middle',
+  'white-space': 'nowrap',
+}
+
+const fixtureTableNumberStyle: JSX.CSSProperties = {
+  'font-size': '28px',
+  'font-weight': 900,
+  color: '#f1c40f',
+  'line-height': 1.1,
+  'margin-bottom': '6px',
+}
+
+const fixtureTeamStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '2px',
+}
+
+const fixtureTeamNameStyle: JSX.CSSProperties = {
+  'font-weight': 700,
+  color: '#2c3e50',
+}
+
+const fixturePlayerStyle: JSX.CSSProperties = {
+  'font-size': '13px',
+  color: '#555',
+}
+
+const fixtureButtonRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'margin-top': '6px',
 }
 
 const emptyContentStyle: JSX.CSSProperties = {
