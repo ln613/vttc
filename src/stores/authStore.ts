@@ -111,6 +111,9 @@ const clearStorage = () => {
   localStorage.removeItem('vttc_isTablet')
 }
 
+// Matches TABLET_USERNAME in netlify/functions/utils/accountHandlers.js.
+const TABLET_USERNAME = 'tablet'
+
 const [authState, setAuthState] = createStore<AuthState>(getInitialState())
 
 export { authState }
@@ -164,6 +167,22 @@ export const authActions = {
         loading: false,
         error: err instanceof Error ? err.message : 'Sign in failed',
       })
+    }
+  },
+
+  /**
+   * Sign in with the match-day password so anyone running a table can
+   * umpire. It authenticates as the tablet role, which is read-only
+   * everywhere except scoring a match — exactly the right this needs.
+   * Returns whether it worked, so the caller can keep its dialog open.
+   */
+  signInAsUmpire: async (password: string): Promise<boolean> => {
+    if (!password) return false
+    try {
+      await authActions.signIn(TABLET_USERNAME, password)
+      return authState.isTablet
+    } catch {
+      return false
     }
   },
 

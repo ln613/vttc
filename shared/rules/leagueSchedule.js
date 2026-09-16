@@ -409,6 +409,35 @@ export const getLeagueMatchesLabel = (format, teamSize) =>
 export const getSupportedTeamSizes = (format) =>
   format === 'RR Singles' ? ['2', '3', '4'] : ['2', '3']
 
+// ==================== Ratings ====================
+
+/**
+ * A player's rating as it stood on a given date.
+ *
+ * A league's rating limits are judged once, against the squad as it was when
+ * the season started. Using today's rating instead would let a team that was
+ * legal in September become illegal in November purely because someone
+ * improved — and would change the answer every time the page is opened.
+ *
+ * `history` is TTCan's list of rating periods ({ periodId, period, rating }).
+ * Returns undefined when the player has no period on or before the date,
+ * which is the case for anyone who joined mid-season.
+ */
+export const ratingAtDate = (history, onDate) => {
+  if (!Array.isArray(history) || history.length === 0) return undefined
+  if (!onDate) return undefined
+  const cutoff = new Date(onDate).getTime()
+  if (Number.isNaN(cutoff)) return undefined
+
+  let best
+  for (const entry of history) {
+    const at = new Date(entry.period).getTime()
+    if (Number.isNaN(at) || at > cutoff) continue
+    if (!best || entry.periodId > best.periodId) best = entry
+  }
+  return best?.rating
+}
+
 // ==================== Players ====================
 
 /**

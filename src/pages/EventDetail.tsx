@@ -3494,6 +3494,10 @@ const FixtureTeam = (props: { participantId: string }) => {
     <div style={fixtureTeamStyle}>
       <div style={fixtureTeamNameStyle}>
         {leagueActions.getTeamName(props.participantId)}
+        <Show when={selected().length > 0}>
+          {' '}
+          ({leagueActions.getSelectedCombinedRating(props.participantId)})
+        </Show>
       </div>
       <Show
         when={selected().length > 0}
@@ -3502,7 +3506,8 @@ const FixtureTeam = (props: { participantId: string }) => {
         <For each={selected()}>
           {(player) => (
             <div style={fixturePlayerStyle}>
-              {player.firstName} {player.lastName} ({player.rating || 0})
+              {player.firstName} {player.lastName} (
+              {leagueActions.getLeagueRating(player)})
             </div>
           )}
         </For>
@@ -3567,7 +3572,7 @@ const SelectPlayersDialog = (props: { participantId: string }) => {
           <For each={roster()}>
             {(player) => (
               <ToggleButton
-                label={`${player.firstName} ${player.lastName} - ${player.rating || 0}`}
+                label={`${player.firstName} ${player.lastName} - ${leagueActions.getLeagueRating(player)}`}
                 value={isPicked(player._id)}
                 onChange={() => toggle(player._id)}
               />
@@ -3606,7 +3611,9 @@ const describeLineupRatingError = (players: Player[]): string | null => {
     return null
   if (players.length < leagueActions.getTeamSize()) return null
 
-  const combined = players.reduce((sum, p) => sum + (p.rating || 0), 0)
+  // Judged on the ratings at the season's start, matching the server.
+  const rated = (p: Player) => leagueActions.getLeagueRating(p)
+  const combined = players.reduce((sum, p) => sum + rated(p), 0)
   if (combined > league.ratingLimit) {
     return `Combined rating (${combined}) exceeds the limit (${league.ratingLimit})`
   }
@@ -3616,9 +3623,9 @@ const describeLineupRatingError = (players: Player[]): string | null => {
     league.topPlayersRatingLimit
   ) {
     const top = [...players]
-      .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+      .sort((a, b) => rated(b) - rated(a))
       .slice(0, league.topPlayersCount)
-      .reduce((sum, p) => sum + (p.rating || 0), 0)
+      .reduce((sum, p) => sum + rated(p), 0)
     if (top > league.topPlayersRatingLimit) {
       return `Top ${league.topPlayersCount} combined rating (${top}) exceeds the limit (${league.topPlayersRatingLimit})`
     }
@@ -4045,9 +4052,12 @@ const fixtureTableNumberStyle: JSX.CSSProperties = {
   'margin-bottom': '6px',
 }
 
+// Centred to match the cell's text-align, so the button sits under the team
+// name rather than at the edge of a full-width flex row.
 const fixtureTeamStyle: JSX.CSSProperties = {
   display: 'flex',
   'flex-direction': 'column',
+  'align-items': 'center',
   gap: '2px',
 }
 
@@ -4063,6 +4073,7 @@ const fixturePlayerStyle: JSX.CSSProperties = {
 
 const fixtureButtonRowStyle: JSX.CSSProperties = {
   display: 'flex',
+  'justify-content': 'center',
   'margin-top': '6px',
 }
 

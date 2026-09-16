@@ -16,6 +16,7 @@ import {
   getLeagueSubMatchCount,
   isRoundSelectionComplete,
   findDoubleBookedPlayers,
+  ratingAtDate,
 } from '../../../shared/rules/leagueSchedule.js'
 import {
   generateId,
@@ -25,6 +26,7 @@ import {
 } from './eventHandlers.js'
 
 const EVENTS_COLLECTION = 'events'
+const PLAYERS_COLLECTION = 'players'
 const TABLE_STATE_COLLECTION = 'tableState'
 const TABLE_STATE_DOC_ID = 'current'
 
@@ -66,6 +68,9 @@ export const getLeague = async (params) => {
 
   const root = rounds[0]
   return sanitizeForOutput({
+    // What each player was rated when the season started — see
+    // leagueRatingMap. The client shows and checks these, not today's.
+    leagueRatings: await leagueRatingMap(db, root),
     leagueId: params.leagueId,
     leagueName: root.leagueName,
     league: root.league,
@@ -81,6 +86,33 @@ export const getLeague = async (params) => {
     paidPlayerIds: root.paidPlayerIds || [],
     rounds: rounds.map(toRoundSummary),
   })
+}
+
+/**
+ * playerId -> rating on the league's start date.
+ *
+ * The embedded roster snapshots only carry the rating at the time they were
+ * written, and the rating history lives on the players collection, so this
+ * is resolved here once rather than by every caller.
+ */
+const leagueRatingMap = async (db, root) => {
+  const startDate = root.league?.startDate || root.date
+  const ids = (root.participants || []).flatMap((p) =>
+    (p.players || []).map((pl) => pl._id),
+  )
+  if (ids.length === 0) return {}
+
+  const players = await db
+    .collection(PLAYERS_COLLECTION)
+    .find({ _id: { $in: ids.map(toObjectId) } }, { projection: { ttcanRatingHistory: 1 } })
+    .toArray()
+
+  const map = {}
+  for (const player of players) {
+    const rating = ratingAtDate(player.ttcanRatingHistory, startDate)
+    if (rating != null) map[player._id.toString()] = rating
+  }
+  return map
 }
 
 const toRoundSummary = (round) => ({
@@ -244,7 +276,10 @@ export const saveLeagueRoundPlayers = async (body) => {
     body.participantId,
     body.playerIds,
   )
-  throwErrors(validateSelection(event, participant, body.playerIds, selections))
+  const leagueRatings = await leagueRatingMap(db, event)
+  throwErrors(
+    validateSelection(event, participant, body.playerIds, selections, leagueRatings),
+  )
 
   await collection.updateOne(
     { _id: event._id },
@@ -264,7 +299,7 @@ const mergeSelection = (selections, participantId, playerIds) => {
   return [...others, { participantId, playerIds }]
 }
 
-const validateSelection = (event, participant, playerIds, selections) => {
+const validateSelection = (event, participant, playerIds, selections, leagueRatings) => {
   const errors = []
   const teamSize = event.nop
 
@@ -296,7 +331,9 @@ const validateSelection = (event, participant, playerIds, selections) => {
 
   // A rated league checks the line-up, not the roster.
   if (event.restriction === 'Rated' && event.ratingLimit) {
-    errors.push(...validateSelectionRating(event, participant, playerIds))
+    errors.push(
+      ...validateSelectionRating(event, participant, playerIds, leagueRatings),
+    )
   }
   return errors
 }
@@ -311,7 +348,7 @@ const namePlayers = (event, playerIds) => {
   return playerIds.map((id) => byId.get(id.toString()) || id).join(', ')
 }
 
-const validateSelectionRating = (event, participant, playerIds) => {
+const validateSelectionRating = (event, participant, playerIds, leagueRatings) => {
   const errors = []
   const selected = (participant.players || []).filter((p) =>
     playerIds.includes(p._id.toString()),
@@ -319,7 +356,10 @@ const validateSelectionRating = (event, participant, playerIds) => {
   // Only a full line-up can be judged; a partial pick may still come good.
   if (selected.length < event.nop) return errors
 
-  const combined = selected.reduce((sum, p) => sum + (p.rating || 0), 0)
+  // The limit is judged against the squad as it stood when the season
+  // started, so a rating earned since cannot make a legal team illegal.
+  const ratingOf = (p) => leagueRatings[p._id.toString()] ?? p.rating ?? 0
+  const combined = selected.reduce((sum, p) => sum + ratingOf(p), 0)
   if (combined > event.ratingLimit) {
     errors.push(
       `Combined rating (${combined}) exceeds limit (${event.ratingLimit})`,
@@ -331,9 +371,9 @@ const validateSelectionRating = (event, participant, playerIds) => {
     event.topPlayersRatingLimit
   ) {
     const top = [...selected]
-      .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+      .sort((a, b) => ratingOf(b) - ratingOf(a))
       .slice(0, event.topPlayersCount)
-      .reduce((sum, p) => sum + (p.rating || 0), 0)
+      .reduce((sum, p) => sum + ratingOf(p), 0)
     if (top > event.topPlayersRatingLimit) {
       errors.push(
         `Top ${event.topPlayersCount} combined rating (${top}) exceeds limit (${event.topPlayersRatingLimit})`,

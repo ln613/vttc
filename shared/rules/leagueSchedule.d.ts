@@ -64,6 +64,11 @@ export declare const getLeagueMatchesLabel: (
 
 export declare const getSupportedTeamSizes: (format: LeagueFormat) => string[]
 
+export declare const ratingAtDate: (
+  history: { periodId: number; period: string; rating: number }[] | undefined,
+  onDate: string | undefined,
+) => number | undefined
+
 export declare const isRoundSelectionComplete: (
   selections: LeagueRoundSelection[],
   playingParticipantIds: string[],

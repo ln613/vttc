@@ -1,4 +1,12 @@
-import { Show, Switch, Match, For, createSignal, type JSX } from 'solid-js'
+import {
+  Show,
+  Switch,
+  Match,
+  For,
+  createSignal,
+  onMount,
+  type JSX,
+} from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { authState, authActions } from '../stores/authStore'
 import { signUpState, signUpActions } from '../stores/signUpStore'
@@ -57,6 +65,31 @@ const PendingPasswordModal = () => {
 const TopBar = () => {
   const navigate = useNavigate()
   const [showTablePicker, setShowTablePicker] = createSignal(false)
+  const [showUmpirePassword, setShowUmpirePassword] = createSignal(false)
+
+  // The button only exists while there is something to umpire, and the
+  // header is on every page — so the table state has to be loaded here
+  // rather than waiting for a page that happens to need it.
+  onMount(() => {
+    if (liveScoreState.tables.length === 0) void liveScoreActions.fetchLiveScore()
+  })
+
+  // Anyone may umpire with the match-day password; an admin or a signed-in
+  // tablet already has the right and skips straight to the table picker,
+  // rather than trading their session for a tablet one.
+  const handleUmpireClick = () => {
+    void liveScoreActions.fetchLiveScore()
+    if (authState.isTablet || authState.isAdmin) {
+      setShowTablePicker(true)
+      return
+    }
+    setShowUmpirePassword(true)
+  }
+
+  const handleUmpireAuthenticated = () => {
+    setShowUmpirePassword(false)
+    setShowTablePicker(true)
+  }
 
   const handleLiveScoreClick = () => {
     if (authState.isTablet) {
@@ -116,6 +149,21 @@ const TopBar = () => {
               Tablet
             </Show>
           </button>
+          <Show
+            when={
+              !authState.isTablet && liveScoreActions.hasMatchesToUmpire()
+            }
+          >
+            <button style={umpireButtonStyle} onClick={handleUmpireClick}>
+              Umpire
+            </button>
+          </Show>
+          <Show when={showUmpirePassword()}>
+            <UmpirePasswordDialog
+              onAuthenticated={handleUmpireAuthenticated}
+              onClose={() => setShowUmpirePassword(false)}
+            />
+          </Show>
           <Show when={showTablePicker()}>
             <TablePickerDialog
               onPick={handleTablePick}
@@ -153,6 +201,62 @@ const TopBar = () => {
 // Every cell is clickable; the GamePlay page handles the no-match
 // case by showing just the big table number.
 const TABLE_GRID_ORDER = [5, 6, 7, 8, 1, 2, 3, 4]
+
+/**
+ * The match-day password, which anyone running a table can be given. It
+ * authenticates as the tablet role — read-only everywhere except umpiring,
+ * which is exactly the right for this.
+ */
+const UmpirePasswordDialog = (props: {
+  onAuthenticated: () => void
+  onClose: () => void
+}) => {
+  const [password, setPassword] = createSignal('')
+  const [error, setError] = createSignal('')
+  const [busy, setBusy] = createSignal(false)
+
+  const submit = async () => {
+    if (!password()) {
+      setError('Enter the match day password.')
+      return
+    }
+    setBusy(true)
+    setError('')
+    const ok = await authActions.signInAsUmpire(password())
+    setBusy(false)
+    if (ok) props.onAuthenticated()
+    else setError('That password was not accepted.')
+  }
+
+  return (
+    <div style={overlayStyle} onClick={props.onClose}>
+      <div style={umpireDialogStyle} onClick={(e) => e.stopPropagation()}>
+        <h2 style={dialogTitleStyle}>Umpire a Match</h2>
+        <div style={umpireHintStyle}>
+          Enter the match day password to score a match on any table.
+        </div>
+        <Input
+          label="Match Day Password"
+          name="matchDayPassword"
+          type="password"
+          value={password()}
+          onChange={setPassword}
+        />
+        <Show when={error()}>
+          <div style={umpireErrorStyle}>{error()}</div>
+        </Show>
+        <div style={umpireButtonRowStyle}>
+          <Button color="#e74c3c" onClick={props.onClose}>
+            Cancel
+          </Button>
+          <Button color="#27ae60" onClick={() => void submit()} disabled={busy()}>
+            {busy() ? 'Checking...' : 'Continue'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const TablePickerDialog = (props: {
   onPick: (t: TableAssignment) => void
@@ -882,6 +986,47 @@ const liveScoreButtonStyle: JSX.CSSProperties = {
   display: 'flex',
   'align-items': 'center',
   'justify-content': 'center',
+}
+
+const umpireButtonStyle: JSX.CSSProperties = {
+  'background-color': '#27ae60',
+  color: '#fff',
+  border: 'none',
+  'border-radius': '6px',
+  padding: '6px 12px',
+  'font-size': '14px',
+  'font-weight': 700,
+  cursor: 'pointer',
+  'white-space': 'nowrap',
+}
+
+const umpireDialogStyle: JSX.CSSProperties = {
+  'background-color': '#fff',
+  'border-radius': '12px',
+  padding: '24px',
+  width: '100%',
+  'max-width': '360px',
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '8px',
+}
+
+const umpireHintStyle: JSX.CSSProperties = {
+  'font-size': '13px',
+  color: '#666',
+  'margin-bottom': '4px',
+}
+
+const umpireErrorStyle: JSX.CSSProperties = {
+  color: '#c0392b',
+  'font-size': '13px',
+}
+
+const umpireButtonRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  gap: '12px',
+  'justify-content': 'flex-end',
+  'margin-top': '8px',
 }
 
 const liveBadgeStyle: JSX.CSSProperties = {

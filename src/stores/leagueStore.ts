@@ -15,6 +15,7 @@ import {
   isRoundSelectionComplete,
 } from '../../shared/rules/leagueRules'
 import { apiGet, apiPost } from '../utils/api'
+import { formatLocalDate } from '../utils/date'
 import {
   subscribeToLiveScoreUpdates,
   type EventSubscription,
@@ -47,6 +48,9 @@ export interface LeagueView {
   topPlayersRatingLimit?: number
   participants: Participant[]
   paidPlayerIds: string[]
+  // playerId -> rating on the league's start date. A league judges its
+  // rating limits against the squad as it stood when the season began.
+  leagueRatings: Record<string, number>
   rounds: LeagueRoundView[]
 }
 
@@ -147,16 +151,15 @@ export const leagueActions = {
     // Already tracking this league — the subscription keeps it current, so
     // there is nothing to fetch here.
     if (isSameLeague && leagueState.data) return
-    setLeagueState({
-      leagueId,
-      loading: !isSameLeague,
-      selectedRoundIndex: isSameLeague
-        ? leagueState.selectedRoundIndex
-        : (event.roundIndex ?? 0),
-    })
+    setLeagueState({ leagueId, loading: !isSameLeague })
     subscribeForLeague(leagueId)
     try {
-      await fetchLeague(leagueId)
+      const data = await fetchLeague(leagueId)
+      // Only on first open: a week the admin has since picked by hand stays
+      // picked when the league refreshes.
+      if (!isSameLeague) {
+        setLeagueState({ selectedRoundIndex: upcomingRoundIndex(data) })
+      }
     } catch (err) {
       setLeagueState({
         loading: false,
@@ -302,6 +305,19 @@ export const leagueActions = {
     ])
   },
 
+  // What a player was rated when the season started; today's rating is the
+  // fallback for anyone who has no period on record from before then.
+  getLeagueRating: (player: Player): number =>
+    leagueState.data?.leagueRatings?.[player._id?.toString()] ??
+    player.rating ??
+    0,
+
+  /** Combined rating of the players a team fields this week. */
+  getSelectedCombinedRating: (participantId: string): number =>
+    leagueActions
+      .getSelectedPlayers(participantId)
+      .reduce((sum, player) => sum + leagueActions.getLeagueRating(player), 0),
+
   isSimulated: (): boolean => !!leagueState.data?.simulated,
 
   hasRoundMatches: (): boolean =>
@@ -329,6 +345,22 @@ export const leagueActions = {
     unsubscribeLeague()
     setLeagueState(getInitialState())
   },
+}
+
+/**
+ * The week a league opens on: the next one to be played, by date, and the
+ * last week once the season is over. Opening on week 1 every time would mean
+ * scrolling past months of finished weeks by November.
+ *
+ * Dates are YYYY-MM-DD, so a string compare orders them correctly. Today
+ * counts as upcoming — a match night should stay on its own week.
+ */
+const upcomingRoundIndex = (data: LeagueView): number => {
+  const rounds = [...data.rounds].sort((a, b) => a.roundIndex - b.roundIndex)
+  if (rounds.length === 0) return 0
+  const today = formatLocalDate(new Date())
+  const upcoming = rounds.find((round) => round.date >= today)
+  return (upcoming ?? rounds[rounds.length - 1]).roundIndex
 }
 
 export const describeTeam = (players: Player[]): string =>

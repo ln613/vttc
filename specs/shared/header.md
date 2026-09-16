@@ -5,6 +5,15 @@
 - banner https://res.cloudinary.com/vttc/image/upload/v1767957616/banner.jpg
 - Top bar (blue bg, white text)
   - Live score icon (for tablet, show Tablet)
+  - "Umpire" button (green bg), next to the live score icon
+    - publicly accessible — no sign in required
+    - visible only when there is a match to umpire (a match on a table that
+      has not finished), and not for the tablet role, which already has its
+      own Tablet button
+    - on click, show the Match Day Password dialog, then the table selection
+      dialog; picking a table opens the Game Play page for it
+    - an admin or a signed-in tablet skips the password and goes straight to
+      the table selection, rather than trading their session for a tablet one
   - Events: go to the Home/Events List page
   - Schedule: go to the schedule page
   - Players: go to the Players page
@@ -12,6 +21,16 @@
   - Account Icon (align right)
     - if not signed in, show sign in dialog
     - if signed in, go to account page
+
+## Match Day Password dialog
+
+- header "Umpire a Match" (h2)
+- note "Enter the match day password to score a match on any table."
+- password input, "Match Day Password"
+- "Cancel" (red) and "Continue" (green) buttons
+- on continue: authenticate with the match day password. Anyone holding it can
+  umpire — the role is read-only everywhere else on the site
+- on failure, keep the dialog open and show the error
 
 ## Sign in dialog
 

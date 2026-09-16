@@ -163,6 +163,18 @@ export const liveScoreActions = {
   getTable: (tableNumber: number): TableAssignment | undefined =>
     liveScoreState.tables.find((t) => t.tableNumber === tableNumber),
 
+  // Is there anything on a table for someone to umpire? A match that is
+  // assigned and not finished needs a person at the table, whether it has
+  // started or not.
+  hasMatchesToUmpire: (): boolean =>
+    liveScoreState.tables.some(
+      (t) =>
+        t.status === 'assigned' &&
+        t.match &&
+        t.match.matchStatus !== 'finished_unconfirmed' &&
+        t.match.match?.winningSide == null,
+    ),
+
   getAssignedTables: (): TableAssignment[] =>
     liveScoreState.tables.filter((t) => t.status === 'assigned'),
 
