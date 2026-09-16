@@ -126,9 +126,21 @@ const convertFilterIds = (filter) => {
 }
 
 // Per coding standard rule 10: the dev environment uses the "-dev"
-// suffixed database so local work never touches production data. The base
-// name comes from the MONGODB_URI path (e.g. ".../vttc?..." → "vttc").
-const BASE_DB_NAME = 'vttc'
+// suffixed database so local work never touches production data.
+//
+// The base name follows the club, or every club would read VTTC's database
+// name on its own cluster and find nothing there. In order: the MONGODB_URI
+// path (".../gvttc?..." → "gvttc"), then CLUB, then vttc — which is what a
+// single-club checkout with no path in its URI has always used.
+const baseDbFromUri = (uri) => {
+  const path = (uri || '').match(/mongodb(?:\+srv)?:\/\/[^/]+\/([^?]+)/)
+  if (!path) return undefined
+  // A URI already pointing at "-dev" shouldn't become "-dev-dev".
+  return decodeURIComponent(path[1]).replace(/-dev$/, '')
+}
+
+const BASE_DB_NAME =
+  baseDbFromUri(process.env.MONGODB_URI) || process.env.CLUB || 'vttc'
 
 // `netlify dev` exports NETLIFY_DEV=true locally; deployed production
 // functions run without it (CONTEXT === 'production').
