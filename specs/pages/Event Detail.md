@@ -84,6 +84,19 @@ The Total column is the total matches played so far.
       - team sub match only
       - delete all sub matches from the same parent match
       - recreate the parent match and assign it to the same table
+    - "Switch Table" button
+      - admin only
+      - visible for any match that has a table and has not finished. That
+        includes one already under way — a game sometimes has to change table
+        part-way through, and the score travels with the match — and a league
+        fixture before its week starts, which is pinned to a table by the
+        schedule rather than sitting on one
+      - on click, show the same tables dialog as the Assign button
+      - any table can be picked except the one this match is already on
+      - confirm, then the two matches trade tables (or the match simply moves,
+        if the picked table is free)
+      - for a team match, every sub match still to be played moves too;
+        sub matches already played keep the table they were played on
     - Postpone button (same as live score page)
     - Start/Umpire button
       - green bg

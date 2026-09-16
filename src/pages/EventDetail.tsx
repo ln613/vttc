@@ -28,6 +28,7 @@ import type { LeagueStandingRow } from '../../shared/types/League'
 import { getRoundRobinSinglesLineup } from '../../shared/rules/leagueRules'
 import type { Match, Game } from '../../shared/types/Match'
 import { parseLocalDate } from '../utils/date'
+import clubConfig from 'club-config'
 
 const EventDetail = () => {
   const params = useParams()
@@ -293,10 +294,17 @@ const assignDialogTitleStyle: JSX.CSSProperties = {
   'text-align': 'center',
 }
 
+// One flex row per row in clubs/<slug>/config.json, so the dialog matches
+// the physical hall. A fixed column count would wrap a 3-wide layout into
+// 4s and put table 4 on the wrong row.
 const assignDialogGridStyle: JSX.CSSProperties = {
-  display: 'grid',
-  'grid-template-columns': 'repeat(4, 64px)',
-  'grid-auto-rows': '64px',
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '8px',
+}
+
+const assignDialogRowStyle: JSX.CSSProperties = {
+  display: 'flex',
   gap: '8px',
 }
 
@@ -306,6 +314,9 @@ const assignDialogGridStyle: JSX.CSSProperties = {
 const assignTableCellStyle = (
   status: 'available' | 'not_started' | 'in_progress',
   assigning: boolean,
+  // Whether this table can be picked — not the same as whether it is free.
+  // Switching accepts an occupied table, and the pointer has to say so.
+  selectable: boolean,
 ): JSX.CSSProperties => {
   const bg =
     status === 'available'
@@ -314,18 +325,24 @@ const assignTableCellStyle = (
         ? '#c0392b'
         : '#2980b9'
   return {
+    // Square, and kept square: border-box so the 3px border doesn't grow it,
+    // flex: none so a flex row can't shrink it into a rectangle.
     width: '64px',
     height: '64px',
+    'box-sizing': 'border-box',
+    flex: 'none',
+    display: 'grid',
+    'place-items': 'center',
+    padding: 0,
     'border-radius': '10px',
     'font-size': '24px',
     'font-weight': 900,
     color: '#f1c40f',
     'background-color': bg,
     border: assigning ? '3px solid #f1c40f' : '3px solid transparent',
-    cursor: status === 'available' ? 'pointer' : 'not-allowed',
+    cursor: selectable ? 'pointer' : 'not-allowed',
     opacity: assigning ? 0.7 : 1,
     'text-shadow': '2px 2px 4px rgba(0,0,0,0.3)',
-    padding: 0,
   }
 }
 
@@ -346,6 +363,9 @@ const toastStyle = (type: 'success' | 'error'): JSX.CSSProperties => ({
 // Admin-only dialog: manually assign a queued match to a chosen table.
 // Layout mirrors the physical table arrangement (5/6/7/8 on top row,
 // 1/2/3/4 on bottom) using the dark live-score background.
+// Top row first, matching the physical hall.
+const TABLE_PICKER_ROWS = clubConfig.tables.rows
+
 export const AssignTableDialog = () => {
   const tables = () => liveScoreState.tables
   const tableState = (n: number) =>
@@ -353,6 +373,21 @@ export const AssignTableDialog = () => {
   const isAvailable = (n: number) => tableState(n)?.status === 'available'
   const isAssigning = (n: number) =>
     eventDetailState.assigningTableNumber === n
+  const isSwitching = () => eventDetailState.assignDialogMode === 'switch'
+  const currentTable = () =>
+    eventDetailState.assignDialogCurrentTable ??
+    tables().find(
+      (t) =>
+        t.status === 'assigned' &&
+        t.match?.matchId === eventDetailState.assignDialogMatchId,
+    )?.tableNumber
+
+  // Assigning needs a free table. Switching takes any table but the one this
+  // match is already on — the two matches trade places, in progress or not.
+  const isSelectable = (n: number) => {
+    if (!isSwitching()) return isAvailable(n)
+    return n !== currentTable()
+  }
   const tableStatus = (
     n: number,
   ): 'available' | 'not_started' | 'in_progress' => {
@@ -362,12 +397,20 @@ export const AssignTableDialog = () => {
     return status === 'not_started' ? 'not_started' : 'in_progress'
   }
 
+  const confirmText = (n: number) => {
+    if (!isSwitching()) return `Assign this match to table ${n}?`
+    return isAvailable(n)
+      ? `Move this match to table ${n}?`
+      : `Switch tables with the match on table ${n}?`
+  }
+
   const handleClick = async (e: MouseEvent, n: number) => {
     e.stopPropagation()
     e.preventDefault()
-    if (!isAvailable(n) || eventDetailState.assigningTableNumber != null) return
-    if (!(await customConfirm(`Assign this match to table ${n}?`))) return
-    await eventDetailActions.assignMatchToTable(n)
+    if (!isSelectable(n) || eventDetailState.assigningTableNumber != null) return
+    if (!(await customConfirm(confirmText(n)))) return
+    if (isSwitching()) await eventDetailActions.switchMatchTables(n)
+    else await eventDetailActions.assignMatchToTable(n)
   }
 
   return (
@@ -376,20 +419,34 @@ export const AssignTableDialog = () => {
         style={assignDialogContentStyle}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={assignDialogTitleStyle}>Assign to Table</div>
+        <div style={assignDialogTitleStyle}>
+          {isSwitching() ? 'Switch Table' : 'Assign to Table'}
+        </div>
+        {/* The hall layout is per club (clubs/<slug>/config.json), top row
+            first — not the 8 tables VTTC happens to have. */}
         <div style={assignDialogGridStyle}>
-          <For each={[5, 6, 7, 8, 1, 2, 3, 4]}>
-            {(n) => (
-              <button
-                style={assignTableCellStyle(tableStatus(n), isAssigning(n))}
-                onClick={(e) => handleClick(e, n)}
-                disabled={
-                  !isAvailable(n) ||
-                  eventDetailState.assigningTableNumber != null
-                }
-              >
-                {n}
-              </button>
+          <For each={TABLE_PICKER_ROWS}>
+            {(row) => (
+              <div style={assignDialogRowStyle}>
+                <For each={row}>
+                  {(n) => (
+                    <button
+                      style={assignTableCellStyle(
+                        tableStatus(n),
+                        isAssigning(n),
+                        isSelectable(n),
+                      )}
+                      onClick={(e) => handleClick(e, n)}
+                      disabled={
+                        !isSelectable(n) ||
+                        eventDetailState.assigningTableNumber != null
+                      }
+                    >
+                      {n}
+                    </button>
+                  )}
+                </For>
+              </div>
             )}
           </For>
         </div>
@@ -1378,6 +1435,27 @@ export const MatchRow = (props: MatchRowProps) => {
     !isCurrentSubMatch() &&
     assignedTable() === undefined
 
+  // The table a match holds: the one it is on, or — before the event starts —
+  // the one it is pinned to by a league fixture.
+  const effectiveTable = () => assignedTable() ?? props.match.lockedTableNumber
+
+  // Any match with a table can be moved, in progress included — a game
+  // sometimes has to change table part-way through. Assign is the action for
+  // a match that has no table at all.
+  const showSwitchTable = () =>
+    authState.isAdmin && effectiveTable() !== undefined && !finishedNow()
+
+  const handleSwitchTableClick = (e?: MouseEvent) => {
+    e?.stopPropagation()
+    e?.preventDefault()
+    const eventId = props.eventId ?? eventDetailState.eventId ?? undefined
+    eventDetailActions.openSwitchTableDialog(
+      props.match._id,
+      effectiveTable(),
+      eventId,
+    )
+  }
+
   const handlePlayNowClick = async (e?: MouseEvent) => {
     e?.stopPropagation()
     e?.preventDefault()
@@ -1635,6 +1713,17 @@ export const MatchRow = (props: MatchRowProps) => {
           reason: started ? 'The order is already set' : 'Assign a table first',
         },
         {
+          key: 'switchTable',
+          label: 'Switch Table',
+          description:
+            'Move this team match to another table, swapping with the match there. Every sub match still to be played moves with it.',
+          color: '#16a085',
+          onClick: handleSwitchTableClick,
+          enabled: showSwitchTable(),
+          busy: false,
+          reason: finished ? 'Match already finished' : 'Match has no table',
+        },
+        {
           key: 'reset',
           label: isResetting() ? 'Resetting...' : 'Reset Team',
           description: 'Delete all sub-matches and reset the team match.',
@@ -1665,6 +1754,17 @@ export const MatchRow = (props: MatchRowProps) => {
               : !allPlayersAvailable()
                 ? 'A player is on another table'
                 : 'No table is available',
+      },
+      {
+        key: 'switchTable',
+        label: 'Switch Table',
+        description:
+          'Move this match to another table, swapping with the match there. A team match takes its remaining sub-matches with it.',
+        color: '#16a085',
+        onClick: handleSwitchTableClick,
+        enabled: showSwitchTable(),
+        busy: false,
+        reason: finished ? 'Match already finished' : 'Match has no table',
       },
       {
         key: 'start',

@@ -57,6 +57,13 @@ interface EventDetailState {
   savingOrderSide: 1 | 2 | null
   // Assign-to-table dialog for a queued match (admin only).
   showAssignDialog: boolean
+  // 'assign' puts a queued match on a free table; 'switch' moves one that is
+  // already on a table, swapping with whatever is on the target.
+  assignDialogMode: 'assign' | 'switch'
+  // The table the match being switched is currently on or pinned to, so the
+  // dialog can grey it out. Before an event starts there is no table state
+  // to look it up from.
+  assignDialogCurrentTable: number | null
   assignDialogMatchId: string | null
   assignDialogEventId: string | null
   assigningTableNumber: number | null
@@ -91,6 +98,8 @@ const getInitialState = (): EventDetailState => ({
   orderDialogEventId: null,
   savingOrderSide: null,
   showAssignDialog: false,
+  assignDialogMode: 'assign',
+  assignDialogCurrentTable: null,
   assignDialogMatchId: null,
   assignDialogEventId: null,
   assigningTableNumber: null,
@@ -560,6 +569,21 @@ export const eventDetailActions = {
   openAssignDialog: (matchId: string, eventId?: string) => {
     setEventDetailState({
       showAssignDialog: true,
+      assignDialogMode: 'assign',
+      assignDialogMatchId: matchId,
+      assignDialogEventId: eventId ?? eventDetailState.eventId,
+    })
+  },
+
+  openSwitchTableDialog: (
+    matchId: string,
+    currentTable: number | undefined,
+    eventId?: string,
+  ) => {
+    setEventDetailState({
+      showAssignDialog: true,
+      assignDialogMode: 'switch',
+      assignDialogCurrentTable: currentTable ?? null,
       assignDialogMatchId: matchId,
       assignDialogEventId: eventId ?? eventDetailState.eventId,
     })
@@ -568,6 +592,8 @@ export const eventDetailActions = {
   closeAssignDialog: () => {
     setEventDetailState({
       showAssignDialog: false,
+      assignDialogMode: 'assign',
+      assignDialogCurrentTable: null,
       assignDialogMatchId: null,
       assignDialogEventId: null,
       assigningTableNumber: null,
@@ -597,6 +623,35 @@ export const eventDetailActions = {
     } finally {
       setEventDetailState({
         showAssignDialog: false,
+        assignDialogMatchId: null,
+        assignDialogEventId: null,
+        assigningTableNumber: null,
+      })
+    }
+  },
+
+  // Move a not-started match to another table, swapping with whatever is
+  // there. A team match takes its remaining sub-matches along.
+  switchMatchTables: async (tableNumber: number) => {
+    const matchId = eventDetailState.assignDialogMatchId
+    const eventId =
+      eventDetailState.assignDialogEventId ?? eventDetailState.eventId
+    if (!matchId || !eventId) return
+    setEventDetailState({ assigningTableNumber: tableNumber })
+    try {
+      await apiPost('switchMatchTables', { _id: eventId, matchId, tableNumber })
+      if (eventDetailState.eventId === eventId) await fetchEvent(eventId, true)
+      await liveScoreActions.fetchLiveScore()
+    } catch (err) {
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Failed to switch tables',
+      )
+    } finally {
+      setEventDetailState({
+        showAssignDialog: false,
+        assignDialogMode: 'assign',
+        assignDialogCurrentTable: null,
         assignDialogMatchId: null,
         assignDialogEventId: null,
         assigningTableNumber: null,

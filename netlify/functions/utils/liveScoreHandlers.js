@@ -1524,6 +1524,159 @@ export const assignMatchToTable = async (body) => {
 }
 
 /**
+ * Swap two matches between tables, or move one to a free table.
+ *
+ * A match in progress can be moved too — players do sometimes have to change
+ * table mid-match, and the score belongs to the match rather than the table,
+ * so it travels with them.
+ *
+ * A team match moves as a unit: its parent and every sub-match still to be
+ * played carry the table, so all of them are re-pinned. Only the sub-matches
+ * already played keep the table they were played on.
+ */
+export const switchMatchTables = async (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body.matchId) throwError('Match ID is required')
+  if (body.tableNumber == null) throwError('tableNumber is required')
+
+  const state = await loadTableState()
+  const tables = state?.tables?.length ? state.tables : createInitialTables()
+
+  const fromIndex = tables.findIndex(
+    (t) => t.status === 'assigned' && t.match?.matchId?.toString() === body.matchId.toString(),
+  )
+  // Before an event starts nothing is on a table yet, but a match can still
+  // have a table: a league fixture is pinned to one by the schedule. Then
+  // the swap is between the two matches' pinned tables, with no live table
+  // state to move.
+  if (fromIndex === -1) return switchPinnedTables(body)
+
+  const toIndex = tables.findIndex((t) => t.tableNumber === body.tableNumber)
+  if (toIndex === -1) throwError('Table not found')
+  if (fromIndex === toIndex) throwError('That match is already on this table')
+
+  const moving = tables[fromIndex].match
+  const displaced = tables[toIndex].status === 'assigned' ? tables[toIndex].match : null
+
+  const fromTable = tables[fromIndex].tableNumber
+  const updated = [...tables]
+  updated[toIndex] = {
+    ...updated[toIndex],
+    match: { ...moving, tableNumber: body.tableNumber },
+    status: 'assigned',
+  }
+  updated[fromIndex] = displaced
+    ? { ...updated[fromIndex], match: { ...displaced, tableNumber: fromTable }, status: 'assigned' }
+    : { tableNumber: fromTable, status: 'available' }
+
+  await saveTableState(updated, state?.matchQueue || [], state?.groupTableMap, {
+    teamTableMap: swapTeamTableEntries(state?.teamTableMap, moving, displaced, {
+      fromTable,
+      toTable: body.tableNumber,
+    }),
+  })
+
+  // The table also lives on the match documents, which is what survives a
+  // queue rebuild — without this the next one puts them straight back.
+  await relockMatchTable(moving, body.tableNumber)
+  if (displaced) await relockMatchTable(displaced, fromTable)
+
+  return { success: true, switchedWith: displaced ? displaced.matchId : null }
+}
+
+/**
+ * Swap two matches that are pinned to tables but not yet on them — a league
+ * round's fixtures before the week starts. Whichever match is pinned to the
+ * target table takes this one's table in return; if none is, this one simply
+ * moves.
+ */
+const switchPinnedTables = async ({ _id, matchId, tableNumber }) => {
+  if (!_id) throwError('Event ID is required')
+  const db = getDB()
+  const collection = db.collection('events')
+  const event = await collection.findOne({ _id: toObjectId(_id) })
+  if (!event) throwError('Event not found')
+
+  const moving = findTopLevelMatch(event, matchId)
+  if (!moving) throwError('That match is not in this event')
+  const fromTable = moving.lockedTableNumber
+  if (fromTable == null) throwError('That match has no table to switch')
+  if (fromTable === tableNumber) throwError('That match is already on this table')
+
+  const displaced = topLevelMatches(event).find(
+    (m) => m._id !== moving._id && m.lockedTableNumber === tableNumber,
+  )
+
+  let stages = updateMatchInStages(event.eventStages, moving._id, (m) =>
+    withRelockedTable(m, tableNumber),
+  )
+  if (displaced) {
+    stages = updateMatchInStages(stages, displaced._id, (m) =>
+      withRelockedTable(m, fromTable),
+    )
+  }
+  await collection.updateOne({ _id: toObjectId(_id) }, { $set: { eventStages: stages } })
+  return { success: true, switchedWith: displaced ? displaced._id : null }
+}
+
+const topLevelMatches = (event) =>
+  (event.eventStages || []).flatMap((stage) => [
+    ...(stage.groups || []).flatMap((g) => g.matches || []),
+    ...(stage.rounds || []).flatMap((r) => (r.matches || []).map((km) => km.match).filter(Boolean)),
+  ])
+
+// The pinned table lives on the parent, so a sub-match resolves to its parent.
+const findTopLevelMatch = (event, matchId) =>
+  topLevelMatches(event).find(
+    (m) =>
+      m._id === matchId || (m.subMatches || []).some((s) => s._id === matchId),
+  )
+
+// The map reserves a table per live team match, so both sides follow their
+// matches across.
+const swapTeamTableEntries = (teamTableMap, moving, displaced, { fromTable, toTable }) => {
+  const map = { ...(teamTableMap || {}) }
+  if (moving.parentMatchId) map[moving.parentMatchId] = toTable
+  if (displaced?.parentMatchId) map[displaced.parentMatchId] = fromTable
+  return map
+}
+
+// Re-pin a queue item's match to a table. A sub-match takes its parent and
+// every sibling still to be played with it.
+const relockMatchTable = async (item, tableNumber) => {
+  if (!item?.eventId) return
+  const db = getDB()
+  const collection = db.collection('events')
+  const event = await collection.findOne({ _id: toObjectId(item.eventId) })
+  if (!event) return
+
+  const parentId = item.parentMatchId
+  const targetId = parentId || item.matchId
+  const stages = updateMatchInStages(event.eventStages, targetId, (match) =>
+    withRelockedTable(match, tableNumber),
+  )
+  await collection.updateOne(
+    { _id: toObjectId(item.eventId) },
+    { $set: { eventStages: stages } },
+  )
+}
+
+const withRelockedTable = (match, tableNumber) => ({
+  ...match,
+  lockedTableNumber: tableNumber,
+  ...(Array.isArray(match.subMatches)
+    ? {
+        subMatches: match.subMatches.map((sub) =>
+          // A sub-match already played keeps the table it was played on.
+          sub.winningSide != null
+            ? sub
+            : { ...sub, lockedTableNumber: tableNumber },
+        ),
+      }
+    : {}),
+})
+
+/**
  * Pin one pending sub-match of an RR Singles tie to a table of its own, so
  * it can be played alongside the sub-match the tie is already running.
  *

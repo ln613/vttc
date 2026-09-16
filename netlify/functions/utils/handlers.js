@@ -52,6 +52,7 @@ import {
   postponeMatch,
   cancelMatch,
   assignMatchToTable,
+  switchMatchTables,
   markQueueDirty,
   syncCachedMatch,
 } from './liveScoreHandlers.js'
@@ -210,6 +211,7 @@ export const apiHandlers = {
     postponeMatch: withEventNotify(postponeMatch),
     cancelMatch: withEventNotify(cancelMatch),
     assignMatchToTable: withEventNotify(assignMatchToTable),
+    switchMatchTables: withEventNotify(switchMatchTables),
     acquireMatchSession: async (body) => {
       const result = await acquireMatchSession(body)
       await notifyLiveScoreUpdate(body?._id)

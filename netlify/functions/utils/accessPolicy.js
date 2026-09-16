@@ -99,6 +99,7 @@ export const ACCESS = {
     postponeMatch: ADMIN,
     cancelMatch: ADMIN,
     assignMatchToTable: ADMIN,
+    switchMatchTables: ADMIN,
     updateRatings: ADMIN,
     saveSettings: ADMIN,
     saveRevenueTemplate: ADMIN,
