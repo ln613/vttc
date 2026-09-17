@@ -14,15 +14,41 @@ const getApiHost = () => {
   return import.meta.env.VITE_PROD_HOST || ''
 }
 
+// An umpire working from the match-day password is not signed in: they get
+// no session and nothing is stored. The token lives here, in memory only,
+// for as long as they are on the scoring page — leaving it clears the token,
+// so the next click on Umpire asks for the password again.
+let umpireToken: string | null = null
+let umpireId: string | null = null
+
+export const setUmpireToken = (token: string) => {
+  umpireToken = token || null
+  // The match session identifies whoever holds a table, so an umpire needs
+  // an id even without an account — otherwise two of them could score the
+  // same match with neither noticing. Unique per visit, so a takeover by a
+  // different umpire is still detected.
+  umpireId = token ? `umpire-${Math.random().toString(36).slice(2, 10)}` : null
+}
+
+export const clearUmpireToken = () => {
+  umpireToken = null
+  umpireId = null
+}
+
+/** The synthetic id an umpire holds a match session under, if any. */
+export const getUmpireId = (): string | null => umpireId
+
 // Read from storage rather than authStore, which imports this module.
 // A missing token just means an anonymous request — the server treats that
 // as the public view rather than an error.
 const authHeaders = (): Record<string, string> => {
   try {
-    const token = localStorage.getItem('vttc_token')
+    // A real session always wins: a signed-in player keeps their identity
+    // even while umpiring.
+    const token = localStorage.getItem('vttc_token') || umpireToken
     return token ? { Authorization: `Bearer ${token}` } : {}
   } catch {
-    return {}
+    return umpireToken ? { Authorization: `Bearer ${umpireToken}` } : {}
   }
 }
 

@@ -38,6 +38,7 @@ import {
 } from './eventHandlers.js'
 import {
   signIn,
+  umpireSignIn,
   updateProfile,
   changePassword,
   sendVerificationCode,
@@ -198,6 +199,7 @@ export const apiHandlers = {
     unregisterPushToken: (body) => removePushToken(body),
     saveRevenueTemplate: (body) => saveRevenueTemplate(body),
     signIn: (body) => signIn(body),
+    umpireSignIn: (body) => umpireSignIn(body),
     signUp: (body) => signUp(body),
     sendVerificationCode: (body) => sendVerificationCode(body),
     verifyCode: (body) => verifyCode(body),

@@ -1,5 +1,5 @@
 import { createStore } from 'solid-js/store'
-import { apiPost } from '../utils/api'
+import { apiPost, setUmpireToken } from '../utils/api'
 
 interface AuthUser {
   _id: string
@@ -111,9 +111,6 @@ const clearStorage = () => {
   localStorage.removeItem('vttc_isTablet')
 }
 
-// Matches TABLET_USERNAME in netlify/functions/utils/accountHandlers.js.
-const TABLET_USERNAME = 'tablet'
-
 const [authState, setAuthState] = createStore<AuthState>(getInitialState())
 
 export { authState }
@@ -178,9 +175,21 @@ export const authActions = {
    */
   signInAsUmpire: async (password: string): Promise<boolean> => {
     if (!password) return false
+    const alreadySignedIn = authActions.isSignedIn()
     try {
-      await authActions.signIn(TABLET_USERNAME, password)
-      return authState.isTablet
+      const result = await apiPost<SignInResponse>('umpireSignIn', { password })
+      // Already signed in: the scoring endpoints only need a valid token, so
+      // this call just confirmed the password. Keep the account — swapping it
+      // would cost this player their identity, and their own matches would
+      // stop offering "Start".
+      if (alreadySignedIn) return true
+
+      // Otherwise: no session, no sign-in, nothing stored. The token is
+      // held in memory by the api module only while they are scoring, so
+      // the site still treats them as a visitor and they are asked for the
+      // password again next time.
+      setUmpireToken(result.token)
+      return true
     } catch {
       return false
     }

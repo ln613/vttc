@@ -41,6 +41,7 @@ export const ACCESS = {
   post: {
     // Getting signed in has to work while signed out.
     signIn: PUBLIC,
+    umpireSignIn: PUBLIC, // the match-day password, for umpires without an account
     signUp: PUBLIC,
     sendVerificationCode: PUBLIC,
     verifyCode: PUBLIC,

@@ -16,6 +16,7 @@ import { eventDetailActions } from '../stores/eventDetailStore'
 import { liveScoreActions, liveScoreState } from '../stores/liveScoreStore'
 import { customConfirm } from '../stores/confirmDialogStore'
 import { authState } from '../stores/authStore'
+import { clearUmpireToken, getUmpireId } from '../utils/api'
 import {
   getTeamSubMatchTitle,
   getTeamMatchLineupLabels,
@@ -181,6 +182,10 @@ const GamePlay = () => {
     resetSub = null
     subscribedEventId = null
     gamePlayActions.reset()
+    // An umpire working from the match-day password holds their token only
+    // while this page is open, so leaving it ends their access and the next
+    // click on Umpire asks for the password again.
+    clearUmpireToken()
   })
 
   const handleExit = async () => {
@@ -263,13 +268,13 @@ const GamePlay = () => {
           !gamePlayActions.bothSidesAssigned() &&
           !gamePlayState.loading &&
           !sessionBlocked() &&
-          // Tablet is just the score-keeper — it doesn't participate
-          // in the "press Start / set order" handshake, so the team
-          // setup dialog (which would show "Waiting to start…" for
-          // both sides) is hidden. The page just shows the regular
-          // state behind it until the players finish their setup and
-          // the auto-hop effect moves to the first sub-match.
-          !authState.isTablet
+          // The tablet, and anyone umpiring with the match-day password,
+          // are score-keepers — they don't take part in the "press Start /
+          // set order" handshake, so this dialog is hidden for them. What
+          // shows instead is the team-init screen behind it, which sets
+          // both sides' order in one go.
+          !authState.isTablet &&
+          getUmpireId() == null
         }
       >
         <TeamSetupDialog />
@@ -1078,13 +1083,16 @@ const TeamSideSetupPanel = (props: {
   userSide: 1 | 2 | undefined
 }) => {
   const match = () => gamePlayActions.getCurrentMatch()
-  const isAdmin = () => authState.isAdmin
   const started = () =>
     props.side === 1
       ? !!match()?.side1Started
       : !!match()?.side2Started
   const assigned = () => gamePlayActions.hasSideAssignment(props.side)
-  const canAct = () => isAdmin() || props.userSide === props.side
+  // Whoever is running the table — admin, tablet, or an umpire with the
+  // match-day password — sets the order for both sides. A player only ever
+  // acts for their own.
+  const canAct = () =>
+    gamePlayActions.canUmpire() || props.userSide === props.side
   const label = () =>
     `${gamePlayActions.getParticipantName(props.side)} (${props.isHome ? 'Home' : 'Away'})`
   const players = () =>

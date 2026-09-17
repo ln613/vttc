@@ -8,12 +8,11 @@
   - "Umpire" button (green bg), next to the live score icon
     - publicly accessible — no sign in required
     - visible only when there is a match to umpire (a match on a table that
-      has not finished), and not for the tablet role, which already has its
-      own Tablet button
+      has not finished)
+    - not shown to an admin or super admin, who open Game Play from the match
+      rows, nor to the tablet role, which has its own Tablet button
     - on click, show the Match Day Password dialog, then the table selection
       dialog; picking a table opens the Game Play page for it
-    - an admin or a signed-in tablet skips the password and goes straight to
-      the table selection, rather than trading their session for a tablet one
   - Events: go to the Home/Events List page
   - Schedule: go to the schedule page
   - Players: go to the Players page
@@ -29,7 +28,14 @@
 - password input, "Match Day Password"
 - "Cancel" (red) and "Continue" (green) buttons
 - on continue: authenticate with the match day password. Anyone holding it can
-  umpire — the role is read-only everywhere else on the site
+  umpire
+  - already signed in: keep the account. Scoring only needs a valid session,
+    which they already have, so the password just unlocks umpiring
+  - not signed in: no session is created and they are not logged in. They are
+    simply let into the scoring page for that table. The site still treats
+    them as a visitor, so on returning they see the Umpire button again and
+    must enter the password again. Access ends when they leave the scoring
+    page
 - on failure, keep the dialog open and show the error
 
 ## Sign in dialog

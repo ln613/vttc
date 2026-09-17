@@ -3,7 +3,7 @@ import type { Event } from '../../shared/types/Tournament'
 import type { Match, GameConfig, HandicapParams } from '../../shared/types/Match'
 import { DEFAULT_GAME_CONFIG } from '../../shared/types/Match'
 import type { Player } from '../../shared/types/Player'
-import { apiGet, apiPost } from '../utils/api'
+import { apiGet, apiPost, getUmpireId } from '../utils/api'
 import { authState } from './authStore'
 import { customAlert, customConfirm } from './confirmDialogStore'
 import { liveScoreActions } from './liveScoreStore'
@@ -207,7 +207,9 @@ const subscribeLiveScore = () => {
 }
 
 const acquireSession = async (matchId: string) => {
-  const userId = authState.user?._id
+  // An umpire working from the match-day password has no account, so they
+  // hold the session under a per-visit id instead.
+  const userId = authState.user?._id ?? getUmpireId()
   if (!userId) {
     setGamePlayState({ sessionError: 'You must be signed in to play.' })
     return false
@@ -746,6 +748,14 @@ export const gamePlayActions = {
     return !!(match?.side1Started && match?.side2Started)
   },
 
+  /**
+   * Whoever is running this table: an admin, the tablet, or someone who came
+   * in with the match-day password. They act for both sides — a player only
+   * ever acts for their own.
+   */
+  canUmpire: (): boolean =>
+    authState.isAdmin || authState.isTablet || getUmpireId() != null,
+
   getUserSideInMatch: (): 1 | 2 | undefined => {
     const uid = authState.user?._id?.toString()
     if (!uid) return undefined
@@ -758,7 +768,10 @@ export const gamePlayActions = {
 
   startTeamSide: async (side: 1 | 2) => {
     const { eventId, matchId } = gamePlayState
-    const uid = authState.user?._id?.toString()
+    // An umpire has no account, so they start the side under their
+    // per-visit id; the endpoint only uses this to check roster membership,
+    // which an umpire never has.
+    const uid = authState.user?._id?.toString() ?? getUmpireId()
     if (!eventId || !matchId || !uid) return
     try {
       await apiPost('startTeamMatchSide', {

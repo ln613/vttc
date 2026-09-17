@@ -74,15 +74,10 @@ const TopBar = () => {
     if (liveScoreState.tables.length === 0) void liveScoreActions.fetchLiveScore()
   })
 
-  // Anyone may umpire with the match-day password; an admin or a signed-in
-  // tablet already has the right and skips straight to the table picker,
-  // rather than trading their session for a tablet one.
+  // The button is only shown to people with no account, so this always asks
+  // for the match-day password.
   const handleUmpireClick = () => {
     void liveScoreActions.fetchLiveScore()
-    if (authState.isTablet || authState.isAdmin) {
-      setShowTablePicker(true)
-      return
-    }
     setShowUmpirePassword(true)
   }
 
@@ -149,9 +144,13 @@ const TopBar = () => {
               Tablet
             </Show>
           </button>
+          {/* For umpires without an account. Admins reach Game Play from the
+              match rows, and the tablet has its own button. */}
           <Show
             when={
-              !authState.isTablet && liveScoreActions.hasMatchesToUmpire()
+              !authState.isTablet &&
+              !authState.isAdmin &&
+              liveScoreActions.hasMatchesToUmpire()
             }
           >
             <button style={umpireButtonStyle} onClick={handleUmpireClick}>

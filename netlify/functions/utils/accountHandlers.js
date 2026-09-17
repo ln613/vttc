@@ -236,6 +236,32 @@ const authenticatePlayer = async (emailOrPhone, password) => {
 }
 
 /**
+ * Sign in to umpire with the match-day password.
+ *
+ * A plain token with no role flags: the scoring endpoints only require a
+ * valid one, so this is all an umpire needs. Deliberately NOT the tablet
+ * role — a person umpiring for the evening is not a kiosk, and shouldn't
+ * get the tablet's read-only chrome or its auto-resume behaviour.
+ *
+ * Someone already signed in ignores the token and keeps their account; for
+ * them this call just confirms the password.
+ */
+export const umpireSignIn = async (body) => {
+  if (!body) throwError('Request body is required')
+  const matchDayPassword = process.env.TABLET_PASSWORD
+  if (!matchDayPassword) throwError('Match day password not configured')
+  if (body.password !== matchDayPassword) throwError('Invalid password')
+
+  return {
+    token: generateToken({ isAdmin: false, isTablet: false }),
+    isAdmin: false,
+    isSuperAdmin: false,
+    isTablet: false,
+    player: { _id: 'umpire', firstName: 'Umpire', lastName: '' },
+  }
+}
+
+/**
  * Sign in - authenticate user with email/phone and password
  */
 export const signIn = async (body) => {
