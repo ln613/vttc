@@ -465,16 +465,20 @@ const teamLabel = (participant) =>
  * Refuses once anything has been played: undoing results is a super admin's
  * Reset Event, not a routine correction.
  */
-export const resetLeagueRound = async (body) => {
+export const resetLeagueRound = async (body, auth) => {
   if (!body?._id) throwError('Event ID is required')
 
   const db = getDB()
   const collection = db.collection(EVENTS_COLLECTION)
   const event = await loadRound(collection, body._id)
 
-  if (hasPlayedMatches(event)) {
+  // Results are a deliberate barrier for an ordinary admin correcting a
+  // line-up, but not for a super admin — they can already wipe the whole
+  // event, so refusing them the smaller action only pushes them to the
+  // bigger one.
+  if (hasPlayedMatches(event) && !auth?.isSuperAdmin) {
     throwError(
-      'This week already has results. A super admin can Reset Event instead.',
+      'This week already has results. Only a super admin can reset it.',
     )
   }
 

@@ -3355,8 +3355,13 @@ const RoundPicker = () => {
   const handleReset = async (e?: MouseEvent) => {
     e?.stopPropagation()
     e?.preventDefault()
+    // Resetting a week that has been played destroys those results, so say
+    // so plainly rather than asking the same mild question either way.
+    const hasResults = leagueActions.selectedRoundHasResults()
     const confirmed = await customConfirm(
-      "Clear this week's matches and player selections so it can be built again?",
+      hasResults
+        ? 'This week has results. Resetting deletes every score already recorded for it, along with the player selections. Continue?'
+        : "Clear this week's matches and player selections so it can be built again?",
       { confirmColor: '#e74c3c' },
     )
     if (confirmed) void leagueActions.resetRound()

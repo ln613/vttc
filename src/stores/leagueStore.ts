@@ -318,6 +318,16 @@ export const leagueActions = {
       .getSelectedPlayers(participantId)
       .reduce((sum, player) => sum + leagueActions.getLeagueRating(player), 0),
 
+  /** Does the selected week have any result already recorded? */
+  selectedRoundHasResults: (): boolean =>
+    (leagueActions.getSelectedRound()?.matches || []).some(
+      (match) =>
+        match.winningSide != null ||
+        (match.subMatches || []).some(
+          (sub) => sub.winningSide != null || (sub.games?.length ?? 0) > 0,
+        ),
+    ),
+
   isSimulated: (): boolean => !!leagueState.data?.simulated,
 
   hasRoundMatches: (): boolean =>

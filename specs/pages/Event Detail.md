@@ -202,6 +202,14 @@ The Total column is the total matches played so far.
     - defaults to the upcoming week — the first one dated today or later, and
       the last week once the season is over. A week the admin picks by hand
       stays picked while the page is open
+    - "Reset Week" button (admin only, red, right of the dropdown), which
+      clears that week's matches and player selections so it can be built
+      again
+      - refused once the week has results, unless the caller is a super
+        admin — they can already Reset Event, so refusing them the smaller
+        action only pushes them to the bigger one
+      - confirm first; when results exist, say plainly that they will be
+        deleted
   - when a round/week is selected
     - if the match schedule is not generated
       - who plays whom is already fixed by the league schedule, so show one

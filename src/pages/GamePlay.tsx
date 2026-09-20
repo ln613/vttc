@@ -17,6 +17,7 @@ import { liveScoreActions, liveScoreState } from '../stores/liveScoreStore'
 import { customConfirm } from '../stores/confirmDialogStore'
 import { authState } from '../stores/authStore'
 import { clearUmpireToken, getUmpireId } from '../utils/api'
+import { FULL_HEIGHT } from '../utils/viewport'
 import {
   getTeamSubMatchTitle,
   getTeamMatchLineupLabels,
@@ -2067,7 +2068,7 @@ const initStartButtonStyle = (
 })
 
 const containerStyle: JSX.CSSProperties = {
-  height: '100dvh',
+  height: FULL_HEIGHT,
   'background-color': '#1a1a2e',
   display: 'flex',
   'flex-direction': 'column',

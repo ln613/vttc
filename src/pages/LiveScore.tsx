@@ -16,6 +16,7 @@ import type { TableAssignment, MatchQueueItem } from '../../shared/types/Table'
 import type { Player } from '../../shared/types/Player'
 import type { Game, Match } from '../../shared/types/Match'
 import { getProvisionalMatchResult } from '../../shared/rules/matchRules'
+import { FULL_HEIGHT } from '../utils/viewport'
 import {
   getTeamSubMatchTitle,
   getTeamPlayerOrderLabel,
@@ -710,7 +711,7 @@ const createIsWideScreen = () => {
 // ==================== STYLES ====================
 
 const pageContainerStyle: JSX.CSSProperties = {
-  height: '100dvh',
+  height: FULL_HEIGHT,
   'background-color': '#1a1a2e',
   display: 'flex',
   'flex-direction': 'column',

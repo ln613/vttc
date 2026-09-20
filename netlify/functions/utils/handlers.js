@@ -86,14 +86,16 @@ import { notifyLiveScoreUpdate } from './pusher.js'
 // Every round/week of a league shares one roster, and registration writes to
 // whichever round was open. Copy the result across the siblings before the
 // clients are told to refetch.
-const withLeagueRosterSync = (fn) => async (body) => {
-  const result = await fn(body)
+const withLeagueRosterSync = (fn) => async (body, auth) => {
+  const result = await fn(body, auth)
   await syncLeagueRoster(body?._id)
   return result
 }
 
-const withEventNotify = (fn) => async (body) => {
-  const result = await fn(body)
+// `auth` is forwarded: a handler that has to know who is asking (a super
+// admin overriding a guard, say) can't get it any other way once wrapped.
+const withEventNotify = (fn) => async (body, auth) => {
+  const result = await fn(body, auth)
   const eventId = body?._id || result?._id
   // Any of these can move a match through the queue, so the cached live
   // tables/queue must be rebuilt on the next read. Awaited (unlike the
