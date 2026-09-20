@@ -85,18 +85,27 @@ const collectRegisteredPlayerIds = (event) => {
 // restricted to players still on the roster, so a withdrawal after payment
 // doesn't linger in the total. That figure is marked provisional: entries
 // are still arriving and it will be superseded the moment groups generate.
-const collectFeePayingPlayerIds = (event) => {
+// Everyone taking part: the draw once it exists, the roster before it.
+const collectEnteredPlayerIds = (event) => {
   const scheduled = collectScheduledPlayerIds(event)
   if (scheduled.size > 0) return { ids: scheduled, provisional: false }
+  return { ids: collectRegisteredPlayerIds(event), provisional: true }
+}
 
-  const registered = collectRegisteredPlayerIds(event)
-  const paid = new Set(
+// Base revenue is money actually received, so it counts entrants who have
+// paid — never entrants who merely played.
+//
+// It used to count whoever was in the draw, on the assumption that an unpaid
+// registrant would have been dropped from it. That only holds while the
+// "ignore unpaid in generation" setting is off; with it on, unpaid players
+// are drawn in like anyone else and their fees were being reported as
+// revenue. One VTTC series carried about $250 of uncollected fees that way.
+const collectPaidPlayerIds = (event, entered) =>
+  new Set(
     (event.paidPlayerIds || [])
       .map((id) => id.toString())
-      .filter((id) => registered.has(id)),
+      .filter((id) => entered.has(id)),
   )
-  return { ids: paid, provisional: true }
-}
 
 // Hosts play for free, so they never contribute a registration fee.
 const countPayingPlayers = (ids, hostIds) => {
@@ -106,14 +115,17 @@ const countPayingPlayers = (ids, hostIds) => {
 }
 
 const computeEventRevenue = (event, hostIds) => {
-  const { ids, provisional } = collectFeePayingPlayerIds(event)
+  const { ids: entered, provisional } = collectEnteredPlayerIds(event)
+  const ids = collectPaidPlayerIds(event, entered)
 
-  // The "include unpaid" view adds everyone on the roster who isn't already
-  // counted. Before the draw that is the players who have yet to pay; after
-  // it, the registrants who were left out of the draw *because* they hadn't
-  // paid (getParticipantDisqualifyReason drops them). Union rather than
-  // replace, so a scheduled player who has since left the roster is kept.
-  const withUnpaid = new Set([...ids, ...collectRegisteredPlayerIds(event)])
+  // The "include unpaid" view is what the event would have taken if everyone
+  // settled up: everyone in the draw plus any registrant left out of it.
+  // Union rather than replace, so a scheduled player who has since left the
+  // roster is still counted.
+  const withUnpaid = new Set([
+    ...entered,
+    ...collectRegisteredPlayerIds(event),
+  ])
 
   const perPlayerFee = getPerPlayerFee(event)
   const paying = countPayingPlayers(ids, hostIds)
