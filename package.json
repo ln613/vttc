@@ -22,7 +22,7 @@
     "db:connections": "node --env-file=.env scripts/db-connections.mjs",
     "sim": "node --env-file=.env scripts/simulate-tournament.mjs",
     "load:test": "node --dns-result-order=ipv4first --env-file=.env scripts/load-test.mjs",
-    "db:new-club": "node --env-file=.env scripts/provision-club-db.mjs",
+    "club:new": "node --env-file=.env --env-file=.env.vttc scripts/provision-club.mjs",
     "ratings:sync": "node --env-file=.env scripts/sync-ttcan-ratings.mjs"
   },
   "dependencies": {

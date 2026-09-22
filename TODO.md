@@ -126,9 +126,18 @@ outstanding:
   1..6 and both tier lists are empty, so every event counts as mid-tier and
   no table is reserved for anything. Fill in once the court quality and the
   rating bands are known.
-- **A second club's Netlify site.** Each club needs its own account/site
-  with `CLUB` and its own secrets set there. `netlify.toml` is shared; only
-  the environment differs.
+- **Provisioning a new club is now scripted.** `npm run club:new --
+  .env.new-club.template` (see `.env.new-club.template` for the fields)
+  creates the Mongo Atlas project/cluster, `clubs/<slug>/config.json`, a
+  Netlify site with every env var set, and the matching local
+  `.env.<slug>`. Three things still need a human, because the provider
+  requires one (mostly to defeat exactly this kind of scripting): a Gmail
+  account + app password, a Pusher app (Channels has no create-app API at
+  all), and the Netlify account itself (site creation *within* an existing
+  account is scriptable and the script does it). After running it, the
+  Netlify site still needs linking to this repo by hand once (Site
+  configuration -> Build & deploy -> Link repository — a GitHub OAuth
+  click, not scriptable) before a `git push` will deploy it.
 - **The rating system.** `rating.js` still carries VTTC's `RDELTA`/`RDIFF`
   tables. Deferred deliberately until a second club needs different ones.
 - **Tournament rules.** `shared/rules/tournamentRules.ts` (group counts,

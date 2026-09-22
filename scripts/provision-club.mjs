@@ -1,18 +1,29 @@
 #!/usr/bin/env node
-// Provision a new club's MongoDB: Atlas project, free cluster, database user,
-// network access, both databases, and the tournament templates to start from.
+// Provision a new club end to end: MongoDB Atlas project + cluster,
+// clubs/<slug>/config.json, a Netlify site with every env var set, and the
+// local .env.<slug> to match. Everything reads from one filled-in template —
+// copy .env.new-club.template, fill it in, then:
 //
-//   npm run db:new-club -- gvttc
-//   npm run db:new-club -- gvttc --source-db vttc --region US_WEST_2
-//   npm run db:new-club -- gvttc --show-uri
+//   npm run club:new -- .env.new-club.template
+//   npm run club:new -- .env.new-club.template --show-secrets
 //
 // Every step is idempotent: re-running finds what already exists rather than
-// creating a second copy, so a run that fails half way can simply be repeated.
+// creating a second copy, so a run that fails half way can simply be
+// repeated once you've fixed whatever it complained about.
+//
+// Three things it cannot do, because the provider requires a human (usually
+// to defeat exactly this kind of automation) — the template says so at each
+// section, and validation refuses to start without them filled in:
+//   - a Gmail account + app password
+//   - a Pusher app (Channels has no public "create app" API at all)
+//   - a Netlify account + personal access token (site creation and env vars
+//     ARE scriptable once the account exists — that part this script does)
 //
 // Needs an Atlas API key with the Organization Project Creator role (see
 // TODO.md). That role grants Project Owner only on projects the key itself
 // creates, so this script cannot reach the clubs already running.
 import { createHash, randomBytes } from 'node:crypto'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { MongoClient } from 'mongodb'
 
 const ATLAS = 'https://cloud.mongodb.com'
@@ -20,46 +31,110 @@ const API_V2 = 'application/vnd.atlas.2023-01-01+json'
 
 // ==================== input ====================
 
-const VALUE_FLAGS = ['source-db', 'region', 'provider']
+// Same shape as scripts/with-club.mjs's own parser: KEY=VALUE lines,
+// '#' comments, blank lines skipped, one layer of matching quotes stripped.
+const parseEnvFile = (path) => {
+  if (!path) throwError('Template path is required')
+  if (!existsSync(path)) throwError(`No such file: ${path}`)
+  const out = {}
+  for (const rawLine of readFileSync(path, 'utf8').split('\n')) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#')) continue
+    const eq = line.indexOf('=')
+    if (eq === -1) continue
+    let value = line.slice(eq + 1).trim()
+    if (value.length >= 2 && /^(".*"|'.*')$/s.test(value)) {
+      value = value.slice(1, -1)
+    }
+    out[line.slice(0, eq).trim()] = value
+  }
+  return out
+}
 
 const parseArgs = (argv) => {
-  const values = {}
-  let slug
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]
-    if (!arg.startsWith('--')) {
-      // The first bare argument is the club; a value flag consumes its own.
-      if (!slug) slug = arg
-      continue
-    }
-    const name = arg.slice(2)
-    if (VALUE_FLAGS.includes(name)) values[name] = argv[++i]
-    else values[name] = true
-  }
+  const templatePath = argv.find((a) => !a.startsWith('--'))
   return {
-    slug,
-    sourceDb: values['source-db'] ?? 'vttc',
-    region: values.region ?? 'US_WEST_2',
-    provider: values.provider ?? 'AWS',
-    showUri: !!values['show-uri'],
+    templatePath,
+    showSecrets: argv.includes('--show-secrets'),
   }
 }
 
-const validateInput = (args, env) => {
+// Table rows come in as JSON ("[[1,2,3],[4,5,6]]"); everything else is a
+// plain string, trimmed, empty meaning "not set".
+const parseTableRows = (raw) => {
+  if (!raw?.trim()) return undefined
+  let rows
+  try {
+    rows = JSON.parse(raw)
+  } catch {
+    throwError(`TABLE_ROWS is not valid JSON: ${raw}`)
+  }
+  if (
+    !Array.isArray(rows) ||
+    rows.length === 0 ||
+    !rows.every((row) => Array.isArray(row) && row.every(Number.isInteger))
+  ) {
+    throwError('TABLE_ROWS must be a JSON array of arrays of table numbers')
+  }
+  return rows
+}
+
+const readClubInput = (template) => ({
+  slug: template.CLUB_SLUG?.trim(),
+  name: template.CLUB_NAME?.trim(),
+  appName: template.APP_NAME?.trim(),
+  contactName: template.CONTACT_NAME?.trim() || template.CLUB_NAME?.trim(),
+  timezone: template.TIMEZONE?.trim() || 'America/Vancouver',
+  bannerUrl: template.BANNER_URL?.trim(),
+  bannerAlt:
+    template.BANNER_ALT?.trim() ||
+    (template.CLUB_NAME ? `${template.CLUB_NAME.trim()} Banner` : undefined),
+  faviconUrl: template.FAVICON_URL?.trim() || '/images/logo.png',
+  pageTitle: template.PAGE_TITLE?.trim() || template.CLUB_NAME?.trim(),
+  tableRows: parseTableRows(template.TABLE_ROWS),
+  sourceDb: template.MONGODB_SOURCE_DB?.trim() || 'vttc',
+  region: template.MONGODB_REGION?.trim() || 'US_WEST_2',
+  gmailAddress: template.GMAIL_ADDRESS?.trim(),
+  gmailAppPassword: (template.GMAIL_APP_PASSWORD || '').replace(/\s+/g, ''),
+  pusherAppId: template.PUSHER_APP_ID?.trim(),
+  pusherKey: template.PUSHER_KEY?.trim(),
+  pusherSecret: template.PUSHER_SECRET?.trim(),
+  pusherCluster: template.PUSHER_CLUSTER?.trim(),
+  netlifyToken: template.NETLIFY_AUTH_TOKEN?.trim(),
+  netlifySiteName: template.NETLIFY_SITE_NAME?.trim(),
+})
+
+const validateInput = (club, env) => {
   const errors = []
-  if (!args.slug) errors.push('Which club? e.g. npm run db:new-club -- gvttc')
-  if (args.slug && !/^[a-z][a-z0-9-]{1,30}$/.test(args.slug)) {
-    errors.push('Club slug must be lowercase letters, digits and dashes')
+  const required = {
+    CLUB_SLUG: club.slug,
+    CLUB_NAME: club.name,
+    APP_NAME: club.appName,
+    BANNER_URL: club.bannerUrl,
+    TABLE_ROWS: club.tableRows,
+    GMAIL_ADDRESS: club.gmailAddress,
+    GMAIL_APP_PASSWORD: club.gmailAppPassword,
+    PUSHER_APP_ID: club.pusherAppId,
+    PUSHER_KEY: club.pusherKey,
+    PUSHER_SECRET: club.pusherSecret,
+    PUSHER_CLUSTER: club.pusherCluster,
+    NETLIFY_AUTH_TOKEN: club.netlifyToken,
+  }
+  for (const [key, value] of Object.entries(required)) {
+    if (!value) errors.push(`${key} is not set in the template`)
+  }
+  if (club.slug && !/^[a-z][a-z0-9-]{1,30}$/.test(club.slug)) {
+    errors.push('CLUB_SLUG must be lowercase letters, digits and dashes')
   }
   if (!env.MONGODB_PROJECT_CREATOR_PUBLIC_KEY) {
-    errors.push('MONGODB_PROJECT_CREATOR_PUBLIC_KEY is not set')
+    errors.push('MONGODB_PROJECT_CREATOR_PUBLIC_KEY is not set in .env')
   }
   if (!env.MONGODB_PROJECT_CREATOR_PRIVATE_KEY) {
-    errors.push('MONGODB_PROJECT_CREATOR_PRIVATE_KEY is not set')
+    errors.push('MONGODB_PROJECT_CREATOR_PRIVATE_KEY is not set in .env')
   }
   if (!env.MONGODB_URI) {
     errors.push(
-      'MONGODB_URI is not set (the existing cluster, for credentials and templates)',
+      'MONGODB_URI is not set in .env (the existing cluster, for credentials and templates)',
     )
   }
   if (errors.length) {
@@ -167,7 +242,7 @@ const readAtlasResponse = async (response, path) => {
   return body
 }
 
-// ==================== provisioning steps ====================
+// ==================== Atlas provisioning steps ====================
 
 const getOrgId = async (api) => {
   const { results = [] } = await api('GET', '/api/atlas/v2/orgs')
@@ -325,43 +400,222 @@ const seedOneDatabase = async (db, name, templates) => {
   return `${name}: created, ${result.insertedCount} tournament(s) copied`
 }
 
+// ==================== club config file ====================
+
+const CLUBS_DIR = 'clubs'
+
+const buildClubConfig = (club) => {
+  const all = club.tableRows.flat()
+  return {
+    slug: club.slug,
+    name: club.name,
+    appName: club.appName,
+    timezone: club.timezone,
+    branding: {
+      bannerUrl: club.bannerUrl,
+      bannerAlt: club.bannerAlt,
+      contactName: club.contactName,
+      faviconUrl: club.faviconUrl,
+      pageTitle: club.pageTitle,
+    },
+    tables: {
+      all,
+      rows: club.tableRows,
+      // Sequential order and empty tiers until someone who has stood in
+      // the hall knows which tables are the good ones and what the rating
+      // bands should be. TODO.md carries the same gap for GVTTC, filled in
+      // by hand after the fact — this just makes that the documented
+      // starting point instead of a silent omission.
+      order: all,
+      lowTierOrder: all,
+      highTierOrder: all,
+      knockoutExcluded: [],
+      generalExcluded: [],
+      highTierExcluded: [],
+      highTierSemifinalExcluded: [],
+      highTierFinalOnly: [],
+      lowTierBigMatchPreferred: [],
+    },
+    tiers: { low: [], high: [] },
+  }
+}
+
+// Never overwrites: a hand-edited config (real tier rules, a fixed table
+// order) must survive re-running this script.
+const ensureClubConfig = (club) => {
+  const dir = `${CLUBS_DIR}/${club.slug}`
+  const path = `${dir}/config.json`
+  if (existsSync(path)) return { path, created: false }
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(path, JSON.stringify(buildClubConfig(club), null, 2) + '\n')
+  return { path, created: true }
+}
+
+// ==================== Netlify ====================
+
+const NETLIFY = 'https://api.netlify.com/api/v1'
+
+const createNetlifyClient = (token) => {
+  if (!token) throwError('Netlify auth token is required')
+  return async (method, path, body) => {
+    const response = await fetch(`${NETLIFY}${path}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    })
+    const text = await response.text()
+    const data = text ? JSON.parse(text) : {}
+    if (!response.ok) {
+      throwError(
+        `${method} ${path} -> ${response.status} ${data.message || JSON.stringify(data)}`,
+      )
+    }
+    return data
+  }
+}
+
+// Netlify does NOT error on a taken site name — it silently appends random
+// characters and creates a second site instead. Idempotency needs an
+// explicit lookup by name first, or every re-run would create a new one.
+const findOrCreateSite = async (netlify, { name }) => {
+  const sites = await netlify('GET', '/sites?per_page=100')
+  const existing = sites.find((s) => s.name === name)
+  if (existing) return { site: existing, created: false }
+  const created = await netlify('POST', '/sites', { name })
+  return { site: created, created: true }
+}
+
+const siteUrlOf = (site) =>
+  site.ssl_url || site.url || `https://${site.name}.netlify.app`
+
+// Build command/env live on the site's build_settings object, set with one
+// PATCH. Read-merge-write instead of trusting a partial PATCH to merge the
+// nested env object for us, so re-running never drops a var someone added
+// by hand in the dashboard afterward.
+const configureSite = async (netlify, site, { env }) => {
+  const current = await netlify('GET', `/sites/${site.id}`)
+  const mergedEnv = { ...(current.build_settings?.env || {}), ...env }
+  await netlify('PATCH', `/sites/${site.id}`, {
+    build_settings: {
+      ...current.build_settings,
+      cmd: 'node scripts/with-club.mjs vite build',
+      dir: 'dist',
+      functions_dir: 'netlify/functions',
+      env: mergedEnv,
+    },
+  })
+  return { envCount: Object.keys(mergedEnv).length }
+}
+
+const buildSiteEnv = (club, uri, siteUrl, authSecret) => ({
+  CLUB: club.slug,
+  MONGODB_URI: uri,
+  MONGODB_DB: club.slug,
+  PUSHER_APP_ID: club.pusherAppId,
+  PUSHER_SECRET: club.pusherSecret,
+  VITE_PUSHER_KEY: club.pusherKey,
+  VITE_PUSHER_CLUSTER: club.pusherCluster,
+  GMAIL_1: club.gmailAddress,
+  GMAIL_1_APP_PASSWORD: club.gmailAppPassword,
+  VITE_PROD_HOST: siteUrl,
+  AUTH_SECRET: authSecret,
+})
+
+const provisionNetlifySite = async (club, { uri, authSecret }) => {
+  const netlify = createNetlifyClient(club.netlifyToken)
+  const { site, created } = await findOrCreateSite(netlify, {
+    name: club.netlifySiteName || club.slug,
+  })
+  const siteUrl = siteUrlOf(site)
+  const env = buildSiteEnv(club, uri, siteUrl, authSecret)
+  const { envCount } = await configureSite(netlify, site, { env })
+  return { site, created, url: siteUrl, envCount }
+}
+
+// ==================== local env file ====================
+
+// Never overwrites: a live .env.<slug> may carry values someone tuned by
+// hand (a rotated AUTH_SECRET, a different VITE_PROD_HOST during testing).
+const ensureLocalEnvFile = (club, { uri, siteUrl, authSecret }) => {
+  const path = `.env.${club.slug}`
+  if (existsSync(path)) return { path, created: false }
+  const lines = [
+    `CLUB=${club.slug}`,
+    '',
+    `MONGODB_URI=${uri}`,
+    `MONGODB_DB=${club.slug}`,
+    '',
+    `PUSHER_APP_ID=${club.pusherAppId}`,
+    `PUSHER_SECRET=${club.pusherSecret}`,
+    `VITE_PUSHER_KEY=${club.pusherKey}`,
+    `VITE_PUSHER_CLUSTER=${club.pusherCluster}`,
+    '',
+    `GMAIL_1=${club.gmailAddress}`,
+    `GMAIL_1_APP_PASSWORD=${club.gmailAppPassword}`,
+    '',
+    `VITE_PROD_HOST=${siteUrl}`,
+    `AUTH_SECRET=${authSecret}`,
+    '',
+  ]
+  writeFileSync(path, lines.join('\n'))
+  return { path, created: true }
+}
+
 // ==================== run ====================
+
+// The DB-scoped connection string every downstream step needs (the
+// seeding client above deliberately uses the bare, database-less version).
+const buildClubUri = (host, { username, password }, dbName) =>
+  `mongodb+srv://${username}:${encodeURIComponent(password)}@${host}/${dbName}?retryWrites=true`
 
 const run = async () => {
   const args = parseArgs(process.argv.slice(2))
-  validateInput(args, process.env)
+  if (!args.templatePath) {
+    console.error(
+      'Which template? e.g. npm run club:new -- .env.new-club.template',
+    )
+    process.exit(1)
+  }
+  const club = readClubInput(parseEnvFile(args.templatePath))
+  validateInput(club, process.env)
 
+  console.log(`provisioning ${club.name} (${club.slug})\n`)
+
+  // ---- MongoDB Atlas ----
   const credentials = readExistingCredentials(process.env.MONGODB_URI)
-  const api = createAtlasClient({
+  const atlas = createAtlasClient({
     username: process.env.MONGODB_PROJECT_CREATOR_PUBLIC_KEY,
     password: process.env.MONGODB_PROJECT_CREATOR_PRIVATE_KEY,
   })
 
-  const org = await getOrgId(api)
+  const org = await getOrgId(atlas)
   console.log(`organization: ${org.name}`)
 
-  const project = await findOrCreateProject(api, {
-    name: args.slug,
+  const project = await findOrCreateProject(atlas, {
+    name: club.slug,
     orgId: org.id,
   })
   console.log(
-    `project:      ${args.slug} ${project.created ? '(created)' : '(existing)'}`,
+    `project:      ${club.slug} ${project.created ? '(created)' : '(existing)'}`,
   )
 
-  const cluster = await findOrCreateCluster(api, {
+  const cluster = await findOrCreateCluster(atlas, {
     projectId: project.id,
-    name: args.slug,
-    provider: args.provider,
-    region: args.region,
+    name: club.slug,
+    provider: 'AWS',
+    region: club.region,
   })
   console.log(
-    `cluster:      ${args.slug} M0 ${args.provider}/${args.region} ` +
+    `cluster:      ${club.slug} M0 AWS/${club.region} ` +
       `${cluster.created ? '(created — this takes a minute)' : '(existing)'}`,
   )
 
-  const ready = await waitForCluster(api, {
+  const ready = await waitForCluster(atlas, {
     projectId: project.id,
-    name: args.slug,
+    name: club.slug,
   })
   const host = (ready.connectionStrings?.standardSrv || '').replace(
     'mongodb+srv://',
@@ -369,7 +623,7 @@ const run = async () => {
   )
   if (!host) throwError('Cluster is IDLE but reported no connection string')
 
-  const user = await ensureDatabaseUser(api, {
+  const user = await ensureDatabaseUser(atlas, {
     projectId: project.id,
     username: credentials.username,
     password: credentials.password,
@@ -378,7 +632,7 @@ const run = async () => {
     `db user:      ${credentials.username} ${user.created ? '(created)' : '(existing)'}`,
   )
 
-  const access = await ensureOpenAccessList(api, { projectId: project.id })
+  const access = await ensureOpenAccessList(atlas, { projectId: project.id })
   console.log(
     `network:      0.0.0.0/0 ${access.created ? '(added)' : '(existing)'}`,
   )
@@ -386,26 +640,57 @@ const run = async () => {
   const { templates, report } = await seedDatabases({
     uri: buildUri(host, credentials),
     sourceUri: process.env.MONGODB_URI,
-    sourceDb: args.sourceDb,
-    databases: [args.slug, `${args.slug}-dev`],
+    sourceDb: club.sourceDb,
+    databases: [club.slug, `${club.slug}-dev`],
   })
-  console.log(`templates:    ${templates} found in ${args.sourceDb}`)
+  console.log(`templates:    ${templates} found in ${club.sourceDb}`)
   for (const line of report) console.log(`              ${line}`)
 
-  const uri = `mongodb+srv://${credentials.username}:${
-    args.showUri ? credentials.password : '<password>'
-  }@${host}/${args.slug}?retryWrites=true`
+  const uri = buildClubUri(host, credentials, club.slug)
+
+  // ---- clubs/<slug>/config.json ----
+  const config = ensureClubConfig(club)
   console.log(
-    `\nAdd to .env.${args.slug}:\n\n  CLUB=${args.slug}\n  MONGODB_URI=${uri}\n`,
+    `\nconfig:       ${config.path} ${config.created ? '(created)' : '(already exists, left alone)'}`,
   )
+
+  // ---- Netlify site + env vars ----
+  const authSecret = randomBytes(32).toString('hex')
+  console.log('\nnetlify site...')
+  const site = await provisionNetlifySite(club, { uri, authSecret })
   console.log(
-    'Then: clubs/' +
-      args.slug +
-      '/config.json for branding and tables, and the\n' +
-      "same MONGODB_URI in that club's Netlify site (MONGODB_DB=" +
-      args.slug +
-      '-dev for a dev site).',
+    `site:         ${site.site.name} ${site.created ? '(created)' : '(existing)'}`,
   )
+  console.log(`url:          ${site.url}`)
+  console.log(
+    `env vars:     ${site.envCount} set (merged with anything already there)`,
+  )
+
+  // ---- local .env.<slug> ----
+  const localEnv = ensureLocalEnvFile(club, {
+    uri,
+    siteUrl: site.url,
+    authSecret,
+  })
+  console.log(
+    `\nlocal env:    ${localEnv.path} ${localEnv.created ? '(written)' : '(already exists, left alone)'}`,
+  )
+
+  console.log(
+    `\n${club.name} is provisioned. Two things still need a human:\n` +
+      '  1. Link the Netlify site to this repo, so a git push deploys it:\n' +
+      `     ${site.url.replace('https://', 'https://app.netlify.com/sites/').replace('.netlify.app', '')}` +
+      ' -> Site configuration -> Build & deploy -> Link repository\n' +
+      '     (needs a GitHub OAuth click in the browser — no API for that step)\n' +
+      `  2. Review clubs/${club.slug}/config.json: table order / tier lists start\n` +
+      '     as sequential / empty placeholders until the hall and rating bands\n' +
+      '     are known — same gap TODO.md already notes for GVTTC.\n',
+  )
+
+  if (args.showSecrets) {
+    console.log(`MONGODB_URI=${uri}`)
+    console.log(`AUTH_SECRET=${authSecret}`)
+  }
 }
 
 run().catch((error) => {

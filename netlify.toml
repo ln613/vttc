@@ -1,6 +1,7 @@
 [build]
   publish = "dist"
   functions = "netlify/functions"
+  ignore = "exit 0"
 
 [functions]
   # club.js reads clubs/<slug>/config.json at runtime, so it has to travel
