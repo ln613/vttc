@@ -93,6 +93,10 @@ const readClubInput = (template) => ({
   pageTitle: template.PAGE_TITLE?.trim() || template.CLUB_NAME?.trim(),
   tableRows: parseTableRows(template.TABLE_ROWS),
   sourceDb: template.MONGODB_SOURCE_DB?.trim() || 'vttc',
+  // Each club has its own cluster, so a source db on another club's
+  // cluster needs its own URI — otherwise we look for it on this one
+  // and quietly find nothing.
+  sourceUri: template.MONGODB_SOURCE_URI?.trim(),
   region: template.MONGODB_REGION?.trim() || 'US_WEST_2',
   gmailAddress: template.GMAIL_ADDRESS?.trim(),
   gmailAppPassword: (template.GMAIL_APP_PASSWORD || '').replace(/\s+/g, ''),
@@ -352,52 +356,68 @@ const ensureOpenAccessList = async (api, { projectId }) => {
 const buildUri = (host, { username, password }) =>
   `mongodb+srv://${username}:${encodeURIComponent(password)}@${host}/?retryWrites=true`
 
+// Copied wholesale from the source club so a new club opens with the
+// tournament formats and the player roster already in place.
+const SEED_COLLECTIONS = ['tournaments', 'players']
+
 const seedDatabases = async ({ uri, sourceUri, sourceDb, databases }) => {
   if (!uri || !sourceUri) throwError('Both cluster URIs are required')
 
-  const templates = await readTournamentTemplates(sourceUri, sourceDb)
+  const source = await readSourceCollections(sourceUri, sourceDb)
   const client = new MongoClient(uri)
   await client.connect()
   const report = []
   try {
     for (const name of databases) {
-      report.push(await seedOneDatabase(client.db(name), name, templates))
+      report.push(...(await seedOneDatabase(client.db(name), name, source)))
     }
   } finally {
     await client.close()
   }
-  return { templates: templates.length, report }
+  return { source, report }
 }
 
-const readTournamentTemplates = async (sourceUri, sourceDb) => {
+const readSourceCollections = async (sourceUri, sourceDb) => {
   const client = new MongoClient(sourceUri)
   await client.connect()
   try {
-    return await client
-      .db(sourceDb)
-      .collection('tournaments')
-      .find({})
-      .toArray()
+    const db = client.db(sourceDb)
+    const entries = await Promise.all(
+      SEED_COLLECTIONS.map(async (name) => [
+        name,
+        await db.collection(name).find({}).toArray(),
+      ]),
+    )
+    return Object.fromEntries(entries)
   } finally {
     await client.close()
   }
 }
 
-const seedOneDatabase = async (db, name, templates) => {
+const seedOneDatabase = async (db, name, source) => {
+  const existing = (await db.listCollections().toArray()).map((c) => c.name)
+  const lines = []
+  for (const collection of SEED_COLLECTIONS) {
+    const outcome = await seedOneCollection(db, existing, collection, source[collection])
+    lines.push(`${name}.${collection}: ${outcome}`)
+  }
+  return lines
+}
+
+// Never overwrites: a collection with anything in it is a club already in
+// use, and a re-run must not reset it.
+const seedOneCollection = async (db, existing, name, documents) => {
   // Mongo creates a database lazily, so without an explicit createCollection
   // neither the database nor the collection exists until something writes.
-  const existing = (await db.listCollections().toArray()).map((c) => c.name)
-  if (!existing.includes('tournaments'))
-    await db.createCollection('tournaments')
+  if (!existing.includes(name)) await db.createCollection(name)
 
-  const collection = db.collection('tournaments')
+  const collection = db.collection(name)
   const already = await collection.countDocuments()
-  if (already > 0)
-    return `${name}: ${already} tournament(s) already, left alone`
-  if (templates.length === 0) return `${name}: created, no templates to copy`
+  if (already > 0) return `${already} already, left alone`
+  if (documents.length === 0) return 'created, nothing to copy'
 
-  const result = await collection.insertMany(templates)
-  return `${name}: created, ${result.insertedCount} tournament(s) copied`
+  const result = await collection.insertMany(documents)
+  return `created, ${result.insertedCount} copied`
 }
 
 // ==================== club config file ====================
@@ -467,13 +487,27 @@ const createNetlifyClient = (token) => {
       ...(body ? { body: JSON.stringify(body) } : {}),
     })
     const text = await response.text()
-    const data = text ? JSON.parse(text) : {}
+    const data = parseJsonBody(text)
     if (!response.ok) {
-      throwError(
-        `${method} ${path} -> ${response.status} ${data.message || JSON.stringify(data)}`,
+      const err = new Error(
+        `${method} ${path} -> ${response.status} ${data.message || text || ''}`,
       )
+      err.status = response.status
+      throw err
     }
     return data
+  }
+}
+
+// Netlify answers some refusals in plain text rather than JSON (notably
+// "Site using Environment Variables API"), so the body can never be fed
+// straight to JSON.parse.
+const parseJsonBody = (text) => {
+  if (!text) return {}
+  try {
+    return JSON.parse(text)
+  } catch {
+    return { message: text }
   }
 }
 
@@ -491,23 +525,77 @@ const findOrCreateSite = async (netlify, { name }) => {
 const siteUrlOf = (site) =>
   site.ssl_url || site.url || `https://${site.name}.netlify.app`
 
-// Build command/env live on the site's build_settings object, set with one
-// PATCH. Read-merge-write instead of trusting a partial PATCH to merge the
-// nested env object for us, so re-running never drops a var someone added
-// by hand in the dashboard afterward.
+// Build command lives on the site's build_settings object; env vars do not
+// (see setSiteEnv). Read-merge-write rather than trusting a partial PATCH to
+// merge the nested object for us.
 const configureSite = async (netlify, site, { env }) => {
   const current = await netlify('GET', `/sites/${site.id}`)
-  const mergedEnv = { ...(current.build_settings?.env || {}), ...env }
+  const { env: _legacyEnv, ...buildSettings } = current.build_settings || {}
   await netlify('PATCH', `/sites/${site.id}`, {
     build_settings: {
-      ...current.build_settings,
+      ...buildSettings,
       cmd: 'node scripts/with-club.mjs vite build',
       dir: 'dist',
       functions_dir: 'netlify/functions',
-      env: mergedEnv,
     },
   })
-  return { envCount: Object.keys(mergedEnv).length }
+  return setSiteEnv(netlify, site, env)
+}
+
+const ENV_SCOPES = ['builds', 'functions', 'runtime', 'post_processing']
+
+// Teams migrated to the Environment Variables API reject env inside a
+// build_settings PATCH with a plain-text "Site using Environment Variables
+// API". Those vars live on the account, scoped to a site by query param.
+// Older teams have no such endpoint, hence the fallback.
+const setSiteEnv = async (netlify, site, env) => {
+  const account = site.account_slug || site.account_id
+  const entries = Object.entries(env).filter(([, value]) => value != null && value !== '')
+  try {
+    await writeAccountEnv(netlify, account, site.id, entries)
+  } catch (e) {
+    if (e.status !== 404) throw e
+    await writeLegacyEnv(netlify, site, env)
+  }
+  return { envCount: entries.length }
+}
+
+const writeAccountEnv = async (netlify, account, siteId, entries) => {
+  const query = `?site_id=${siteId}`
+  const existing = await netlify('GET', `/accounts/${account}/env${query}`)
+  const known = new Set((Array.isArray(existing) ? existing : []).map((v) => v.key))
+
+  const toCreate = entries.filter(([key]) => !known.has(key))
+  if (toCreate.length > 0)
+    await netlify(
+      'POST',
+      `/accounts/${account}/env${query}`,
+      toCreate.map(([key, value]) => envVarBody(key, value)),
+    )
+
+  // Updates are one call per key — the API has no batch update.
+  for (const [key, value] of entries.filter(([key]) => known.has(key)))
+    await netlify(
+      'PUT',
+      `/accounts/${account}/env/${key}${query}`,
+      envVarBody(key, value),
+    )
+}
+
+const envVarBody = (key, value) => ({
+  key,
+  scopes: ENV_SCOPES,
+  values: [{ value: String(value), context: 'all' }],
+})
+
+const writeLegacyEnv = async (netlify, site, env) => {
+  const current = await netlify('GET', `/sites/${site.id}`)
+  await netlify('PATCH', `/sites/${site.id}`, {
+    build_settings: {
+      ...current.build_settings,
+      env: { ...(current.build_settings?.env || {}), ...env },
+    },
+  })
 }
 
 const buildSiteEnv = (club, uri, siteUrl, authSecret) => ({
@@ -570,6 +658,19 @@ const ensureLocalEnvFile = (club, { uri, siteUrl, authSecret }) => {
 // seeding client above deliberately uses the bare, database-less version).
 const buildClubUri = (host, { username, password }, dbName) =>
   `mongodb+srv://${username}:${encodeURIComponent(password)}@${host}/${dbName}?retryWrites=true`
+
+const describeSource = (source) =>
+  SEED_COLLECTIONS.map((name) => `${source[name].length} ${name}`).join(', ')
+
+const isSourceEmpty = (source) =>
+  SEED_COLLECTIONS.every((name) => source[name].length === 0)
+
+// A source db with nothing in it is far more often the wrong cluster than a
+// genuinely empty one — each club's db lives on its own cluster, so the name
+// alone resolves against whichever URI we happen to be holding.
+const warnEmptySource = (club) =>
+  `              ^ source db is empty. If ${club.sourceDb} is on another\n` +
+  `                cluster, set MONGODB_SOURCE_URI in the template.`
 
 const run = async () => {
   const args = parseArgs(process.argv.slice(2))
@@ -637,13 +738,14 @@ const run = async () => {
     `network:      0.0.0.0/0 ${access.created ? '(added)' : '(existing)'}`,
   )
 
-  const { templates, report } = await seedDatabases({
+  const { source, report } = await seedDatabases({
     uri: buildUri(host, credentials),
-    sourceUri: process.env.MONGODB_URI,
+    sourceUri: club.sourceUri || process.env.MONGODB_URI,
     sourceDb: club.sourceDb,
     databases: [club.slug, `${club.slug}-dev`],
   })
-  console.log(`templates:    ${templates} found in ${club.sourceDb}`)
+  console.log(`source:       ${describeSource(source)} in ${club.sourceDb}`)
+  if (isSourceEmpty(source)) console.log(warnEmptySource(club))
   for (const line of report) console.log(`              ${line}`)
 
   const uri = buildClubUri(host, credentials, club.slug)

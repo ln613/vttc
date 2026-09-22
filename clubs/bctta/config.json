@@ -1,0 +1,79 @@
+{
+  "slug": "bctta",
+  "name": "BCTTA",
+  "appName": "BCTTA Live",
+  "timezone": "America/Vancouver",
+  "branding": {
+    "bannerUrl": "https://res.cloudinary.com/vttc/image/upload/v1790069054/9fdf0cdb-40c1-43ef-b88e-d0e9ec3640b6_Medium_dcdlq1.jpg",
+    "bannerAlt": "BCTTA Banner",
+    "contactName": "BCTTA",
+    "faviconUrl": "/images/logo.png",
+    "pageTitle": "BCTTA"
+  },
+  "tables": {
+    "all": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "rows": [
+      [
+        1,
+        2,
+        3,
+        4
+      ],
+      [
+        5,
+        6,
+        7,
+        8
+      ]
+    ],
+    "order": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "lowTierOrder": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "highTierOrder": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "knockoutExcluded": [],
+    "generalExcluded": [],
+    "highTierExcluded": [],
+    "highTierSemifinalExcluded": [],
+    "highTierFinalOnly": [],
+    "lowTierBigMatchPreferred": []
+  },
+  "tiers": {
+    "low": [],
+    "high": []
+  }
+}
