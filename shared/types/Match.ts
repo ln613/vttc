@@ -41,6 +41,12 @@ export interface MatchConfig {
  * A single or double match between 2 sides
  */
 export interface Match {
+  /**
+   * Who ran this match: a roster umpire's name, or "Admin" / "Public".
+   * Written when the match is finished, so a match handed over mid-way
+   * records whoever saw it out. See specs/rules/umpires.md.
+   */
+  umpiredBy?: string
   _id: string
   config: MatchConfig
   side1: Player[] // 1 player for single, 2 for doubles

@@ -32,6 +32,9 @@ export const ACCESS = {
     liveScore: PUBLIC,
     league: PUBLIC, // the league's rounds, standings and fixtures
     settings: PUBLIC, // read on app start, before anyone has signed in
+    umpires: ADMIN, // the roster, with contact details
+    umpireTableCounts: ADMIN, // for the assign-a-table dialog
+    matchUmpireChoices: USER, // the tablet asks who is running this match
 
     // Money.
     revenue: ADMIN,
@@ -105,6 +108,10 @@ export const ACCESS = {
     assignMatchToTable: ADMIN,
     switchMatchTables: ADMIN,
     updateRatings: ADMIN,
+    saveUmpire: ADMIN,
+    deleteUmpire: ADMIN,
+    assignUmpireTable: ADMIN,
+    unassignUmpire: ADMIN,
     saveSettings: ADMIN,
     saveRevenueTemplate: ADMIN,
   },

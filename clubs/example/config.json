@@ -6,6 +6,8 @@
   "enableUpdateRating": false,
   "tabletMirrorEnabled": false,
   "allowPublicUmpire": true,
+  "saveUmpireInfo": false,
+  "maxUmpiresPerTable": 1,
   "branding": {
     "bannerUrl": "https://example.org/banner.jpg",
     "bannerUrlMobile": "https://example.org/banner-mobile.jpg",

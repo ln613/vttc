@@ -1940,6 +1940,12 @@ export const MatchRow = (props: MatchRowProps) => {
         inQueue() || isPendingSubMatch(),
       )}
     >
+      {/* Who ran the match, once it has been played. Pinned to the row's
+          bottom-left so it never competes with the score or the actions —
+          see specs/rules/umpires.md. */}
+      <Show when={props.match.umpiredBy}>
+        <div style={umpiredByStyle}>Umpired by {props.match.umpiredBy}</div>
+      </Show>
       {/* The row's own header — badge, players, actions. Kept in its own
           positioned box so the table number centres on this and not on the
           expanded sub-match list that follows it. */}
@@ -4271,6 +4277,19 @@ const getMatchRowStyle = (
 // The header box starts at the row's content edge, so the badge sits flush
 // against it at left: 0 (it was 16px when positioned against the row itself,
 // whose padding box starts one border-width earlier).
+const umpiredByStyle: JSX.CSSProperties = {
+  position: 'absolute',
+  left: '10px',
+  bottom: '4px',
+  'font-size': '10px',
+  color: '#95a5a6',
+  'pointer-events': 'none',
+  'white-space': 'nowrap',
+  'max-width': 'calc(100% - 20px)',
+  overflow: 'hidden',
+  'text-overflow': 'ellipsis',
+}
+
 const matchRowHeaderStyle: JSX.CSSProperties = {
   position: 'relative',
   width: '100%',

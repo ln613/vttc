@@ -35,6 +35,13 @@ declare module 'club-config' {
      * rate their players against rules that are not theirs.
      */
     enableUpdateRating?: boolean
+    /**
+     * Defaults for the human-umpire feature — see specs/rules/umpires.md.
+     * `saveUmpireInfo` absent = off, and with it off none of the rest
+     * happens. `maxUmpiresPerTable` absent = 1.
+     */
+    saveUmpireInfo?: boolean
+    maxUmpiresPerTable?: number
     branding: {
       bannerUrl: string
       /** Optional narrow-screen crop; the wide banner is used without it. */

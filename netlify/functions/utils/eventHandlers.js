@@ -11,7 +11,7 @@ const getGroupLetter = (i) =>
 const getGroupName = (i) => `Group ${getGroupLetter(i)}`
 import { notifyLiveScoreUpdate, notifyMatchReset } from './pusher.js'
 import { getSettings as readGlobalSettings } from './settingsHandlers.js'
-import { club, getClubTimezone } from './club.js'
+import { club, clubDate, getClubTimezone } from './club.js'
 import { sanitizeForOutput, sanitizeForStorage } from './embeddedPlayers.js'
 import {
   getRoundRobinSinglesLineup,
@@ -2400,7 +2400,7 @@ const advanceKnockoutRound = (stage, event) => {
 export const finishMatch = async (body) => {
   validateFinishMatchInput(body)
 
-  const { _id, matchId, result, confirmed } = body
+  const { _id, matchId, result, confirmed, umpiredBy } = body
 
   const db = getDB()
   const collection = db.collection(EVENTS_COLLECTION)
@@ -2541,6 +2541,16 @@ export const finishMatch = async (body) => {
   }
 
   if (!matchFound) throwError('Match not found')
+
+  // Who ran it is recorded at the finish, not at the start: a match handed
+  // over mid-way belongs to whoever saw it out. Stamped here, by id, rather
+  // than threaded through each of the four finish paths above.
+  if (umpiredBy) {
+    updatedStages = updateMatchInStages(updatedStages, matchId, (m) => ({
+      ...m,
+      umpiredBy,
+    }))
+  }
 
   await collection.updateOne({ _id: toObjectId(_id) }, { $set: { eventStages: updatedStages } })
 
@@ -5726,13 +5736,7 @@ const validateRegisterForEventRules = (event, player) => {
 
 const CLUB_TIMEZONE = getClubTimezone()
 
-const getClubDate = () =>
-  new Intl.DateTimeFormat('en-CA', {
-    timeZone: CLUB_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date())
+const getClubDate = () => clubDate()
 
 const getClubMinutesOfDay = () => {
   const parts = new Intl.DateTimeFormat('en-GB', {

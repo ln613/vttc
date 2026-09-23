@@ -225,6 +225,13 @@ const GamePlay = () => {
         <TabletRoleDialog />
       </Show>
       <Show
+        when={
+          gamePlayState.showUmpireDialog && !gamePlayState.showRoleDialog
+        }
+      >
+        <UmpireChoiceDialog />
+      </Show>
+      <Show
         when={!gamePlayState.loading}
         fallback={<LoadingSpinner />}
       >
@@ -337,6 +344,57 @@ const roleChoiceColumnStyle: JSX.CSSProperties = {
 }
 
 const roleChoiceButtonStyle: JSX.CSSProperties = {
+  padding: '14px 24px',
+  'font-size': '16px',
+  'font-weight': 600,
+  color: '#fff',
+  'background-color': '#2185d0',
+  border: 'none',
+  'border-radius': '6px',
+  cursor: 'pointer',
+}
+
+// The first question a tablet asks when a match lands on its table, when
+// there is more than one person it could be: the umpires assigned to this
+// table, plus anyone in the group who is not on court.
+const UmpireChoiceDialog = () => (
+  <div style={overlayStyle}>
+    <div style={overlayCardStyle}>
+      <div style={overlayMessageStyle}>Who is umpiring this match?</div>
+      <div style={umpireChoiceColumnStyle}>
+        <For each={gamePlayState.umpireChoices}>
+          {(choice) => (
+            <button
+              style={umpireChoiceButtonStyle}
+              onClick={() => gamePlayActions.chooseUmpire(choice.name)}
+            >
+              <span style={umpireChoiceKindStyle}>
+                {choice.kind === 'player' ? 'Player' : 'Umpire'}:
+              </span>{' '}
+              {choice.name}
+            </button>
+          )}
+        </For>
+      </div>
+    </div>
+  </div>
+)
+
+const umpireChoiceColumnStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '10px',
+  'margin-top': '8px',
+  'max-height': '50vh',
+  'overflow-y': 'auto',
+}
+
+const umpireChoiceKindStyle: JSX.CSSProperties = {
+  'font-weight': 400,
+  opacity: 0.85,
+}
+
+const umpireChoiceButtonStyle: JSX.CSSProperties = {
   padding: '14px 24px',
   'font-size': '16px',
   'font-weight': 600,

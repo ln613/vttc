@@ -8,12 +8,16 @@ export interface AppSettings {
   // only what the page shows before it does.
   tabletMirrorEnabled: boolean
   allowPublicUmpire: boolean
+  saveUmpireInfo: boolean
+  maxUmpiresPerTable: number
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
   ignoreUnpaidInGeneration: true,
   tabletMirrorEnabled: false,
   allowPublicUmpire: true,
+  saveUmpireInfo: false,
+  maxUmpiresPerTable: 1,
 }
 
 interface SettingsState {

@@ -1,5 +1,10 @@
 import { getDB, toObjectId } from './db.js'
-import { getClubTimezone, getTableConfig, eventIsInTier } from './club.js'
+import {
+  clubDate,
+  getClubTimezone,
+  getTableConfig,
+  eventIsInTier,
+} from './club.js'
 import { sanitizeForOutput } from './embeddedPlayers.js'
 import {
   autoGenerateForEvent,
@@ -42,15 +47,9 @@ const throwError = (message) => {
  */
 const CLUB_TIMEZONE = getClubTimezone()
 
-const clubDateOf = (date) =>
-  new Intl.DateTimeFormat('en-CA', {
-    timeZone: CLUB_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date)
+const clubDateOf = clubDate
 
-export const getClubDate = () => clubDateOf(new Date())
+export const getClubDate = () => clubDate()
 
 const getClubMinutesOfDay = () => {
   const parts = new Intl.DateTimeFormat('en-GB', {
@@ -166,7 +165,14 @@ const sessionFields = ({ full, scorerHeld }) => ({
   scorerHeldMatchIds: scorerHeld,
 })
 
-const readAllowPublicUmpire = async () => (await getSettings()).allowPublicUmpire
+// The one flag every client needs and cannot read from the admin-only
+// settings: whether the Umpire button should exist at all. Whether a tablet
+// asks who is umpiring is answered by matchUmpireChoices itself, so there
+// is no second copy of that to go stale.
+const readUmpireFlags = async () => {
+  const { allowPublicUmpire } = await getSettings()
+  return { allowPublicUmpire }
+}
 
 const stampTabletMirror = async (collection, events) => {
   const unstamped = events.filter((e) => e.tabletMirrorEnabled === undefined)
@@ -1129,7 +1135,7 @@ export const getLiveScore = async (params = {}) => {
       tables: cached.tables,
       matchQueue: cached.matchQueue || [],
       ...sessionFields(await getMatchSessionSummary()),
-      allowPublicUmpire: await readAllowPublicUmpire(),
+      ...(await readUmpireFlags()),
     }
   }
 
@@ -1187,13 +1193,13 @@ export const getLiveScore = async (params = {}) => {
   await notifyNewlyAssignedMatches(savedState?.tables, result.tables)
 
   const sessions = sessionFields(await getMatchSessionSummary())
-  const allowPublicUmpire = await readAllowPublicUmpire()
+  const umpireFlags = await readUmpireFlags()
 
   return {
     tables: publicTables,
     matchQueue: publicQueue,
     ...sessions,
-    allowPublicUmpire,
+    ...umpireFlags,
   }
 }
 

@@ -88,6 +88,13 @@ interface GamePlayState {
   roleChoices: TabletRole[]
   // Whether the other half of the pair is on the table's channel.
   sisterPresent: boolean
+  // ---- Human umpires (specs/rules/umpires.md) ----
+  // Who is running this match, recorded when it finishes. "Admin" and
+  // "Public" stand in for people who are not on the club's roster.
+  umpiredBy: string | null
+  // Asked only when there is a real choice — see getMatchUmpireChoices.
+  showUmpireDialog: boolean
+  umpireChoices: UmpireChoice[]
   // Whether the umpire has pressed Start on this match — the moment the
   // serving side and the ends are settled. On a Mirror it arrives with the
   // Scorer's snapshot; nothing is named before it.
@@ -95,6 +102,12 @@ interface GamePlayState {
 }
 
 export type TabletRole = 'scorer' | 'mirror'
+
+/** Someone who could be running this match, and in what capacity. */
+export interface UmpireChoice {
+  kind: 'umpire' | 'player'
+  name: string
+}
 
 const getInitialState = (): GamePlayState => ({
   data: null,
@@ -141,6 +154,9 @@ const getInitialState = (): GamePlayState => ({
   roleChoices: [],
   sisterPresent: false,
   setupConfirmed: false,
+  umpiredBy: null,
+  showUmpireDialog: false,
+  umpireChoices: [],
 })
 
 const [gamePlayState, setGamePlayState] =
@@ -318,9 +334,12 @@ const acquireSession = async (matchId: string, role?: TabletRole) => {
       sessionTakenOver: false,
       sessionError: null,
       // The first tablet on a table is asked its role only after the event
-      // has loaded, so a setup screen may already be up behind the dialog.
-      // A Mirror is never the device that sets a match up.
-      ...(assigned === 'mirror' ? { showInitDialog: false } : {}),
+      // has loaded, so a setup screen — or the umpire question — may
+      // already be up behind the dialog. A Mirror neither sets a match up
+      // nor finishes one.
+      ...(assigned === 'mirror'
+        ? { showInitDialog: false, showUmpireDialog: false, umpiredBy: null }
+        : {}),
     })
     startHeartbeat()
     subscribeLiveScore()
@@ -352,6 +371,52 @@ const releaseSession = () => {
   // Fire-and-forget; never block teardown on the release call.
   apiPost('releaseMatchSession', { matchId, sessionId }).catch(() => {})
   setGamePlayState({ sessionId: null })
+}
+
+// Who is running this match. An admin and a public umpire are not on the
+// roster and answer for themselves; a tablet asks the server, which knows
+// who is assigned to its table and, in a group, who is free to stand in.
+//
+// The whole thing is skipped unless the club records it — see the
+// saveUmpireInfo setting.
+const resolveUmpire = async () => {
+  const { eventId, matchId, tableNumber, tabletRole } = gamePlayState
+  if (!eventId || !matchId) return
+  // A Mirror does not finish matches, so it has nobody to record.
+  if (tabletRole === 'mirror') return
+
+  if (authState.isAdmin) {
+    setGamePlayState({ umpiredBy: 'Admin' })
+    return
+  }
+  if (!authState.isTablet) {
+    setGamePlayState({ umpiredBy: getUmpireId() ? 'Public' : null })
+    return
+  }
+
+  // Asked of the server rather than decided from a flag carried on the
+  // live score: that flag is a copy, and a stale copy would quietly skip
+  // the question with nothing to show for it. The endpoint answers
+  // `ask: false` when the club does not record umpires, so a club with the
+  // feature off costs one small GET per match and nothing else.
+  try {
+    const result = await apiGet<{
+      ask: boolean
+      choices: UmpireChoice[]
+      auto: string | null
+    }>('matchUmpireChoices', {
+      _id: eventId,
+      matchId,
+      ...(tableNumber != null ? { tableNumber: String(tableNumber) } : {}),
+    })
+    setGamePlayState({
+      umpiredBy: result.auto ?? null,
+      umpireChoices: result.choices ?? [],
+      showUmpireDialog: !!result.ask,
+    })
+  } catch {
+    // Not knowing who umpired must never stop a match being scored.
+  }
 }
 
 // ==================== Paired tablets ====================
@@ -885,6 +950,9 @@ export const gamePlayActions = {
       sessionError: null,
       matchReset: false,
       setupConfirmed: false,
+      umpiredBy: null,
+      showUmpireDialog: false,
+      umpireChoices: [],
       // Tablet entry without a match has nothing to load — drop the
       // loading flag immediately so the "No match assigned" screen
       // shows instead of the spinner.
@@ -893,6 +961,7 @@ export const gamePlayActions = {
 
     if (matchId) await acquireSession(matchId)
     if (eventId) await fetchEvent(eventId)
+    await resolveUmpire()
   },
 
   notifyMatchReset: (matchId: string) => {
@@ -1270,6 +1339,13 @@ export const gamePlayActions = {
 
   isMirror: (): boolean => gamePlayState.tabletRole === 'mirror',
 
+  // The umpire named on a finished match, for display.
+  getUmpiredBy: (): string | undefined =>
+    gamePlayActions.getCurrentMatch()?.umpiredBy,
+
+  chooseUmpire: (name: string) =>
+    setGamePlayState({ umpiredBy: name, showUmpireDialog: false }),
+
   // Until the umpire presses Start, which end each player is at has not
   // been decided, and naming them would put the wrong name in front of the
   // wrong player. A Mirror shows the score boxes with no names until then.
@@ -1493,6 +1569,9 @@ export const gamePlayActions = {
           _id: gamePlayState.eventId,
           matchId: gamePlayState.matchId,
           confirmed: true,
+          // Sent at the finish, so a match handed over mid-way records
+          // whoever saw it out.
+          umpiredBy: gamePlayState.umpiredBy ?? undefined,
           result: preview.games.map((g) => ({
             score1: g.score1,
             score2: g.score2,

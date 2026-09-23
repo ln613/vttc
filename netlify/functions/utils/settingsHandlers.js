@@ -20,6 +20,10 @@ const defaultSettings = () => ({
   // match. Absent from the club config means allowed, which is how the app
   // behaved before this could be turned off.
   allowPublicUmpire: club.allowPublicUmpire !== false,
+  // Human umpires — see specs/rules/umpires.md. Off by default: a club
+  // that does not track who umpired should not be asked about it.
+  saveUmpireInfo: !!club.saveUmpireInfo,
+  maxUmpiresPerTable: club.maxUmpiresPerTable ?? 1,
 })
 
 const throwError = (msg) => {

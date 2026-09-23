@@ -14,12 +14,14 @@ import {
   liveScoreState,
   liveScoreActions,
 } from '../stores/liveScoreStore'
-import type { TableAssignment } from '../../shared/types/Table'
 import Input from './Input'
 import Button from './Button'
 import Select from './Select'
 import DatePicker from './DatePicker'
 import PasswordRules from './PasswordRules'
+import TablePickerDialog, {
+  type TableCellStatus,
+} from './TablePickerDialog'
 import { parseLocalDate, formatLocalDate } from '../utils/date'
 import clubConfig from 'club-config'
 
@@ -116,13 +118,23 @@ const TopBar = () => {
     navigate('/live-score')
   }
 
-  const handleTablePick = (t: TableAssignment) => {
+  const handleTablePick = (tableNumber: number) => {
     setShowTablePicker(false)
     // URL identifies the table only — the current match on that table
     // is resolved reactively from live-score state by GamePlay's
     // auto-load effect, so the URL never goes stale when the match
     // assignment changes.
-    navigate(`/game-play?tableNumber=${t.tableNumber}`)
+    navigate(`/game-play?tableNumber=${tableNumber}`)
+  }
+
+  // Green free, red waiting to start, blue under way — the same colours the
+  // Live Score page uses for a table.
+  const statusForTable = (n: number): TableCellStatus => {
+    const table = liveScoreState.tables.find((t) => t.tableNumber === n)
+    if (!table || table.status === 'available') return 'available'
+    return table.match?.matchStatus === 'not_started'
+      ? 'not_started'
+      : 'in_progress'
   }
 
   const handleEventsClick = () => {
@@ -185,6 +197,8 @@ const TopBar = () => {
           </Show>
           <Show when={showTablePicker()}>
             <TablePickerDialog
+              statusFor={statusForTable}
+              isDisabled={(n) => !liveScoreActions.canEnterTable(n)}
               onPick={handleTablePick}
               onClose={() => setShowTablePicker(false)}
             />
@@ -213,13 +227,6 @@ const TopBar = () => {
     </div>
   )
 }
-
-// Tablet table picker — same visual language as the AssignTableDialog
-// on EventDetail (4-wide grid in 5,6,7,8 / 1,2,3,4 order, live-score
-// palette: green=available, red=not_started, blue=in_progress).
-// Every cell is clickable; the GamePlay page handles the no-match
-// case by showing just the big table number.
-const TABLE_GRID_ORDER = [5, 6, 7, 8, 1, 2, 3, 4]
 
 /**
  * The match-day password, which anyone running a table can be given. It
@@ -275,128 +282,6 @@ const UmpirePasswordDialog = (props: {
       </div>
     </div>
   )
-}
-
-const TablePickerDialog = (props: {
-  onPick: (t: TableAssignment) => void
-  onClose: () => void
-}) => {
-  const tableFor = (n: number) =>
-    liveScoreState.tables.find((t) => t.tableNumber === n)
-  const statusFor = (
-    n: number,
-  ): 'available' | 'not_started' | 'in_progress' => {
-    const t = tableFor(n)
-    if (!t || t.status === 'available') return 'available'
-    return t.match?.matchStatus === 'not_started' ? 'not_started' : 'in_progress'
-  }
-  // A table this device could not actually take is offered greyed out
-  // rather than letting someone pick it and be turned away on arrival.
-  // What counts as "could not" depends on who is asking — a tablet can
-  // still join a paired table as its Mirror, an umpire without an account
-  // cannot. See specs/rules/tablet mirror.md.
-  const isTakenByAnotherUmpire = (n: number): boolean =>
-    !liveScoreActions.canEnterTable(n)
-  const handleClick = (n: number) => {
-    if (isTakenByAnotherUmpire(n)) return
-    const t = tableFor(n) ?? ({
-      tableNumber: n as TableAssignment['tableNumber'],
-      status: 'available',
-    } as TableAssignment)
-    props.onPick(t)
-  }
-
-  return (
-    <div style={tablePickerOverlayStyle} onClick={props.onClose}>
-      <div style={tablePickerDialogStyle} onClick={(e) => e.stopPropagation()}>
-        <div style={tablePickerTitleStyle}>Pick a table</div>
-        <div style={tablePickerGridStyle}>
-          <For each={TABLE_GRID_ORDER}>
-            {(n) => {
-              const taken = () => isTakenByAnotherUmpire(n)
-              return (
-                <button
-                  type="button"
-                  style={tablePickerCellStyle(statusFor(n), taken())}
-                  onClick={() => handleClick(n)}
-                  disabled={taken()}
-                >
-                  {n}
-                </button>
-              )
-            }}
-          </For>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-const tablePickerOverlayStyle: JSX.CSSProperties = {
-  position: 'fixed',
-  top: '0',
-  left: '0',
-  right: '0',
-  bottom: '0',
-  'background-color': 'rgba(0, 0, 0, 0.5)',
-  display: 'flex',
-  'align-items': 'center',
-  'justify-content': 'center',
-  'z-index': '2000',
-  padding: '16px',
-}
-
-const tablePickerDialogStyle: JSX.CSSProperties = {
-  'background-color': '#fff',
-  'border-radius': '12px',
-  padding: '20px',
-  width: 'auto',
-  'max-width': '360px',
-  display: 'flex',
-  'flex-direction': 'column',
-  'align-items': 'center',
-  gap: '14px',
-  'box-shadow': '0 4px 20px rgba(0, 0, 0, 0.15)',
-}
-
-const tablePickerTitleStyle: JSX.CSSProperties = {
-  'font-size': '18px',
-  'font-weight': 700,
-  color: '#2c3e50',
-  'text-align': 'center',
-}
-
-const tablePickerGridStyle: JSX.CSSProperties = {
-  display: 'grid',
-  'grid-template-columns': 'repeat(4, 64px)',
-  'grid-auto-rows': '64px',
-  gap: '8px',
-}
-
-const tablePickerCellStyle = (
-  status: 'available' | 'not_started' | 'in_progress',
-  disabled = false,
-): JSX.CSSProperties => {
-  const bg =
-    status === 'available'
-      ? '#27ae60'
-      : status === 'not_started'
-        ? '#c0392b'
-        : '#2980b9'
-  return {
-    width: '64px',
-    height: '64px',
-    'border-radius': '10px',
-    'font-size': '24px',
-    'font-weight': 900,
-    color: '#f1c40f',
-    'background-color': bg,
-    border: '3px solid transparent',
-    cursor: disabled ? 'not-allowed' : 'pointer',
-    'text-shadow': '2px 2px 4px rgba(0,0,0,0.3)',
-    padding: 0,
-    opacity: disabled ? 0.4 : 1,
-  }
 }
 
 const LiveScoreIcon = () => (

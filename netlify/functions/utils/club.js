@@ -61,6 +61,17 @@ export const getClubTimezone = () =>
 
 export const getTableConfig = () => club.tables
 
+// "Today" in the club's own timezone, as YYYY-MM-DD. Every date the app
+// compares against — an event's date, an umpire's assignment — is a club
+// date, not the server's or the browser's.
+export const clubDate = (date = new Date()) =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: getClubTimezone(),
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
+
 // Does an event match one of a tier's rules? Each rule is a set of
 // conditions that must all hold, so the tier lists read as "any of these".
 const eventMatchesTierRule = (event, rule) => {

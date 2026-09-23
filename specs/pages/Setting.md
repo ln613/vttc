@@ -19,6 +19,11 @@ Vertical
 ## Event Setting Section
 
 - checkbox: "Ignore unpaid players when generating groups, RR or first round knockout if no group stage", default checked. If unchecked, include the unpaid players.
+- checkbox: "Save Umpire Info", default from the club config's
+  `saveUmpireInfo` (absent = off). Records who umpired each match and lets
+  umpires be assigned to tables for the day. When on, a number field "Max
+  umpires on a table" appears, defaulting to `maxUmpiresPerTable`. See
+  `specs/rules/umpires.md`.
 - checkbox: "Enable Tablet Mirror", defaulting to the club config's
   `tabletMirrorEnabled`. When checked, a table can be run by two tablets —
   one facing the umpire, one facing the players. The value is copied onto
@@ -28,6 +33,11 @@ Vertical
 ### Interaction
 
 - on save click: save the settings to db
+
+## Umpire Section
+
+- shown only when "Save Umpire Info" is on
+- link to the Umpires page (admin only) — see `specs/rules/umpires.md`
 
 ## Revenue Section
 

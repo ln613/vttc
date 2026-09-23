@@ -77,6 +77,15 @@ import {
 import { getSettings, saveSettings } from './settingsHandlers.js'
 import { updateRatings, getPlayerHistory } from './rating.js'
 import {
+  getUmpires,
+  saveUmpire,
+  deleteUmpire,
+  assignUmpireTable,
+  unassignUmpire,
+  getUmpireTableCounts,
+  getMatchUmpireChoices,
+} from './umpireHandlers.js'
+import {
   getRevenue,
   getRevenueTemplates,
   saveRevenueTemplate,
@@ -131,6 +140,9 @@ export const apiHandlers = {
     liveScore: (params) => getLiveScore(params),
     league: (params) => getLeague(params),
     settings: () => getSettings(),
+    umpires: () => getUmpires(),
+    umpireTableCounts: () => getUmpireTableCounts(),
+    matchUmpireChoices: (params) => getMatchUmpireChoices(params),
     revenue: () => getRevenue(),
     revenueTemplates: () => getRevenueTemplates(),
   },
@@ -194,6 +206,10 @@ export const apiHandlers = {
     deleteEvent: withEventNotify(deleteEvent),
     setParticipantDefault: withEventNotify(setParticipantDefault),
     saveSettings: (body) => saveSettings(body),
+    saveUmpire: (body) => saveUmpire(body),
+    deleteUmpire: (body) => deleteUmpire(body),
+    assignUmpireTable: (body) => assignUmpireTable(body),
+    unassignUmpire: (body) => unassignUmpire(body),
     updateRatings: () => updateRatings(),
     registerForEvent: withEventNotify(withLeagueRosterSync(registerForEvent)),
     getPartialTeams: (body) => getPartialTeams(body),

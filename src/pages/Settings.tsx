@@ -22,6 +22,11 @@ const Settings = () => {
             <div style={errorStyle}>{settingsState.error}</div>
           </Show>
           <EventSettingSection />
+          {/* Only where the club records who umpired — otherwise there is
+              no roster to keep. */}
+          <Show when={settingsState.settings.saveUmpireInfo}>
+            <UmpireSection />
+          </Show>
           <RevenueSection />
           {/* Only for a club that actually uses the app's rating system —
               see enableUpdateRating in clubs/<slug>/config.json. */}
@@ -30,6 +35,24 @@ const Settings = () => {
           </Show>
         </div>
       </Show>
+    </div>
+  )
+}
+
+const UmpireSection = () => {
+  const navigate = useNavigate()
+  return (
+    <div style={sectionStyle}>
+      <h4 style={sectionHeaderStyle}>Umpires</h4>
+      <div style={linkColumnStyle}>
+        <button
+          type="button"
+          style={linkButtonStyle}
+          onClick={() => navigate('/umpires')}
+        >
+          Umpires
+        </button>
+      </div>
     </div>
   )
 }
@@ -130,22 +153,63 @@ const EventSettingSection = () => (
       field="allowPublicUmpire"
       label="Allow Public Umpire — anyone with the match day password can score a match without an account."
     />
+    <SettingCheckbox
+      field="saveUmpireInfo"
+      label="Save Umpire Info — record who umpired each match, and let umpires be assigned to tables for the day."
+    />
+    <Show when={settingsValue('saveUmpireInfo')}>
+      <SettingNumber
+        field="maxUmpiresPerTable"
+        label="Max umpires on a table"
+        min={1}
+        max={4}
+      />
+    </Show>
   </div>
+)
+
+const settingsValue = <K extends keyof AppSettings>(field: K): AppSettings[K] =>
+  settingsState.editing
+    ? settingsState.draft[field]
+    : settingsState.settings[field]
+
+const SettingNumber = (props: {
+  field: keyof AppSettings
+  label: string
+  min: number
+  max: number
+}) => (
+  <label style={checkboxRowStyle}>
+    <input
+      type="number"
+      min={props.min}
+      max={props.max}
+      value={String(settingsValue(props.field))}
+      disabled={!settingsState.editing}
+      onChange={(e) => {
+        const n = Number((e.target as HTMLInputElement).value)
+        if (Number.isFinite(n)) {
+          settingsActions.setDraft(
+            props.field,
+            Math.min(props.max, Math.max(props.min, Math.round(n))) as never,
+          )
+        }
+      }}
+      style={numberInputStyle}
+    />
+    <span style={checkboxLabelStyle}>{props.label}</span>
+  </label>
 )
 
 const SettingCheckbox = (props: {
   field: keyof AppSettings
   label: string
 }) => {
-  const value = () =>
-    settingsState.editing
-      ? settingsState.draft[props.field]
-      : settingsState.settings[props.field]
   return (
     <label style={checkboxRowStyle}>
       <input
         type="checkbox"
-        checked={value()}
+        checked={!!settingsValue(props.field)}
         disabled={!settingsState.editing}
         onChange={(e) =>
           settingsActions.setDraft(
@@ -349,3 +413,12 @@ const spinnerInnerStyle: JSX.CSSProperties = {
 }
 
 export default Settings
+
+const numberInputStyle: JSX.CSSProperties = {
+  width: '64px',
+  padding: '4px 8px',
+  'border-radius': '6px',
+  border: '1px solid #cbd5e0',
+  'font-size': '14px',
+  'flex-shrink': 0,
+}

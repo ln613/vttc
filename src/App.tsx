@@ -12,6 +12,7 @@ import GamePlay from './pages/GamePlay'
 import LiveScore from './pages/LiveScore'
 import Account from './pages/Account'
 import Settings from './pages/Settings'
+import Umpires from './pages/Umpires'
 import Revenue from './pages/Revenue'
 import RevenueCalculator from './pages/RevenueCalculator'
 import History from './pages/History'
@@ -52,6 +53,7 @@ const App = () => (
     <Route path="/game-play" component={GamePlay} />
     <Route path="/live-score" component={LiveScore} />
     <Route path="/settings" component={Settings} />
+    <Route path="/umpires" component={Umpires} />
     <Route path="/revenue" component={Revenue} />
     <Route path="/revenue-calculator" component={RevenueCalculator} />
     <Route path="/history/:playerId" component={History} />
