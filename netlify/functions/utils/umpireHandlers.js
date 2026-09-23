@@ -197,8 +197,18 @@ export const getMatchUmpireChoices = async (params) => {
   if (!params?._id || !params.matchId) throwError('Event and match are required')
 
   const db = getDB()
+  const event = await db
+    .collection('events')
+    .findOne({ _id: toObjectId(params._id) })
+
+  // A team match is a container for its sub-matches, each of which is
+  // umpired and recorded on its own. Nobody umpires the parent.
+  if (isTeamParent(event, params.matchId)) {
+    return { ask: false, choices: [], auto: null }
+  }
+
   const assigned = await umpiresOnTable(db, params.tableNumber)
-  const standIns = await freeGroupPlayers(db, params._id, params.matchId)
+  const standIns = availablePlayers(event, await playersOnTables(db), params.matchId)
 
   // Each choice says what kind of person it is, so the tablet can show
   // "Umpire: …" and "Player: …" — the two are not the same offer, and a
@@ -208,11 +218,11 @@ export const getMatchUmpireChoices = async (params) => {
     ...standIns.map((name) => ({ kind: 'player', name })),
   ]
 
-  return {
-    ask: choices.length > 1,
-    choices,
-    auto: choices.length === 1 ? choices[0].name : null,
-  }
+  // Asked whenever there is anyone at all to name, even a single one:
+  // recording who umpired is the point, and picking the only candidate is
+  // still the umpire saying so. Only a table with nobody assigned and
+  // nobody free goes unasked, because there would be nothing to choose.
+  return { ask: choices.length > 0, choices }
 }
 
 const umpiresOnTable = async (db, tableNumber) => {
@@ -224,27 +234,93 @@ const umpiresOnTable = async (db, tableNumber) => {
   return assigned.map(umpireName).sort((a, b) => a.localeCompare(b))
 }
 
-// In a group everyone is sitting at the same table waiting their turn, so
-// whoever is not on court can umpire. Anyone already standing at another
-// table cannot.
-const freeGroupPlayers = async (db, eventId, matchId) => {
-  const event = await db.collection('events').findOne({ _id: toObjectId(eventId) })
-  const group = findGroupOfMatch(event, matchId)
-  if (!group) return []
-
-  const playing = await playersOnTables(db)
-  for (const side of sidesOfMatch(group, matchId)) {
-    for (const player of side) playing.add(player._id?.toString())
-  }
-
-  const names = []
-  for (const gp of group.participants || []) {
-    for (const player of gp.participant?.players || [gp.participant]) {
-      if (!player?._id || playing.has(player._id.toString())) continue
-      names.push([player.firstName, player.lastName].filter(Boolean).join(' '))
+const isTeamParent = (event, matchId) => {
+  for (const stage of event?.eventStages || []) {
+    for (const group of stage.groups || []) {
+      const match = (group.matches || []).find((m) => m._id === matchId)
+      if (match) return !!match.isTeamMatch
+    }
+    for (const round of stage.rounds || []) {
+      const km = (round.matches || []).find((m) => m.match?._id === matchId)
+      if (km) return !!km.match?.isTeamMatch
     }
   }
-  return names.sort((a, b) => a.localeCompare(b))
+  return false
+}
+
+// Whoever is standing at this table with nothing to do can umpire.
+//
+// In a singles group that is everyone in the group who is not on court. In
+// a team tie it is both teams' players who are not in this sub-match —
+// their own team mates and their opponents' alike, knockout included,
+// because the whole tie is at this one table.
+//
+// Anyone already playing somewhere else is not available.
+const availablePlayers = (event, playing, matchId) => {
+  const pool = teamTiePlayers(event, matchId) ?? groupPlayers(event, matchId)
+  if (!pool) return []
+
+  const names = []
+  for (const player of pool) {
+    if (!player?._id || playing.has(player._id.toString())) continue
+    names.push([player.firstName, player.lastName].filter(Boolean).join(' '))
+  }
+  return [...new Set(names)].sort((a, b) => a.localeCompare(b))
+}
+
+// The two teams of the tie this sub-match belongs to, minus whoever is
+// playing the sub-match itself.
+const teamTiePlayers = (event, matchId) => {
+  const parent = findTeamParentOfSub(event, matchId)
+  if (!parent) return undefined
+
+  const sub = (parent.subMatches || []).find((m) => m._id === matchId)
+  const onCourt = new Set(
+    [...(sub?.side1 || []), ...(sub?.side2 || [])]
+      .map((p) => p?._id?.toString())
+      .filter(Boolean),
+  )
+  return [...(parent.side1 || []), ...(parent.side2 || [])].filter(
+    (p) => !onCourt.has(p?._id?.toString()),
+  )
+}
+
+const findTeamParentOfSub = (event, matchId) => {
+  for (const match of allMatchesOf(event)) {
+    if ((match.subMatches || []).some((m) => m._id === matchId)) return match
+  }
+  return undefined
+}
+
+// Everyone in this match's group, minus the two sides playing it.
+const groupPlayers = (event, matchId) => {
+  const group = findGroupOfMatch(event, matchId)
+  if (!group) return undefined
+
+  const onCourt = new Set(
+    sidesOfMatch(group, matchId)
+      .flat()
+      .map((p) => p?._id?.toString())
+      .filter(Boolean),
+  )
+  const players = []
+  for (const gp of group.participants || []) {
+    for (const player of gp.participant?.players || [gp.participant]) {
+      if (player?._id && !onCourt.has(player._id.toString())) players.push(player)
+    }
+  }
+  return players
+}
+
+function* allMatchesOf(event) {
+  for (const stage of event?.eventStages || []) {
+    for (const group of stage.groups || []) {
+      for (const match of group.matches || []) yield match
+    }
+    for (const round of stage.rounds || []) {
+      for (const km of round.matches || []) if (km.match) yield km.match
+    }
+  }
 }
 
 const findGroupOfMatch = (event, matchId) => {

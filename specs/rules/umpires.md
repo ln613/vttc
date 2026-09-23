@@ -60,16 +60,29 @@ match handed over part-way through records whoever saw it out.
 
 When a match arrives on a tablet's table, the first question — before the
 serving side and the ends — is **"Who is umpiring this match?"**. The
-choices are:
+choices are the umpires assigned to that table today, plus whoever is
+standing at the table with nothing to do:
 
-- the umpires assigned to that table today, and
-- in a group match, every player in the group who is not on court,
-  anywhere. They are all sitting at the same table waiting their turn, so
-  any of them can umpire
+- in a singles group match, every player in the group who is not on court
+- in a team tie, every player of **either** team who is not in this
+  sub-match — their own team mates and their opponents' alike, knockout
+  included, because the whole tie is at this one table
 
-It is only asked when there is a real choice. One name and no question is
-not a choice, so it is applied without asking; no names at all records
-nobody.
+Anyone already playing at another table is not offered.
+
+The choices say which they are — "Umpire: David Su", "Player: Zhenke Zhou"
+— because standing in is not the same offer as being on the roster. Only
+the name is recorded.
+
+**Asked whenever there is anyone to name at all**, even a single
+candidate: recording who umpired is the point, and picking the only name is
+still the umpire saying so. Nothing is ever assumed on their behalf. A
+table with nobody assigned and nobody free is the one case that goes
+unasked, because there would be nothing to choose.
+
+**A team match is never asked about.** It is a container for its
+sub-matches, each of which is umpired and recorded on its own. The tablet
+asks as it reaches each sub-match, once the order of play has been set.
 
 An admin records `"Admin"` and a public umpire records `"Public"`, without
 being asked — they are not on the roster and answer for themselves. A

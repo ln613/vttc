@@ -384,6 +384,9 @@ const resolveUmpire = async () => {
   if (!eventId || !matchId) return
   // A Mirror does not finish matches, so it has nobody to record.
   if (tabletRole === 'mirror') return
+  // A team match is a container: each of its sub-matches is umpired and
+  // recorded on its own, and the tablet hops into them one at a time.
+  if (gamePlayActions.getCurrentMatch()?.isTeamMatch) return
 
   if (authState.isAdmin) {
     setGamePlayState({ umpiredBy: 'Admin' })
@@ -403,14 +406,14 @@ const resolveUmpire = async () => {
     const result = await apiGet<{
       ask: boolean
       choices: UmpireChoice[]
-      auto: string | null
     }>('matchUmpireChoices', {
       _id: eventId,
       matchId,
       ...(tableNumber != null ? { tableNumber: String(tableNumber) } : {}),
     })
+    // Nothing is assumed: a name is recorded only once someone picks it.
     setGamePlayState({
-      umpiredBy: result.auto ?? null,
+      umpiredBy: null,
       umpireChoices: result.choices ?? [],
       showUmpireDialog: !!result.ask,
     })
