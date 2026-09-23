@@ -23,7 +23,8 @@
     "sim": "node --env-file=.env scripts/simulate-tournament.mjs",
     "load:test": "node --dns-result-order=ipv4first --env-file=.env scripts/load-test.mjs",
     "club:new": "node --env-file=.env --env-file=.env.vttc scripts/provision-club.mjs",
-    "ratings:sync": "node --env-file=.env scripts/sync-ttcan-ratings.mjs"
+    "ratings:sync": "node --env-file=.env scripts/sync-ttcan-ratings.mjs",
+    "seed:series": "node --env-file=.env scripts/seed-event-series.mjs"
   },
   "dependencies": {
     "@solidjs/router": "^0.15.3",

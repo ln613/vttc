@@ -20,7 +20,7 @@ import { eventState, eventActions } from './eventStore'
 import { leagueActions } from './leagueStore'
 import { authState } from './authStore'
 import { liveScoreActions } from './liveScoreStore'
-import { isEventStarted } from '../utils/eventTiming'
+import { isEventStarted, isStartableToday } from '../utils/eventTiming'
 import { getProvisionalMatchResult } from '../../shared/rules/matchRules'
 
 export type StageTab =
@@ -489,10 +489,10 @@ export const eventDetailActions = {
       await apiPost('generateKnockout', { _id: eventId })
       await fetchEvent(eventId, false)
     } catch (err) {
-      setEventDetailState({
-        error:
-          err instanceof Error ? err.message : 'Failed to generate next round',
-      })
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Failed to generate next round',
+      )
     } finally {
       setEventDetailState({ generatingNextRound: false })
     }
@@ -628,10 +628,10 @@ export const eventDetailActions = {
         await fetchEvent(eventId, true)
       }
     } catch (err) {
-      setEventDetailState({
-        error:
-          err instanceof Error ? err.message : 'Failed to assign match to table',
-      })
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Failed to assign match to table',
+      )
     } finally {
       setEventDetailState({
         showAssignDialog: false,
@@ -720,12 +720,10 @@ export const eventDetailActions = {
         await fetchEvent(eventId, true)
       }
     } catch (err) {
-      setEventDetailState({
-        error:
-          err instanceof Error
-            ? err.message
-            : 'Failed to save team match order',
-      })
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Failed to save team match order',
+      )
     } finally {
       setEventDetailState({ savingOrderSide: null })
     }
@@ -772,10 +770,10 @@ export const eventDetailActions = {
         await fetchEvent(eventId, true)
       }
     } catch (err) {
-      setEventDetailState({
-        error:
-          err instanceof Error ? err.message : 'Failed to confirm match',
-      })
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Failed to confirm match',
+      )
     } finally {
       setEventDetailState({
         confirmingMatchId: null,
@@ -824,10 +822,10 @@ export const eventDetailActions = {
       // instead of waiting for the pusher live-score ping.
       void eventActions.refreshEvents()
     } catch (err) {
-      setEventDetailState({
-        error:
-          err instanceof Error ? err.message : 'Failed to reset match',
-      })
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Failed to reset match',
+      )
     } finally {
       setEventDetailState({ resettingMatchId: null })
     }
@@ -851,10 +849,10 @@ export const eventDetailActions = {
       }
       void eventActions.refreshEvents()
     } catch (err) {
-      setEventDetailState({
-        error:
-          err instanceof Error ? err.message : 'Failed to reset team match',
-      })
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Failed to reset team match',
+      )
     } finally {
       setEventDetailState({ resettingMatchId: null })
     }
@@ -892,21 +890,26 @@ export const eventDetailActions = {
       await apiPost('resetEvent', { _id: eventId })
       await fetchEvent(eventId, false)
     } catch (err) {
-      setEventDetailState({
-        error:
-          err instanceof Error ? err.message : 'Failed to reset event',
-      })
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Failed to reset event',
+      )
     } finally {
       setEventDetailState({ resettingEvent: false })
     }
   },
 
-  // The desk can start an event early, but only once there is something to
-  // start: without groups there are no matches for the queue to pick up.
+  // The desk can start an event early, but only on the day itself, and only
+  // once there is something to start: without groups there are no matches
+  // for the queue to pick up.
   canStartEvent: (): boolean => {
     const event = eventDetailState.data
     if (!event) return false
-    return eventDetailActions.hasGroups() && !isEventStarted(event)
+    return (
+      eventDetailActions.hasGroups() &&
+      !isEventStarted(event) &&
+      isStartableToday(event)
+    )
   },
 
   startEvent: async () => {
@@ -918,9 +921,10 @@ export const eventDetailActions = {
       await apiPost('startEvent', { _id: eventId })
       await fetchEvent(eventId, false)
     } catch (err) {
-      setEventDetailState({
-        error: err instanceof Error ? err.message : 'Failed to start event',
-      })
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Failed to start event',
+      )
     } finally {
       setEventDetailState({ startingEvent: false })
     }

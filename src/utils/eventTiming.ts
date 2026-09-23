@@ -1,4 +1,4 @@
-import { parseLocalDate } from './date'
+import { formatLocalDate, parseLocalDate } from './date'
 
 // Whether an event has begun.
 //
@@ -37,4 +37,13 @@ export const isEventStarted = (event: EventTiming): boolean => {
     }
   }
   return new Date() >= eventDate
+}
+
+// An event scheduled for a later day cannot be started early: the live
+// queue only ever picks up events dated today (getStartedEvents), so
+// startEvent refuses one in the future. Mirrored here so the button is not
+// offered when pressing it can only fail.
+export const isStartableToday = (event: EventTiming): boolean => {
+  if (!event.date) return true
+  return event.date <= formatLocalDate(new Date())
 }
