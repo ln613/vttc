@@ -25,15 +25,34 @@ import clubConfig from 'club-config'
 
 export const Header = () => (
   <header>
+    <Banner />
+    <TopBar />
+    <AuthDialog />
+    <PendingPasswordModal />
+  </header>
+)
+
+const MOBILE_BANNER_MAX_WIDTH = 768
+
+// A club may supply a second crop for narrow screens. <picture> lets the
+// browser pick before it fetches, so a phone never downloads the wide
+// banner just to squash it. Without a mobile crop the <source> points at
+// the same file as the <img>, which is one request either way — no reason
+// to make the element conditional.
+const Banner = () => (
+  <picture>
+    <source
+      media={`(max-width: ${MOBILE_BANNER_MAX_WIDTH}px)`}
+      srcset={
+        clubConfig.branding.bannerUrlMobile || clubConfig.branding.bannerUrl
+      }
+    />
     <img
       src={clubConfig.branding.bannerUrl}
       alt={clubConfig.branding.bannerAlt}
       style={{ width: '100%', height: 'auto', display: 'block' }}
     />
-    <TopBar />
-    <AuthDialog />
-    <PendingPasswordModal />
-  </header>
+  </picture>
 )
 
 const PendingPasswordModal = () => {

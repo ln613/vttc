@@ -5,7 +5,7 @@ import Button from '../components/Button'
 import MatchConfirmDialog from '../components/MatchConfirmDialog'
 import PostponeDialog from '../components/PostponeDialog'
 import { eventDetailState, eventDetailActions } from '../stores/eventDetailStore'
-import type { StageTab } from '../stores/eventDetailStore'
+import type { StageTab, BracketSlot } from '../stores/eventDetailStore'
 import { eventState } from '../stores/eventStore'
 import { playerState } from '../stores/playerStore'
 import { customConfirm } from '../stores/confirmDialogStore'
@@ -3155,6 +3155,13 @@ const BracketContent = () => {
       when={rounds().length > 0}
       fallback={<div style={emptyContentStyle}>No bracket data available</div>}
     >
+      <Show when={eventDetailActions.canReorderBracket()}>
+        <div style={bracketReorderHintStyle}>
+          Drag a name onto another to swap their places in the draw. The top
+          two seeds stay where they are, and the draw locks once a match has
+          started.
+        </div>
+      </Show>
       <div style={bracketContainerStyle}>
         <For each={rounds()}>
           {(round, roundIndex) => (
@@ -3163,11 +3170,12 @@ const BracketContent = () => {
                 <div style={bracketRoundHeaderStyle}>{round.name}</div>
                 <div style={bracketRoundMatchesStyle}>
                   <For each={round.matches}>
-                    {(km) => (
+                    {(km, matchIndex) => (
                       <div style={bracketMatchSlotStyle}>
                         <BracketMatchCard
                           knockoutMatch={km}
                           showGroupRank={roundIndex() === 0 && hasGroupStage()}
+                          matchIndex={roundIndex() === 0 ? matchIndex() : undefined}
                         />
                       </div>
                     )}
@@ -3229,6 +3237,8 @@ const ConnectorPair = () => (
 interface BracketMatchCardProps {
   knockoutMatch: KnockoutMatchType
   showGroupRank?: boolean
+  /** Set on the first round only — the one round that can be reordered. */
+  matchIndex?: number
 }
 
 const BracketMatchCard = (props: BracketMatchCardProps) => {
@@ -3264,44 +3274,146 @@ const BracketMatchCard = (props: BracketMatchCardProps) => {
     return '#fff'
   }
 
+  // Only the first round carries a slot, and only then can it be dragged.
+  const slotFor = (slot: 1 | 2): BracketSlot | undefined =>
+    props.matchIndex === undefined
+      ? undefined
+      : { matchIndex: props.matchIndex, slot }
+
   return (
     <div style={bracketMatchCardStyle}>
-      <div
-        style={{
-          ...bracketMatchPlayerStyle,
-          'font-weight': p1IsWinner() || p1IsLeading() ? 700 : 400,
-          'background-color': p1BgColor(),
-        }}
-      >
-        <span style={bracketPlayerNameStyle}>{p1Name()}</span>
-        <Show when={match()}>
-          <span style={bracketScoreStyle}>{match()!.gamesWon1}</span>
-        </Show>
-      </div>
-      <div
-        style={{
-          ...bracketMatchPlayerStyle,
-          'font-weight': p2IsWinner() || p2IsLeading() ? 700 : 400,
-          'background-color': p2BgColor(),
-          'border-top': '1px solid #e0e0e0',
-        }}
-      >
-        <span
-          style={{
-            ...bracketPlayerNameStyle,
-            color: isBye() ? '#999' : '#333',
-            'font-style': isBye() ? 'italic' : 'normal',
-          }}
-        >
-          {p2Name()}
-        </span>
-        <Show when={match() && !isBye()}>
-          <span style={bracketScoreStyle}>{match()!.gamesWon2}</span>
-        </Show>
-      </div>
+      <BracketPlayerLine
+        name={p1Name()}
+        emphasise={p1IsWinner() || p1IsLeading()}
+        background={p1BgColor()}
+        score={match() ? match()!.gamesWon1 : undefined}
+        slot={slotFor(1)}
+      />
+      <BracketPlayerLine
+        name={p2Name()}
+        emphasise={p2IsWinner() || p2IsLeading()}
+        background={p2BgColor()}
+        isBye={isBye()}
+        score={match() && !isBye() ? match()!.gamesWon2 : undefined}
+        divider
+        slot={slotFor(2)}
+      />
     </div>
   )
 }
+
+interface BracketPlayerLineProps {
+  name: string
+  background: string
+  emphasise: boolean
+  isBye?: boolean
+  score?: number
+  divider?: boolean
+  /** Only set on first-round lines; absent elsewhere, so they never drag. */
+  slot?: BracketSlot
+}
+
+// One name on the bracket. On the first round, before anything is played,
+// it is also a drag handle and a drop target — dropping one name on
+// another trades their places in the draw.
+const BracketPlayerLine = (props: BracketPlayerLineProps) => {
+  const movable = () =>
+    !!props.slot && eventDetailActions.isBracketSlotMovable(props.slot)
+  const dragging = () =>
+    !!props.slot && eventDetailActions.isBracketSlotDragging(props.slot)
+  const isDropTarget = () =>
+    !!props.slot && eventDetailActions.isBracketSlotDropTarget(props.slot)
+
+  const handleDragStart = (e: DragEvent) => {
+    if (!props.slot || !movable()) return
+    // Firefox starts no drag at all unless the payload is set.
+    e.dataTransfer?.setData('text/plain', `${props.slot.matchIndex}`)
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
+    eventDetailActions.startBracketDrag(props.slot)
+  }
+
+  const handleDragOver = (e: DragEvent) => {
+    if (!props.slot || !movable()) return
+    if (!eventDetailState.bracketDragFrom) return
+    // A drop is refused unless the dragover default is prevented.
+    e.preventDefault()
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+    eventDetailActions.setBracketDragOver(props.slot)
+  }
+
+  const handleDrop = (e: DragEvent) => {
+    if (!props.slot) return
+    e.preventDefault()
+    void eventDetailActions.dropOnBracketSlot(props.slot)
+  }
+
+  return (
+    <div
+      draggable={movable()}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragLeave={() => eventDetailActions.setBracketDragOver(null)}
+      onDrop={handleDrop}
+      onDragEnd={() => eventDetailActions.endBracketDrag()}
+      style={{
+        ...bracketMatchPlayerStyle,
+        'font-weight': props.emphasise ? 700 : 400,
+        'background-color': props.background,
+        ...(props.divider ? { 'border-top': '1px solid #e0e0e0' } : {}),
+        // Every cue below is conditional on the line actually being
+        // movable, so a bracket that cannot be reordered — not an admin,
+        // a match already started, a fixed seed, a BYE — looks exactly as
+        // it did before any of this existed.
+        ...(movable()
+          ? {
+              cursor: 'grab',
+              'user-select': 'none' as const,
+              'background-color': DRAGGABLE_BG,
+            }
+          : {}),
+        ...(dragging() ? { opacity: 0.4 } : {}),
+        ...(isDropTarget()
+          ? {
+              outline: '2px dashed #2185d0',
+              'outline-offset': '-2px',
+              'background-color': DROP_TARGET_BG,
+            }
+          : {}),
+      }}
+    >
+      <Show when={movable()}>
+        <GripIcon />
+      </Show>
+      <span
+        style={{
+          ...bracketPlayerNameStyle,
+          color: props.isBye ? '#999' : '#333',
+          'font-style': props.isBye ? 'italic' : 'normal',
+        }}
+      >
+        {props.name}
+      </span>
+      <Show when={props.score !== undefined}>
+        <span style={bracketScoreStyle}>{props.score}</span>
+      </Show>
+    </div>
+  )
+}
+
+// The usual two-column grip. Sized explicitly and never allowed to shrink,
+// so the flex row can't squash it out of square.
+const GripIcon = () => (
+  <span style={gripIconStyle} aria-hidden="true">
+    <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor">
+      <circle cx="2.5" cy="2" r="1.4" />
+      <circle cx="7.5" cy="2" r="1.4" />
+      <circle cx="2.5" cy="7" r="1.4" />
+      <circle cx="7.5" cy="7" r="1.4" />
+      <circle cx="2.5" cy="12" r="1.4" />
+      <circle cx="7.5" cy="12" r="1.4" />
+    </svg>
+  </span>
+)
 
 // ==================== STYLES ====================
 
@@ -4473,6 +4585,16 @@ const gameDelimiterStyle: JSX.CSSProperties = {
 }
 
 // Bracket styles
+const bracketReorderHintStyle: JSX.CSSProperties = {
+  padding: '8px 12px',
+  margin: '0 0 12px',
+  'background-color': '#f0f6fc',
+  border: '1px solid #d6e4f0',
+  'border-radius': '4px',
+  'font-size': '13px',
+  color: '#4a6b8a',
+}
+
 const bracketContainerStyle: JSX.CSSProperties = {
   display: 'flex',
   'overflow-x': 'auto',
@@ -4535,6 +4657,25 @@ const bracketPlayerNameStyle: JSX.CSSProperties = {
   overflow: 'hidden',
   'text-overflow': 'ellipsis',
   'max-width': '160px',
+  'margin-right': 'auto',
+}
+
+// A line that can be picked up: tinted, and carrying a grip. Only ever
+// applied while the draw is still open to reordering, so it never competes
+// with the winner / leading / bye colours, which cannot exist yet.
+const DRAGGABLE_BG = '#f2f7fc'
+const DROP_TARGET_BG = '#e3f0fb'
+
+const gripIconStyle: JSX.CSSProperties = {
+  width: '14px',
+  height: '14px',
+  'box-sizing': 'border-box',
+  padding: 0,
+  flex: 'none',
+  display: 'grid',
+  'place-items': 'center',
+  'margin-right': '8px',
+  color: '#9bb3c9',
 }
 
 const bracketScoreStyle: JSX.CSSProperties = {

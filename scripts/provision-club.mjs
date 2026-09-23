@@ -86,6 +86,7 @@ const readClubInput = (template) => ({
   contactName: template.CONTACT_NAME?.trim() || template.CLUB_NAME?.trim(),
   timezone: template.TIMEZONE?.trim() || 'America/Vancouver',
   bannerUrl: template.BANNER_URL?.trim(),
+  bannerUrlMobile: template.BANNER_URL_MOBILE?.trim(),
   bannerAlt:
     template.BANNER_ALT?.trim() ||
     (template.CLUB_NAME ? `${template.CLUB_NAME.trim()} Banner` : undefined),
@@ -433,6 +434,11 @@ const buildClubConfig = (club) => {
     timezone: club.timezone,
     branding: {
       bannerUrl: club.bannerUrl,
+      // Left out entirely when unset, rather than written as an empty
+      // string — the client falls back to the wide banner on absence.
+      ...(club.bannerUrlMobile
+        ? { bannerUrlMobile: club.bannerUrlMobile }
+        : {}),
       bannerAlt: club.bannerAlt,
       contactName: club.contactName,
       faviconUrl: club.faviconUrl,

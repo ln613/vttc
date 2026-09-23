@@ -194,6 +194,43 @@ The Total column is the total matches played so far.
 - Shows the bracket of the knockout stage
 - if preceded by group stage, the 1st round KO, name should be "{Group}{Rank} {name}", e.g., "B1 - Eric..."
 
+### Resetting a knockout match
+
+- the winner is taken back out of the next-round slot it fed, and that slot
+  is cleared **in place**, keeping the other half of the draw where it is
+- the next round's matches are positional — slot j is fed by matches 2j and
+  2j+1 of the round before it — so a slot is never removed from the array,
+  only emptied
+
+### Interaction: reorder the first round
+
+- admin only, first round only, and only before any knockout match has
+  started — a match counts as started once its toss is entered, not only
+  once a point is scored. A match merely sitting on a table is not started,
+  and reordering under it is allowed: the table picks up the new names on
+  its next read
+- drag any name in the first round onto another to make the two trade
+  places in the draw
+- "A1" and "B1" never move: they cannot be dragged and nothing can be
+  dropped on them. They are identified from the participants' own group and
+  rank, not from the stage's `seedingList` — that list is replaced with a
+  later round's as the draw progresses, so it does not describe the first
+  round. In a knockout-only event there are no groups, and the two
+  highest-rated entrants hold the same two positions
+- a "BYE" line holds nobody, so it is neither a drag handle nor a drop target
+- a position keeps everything but its occupant. Its bye, its match record
+  and its place in the bracket all stay put, so the shape of the draw never
+  changes — only the names move
+  - so a player dragged into a bye's position inherits the walkover, and the
+    one who leaves it gives it up
+- a drop clears every later round and leaves it clear. A pair of adjacent
+  byes can already name a next-round match the moment the draw exists, but
+  while the draw is still being rearranged that answer is provisional — the
+  next drag would invalidate it. Later rounds fill in the ordinary way, once
+  a match is actually played
+- for a team event, a side that changes hands loses its order of play — it
+  named players who are no longer on that side
+
 ## Matches Tab (league)
 - if League Schedule has not been generated
   - "Generate League Schedule" button

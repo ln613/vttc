@@ -25,8 +25,18 @@ const parseTime = (
   return { hours, minutes }
 }
 
+// An event moved to a later day carries a start stamp from the day it used
+// to be on. That stamp says nothing about the new date, so it is ignored —
+// mirrors startedOnAnEarlierDate in liveScoreHandlers.
+const startedOnAnEarlierDate = (event: EventTiming): boolean => {
+  if (!event.startedAt || !event.date) return false
+  const startedOn = new Date(event.startedAt)
+  if (Number.isNaN(startedOn.getTime())) return false
+  return formatLocalDate(startedOn) < event.date
+}
+
 export const isEventStarted = (event: EventTiming): boolean => {
-  if (event.startedAt) return true
+  if (event.startedAt && !startedOnAnEarlierDate(event)) return true
   if (!event.date) return false
 
   const eventDate = parseLocalDate(event.date)

@@ -87,6 +87,7 @@ export const ACCESS = {
     paymentReceived: ADMIN,
     generateGroups: ADMIN,
     generateKnockout: ADMIN,
+    swapKnockoutSeeds: ADMIN,
     generateLeagueSchedule: ADMIN,
     saveLeagueRoundPlayers: ADMIN,
     autoSelectLeagueRoundPlayers: ADMIN,

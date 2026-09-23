@@ -19,6 +19,11 @@ import {
   getTotalRounds,
   getRoundsPerPhase,
 } from '../../../shared/rules/leagueSchedule.js'
+import {
+  getFixedParticipantIds,
+  participantIdOf,
+  roundParticipants,
+} from '../../../shared/rules/knockoutSeeding.js'
 
 const EVENTS_COLLECTION = 'events'
 const TOURNAMENTS_COLLECTION = 'tournaments'
@@ -105,6 +110,7 @@ export const saveEvent = async (body) => {
   const eventName = name || tournament.name
 
   // Validation
+  let current
   if (!isEdit) {
     const existing = await eventsCollection.findOne({ eventName, date })
     if (existing) {
@@ -115,6 +121,7 @@ export const saveEvent = async (body) => {
     if (!existing) {
       throwError('Event not found')
     }
+    current = existing
     // Once schedules exist the structural fields are locked, but the
     // registration fee and prizes can still be adjusted — apply just those
     // and leave everything else untouched.
@@ -179,7 +186,13 @@ export const saveEvent = async (body) => {
   })
 
   if (isEdit) {
-    await eventsCollection.updateOne({ _id: toObjectId(_id) }, { $set: event })
+    // Moving an event to another day reschedules it, so an early-start
+    // stamp from the old date no longer means anything.
+    const update = { $set: event }
+    if (current.date !== date && current.startedAt) {
+      update.$unset = { startedAt: '' }
+    }
+    await eventsCollection.updateOne({ _id: toObjectId(_id) }, update)
     return { ...event, _id }
   } else {
     event.createdAt = new Date().toISOString()
@@ -1829,6 +1842,218 @@ const validateGenerateKnockoutRules = (event, { ignoreUnpaid = true } = {}) => {
   return errors
 }
 
+// ==================== Reordering the first round ====================
+
+// The draw the seeding produces is a starting point, not a verdict: an
+// admin may know that two players travelled together, or that a court is
+// wrong for a tie. Before the first ball is struck, any two first-round
+// positions can trade occupants.
+//
+// A position keeps everything except who stands in it — its bye, its match
+// record and its place in the bracket all stay put, so the shape of the
+// draw is untouched and only the names move.
+
+export const swapKnockoutSeeds = async (body) => {
+  validateSwapKnockoutSeedsInput(body)
+
+  const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
+  const event = await collection.findOne({ _id: toObjectId(body._id) })
+  if (!event) throwError('Event not found')
+
+  const stageIndex = (event.eventStages || []).findIndex(
+    (s) => s.type === 'knockout',
+  )
+  if (stageIndex === -1) throwError('Event does not have a knockout stage')
+
+  const stage = event.eventStages[stageIndex]
+  const firstRound = stage.rounds?.[0]
+  if (!firstRound?.matches?.length) {
+    throwError('Generate the knockout bracket first')
+  }
+
+  validateKnockoutNotStarted(stage)
+
+  const from = readBracketSlot(firstRound, body.from)
+  const to = readBracketSlot(firstRound, body.to)
+  validateSlotsAreMovable(stage, firstRound, [from, to])
+
+  const updatedStages = [...event.eventStages]
+  updatedStages[stageIndex] = swapFirstRoundSlots(stage, event, from, to)
+
+  await collection.updateOne(
+    { _id: toObjectId(body._id) },
+    { $set: { eventStages: updatedStages } },
+  )
+
+  return updatedStages[stageIndex]
+}
+
+const validateSwapKnockoutSeedsInput = (body) => {
+  if (!body) throwError('Request body is required')
+  if (!body._id) throwError('Event ID is required')
+
+  const errors = []
+  for (const [name, position] of [
+    ['from', body.from],
+    ['to', body.to],
+  ]) {
+    if (!position) {
+      errors.push(`${name} position is required`)
+    } else if (
+      !Number.isInteger(position.matchIndex) ||
+      position.matchIndex < 0
+    ) {
+      errors.push(`${name} match index is invalid`)
+    } else if (position.slot !== 1 && position.slot !== 2) {
+      errors.push(`${name} slot must be 1 or 2`)
+    }
+  }
+  throwErrors(errors)
+
+  if (
+    body.from.matchIndex === body.to.matchIndex &&
+    body.from.slot === body.to.slot
+  ) {
+    throwError('A position cannot be swapped with itself')
+  }
+}
+
+// Only actual play stops a reorder. Sitting on a table does not: the
+// table caches a copy of the match, and markQueueDirty (withEventNotify)
+// makes the next read reconcile it against the event, so the table and any
+// tablet watching it pick up the new names on their own.
+//
+// A bye carries a winner from the moment the draw is made, so byes are not
+// play — only matches with a record of their own count.
+const validateKnockoutNotStarted = (stage) => {
+  const started = (stage.rounds || []).some((round) =>
+    (round.matches || []).some((km) => hasKnockoutMatchBegun(km.match)),
+  )
+  if (started) {
+    throwError('The bracket cannot be changed once a match has started')
+  }
+}
+
+// The same notion of "started" the live score uses (getMatchStatus): the
+// toss counts, so a match set up but not yet scored is already under way.
+const hasKnockoutMatchBegun = (match) => {
+  if (!match) return false
+  if (match.winningSide != null || match.confirmed === true) return true
+  if ((match.games?.length ?? 0) > 0) return true
+  if (match.initialServingSide != null && match.leftSide != null) return true
+  // A team match starts when either side commits its order of play.
+  if (match.side1Started || match.side2Started) return true
+  return (match.subMatches || []).some(hasKnockoutMatchBegun)
+}
+
+// A bracket position: which first-round match, and which of its two lines.
+const readBracketSlot = (round, { matchIndex, slot }) => {
+  const km = round.matches[matchIndex]
+  if (!km) throwError(`There is no first-round match ${matchIndex + 1}`)
+  return {
+    matchIndex,
+    slot,
+    participant: slot === 1 ? km.participant1 : km.participant2,
+  }
+}
+
+const validateSlotsAreMovable = (stage, firstRound, slots) => {
+  const fixed = getFixedParticipantIds(roundParticipants(firstRound), {
+    isKnockoutOnly: !!stage.config?.isKnockoutOnly,
+  })
+
+  const errors = []
+  for (const slot of slots) {
+    if (!slot.participant) {
+      errors.push(`Match ${slot.matchIndex + 1} has nobody in that position`)
+    } else if (fixed.has(participantIdOf(slot.participant))) {
+      errors.push(
+        `${knockoutParticipantLabel(slot.participant)} is a top seed and stays where they are`,
+      )
+    }
+  }
+  throwErrors(errors)
+}
+
+const knockoutParticipantLabel = (entry) => {
+  const p = entry?.participant
+  if (!p) return 'That position'
+  if (p.teamName) return p.teamName
+  const players = p.players || [p]
+  return players
+    .map((pl) => [pl.firstName, pl.lastName].filter(Boolean).join(' '))
+    .filter(Boolean)
+    .join(' / ')
+}
+
+// Every later round is emptied and left that way. A pair of adjacent byes
+// can already name a next-round match the moment a draw exists, but while
+// the draw is still being rearranged that answer is provisional — the next
+// drag would invalidate it. The rounds below fill in the ordinary way, once
+// a match is actually played (finishMatch -> generateNextRoundIfNeeded).
+const swapFirstRoundSlots = (stage, event, from, to) => {
+  const matches = stage.rounds[0].matches.map((km) => ({ ...km }))
+  placeInSlot(matches[from.matchIndex], from.slot, to.participant, event)
+  placeInSlot(matches[to.matchIndex], to.slot, from.participant, event)
+
+  const rounds = stage.rounds.map((round, index) =>
+    index === 0
+      ? { ...round, matches, isComplete: false }
+      : { ...round, matches: [], isComplete: false },
+  )
+
+  return {
+    ...stage,
+    seedingList: reassignByes(stage.seedingList, matches),
+    rounds,
+  }
+}
+
+const placeInSlot = (km, slot, participant, event) => {
+  if (slot === 1) km.participant1 = participant
+  else km.participant2 = participant
+  // The walkover belongs to the slot, not the player, so whoever now
+  // stands in a bye's position inherits it.
+  if (km.isBye2) km.winner = km.participant1
+  if (km.match) km.match = withSwappedSide(km.match, slot, participant, event)
+  return km
+}
+
+const withSwappedSide = (match, slot, entry, event) => {
+  const participant = entry.participant
+  const players = participant.players || [participant]
+  const side = slot === 1 ? 'side1' : 'side2'
+
+  const updated = { ...match, [side]: players }
+  if (event.type === 'Team') {
+    updated.participantIds = { ...match.participantIds, [side]: participant._id }
+    // An order of play names individual players, so it means nothing once a
+    // different team stands on that side. The side is not started — that
+    // would have been refused — so there is nothing under way to lose.
+    updated[`${side}Assignment`] = undefined
+  }
+  return updated
+}
+
+// hasBye follows the position too: after a swap it is whoever moved into
+// the bye's slot who carries it, not whoever used to.
+const reassignByes = (seedingList, firstRoundMatches) => {
+  const withByes = new Set(
+    firstRoundMatches
+      .filter((km) => km.isBye2 && km.participant1)
+      .map((km) => knockoutParticipantKey(km.participant1)),
+  )
+  return (seedingList || []).map((entry) => ({
+    ...entry,
+    hasBye:
+      !!entry.participant && withByes.has(knockoutParticipantKey(entry.participant)),
+  }))
+}
+
+const knockoutParticipantKey = (entry) =>
+  (entry._id || entry.participant?._id)?.toString()
+
 const isPowerOf2 = (n) => n > 0 && (n & (n - 1)) === 0
 
 const calculateNumberOfRounds = (participantCount) => Math.ceil(Math.log2(participantCount))
@@ -3045,6 +3270,25 @@ const tryResetGroupMatch = (updatedStages, groupStageIndex, matchId) => {
   return false
 }
 
+// Put a next-round slot back to what it was before this winner arrived:
+// the other side stays (it may be a bye that is still decided), and with
+// one side unknown again there is no match to play.
+const withAdvancedParticipantRemoved = (km, advancedPid) => {
+  if (!km) return km
+
+  const inSlot1 = knockoutParticipantId(km.participant1) === advancedPid
+  const inSlot2 = knockoutParticipantId(km.participant2) === advancedPid
+  if (!inSlot1 && !inSlot2) return km
+
+  return {
+    ...km,
+    participant1: inSlot1 ? undefined : km.participant1,
+    participant2: inSlot2 ? undefined : km.participant2,
+    match: undefined,
+    winner: undefined,
+  }
+}
+
 const tryResetKnockoutMatch = (updatedStages, knockoutStageIndex, matchId) => {
   const knockoutStage = updatedStages[knockoutStageIndex]
 
@@ -3094,16 +3338,17 @@ const tryResetKnockoutMatch = (updatedStages, knockoutStageIndex, matchId) => {
           isComplete: false,
         }
       }
-      // Remove only the next-round match this winner fed into (if any),
-      // leaving the other half's matches untouched.
+      // Take this winner back out of the next-round slot it fed, leaving
+      // the other half's matches untouched.
+      //
+      // Cleared in place, never filtered out: the next round's array is
+      // positional — slot j is fed by matches [2j] and [2j+1] of this round
+      // — so dropping an entry shifts every later slot up one and lands the
+      // other half of the draw in the wrong bracket position.
       if (i === ri + 1 && advancedPid) {
         return {
           ...r,
-          matches: r.matches.filter(
-            (m) =>
-              knockoutParticipantId(m.participant1) !== advancedPid &&
-              knockoutParticipantId(m.participant2) !== advancedPid,
-          ),
+          matches: r.matches.map((m) => withAdvancedParticipantRemoved(m, advancedPid)),
           isComplete: false,
         }
       }

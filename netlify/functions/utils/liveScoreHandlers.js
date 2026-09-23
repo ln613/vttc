@@ -41,13 +41,15 @@ const throwError = (message) => {
  */
 const CLUB_TIMEZONE = getClubTimezone()
 
-export const getClubDate = () =>
+const clubDateOf = (date) =>
   new Intl.DateTimeFormat('en-CA', {
     timeZone: CLUB_TIMEZONE,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).format(new Date())
+  }).format(date)
+
+export const getClubDate = () => clubDateOf(new Date())
 
 const getClubMinutesOfDay = () => {
   const parts = new Intl.DateTimeFormat('en-GB', {
@@ -146,7 +148,7 @@ const getStartedEvents = async () => {
 
 const hasEventStarted = (event) => {
   // Set by an explicit "Start Event" — see startEvent in eventHandlers.
-  if (event.startedAt) return true
+  if (event.startedAt && !startedOnAnEarlierDate(event)) return true
   if (!event.date) return true
   const today = getClubDate()
   if (event.date < today) return true
@@ -154,6 +156,17 @@ const hasEventStarted = (event) => {
   if (!event.time) return true
   const eventTime = parseEventTime(event.time)
   return getClubMinutesOfDay() >= eventTime
+}
+
+// An event moved to a later day carries a start stamp from the day it used
+// to be on. That stamp says nothing about the new date, so it is ignored —
+// otherwise changing the date of a finished day's event silently starts it
+// again, hours before its time.
+const startedOnAnEarlierDate = (event) => {
+  if (!event.startedAt || !event.date) return false
+  const startedOn = new Date(event.startedAt)
+  if (Number.isNaN(startedOn.getTime())) return false
+  return clubDateOf(startedOn) < event.date
 }
 
 const parseEventTime = (time) => {

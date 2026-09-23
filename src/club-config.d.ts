@@ -18,6 +18,8 @@ declare module 'club-config' {
     timezone: string
     branding: {
       bannerUrl: string
+      /** Optional narrow-screen crop; the wide banner is used without it. */
+      bannerUrlMobile?: string
       bannerAlt: string
       contactName: string
     }

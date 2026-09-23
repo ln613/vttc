@@ -22,6 +22,11 @@ import { authState } from './authStore'
 import { liveScoreActions } from './liveScoreStore'
 import { isEventStarted, isStartableToday } from '../utils/eventTiming'
 import { getProvisionalMatchResult } from '../../shared/rules/matchRules'
+import {
+  getFixedParticipantIds,
+  participantIdOf,
+  roundParticipants,
+} from '../../shared/rules/knockoutSeeding.js'
 
 export type StageTab =
   | 'group'
@@ -70,7 +75,19 @@ interface EventDetailState {
   resettingMatchId: string | null
   resettingEvent: boolean
   startingEvent: boolean
+  // Dragging a name around the first round of the bracket. Two components
+  // read this — the card being dragged and the card being dragged over —
+  // so it cannot live inside either of them.
+  bracketDragFrom: BracketSlot | null
+  bracketDragOver: BracketSlot | null
+  swappingBracket: boolean
   toastMessage: ToastMessage | null
+}
+
+/** A position in the first round: which match, and which of its two lines. */
+export interface BracketSlot {
+  matchIndex: number
+  slot: 1 | 2
 }
 
 interface ToastMessage {
@@ -107,6 +124,9 @@ const getInitialState = (): EventDetailState => ({
   toastMessage: null,
   resettingEvent: false,
   startingEvent: false,
+  bracketDragFrom: null,
+  bracketDragOver: null,
+  swappingBracket: false,
 })
 
 const [eventDetailState, setEventDetailState] =
@@ -140,6 +160,57 @@ const subscribeForEvent = (eventId: string) => {
     if (eventDetailState.data?.eventType === 'league') return
     refetch()
   })
+}
+
+// A bye carries a winner from the moment the draw is made, so it is not
+// play — only a match with a record of its own counts. The toss counts as
+// started, matching getMatchStatus on the server, so a match set up but
+// not yet scored is already under way.
+const hasKnockoutMatchBegun = (match?: Match): boolean => {
+  if (!match) return false
+  if (match.winningSide != null || match.confirmed === true) return true
+  if ((match.games?.length ?? 0) > 0) return true
+  if (match.initialServingSide != null && match.leftSide != null) return true
+  if (match.side1Started || match.side2Started) return true
+  return (match.subMatches ?? []).some(hasKnockoutMatchBegun)
+}
+
+const isSameBracketSlot = (a: BracketSlot | null, b: BracketSlot | null) =>
+  !!a && !!b && a.matchIndex === b.matchIndex && a.slot === b.slot
+
+// The draw is open to rearranging: an admin, a first round that exists, and
+// nothing played yet. Whether any individual line may move is a separate
+// question — see movableBracketSlots.
+const isBracketOpenForReorder = (): boolean => {
+  if (!authState.isAdmin) return false
+  const rounds = eventDetailActions.getKnockoutRounds()
+  if (!rounds[0]?.matches?.length) return false
+  return !rounds.some((round) =>
+    round.matches.some((km) => hasKnockoutMatchBegun(km.match)),
+  )
+}
+
+// Every first-round line that can be picked up: occupied, and not one of
+// the two the draw is built around.
+const movableBracketSlots = (): BracketSlot[] => {
+  if (!isBracketOpenForReorder()) return []
+
+  const stage = eventDetailActions.getKnockoutStage()
+  const round = stage?.rounds?.[0]
+  const fixed = getFixedParticipantIds(roundParticipants(round), {
+    isKnockoutOnly: !!stage?.config?.isKnockoutOnly,
+  })
+
+  const slots: BracketSlot[] = []
+  ;(round?.matches ?? []).forEach((km, matchIndex) => {
+    for (const slot of [1, 2] as const) {
+      const participant = slot === 1 ? km.participant1 : km.participant2
+      if (!participant) continue
+      if (fixed.has(participantIdOf(participant) ?? '')) continue
+      slots.push({ matchIndex, slot })
+    }
+  })
+  return slots
 }
 
 const showToast = (type: 'success' | 'error', text: string) => {
@@ -501,6 +572,68 @@ export const eventDetailActions = {
   getKnockoutRounds: (): KnockoutRound[] => {
     const knockoutStage = eventDetailActions.getKnockoutStage()
     return knockoutStage?.rounds || []
+  },
+
+  // ---- Reordering the first round of the bracket ----
+  //
+  // The seeded draw is a starting point. Until the first ball is struck an
+  // admin can drag any two first-round names to trade places; the server
+  // has the final say (swapKnockoutSeeds) and these mirror its rules so the
+  // page only offers what will be accepted.
+
+  // True only when there is actually something to do: two or more lines
+  // free to trade places. Everything the page shows about reordering — the
+  // instruction, the tint, the grip, the grab cursor — hangs off this, so
+  // when it is false the bracket looks as it always did.
+  canReorderBracket: (): boolean => movableBracketSlots().length >= 2,
+
+  isBracketSlotMovable: (slot: BracketSlot): boolean =>
+    eventDetailActions.canReorderBracket() &&
+    movableBracketSlots().some((s) => isSameBracketSlot(s, slot)),
+
+  isBracketSlotDragging: (slot: BracketSlot): boolean =>
+    isSameBracketSlot(eventDetailState.bracketDragFrom, slot),
+
+  isBracketSlotDropTarget: (slot: BracketSlot): boolean =>
+    !!eventDetailState.bracketDragFrom &&
+    !isSameBracketSlot(eventDetailState.bracketDragFrom, slot) &&
+    isSameBracketSlot(eventDetailState.bracketDragOver, slot),
+
+  startBracketDrag: (slot: BracketSlot) => {
+    setEventDetailState({ bracketDragFrom: slot, bracketDragOver: null })
+  },
+
+  setBracketDragOver: (slot: BracketSlot | null) => {
+    setEventDetailState({ bracketDragOver: slot })
+  },
+
+  endBracketDrag: () => {
+    setEventDetailState({ bracketDragFrom: null, bracketDragOver: null })
+  },
+
+  dropOnBracketSlot: async (target: BracketSlot) => {
+    const { eventId, bracketDragFrom } = eventDetailState
+    eventDetailActions.endBracketDrag()
+    if (!eventId || !bracketDragFrom) return
+    if (isSameBracketSlot(bracketDragFrom, target)) return
+    if (!eventDetailActions.isBracketSlotMovable(target)) return
+
+    setEventDetailState({ swappingBracket: true })
+    try {
+      await apiPost('swapKnockoutSeeds', {
+        _id: eventId,
+        from: bracketDragFrom,
+        to: target,
+      })
+      await fetchEvent(eventId, false)
+    } catch (err) {
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Failed to change the bracket',
+      )
+    } finally {
+      setEventDetailState({ swappingBracket: false })
+    }
   },
 
   getEventType: (): TournamentType | undefined =>
