@@ -1,4 +1,5 @@
 import { createStore } from 'solid-js/store'
+import { createEffect, createRoot } from 'solid-js'
 import type { Event } from '../../shared/types/Tournament'
 import type { Match, GameConfig, HandicapParams } from '../../shared/types/Match'
 import { DEFAULT_GAME_CONFIG } from '../../shared/types/Match'
@@ -10,9 +11,18 @@ import { liveScoreActions } from './liveScoreStore'
 import { getTeamPlayerOrderLabel } from '../pages/EventDetail'
 import {
   subscribeToLiveScoreUpdates,
+  joinTableChannel,
   type EventSubscription,
+  type TablePairing,
+  type TabletMirrorState,
 } from '../utils/pusher'
 import { createJitteredRefetch } from '../utils/refetch'
+import {
+  getDeviceId,
+  readLocal,
+  writeLocal,
+  removeLocal,
+} from '../utils/device'
 import {
   validateGameScore,
   determineGameWinner,
@@ -69,7 +79,22 @@ interface GamePlayState {
   sessionTakenOver: boolean
   sessionError: string | null
   matchReset: boolean
+  // ---- Tablet Mirror (specs/rules/tablet mirror.md) ----
+  // null on every table not running a pair, which is every table while the
+  // setting is off. Nothing about scoring changes while it is null.
+  tabletRole: TabletRole | null
+  // The first tablet on a table picks; the second gets the other role.
+  showRoleDialog: boolean
+  roleChoices: TabletRole[]
+  // Whether the other half of the pair is on the table's channel.
+  sisterPresent: boolean
+  // Whether the umpire has pressed Start on this match — the moment the
+  // serving side and the ends are settled. On a Mirror it arrives with the
+  // Scorer's snapshot; nothing is named before it.
+  setupConfirmed: boolean
 }
+
+export type TabletRole = 'scorer' | 'mirror'
 
 const getInitialState = (): GamePlayState => ({
   data: null,
@@ -111,6 +136,11 @@ const getInitialState = (): GamePlayState => ({
   sessionTakenOver: false,
   matchReset: false,
   sessionError: null,
+  tabletRole: null,
+  showRoleDialog: false,
+  roleChoices: [],
+  sisterPresent: false,
+  setupConfirmed: false,
 })
 
 const [gamePlayState, setGamePlayState] =
@@ -206,7 +236,39 @@ const subscribeLiveScore = () => {
   })
 }
 
-const acquireSession = async (matchId: string) => {
+// A tablet's role is a fact about where it is standing, so it belongs to
+// the table rather than to any one match. Remembering it is what stops the
+// question being asked again every time a table's match is replaced by the
+// next one — and it survives a reload, which a session cannot when the
+// match has changed underneath it.
+const roleStorageKey = (tableNumber: number) => `vttc.tabletRole.${tableNumber}`
+
+const rememberedRole = (tableNumber: number | null): TabletRole | undefined => {
+  if (tableNumber == null) return undefined
+  const stored = readLocal(roleStorageKey(tableNumber))
+  return stored === 'scorer' || stored === 'mirror' ? stored : undefined
+}
+
+const rememberRole = (tableNumber: number | null, role: TabletRole) => {
+  if (tableNumber == null) return
+  writeLocal(roleStorageKey(tableNumber), role)
+}
+
+// Leaving the page forgets it, so picking the table again asks afresh.
+// Finishing a match and moving to the table's next one does not.
+const forgetRole = (tableNumber: number | null) => {
+  if (tableNumber == null) return
+  removeLocal(roleStorageKey(tableNumber))
+}
+
+interface AcquireResult {
+  sessionId?: string
+  role?: TabletRole
+  needsRole?: boolean
+  availableRoles?: TabletRole[]
+}
+
+const acquireSession = async (matchId: string, role?: TabletRole) => {
   // An umpire working from the match-day password has no account, so they
   // hold the session under a per-visit id instead.
   const userId = authState.user?._id ?? getUmpireId()
@@ -214,19 +276,64 @@ const acquireSession = async (matchId: string) => {
     setGamePlayState({ sessionError: 'You must be signed in to play.' })
     return false
   }
+
+  const { tableNumber } = gamePlayState
+  const wanted = role ?? rememberedRole(tableNumber)
   const sessionId = generateSessionId()
   try {
-    await apiPost('acquireMatchSession', {
+    // The server decides whether this table runs a pair, by reading the
+    // event: live-score data is a cache and can be a rebuild behind, and a
+    // wrong answer would quietly close the table to its second tablet.
+    const result = await apiPost<AcquireResult>('acquireMatchSession', {
       matchId,
+      eventId: gamePlayState.eventId,
       userId,
+      // Both tablets on a table share one account, so the device is what
+      // separates them — and what lets this one reclaim its own role after
+      // a reload without being asked again.
+      deviceId: getDeviceId(),
       sessionId,
+      role: wanted,
       asAdmin: authState.isAdmin,
     })
-    setGamePlayState({ sessionId, sessionTakenOver: false, sessionError: null })
+
+    // Both roles free: the first tablet on the table says which it is.
+    if (result.needsRole) {
+      setGamePlayState({
+        showRoleDialog: true,
+        roleChoices: result.availableRoles ?? [],
+      })
+      return false
+    }
+
+    const assigned = result.role ?? null
+    if (assigned) rememberRole(tableNumber, assigned)
+    setGamePlayState({
+      sessionId,
+      // The server only names a role when the event runs a pair, so a lone
+      // tablet behaves exactly as it always did.
+      tabletRole: assigned,
+      showRoleDialog: false,
+      roleChoices: [],
+      sessionTakenOver: false,
+      sessionError: null,
+      // The first tablet on a table is asked its role only after the event
+      // has loaded, so a setup screen may already be up behind the dialog.
+      // A Mirror is never the device that sets a match up.
+      ...(assigned === 'mirror' ? { showInitDialog: false } : {}),
+    })
     startHeartbeat()
     subscribeLiveScore()
+    joinPairing()
     return true
   } catch (err) {
+    // The remembered role may have been taken by the other tablet while
+    // this one was between matches. Forget it and let the server decide,
+    // which either hands over the free role or asks.
+    if (!role && wanted) {
+      forgetRole(tableNumber)
+      return acquireSession(matchId)
+    }
     setGamePlayState({
       sessionError:
         err instanceof Error ? err.message : 'Failed to acquire match session',
@@ -238,12 +345,123 @@ const acquireSession = async (matchId: string) => {
 const releaseSession = () => {
   stopHeartbeat()
   unsubscribeLiveScore()
+  leavePairing()
   const { matchId, sessionId } = gamePlayState
+  setGamePlayState({ tabletRole: null, showRoleDialog: false, roleChoices: [] })
   if (!matchId || !sessionId) return
   // Fire-and-forget; never block teardown on the release call.
   apiPost('releaseMatchSession', { matchId, sessionId }).catch(() => {})
   setGamePlayState({ sessionId: null })
 }
+
+// ==================== Paired tablets ====================
+//
+// The Scorer publishes its whole scoring state to the Mirror as a Pusher
+// client event — device to device, never through the API. A point therefore
+// costs no invocation, no write and no broadcast. The Mirror only listens.
+
+let pairing: TablePairing | null = null
+
+const leavePairing = () => {
+  pairing?.unsubscribe()
+  pairing = null
+  setGamePlayState({ sisterPresent: false })
+}
+
+const joinPairing = () => {
+  leavePairing()
+  const { tableNumber, tabletRole } = gamePlayState
+  // A table is the unit of pairing; an admin reaching Game Play from a match
+  // row has no table and scores alone.
+  if (!tableNumber || !tabletRole) return
+
+  pairing = joinTableChannel(tableNumber, {
+    onSisterChange: (present) => {
+      setGamePlayState({ sisterPresent: present })
+      // A Mirror that just arrived has nothing to draw until the next
+      // point, which could be a minute away.
+      if (present) publishMirrorState()
+    },
+    onHello: () => publishMirrorState(),
+    onState: applyMirrorState,
+  })
+
+  if (tabletRole === 'mirror') pairing.publishHello()
+}
+
+const mirrorSnapshot = (): TabletMirrorState | null => {
+  const { matchId } = gamePlayState
+  if (!matchId) return null
+  return {
+    matchId,
+    currentGameIndex: gamePlayState.currentGameIndex,
+    score1: gamePlayState.score1,
+    score2: gamePlayState.score2,
+    gamesWon1: gamePlayState.gamesWon1,
+    gamesWon2: gamePlayState.gamesWon2,
+    servingSide: gamePlayState.servingSide,
+    leftSide: gamePlayState.leftSide,
+    timeout1: gamePlayState.timeout1,
+    timeout2: gamePlayState.timeout2,
+    lastScoredSide: gamePlayState.lastScoredSide,
+    matchSubmitted: gamePlayState.matchSubmitted,
+    setupConfirmed: gamePlayState.setupConfirmed,
+  }
+}
+
+const publishMirrorState = () => {
+  if (gamePlayState.tabletRole !== 'scorer') return
+  const snapshot = mirrorSnapshot()
+  if (snapshot) pairing?.publishState(snapshot)
+}
+
+// A snapshot is the whole picture, so one that arrives late or out of order
+// is still correct, and one that is dropped costs only a moment.
+const applyMirrorState = (state: TabletMirrorState) => {
+  if (gamePlayState.tabletRole !== 'mirror') return
+  // The Mirror resolves its own match from the table; until the two agree,
+  // the snapshot is about a match it is not showing.
+  if (!state?.matchId || state.matchId !== gamePlayState.matchId) return
+
+  // Nothing in a snapshot means anything until the umpire presses Start.
+  // The Scorer publishes from the moment it opens the match, and while the
+  // umpire is still on the setup screen its `leftSide` swings about with
+  // every tap of the side buttons — mirroring that would have the players
+  // watching the board flip under them before the match had begun.
+  if (!state.setupConfirmed) {
+    setGamePlayState({ setupConfirmed: false, showInitDialog: false })
+    return
+  }
+
+  setGamePlayState({
+    currentGameIndex: state.currentGameIndex,
+    score1: state.score1,
+    score2: state.score2,
+    gamesWon1: state.gamesWon1,
+    gamesWon2: state.gamesWon2,
+    servingSide: state.servingSide,
+    leftSide: state.leftSide,
+    timeout1: state.timeout1,
+    timeout2: state.timeout2,
+    lastScoredSide: state.lastScoredSide,
+    matchSubmitted: state.matchSubmitted,
+    setupConfirmed: !!state.setupConfirmed,
+    // A Mirror is never the one being asked to set up a match.
+    showInitDialog: false,
+  })
+}
+
+// An effect rather than a call at each mutation site: there are a dozen ways
+// a score changes — a point, an undo, a timeout, a new game, a side switch —
+// and missing one would leave the Mirror quietly stale.
+createRoot(() => {
+  createEffect(() => {
+    const snapshot = mirrorSnapshot()
+    if (!snapshot) return
+    if (gamePlayState.tabletRole !== 'scorer') return
+    pairing?.publishState(snapshot)
+  })
+})
 
 // Track in-flight save promise so other stores can wait for it
 let pendingSavePromise: Promise<void> | null = null
@@ -277,6 +495,9 @@ const restoreMatchSetupIfExists = () => {
       initialServingSide: match.initialServingSide,
       leftSide: match.leftSide,
       showInitDialog: false,
+      // Already started, whoever started it — a Mirror joining now can name
+      // both ends straight away.
+      setupConfirmed: true,
     })
     restoreGameProgress(match)
     return
@@ -287,11 +508,11 @@ const restoreMatchSetupIfExists = () => {
   // generated and we auto-hop into one).
   if (match.isTeamMatch) {
     if (!match.side1Assignment || !match.side2Assignment) {
-      setGamePlayState({ showInitDialog: true })
+      setGamePlayState({ showInitDialog: !isMirror() })
     }
     return
   }
-  setGamePlayState({ showInitDialog: true })
+  setGamePlayState({ showInitDialog: !isMirror() })
 }
 
 const restoreGameProgress = (match: Match) => {
@@ -569,7 +790,10 @@ const getStartingScores = (): { score1: number; score2: number } => {
   return getHandicapStartingScore(match.side1, match.side2, handicapParams)
 }
 
+const isMirror = () => gamePlayState.tabletRole === 'mirror'
+
 const saveMatchSetup = async () => {
+  if (isMirror()) return
   if (!gamePlayState.eventId || !gamePlayState.matchId) return
   try {
     await apiPost('saveMatchSetup', {
@@ -584,6 +808,7 @@ const saveMatchSetup = async () => {
 }
 
 const debouncedSaveGame = () => {
+  if (isMirror()) return
   if (saveDebounceTimer) {
     clearTimeout(saveDebounceTimer)
   }
@@ -659,6 +884,7 @@ export const gamePlayActions = {
       sessionTakenOver: false,
       sessionError: null,
       matchReset: false,
+      setupConfirmed: false,
       // Tablet entry without a match has nothing to load — drop the
       // loading flag immediately so the "No match assigned" screen
       // shows instead of the spinner.
@@ -726,6 +952,7 @@ export const gamePlayActions = {
 
     setGamePlayState({
       showInitDialog: false,
+      setupConfirmed: true,
       score1: startingScores.score1,
       score2: startingScores.score2,
       servingSide: calculateServingSide(
@@ -1029,13 +1256,48 @@ export const gamePlayActions = {
     return match?.side2 || []
   },
 
+  // Which side the screen shows on the left. The Scorer *tablet* is mounted
+  // facing the umpire, across the table from the players, so its left is
+  // their right. An admin or a public umpire holding their own device is
+  // not mounted anywhere and keeps the view everyone had before any of
+  // this, even while they hold the Scorer seat. `leftSide` itself stays one
+  // shared, persisted value.
+  displayLeftSide: (): 1 | 2 => {
+    const { leftSide, tabletRole } = gamePlayState
+    if (tabletRole !== 'scorer' || !authState.isTablet) return leftSide
+    return leftSide === 1 ? 2 : 1
+  },
+
+  isMirror: (): boolean => gamePlayState.tabletRole === 'mirror',
+
+  // Until the umpire presses Start, which end each player is at has not
+  // been decided, and naming them would put the wrong name in front of the
+  // wrong player. A Mirror shows the score boxes with no names until then.
+  showParticipantNames: (): boolean =>
+    gamePlayState.tabletRole !== 'mirror' || gamePlayState.setupConfirmed,
+
+  // Who is serving is decided at Start along with the ends, so a Mirror
+  // marks nobody until then rather than highlighting a side by default.
+  showServingSide: (): boolean =>
+    gamePlayState.tabletRole !== 'mirror' || gamePlayState.setupConfirmed,
+
+  isScorer: (): boolean => gamePlayState.tabletRole === 'scorer',
+
+  // The first tablet on a table chooses; the second is given the other role.
+  chooseTabletRole: async (role: TabletRole) => {
+    const { matchId } = gamePlayState
+    setGamePlayState({ showRoleDialog: false })
+    if (!matchId) return
+    await acquireSession(matchId, role)
+  },
+
   getLeftSidePlayers: (): Player[] =>
-    gamePlayState.leftSide === 1
+    gamePlayActions.displayLeftSide() === 1
       ? gamePlayActions.getSide1Players()
       : gamePlayActions.getSide2Players(),
 
   getRightSidePlayers: (): Player[] =>
-    gamePlayState.leftSide === 1
+    gamePlayActions.displayLeftSide() === 1
       ? gamePlayActions.getSide2Players()
       : gamePlayActions.getSide1Players(),
 
@@ -1298,6 +1560,7 @@ export const gamePlayActions = {
       matchId: null,
       eventId: null,
       data: null,
+      setupConfirmed: false,
       currentGameIndex: 0,
       score1: 0,
       score2: 0,
@@ -1321,6 +1584,12 @@ export const gamePlayActions = {
   reset: () => {
     flushPendingSave()
     releaseSession()
+    // Leaving the page gives up the tablet's place at the table, so the
+    // role goes with it and the next visit asks again. Read before the
+    // state is cleared, while the table is still known. Hopping to the
+    // table's next match does not come through here, so a role survives
+    // that — see clearMatchForTable.
+    forgetRole(gamePlayState.tableNumber)
     setGamePlayState(getInitialState())
   },
 }

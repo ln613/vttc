@@ -3,10 +3,17 @@ import { apiGet, apiPost } from '../utils/api'
 
 export interface AppSettings {
   ignoreUnpaidInGeneration: boolean
+  // Two tablets on one table — see specs/rules/tablet mirror.md. The real
+  // default comes from the club config and arrives with the fetch; this is
+  // only what the page shows before it does.
+  tabletMirrorEnabled: boolean
+  allowPublicUmpire: boolean
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
   ignoreUnpaidInGeneration: true,
+  tabletMirrorEnabled: false,
+  allowPublicUmpire: true,
 }
 
 interface SettingsState {

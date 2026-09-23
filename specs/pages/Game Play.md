@@ -1,5 +1,10 @@
 # Game Play Page
 
+A table whose event has Tablet Mirror enabled can be opened by two tablets,
+one scoring and one display-only — see `specs/rules/tablet mirror.md`. On
+the Mirror the hamburger menu offers only Exit, and no score can be
+changed.
+
 ## Layout
 
 Portrait:

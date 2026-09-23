@@ -255,6 +255,12 @@ export interface Event extends Tournament {
   participants: Participant[]
   eventStages: Stage[]
   paidPlayerIds: string[] // Player IDs that have paid for this event
+  /**
+   * Whether this event's tables may be run by a Scorer + Mirror pair of
+   * tablets. Copied from the club setting when the event is created and
+   * fixed thereafter — see specs/rules/tablet mirror.md.
+   */
+  tabletMirrorEnabled?: boolean
 
   // ----- League rounds only -----
   /** The root round's _id, shared by every round/week of the league. */

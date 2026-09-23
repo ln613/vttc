@@ -2,7 +2,7 @@
 // Integer ratings; the change depends on the rating gap between winner and
 // loser. Big favourite wins → small change; upset → big change.
 import { getDB, toObjectId } from './db.js'
-import { getClubTimezone } from './club.js'
+import { club, getClubTimezone } from './club.js'
 
 const PLAYERS_COLLECTION = 'players'
 const EVENTS_COLLECTION = 'events'
@@ -104,6 +104,13 @@ const unratedSinglesResult = (m) => {
 // before/change/after for both players and is flagged `rated` so it's never
 // counted twice. Player ratings are persisted.
 export const updateRatings = async () => {
+  // Hiding the button is a courtesy; refusing here is the rule. The tables
+  // in this file are VTTC's, so running it for a club that has not opted in
+  // would rate their players against rules that are not theirs.
+  if (!club.enableUpdateRating) {
+    throw new Error('Rating updates are not enabled for this club')
+  }
+
   const db = getDB()
 
   const players = await db.collection(PLAYERS_COLLECTION).find({}).toArray()

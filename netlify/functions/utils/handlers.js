@@ -82,7 +82,7 @@ import {
   saveRevenueTemplate,
 } from './revenueHandlers.js'
 import { savePushToken, removePushToken } from './push.js'
-import { notifyLiveScoreUpdate } from './pusher.js'
+import { notifyLiveScoreUpdate, authorizePusherChannel } from './pusher.js'
 
 // Every round/week of a league shares one roster, and registration writes to
 // whichever round was open. Copy the result across the siblings before the
@@ -220,8 +220,13 @@ export const apiHandlers = {
     cancelMatch: withEventNotify(cancelMatch),
     assignMatchToTable: withEventNotify(assignMatchToTable),
     switchMatchTables: withEventNotify(switchMatchTables),
-    acquireMatchSession: async (body) => {
-      const result = await acquireMatchSession(body)
+    // Signed once per channel subscription, not per point: the tablets'
+    // own score messages are Pusher client events and never come here.
+    pusherAuth: (body, auth) => authorizePusherChannel(body, auth),
+    acquireMatchSession: async (body, auth) => {
+      // Who is asking decides which roles are on offer — only a tablet can
+      // be a Mirror. See specs/rules/tablet mirror.md.
+      const result = await acquireMatchSession(body, auth)
       await notifyLiveScoreUpdate(body?._id)
       return result
     },

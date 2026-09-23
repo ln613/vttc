@@ -112,3 +112,46 @@ export const notifyTableAssigned = async (playerId, data) => {
   if (!playerId) return
   await triggerSafely(`user-${playerId}`, 'table-assigned', data || {})
 }
+
+// ==================== Channel authorisation ====================
+
+// The Scorer and Mirror tablets on one table talk to each other over a
+// presence channel with Pusher *client events*, which never reach this
+// server — that is the whole point, since a point scored must not cost a
+// function invocation. Subscribing to a presence channel does need one
+// signature each, which is what this is. See specs/rules/tablet mirror.md.
+//
+// Only table channels are signed. Nothing else in the app uses a private or
+// presence channel, so anything else asking for one is a mistake or an
+// attempt to get a signature for a channel we never intended to exist.
+const TABLE_CHANNEL = /^presence-table-(\d+)$/
+
+export const authorizePusherChannel = (body, auth) => {
+  if (!body?.socketId) throwAuthError('socketId is required')
+  if (!body?.channelName) throwAuthError('channelName is required')
+
+  const match = TABLE_CHANNEL.exec(body.channelName)
+  if (!match) throwAuthError(`Channel ${body.channelName} cannot be authorized`)
+
+  const client = getClient()
+  if (!client) throwAuthError('Realtime is not configured')
+
+  // Presence counts members by user_id, so it has to be per *device*, not
+  // per account: two tablets signed in as the same admin would otherwise
+  // show up as one member and neither would see the other. The client
+  // supplies it; it names a device on one table's channel and nothing
+  // else, so it is not a credential.
+  if (!body.deviceId) throwAuthError('A device id is required')
+
+  return client.authorizeChannel(body.socketId, body.channelName, {
+    user_id: body.deviceId.toString(),
+    user_info: {
+      role: body.role === 'mirror' ? 'mirror' : 'scorer',
+      playerId: auth?.playerId || null,
+    },
+  })
+}
+
+const throwAuthError = (message) => {
+  throw new Error(message)
+}

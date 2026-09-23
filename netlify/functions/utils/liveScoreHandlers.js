@@ -6,7 +6,8 @@ import {
   updateMatchInStages,
   createResetMatch,
 } from './eventHandlers.js'
-import { getActiveSessionMatchIds } from './matchSessionHandlers.js'
+import { getMatchSessionSummary } from './matchSessionHandlers.js'
+import { getSettings } from './settingsHandlers.js'
 import { notifyTableAssigned } from './pusher.js'
 import { sendTableAssignedPush } from './push.js'
 
@@ -143,7 +144,40 @@ const getStartedEvents = async () => {
   // NOT sanitised here: these same documents drive auto-generation, which
   // reads `host` and `dateOfBirth` off the snapshots. The trim happens
   // where the data leaves — see getLiveScore.
-  return collection.find({ _id: { $in: wanted } }).toArray()
+  const events = await collection.find({ _id: { $in: wanted } }).toArray()
+  await stampTabletMirror(collection, events)
+  return events
+}
+
+// Whether a table runs a pair of tablets is settled when its event starts,
+// not when it was created: an admin may change the club setting right up to
+// the first match, but once play is under way the event must not change
+// shape beneath the tablets running it. See specs/rules/tablet mirror.md.
+//
+// Every event here has started by definition, so this writes once per event
+// and is a no-op on every rebuild afterwards.
+// The Umpire button is shown to people with no account, who cannot read
+// the settings endpoint's admin fields — so the one flag they need rides
+// along with the live score they already fetch.
+// `activeSessionMatchIds` keeps its name and meaning — a table nobody else
+// can join — so every existing caller is unaffected.
+const sessionFields = ({ full, scorerHeld }) => ({
+  activeSessionMatchIds: full,
+  scorerHeldMatchIds: scorerHeld,
+})
+
+const readAllowPublicUmpire = async () => (await getSettings()).allowPublicUmpire
+
+const stampTabletMirror = async (collection, events) => {
+  const unstamped = events.filter((e) => e.tabletMirrorEnabled === undefined)
+  if (unstamped.length === 0) return
+
+  const enabled = !!(await getSettings()).tabletMirrorEnabled
+  await collection.updateMany(
+    { _id: { $in: unstamped.map((e) => e._id) } },
+    { $set: { tabletMirrorEnabled: enabled } },
+  )
+  for (const event of unstamped) event.tabletMirrorEnabled = enabled
 }
 
 const hasEventStarted = (event) => {
@@ -1094,7 +1128,8 @@ export const getLiveScore = async (params = {}) => {
     return {
       tables: cached.tables,
       matchQueue: cached.matchQueue || [],
-      activeSessionMatchIds: await getActiveSessionMatchIds(),
+      ...sessionFields(await getMatchSessionSummary()),
+      allowPublicUmpire: await readAllowPublicUmpire(),
     }
   }
 
@@ -1151,12 +1186,14 @@ export const getLiveScore = async (params = {}) => {
   // Notify players of any match that just landed on a table.
   await notifyNewlyAssignedMatches(savedState?.tables, result.tables)
 
-  const activeSessionMatchIds = await getActiveSessionMatchIds()
+  const sessions = sessionFields(await getMatchSessionSummary())
+  const allowPublicUmpire = await readAllowPublicUmpire()
 
   return {
     tables: publicTables,
     matchQueue: publicQueue,
-    activeSessionMatchIds,
+    ...sessions,
+    allowPublicUmpire,
   }
 }
 

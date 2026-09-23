@@ -221,6 +221,9 @@ const GamePlay = () => {
 
   return (
     <div ref={containerRef} style={containerStyle}>
+      <Show when={gamePlayState.showRoleDialog}>
+        <TabletRoleDialog />
+      </Show>
       <Show
         when={!gamePlayState.loading}
         fallback={<LoadingSpinner />}
@@ -301,25 +304,68 @@ const goBackOrSchedule = (navigate: ReturnType<typeof useNavigate>) => {
   }
 }
 
+// Asked of the first tablet to reach a table whose event runs a pair. The
+// second tablet is given the other role without being asked, so this is
+// seen once per table, not once per device.
+const TabletRoleDialog = () => (
+  <div style={overlayStyle}>
+    <div style={overlayCardStyle}>
+      <div style={overlayMessageStyle}>Which tablet is this?</div>
+      <div style={roleChoiceColumnStyle}>
+        <button
+          style={roleChoiceButtonStyle}
+          onClick={() => void gamePlayActions.chooseTabletRole('scorer')}
+        >
+          Scorer (Umpire-facing)
+        </button>
+        <button
+          style={roleChoiceButtonStyle}
+          onClick={() => void gamePlayActions.chooseTabletRole('mirror')}
+        >
+          Mirror (Player-facing)
+        </button>
+      </div>
+    </div>
+  </div>
+)
+
+const roleChoiceColumnStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '12px',
+  'margin-top': '8px',
+}
+
+const roleChoiceButtonStyle: JSX.CSSProperties = {
+  padding: '14px 24px',
+  'font-size': '16px',
+  'font-weight': 600,
+  color: '#fff',
+  'background-color': '#2185d0',
+  border: 'none',
+  'border-radius': '6px',
+  cursor: 'pointer',
+}
+
 const SessionBlockedOverlay = (props: { onExit: () => void }) => {
   const message = () => {
     if (gamePlayState.matchReset) return 'The match has been reset.'
-    if (gamePlayState.sessionTakenOver) return 'An admin has taken over this match.'
+    // Not only an admin: a public umpire displacing a mirror, or any
+    // other device taking the table, lands here too.
+    if (gamePlayState.sessionTakenOver)
+      return 'Another umpire has taken over this match.'
     return gamePlayState.sessionError ?? 'This match is unavailable.'
   }
   return (
     <div style={overlayStyle}>
       <div style={overlayCardStyle}>
         <div style={overlayMessageStyle}>{message()}</div>
-        {/* Tablet is pinned to a table — Go Back would orphan the
-            kiosk. We auto-dismiss this overlay (and re-acquire the
-            session) when the admin exits the match, so no button is
-            needed. */}
-        <Show when={!authState.isTablet}>
-          <button style={overlayButtonStyle} onClick={props.onExit}>
-            Go Back
-          </button>
-        </Show>
+        {/* A tablet re-acquires on its own once whoever took the match
+            leaves it, so it need not be touched — but it should not be
+            stuck here either, with no way back to the table list. */}
+        <button style={overlayButtonStyle} onClick={props.onExit}>
+          Go Back
+        </button>
       </div>
     </div>
   )
@@ -531,16 +577,18 @@ const HamburgerMenu = (props: HamburgerMenuProps) => {
     <>
       <div style={menuOverlayStyle} onClick={() => gamePlayActions.closeMenu()} />
       <div style={menuDropdownStyle}>
-        <button style={menuItemStyle} onClick={handleResetGame}>
-          Reset Game
-        </button>
-        <button
-          style={getMenuItemStyle(matchSubmitted())}
-          onClick={handleResetMatch}
-          disabled={matchSubmitted()}
-        >
-          Reset Match
-        </button>
+        <Show when={!gamePlayActions.isMirror()}>
+          <button style={menuItemStyle} onClick={handleResetGame}>
+            Reset Game
+          </button>
+          <button
+            style={getMenuItemStyle(matchSubmitted())}
+            onClick={handleResetMatch}
+            disabled={matchSubmitted()}
+          >
+            Reset Match
+          </button>
+        </Show>
         <button style={menuItemStyle} onClick={handleExit}>
           Exit
         </button>
@@ -624,7 +672,7 @@ interface ScoreBoxesProps {
 }
 
 const ScoreBoxes = (props: ScoreBoxesProps) => {
-  const leftSide = () => gamePlayState.leftSide
+  const leftSide = () => gamePlayActions.displayLeftSide()
   const rightSide = () => (leftSide() === 1 ? 2 : 1)
   const winningSide = () => gamePlayActions.getGameWinningSide()
   const isMatchFinished = () => gamePlayActions.isMatchFinished()
@@ -638,7 +686,9 @@ const ScoreBoxes = (props: ScoreBoxesProps) => {
         </Show>
         <ScoreBox side={rightSide()} isLeft={false} />
       </div>
-      <Show when={winningSide()}>
+      {/* Ending a game or the match is the Scorer's call — a Mirror shows
+          the result and offers nothing to press. */}
+      <Show when={winningSide() && !gamePlayActions.isMirror()}>
         <GameEndButton isMatchFinished={isMatchFinished()} />
       </Show>
     </div>
@@ -730,7 +780,7 @@ const LandscapeInfoBox = (_props: { onExit: () => void }) => {
   // matches scoreBoxesContainerStyle's row-reverse). Map gamePlayState
   // .leftSide (umpire's left) to the visually-right column accordingly.
   const leftRightScores = (game: { score1: number; score2: number }) => {
-    const leftSideOnScreen = gamePlayState.leftSide === 1 ? 2 : 1
+    const leftSideOnScreen = gamePlayActions.displayLeftSide() === 1 ? 2 : 1
     const left = leftSideOnScreen === 1 ? game.score1 : game.score2
     const right = leftSideOnScreen === 1 ? game.score2 : game.score1
     return { left, right }
@@ -761,7 +811,7 @@ const LandscapeInfoBox = (_props: { onExit: () => void }) => {
                 const lr = () => leftRightScores(g)
                 const hSide = () => highlightSide(g)
                 const leftSideOnScreen = () =>
-                  gamePlayState.leftSide === 1 ? 2 : 1
+                  gamePlayActions.displayLeftSide() === 1 ? 2 : 1
                 const leftHighlight = () => hSide() === leftSideOnScreen()
                 const rightHighlight = () => hSide() != null && !leftHighlight()
                 return (
@@ -794,7 +844,8 @@ const ScoreBox = (props: ScoreBoxProps) => {
   const score = () => (props.side === 1 ? gamePlayState.score1 : gamePlayState.score2)
   const gamesWon = () => gamePlayActions.getGamesWon(props.side)
   const timeout = () => (props.side === 1 ? gamePlayState.timeout1 : gamePlayState.timeout2)
-  const isServing = () => servingSide() === props.side
+  const isServing = () =>
+    gamePlayActions.showServingSide() && servingSide() === props.side
   const winningSide = () => gamePlayActions.getGameWinningSide()
   const isWinner = () => winningSide() === props.side
   const isGameOver = () => winningSide() !== undefined
@@ -827,32 +878,39 @@ const ScoreBox = (props: ScoreBoxProps) => {
     onCleanup(() => window.removeEventListener('resize', calculateFontSize))
   })
 
+  // A Mirror shows the Scorer's screen and nothing else — every way of
+  // changing the match is closed to it, buttons included.
+  const readOnly = () => gamePlayActions.isMirror()
+
   const handleAddPoint = () => {
-    if (isGameOver()) return
+    if (readOnly() || isGameOver()) return
     gamePlayActions.addPointToSide(props.side)
   }
 
   const isLoserSide = () => isGameOver() && !isWinner()
 
   const handleDeductPoint = () => {
-    if (isLoserSide()) return
+    if (readOnly() || isLoserSide()) return
     gamePlayActions.deductPointFromSide(props.side)
   }
 
   const handleToggleTimeout = () => {
+    if (readOnly()) return
     gamePlayActions.toggleTimeout(props.side)
   }
 
   return (
     <div style={scoreBoxWrapperStyle}>
       <div style={scoreAreaContainerStyle}>
-        <button
-          style={getPlusButtonStyle(isServing(), isGameOver())}
-          onClick={handleAddPoint}
-          disabled={isGameOver()}
-        >
-          +
-        </button>
+        <Show when={!readOnly()}>
+          <button
+            style={getPlusButtonStyle(isServing(), isGameOver())}
+            onClick={handleAddPoint}
+            disabled={isGameOver()}
+          >
+            +
+          </button>
+        </Show>
         <div
           ref={pointBoxRef}
           style={getPointBoxStyle(isServing(), isGameOver())}
@@ -868,13 +926,15 @@ const ScoreBox = (props: ScoreBoxProps) => {
         <GamesWonBadge gamesWon={gamesWon()} isLeft={props.isLeft} />
         <TimeoutBadge timeout={timeout()} isLeft={props.isLeft} onToggle={handleToggleTimeout} />
       </div>
-      <button
-        style={getMinusButtonStyle(isServing(), isLoserSide())}
-        onClick={handleDeductPoint}
-        disabled={isLoserSide()}
-      >
-        −
-      </button>
+      <Show when={!readOnly()}>
+        <button
+          style={getMinusButtonStyle(isServing(), isLoserSide())}
+          onClick={handleDeductPoint}
+          disabled={isLoserSide()}
+        >
+          −
+        </button>
+      </Show>
     </div>
   )
 }
@@ -924,9 +984,11 @@ const ParticipantNames = (props: ParticipantNamesProps) => {
   return (
     <div style={containerStyle()}>
       <div style={participantNamesInnerStyle}>
-        <For each={lines()}>
-          {(name) => <div>{name}</div>}
-        </For>
+        <Show when={gamePlayActions.showParticipantNames()}>
+          <For each={lines()}>
+            {(name) => <div>{name}</div>}
+          </For>
+        </Show>
       </div>
     </div>
   )

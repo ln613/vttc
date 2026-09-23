@@ -18,6 +18,8 @@ interface LiveScoreState {
   tables: TableAssignment[]
   matchQueue: MatchQueueItem[]
   activeSessionMatchIds: string[]
+  scorerHeldMatchIds: string[]
+  allowPublicUmpire: boolean
   loading: boolean
   error: string | null
 }
@@ -26,6 +28,10 @@ const getInitialState = (): LiveScoreState => ({
   tables: [],
   matchQueue: [],
   activeSessionMatchIds: [],
+  scorerHeldMatchIds: [],
+  // Assumed on until the first fetch says otherwise, matching how the app
+  // behaved before the setting existed.
+  allowPublicUmpire: true,
   loading: false,
   error: null,
 })
@@ -55,6 +61,8 @@ const fetchLiveScore = async (runAutoStart = false) => {
       tables: data.tables || [],
       matchQueue: data.matchQueue || [],
       activeSessionMatchIds: data.activeSessionMatchIds || [],
+      scorerHeldMatchIds: data.scorerHeldMatchIds || [],
+      allowPublicUmpire: data.allowPublicUmpire !== false,
       loading: false,
       error: null,
     })
@@ -211,6 +219,23 @@ export const liveScoreActions = {
     liveScoreState.activeSessionMatchIds.some(
       (id) => id.toString() === matchId.toString(),
     ),
+
+  // Whether this device could actually take the table, which is not the
+  // same question for everyone. A tablet can be the Mirror of a tablet
+  // Scorer, so a table with one seat left is open to it; anyone who can
+  // only be a Scorer needs that seat free. Asked before the table is
+  // offered, so nobody picks a table only to be turned away on arrival.
+  canEnterTable: (tableNumber: number): boolean => {
+    const matchId = liveScoreActions.getTable(tableNumber)?.match?.matchId
+    if (!matchId) return true
+    if (authState.isAdmin) return true
+
+    const id = matchId.toString()
+    const held = (ids: string[]) => ids.some((x) => x.toString() === id)
+    return authState.isTablet
+      ? !held(liveScoreState.activeSessionMatchIds)
+      : !held(liveScoreState.scorerHeldMatchIds)
+  },
 
   getTableForMatch: (matchId: string): number | undefined => {
     for (const table of liveScoreState.tables) {

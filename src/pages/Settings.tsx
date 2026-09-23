@@ -3,6 +3,8 @@ import { useNavigate } from '@solidjs/router'
 import { Header } from '../components/Header'
 import { authState } from '../stores/authStore'
 import { settingsState, settingsActions } from '../stores/settingsStore'
+import type { AppSettings } from '../stores/settingsStore'
+import clubConfig from 'club-config'
 
 const Settings = () => {
   onMount(() => {
@@ -21,7 +23,11 @@ const Settings = () => {
           </Show>
           <EventSettingSection />
           <RevenueSection />
-          <UpdateSection />
+          {/* Only for a club that actually uses the app's rating system —
+              see enableUpdateRating in clubs/<slug>/config.json. */}
+          <Show when={clubConfig.enableUpdateRating}>
+            <UpdateSection />
+          </Show>
         </div>
       </Show>
     </div>
@@ -109,33 +115,48 @@ const TitleRow = () => (
   </div>
 )
 
-const EventSettingSection = () => {
+const EventSettingSection = () => (
+  <div style={sectionStyle}>
+    <h4 style={sectionHeaderStyle}>Event Setting</h4>
+    <SettingCheckbox
+      field="ignoreUnpaidInGeneration"
+      label="Ignore unpaid players when generating groups, RR or first round knockout if no group stage"
+    />
+    <SettingCheckbox
+      field="tabletMirrorEnabled"
+      label="Enable Tablet Mirror — a table may be run by two tablets, one facing the umpire and one facing the players. Applies to any event that has not started yet."
+    />
+    <SettingCheckbox
+      field="allowPublicUmpire"
+      label="Allow Public Umpire — anyone with the match day password can score a match without an account."
+    />
+  </div>
+)
+
+const SettingCheckbox = (props: {
+  field: keyof AppSettings
+  label: string
+}) => {
   const value = () =>
     settingsState.editing
-      ? settingsState.draft.ignoreUnpaidInGeneration
-      : settingsState.settings.ignoreUnpaidInGeneration
+      ? settingsState.draft[props.field]
+      : settingsState.settings[props.field]
   return (
-    <div style={sectionStyle}>
-      <h4 style={sectionHeaderStyle}>Event Setting</h4>
-      <label style={checkboxRowStyle}>
-        <input
-          type="checkbox"
-          checked={value()}
-          disabled={!settingsState.editing}
-          onChange={(e) =>
-            settingsActions.setDraft(
-              'ignoreUnpaidInGeneration',
-              (e.target as HTMLInputElement).checked,
-            )
-          }
-          style={checkboxStyle}
-        />
-        <span style={checkboxLabelStyle}>
-          Ignore unpaid players when generating groups, RR or first round
-          knockout if no group stage
-        </span>
-      </label>
-    </div>
+    <label style={checkboxRowStyle}>
+      <input
+        type="checkbox"
+        checked={value()}
+        disabled={!settingsState.editing}
+        onChange={(e) =>
+          settingsActions.setDraft(
+            props.field,
+            (e.target as HTMLInputElement).checked,
+          )
+        }
+        style={checkboxStyle}
+      />
+      <span style={checkboxLabelStyle}>{props.label}</span>
+    </label>
   )
 }
 
@@ -260,6 +281,10 @@ const checkboxLabelStyle: JSX.CSSProperties = {
   'font-size': '14px',
   color: '#333',
   'line-height': '1.4',
+  // #root centres everything (App.css, from the Vite template), which
+  // would otherwise centre a wrapped label under its own first line. The
+  // section header above keeps the inherited centring.
+  'text-align': 'left',
 }
 
 const updateButtonStyle: JSX.CSSProperties = {

@@ -1,14 +1,26 @@
 import { getDB } from './db.js'
+import { club } from './club.js'
 
 const COLLECTION = 'settings'
 const DOC_ID = 'global'
 
-const DEFAULT_SETTINGS = {
+// A function, not a constant: tabletMirrorEnabled's default is whatever the
+// club config says, so it cannot be baked in at module load of a shared
+// object that is then spread into responses.
+const defaultSettings = () => ({
   // When true, unpaid participants are excluded from generating
   // groups / round-robin / first-round knockout (when no group stage
   // exists). When false, they are included.
   ignoreUnpaidInGeneration: true,
-}
+  // Two tablets on one table — see specs/rules/tablet mirror.md. The club
+  // config supplies the default; an admin can change it for the club, and
+  // the value is copied onto each event as it is created.
+  tabletMirrorEnabled: !!club.tabletMirrorEnabled,
+  // Whether the match-day password lets someone without an account score a
+  // match. Absent from the club config means allowed, which is how the app
+  // behaved before this could be turned off.
+  allowPublicUmpire: club.allowPublicUmpire !== false,
+})
 
 const throwError = (msg) => {
   throw new Error(msg)
@@ -17,14 +29,15 @@ const throwError = (msg) => {
 const readSettingsDoc = async () => {
   const db = getDB()
   const doc = await db.collection(COLLECTION).findOne({ docId: DOC_ID })
-  return { ...DEFAULT_SETTINGS, ...(doc?.settings || {}) }
+  return { ...defaultSettings(), ...(doc?.settings || {}) }
 }
 
 export const getSettings = async () => readSettingsDoc()
 
 export const saveSettings = async (body) => {
   if (!body) throwError('Request body is required')
-  const allowedKeys = Object.keys(DEFAULT_SETTINGS)
+  const defaults = defaultSettings()
+  const allowedKeys = Object.keys(defaults)
   const settings = {}
   for (const k of allowedKeys) {
     if (k in body) settings[k] = body[k]
@@ -35,11 +48,11 @@ export const saveSettings = async (body) => {
     {
       $set: {
         docId: DOC_ID,
-        settings: { ...DEFAULT_SETTINGS, ...settings },
+        settings: { ...defaults, ...settings },
         updatedAt: new Date().toISOString(),
       },
     },
     { upsert: true },
   )
-  return { success: true, settings: { ...DEFAULT_SETTINGS, ...settings } }
+  return { success: true, settings: { ...defaults, ...settings } }
 }

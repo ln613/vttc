@@ -57,6 +57,7 @@ export const ACCESS = {
     markTeamMatchSideOpened: USER,
     saveTeamMatchAssignment: USER, // each side sets its own order of play
     resetMatch: USER, // in the Game Play menu, not just the admin row
+    pusherAuth: USER, // signs a table's presence channel for a paired tablet
     acquireMatchSession: USER,
     heartbeatMatchSession: USER,
     releaseMatchSession: USER,

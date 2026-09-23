@@ -169,6 +169,7 @@ const TopBar = () => {
             when={
               !authState.isTablet &&
               !authState.isAdmin &&
+              liveScoreState.allowPublicUmpire &&
               liveScoreActions.hasMatchesToUmpire()
             }
           >
@@ -289,13 +290,13 @@ const TablePickerDialog = (props: {
     if (!t || t.status === 'available') return 'available'
     return t.match?.matchStatus === 'not_started' ? 'not_started' : 'in_progress'
   }
-  // A table whose current match already has an active umpiring session is
-  // being run by another tablet/device. Disable it so picking a table can
-  // never take over (kick out) an in-progress umpire.
-  const isTakenByAnotherUmpire = (n: number): boolean => {
-    const matchId = tableFor(n)?.match?.matchId
-    return !!matchId && liveScoreActions.isMatchSessionActive(matchId.toString())
-  }
+  // A table this device could not actually take is offered greyed out
+  // rather than letting someone pick it and be turned away on arrival.
+  // What counts as "could not" depends on who is asking — a tablet can
+  // still join a paired table as its Mirror, an umpire without an account
+  // cannot. See specs/rules/tablet mirror.md.
+  const isTakenByAnotherUmpire = (n: number): boolean =>
+    !liveScoreActions.canEnterTable(n)
   const handleClick = (n: number) => {
     if (isTakenByAnotherUmpire(n)) return
     const t = tableFor(n) ?? ({

@@ -133,7 +133,10 @@ outstanding:
   `.env.<slug>`. Three things still need a human, because the provider
   requires one (mostly to defeat exactly this kind of scripting): a Gmail
   account + app password, a Pusher app (Channels has no create-app API at
-  all), and the Netlify account itself (site creation *within* an existing
+  all) **with "Enable client events" switched on in its dashboard** (also
+  dashboard-only — without it the paired Scorer/Mirror tablets never hear
+  each other, see `specs/rules/tablet mirror.md`), and the Netlify account
+  itself (site creation *within* an existing
   account is scriptable and the script does it). After running it, the
   Netlify site still needs linking to this repo by hand once (Site
   configuration -> Build & deploy -> Link repository — a GitHub OAuth

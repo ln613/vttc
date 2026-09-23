@@ -1,4 +1,5 @@
 import { getDB, save, toObjectId } from './db.js'
+import { getSettings } from './settingsHandlers.js'
 import { createToken } from './authToken.js'
 import crypto from 'crypto'
 import argon2 from 'argon2'
@@ -248,6 +249,12 @@ const authenticatePlayer = async (emailOrPhone, password) => {
  */
 export const umpireSignIn = async (body) => {
   if (!body) throwError('Request body is required')
+
+  // Checked here rather than only in the UI: hiding the button is a
+  // courtesy, refusing the password is the rule.
+  const { allowPublicUmpire } = await getSettings()
+  if (!allowPublicUmpire) throwError('Umpiring without an account is turned off')
+
   const matchDayPassword = process.env.TABLET_PASSWORD
   if (!matchDayPassword) throwError('Match day password not configured')
   if (body.password !== matchDayPassword) throwError('Invalid password')

@@ -3,6 +3,9 @@
   "name": "Example TTC",
   "appName": "Example TTC Live",
   "timezone": "America/Toronto",
+  "enableUpdateRating": false,
+  "tabletMirrorEnabled": false,
+  "allowPublicUmpire": true,
   "branding": {
     "bannerUrl": "https://example.org/banner.jpg",
     "bannerUrlMobile": "https://example.org/banner-mobile.jpg",

@@ -116,5 +116,10 @@ export interface TableLiveScore {
 export interface LiveScoreData {
   tables: TableAssignment[]
   matchQueue: MatchQueueItem[]
+  /** Matches no further device can join. */
   activeSessionMatchIds?: string[]
+  /** Matches whose Scorer seat is taken — all a non-tablet could have had. */
+  scorerHeldMatchIds?: string[]
+  /** Whether the match-day password may be used by someone with no account. */
+  allowPublicUmpire?: boolean
 }

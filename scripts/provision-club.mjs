@@ -15,7 +15,10 @@
 // to defeat exactly this kind of automation) — the template says so at each
 // section, and validation refuses to start without them filled in:
 //   - a Gmail account + app password
-//   - a Pusher app (Channels has no public "create app" API at all)
+//   - a Pusher app (Channels has no public "create app" API at all), and
+//     on that app, "Enable client events" switched on in the dashboard —
+//     also dashboard-only. Without it the paired Scorer/Mirror tablets
+//     never hear each other (specs/rules/tablet mirror.md)
 //   - a Netlify account + personal access token (site creation and env vars
 //     ARE scriptable once the account exists — that part this script does)
 //

@@ -16,6 +16,25 @@ declare module 'club-config' {
     name: string
     appName: string
     timezone: string
+    /**
+     * Default for the club-wide "Enable Tablet Mirror" setting: a table run
+     * by two tablets, one facing the umpire and one facing the players.
+     * See specs/rules/tablet mirror.md. Absent = off.
+     */
+    tabletMirrorEnabled?: boolean
+    /**
+     * Default for "Allow Public Umpire": whether anyone holding the match-day
+     * password may score without an account. Absent = allowed, which is how
+     * the app behaved before the setting existed.
+     */
+    allowPublicUmpire?: boolean
+    /**
+     * Whether this club uses the app's rating system, and so whether the
+     * Setting page offers "Update Rating". Absent = hidden: `rating.js`
+     * still carries VTTC's tables, so running it for another club would
+     * rate their players against rules that are not theirs.
+     */
+    enableUpdateRating?: boolean
     branding: {
       bannerUrl: string
       /** Optional narrow-screen crop; the wide banner is used without it. */
