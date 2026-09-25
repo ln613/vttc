@@ -29,6 +29,8 @@ import type { WaitingForPlayer } from '../../shared/types/Table'
 import Button from '../components/Button'
 import MatchConfirmDialog from '../components/MatchConfirmDialog'
 import serveIconUrl from '../assets/serve.png'
+import receiveIconUrl from '../assets/receive.png'
+import ballIconUrl from '../assets/ball.png'
 import tableIconUrl from '../assets/table.png'
 
 const GamePlay = () => {
@@ -231,6 +233,9 @@ const GamePlay = () => {
       >
         <UmpireChoiceDialog />
       </Show>
+      <Show when={gamePlayState.showServerDialog}>
+        <GameServerDialog />
+      </Show>
       <Show
         when={!gamePlayState.loading}
         fallback={<LoadingSpinner />}
@@ -353,6 +358,35 @@ const roleChoiceButtonStyle: JSX.CSSProperties = {
   'border-radius': '6px',
   cursor: 'pointer',
 }
+
+// Every game after the first opens with the umpire naming its server. The
+// side is already settled by the rotation, so only the two players of that
+// pair are offered — see specs/rules/doubles.md.
+const GameServerDialog = () => (
+  <div style={overlayStyle}>
+    <div style={overlayCardStyle}>
+      <div style={overlayMessageStyle}>Who is serving this game?</div>
+      <div style={umpireChoiceColumnStyle}>
+        <For each={gamePlayActions.getServerChoices()}>
+          {(p) => (
+            <button
+              style={umpireChoiceButtonStyle}
+              onClick={() =>
+                gamePlayActions.setGameServer(
+                  gamePlayState.currentGameIndex,
+                  p._id,
+                )
+              }
+            >
+              <img src={serveIconUrl} alt="" style={roleIconStyle} />{' '}
+              {p.firstName} {p.lastName}
+            </button>
+          )}
+        </For>
+      </div>
+    </div>
+  </div>
+)
 
 // The first question a tablet asks when a match lands on its table, when
 // there is more than one person it could be: the umpires assigned to this
@@ -1030,8 +1064,38 @@ interface ParticipantNamesProps {
   side: 1 | 2
 }
 
+// Doubles marks the two players on the ball: the server and the one
+// receiving from them. Everyone else is drawn as before.
+const participantLineStyle = (line: {
+  serving: boolean
+  receiving: boolean
+}): JSX.CSSProperties => ({
+  display: 'inline-flex',
+  'align-items': 'center',
+  gap: '4px',
+  ...(line.serving
+    ? { color: '#ffe082', 'font-weight': 700 }
+    : line.receiving
+      ? { color: '#b3e5fc', 'font-weight': 700 }
+      : {}),
+})
+
+const roleIconStyle: JSX.CSSProperties = {
+  width: '14px',
+  height: '14px',
+  'box-sizing': 'border-box',
+  padding: 0,
+  flex: 'none',
+  'object-fit': 'contain',
+}
+
+const roleSuffixStyle: JSX.CSSProperties = {
+  'font-weight': 400,
+  opacity: 0.85,
+}
+
 const ParticipantNames = (props: ParticipantNamesProps) => {
-  const lines = () => gamePlayActions.getParticipantNameLines(props.side)
+  const lines = () => gamePlayActions.getParticipantNameEntries(props.side)
   const isLandscape = createIsLandscape()
   // Extra breathing room above the names in portrait so they don't
   // crowd the "+" button. Landscape keeps the tighter spacing.
@@ -1044,7 +1108,25 @@ const ParticipantNames = (props: ParticipantNamesProps) => {
       <div style={participantNamesInnerStyle}>
         <Show when={gamePlayActions.showParticipantNames()}>
           <For each={lines()}>
-            {(name) => <div>{name}</div>}
+            {(line) => (
+              <div style={participantLineStyle(line)}>
+                {/* In doubles it is not enough to know which side is on
+                    serve — these two say which player. */}
+                <Show when={line.serving || line.receiving}>
+                  <img
+                    src={line.serving ? ballIconUrl : receiveIconUrl}
+                    alt=""
+                    style={roleIconStyle}
+                  />
+                </Show>
+                {line.text}
+                <Show when={line.serving || line.receiving}>
+                  <span style={roleSuffixStyle}>
+                    {line.serving ? ' - Serving' : ' - Receiving'}
+                  </span>
+                </Show>
+              </div>
+            )}
           </For>
         </Show>
       </div>
@@ -1448,7 +1530,12 @@ const InitScreen = () => {
     gamePlayActions.setLeftSide(side)
   }
 
-  const canStart = () => serveChoice() != null && leftChoice() != null
+  const canStart = () =>
+    serveChoice() != null &&
+    leftChoice() != null &&
+    // Doubles needs a named server and receiver as well; singles has
+    // nobody to choose between.
+    gamePlayActions.hasDoublesChoices()
 
   const handleStart = () => {
     if (!canStart()) return
@@ -1512,6 +1599,10 @@ const RegularInitBody = (props: {
   landscape: boolean
 }) => (
   <>
+    {/* Both grids are grouped so they stack together and the pair sits
+        centred, rather than the first one growing to fill the screen and
+        shoving the second down onto the Start button. */}
+    <div style={initBodyStyle}>
     <div style={initColumnsStyle}>
       <div style={initColumnStyle}>
         <div style={initColPlaceholderStyle} />
@@ -1548,6 +1639,13 @@ const RegularInitBody = (props: {
           alt="Umpire's left"
         />
       </div>
+    </div>
+    {/* Doubles also needs to know which two players are on the ball —
+        see specs/rules/doubles.md. Only offered once a side has been
+        picked, because until then there is no serving pair. */}
+    <Show when={gamePlayActions.isDoubles() && props.serveChoice != null}>
+      <DoublesServeReceiveGrid servingSide={props.serveChoice!} />
+    </Show>
     </div>
     <div style={initButtonSpacerStyle} />
     <button
@@ -1820,6 +1918,78 @@ const TeamPlayerPickerDialog = (props: {
   </div>
 )
 
+// Who serves and who receives, once the serving side is settled. Four
+// columns: the serving pair, a serve icon each, a receive icon each, and
+// the receiving pair. Picking one icon in a column names that player.
+const DoublesServeReceiveGrid = (props: { servingSide: 1 | 2 }) => {
+  const servers = () =>
+    props.servingSide === 1
+      ? gamePlayActions.getSide1Players()
+      : gamePlayActions.getSide2Players()
+  const receivers = () =>
+    props.servingSide === 1
+      ? gamePlayActions.getSide2Players()
+      : gamePlayActions.getSide1Players()
+  const nameOf = (p?: Player) =>
+    p ? `${p.firstName} ${p.lastName}`.trim() : ''
+
+  return (
+    <div style={doublesGridStyle}>
+      <div style={initColumnStyle}>
+        <div style={initColPlaceholderStyle} />
+        <For each={servers()}>
+          {(p) => <div style={initRowLabelStyle}>{nameOf(p)}</div>}
+        </For>
+      </div>
+      <div style={initColumnStyle}>
+        <div style={initColHeaderStyle}>Serve</div>
+        <For each={servers()}>
+          {(p) => (
+            <InitIcon
+              src={serveIconUrl}
+              active={gamePlayActions.getGameServerId(0) === p._id}
+              onClick={() => gamePlayActions.setGameServer(0, p._id)}
+              alt={`${nameOf(p)} serves first`}
+            />
+          )}
+        </For>
+      </div>
+      <div style={initColumnStyle}>
+        <div style={initColHeaderStyle}>Receive</div>
+        <For each={receivers()}>
+          {(p) => (
+            <InitIcon
+              src={receiveIconUrl}
+              active={gamePlayState.initialReceiverId === p._id}
+              onClick={() => gamePlayActions.setInitialReceiver(p._id)}
+              alt={`${nameOf(p)} receives first`}
+            />
+          )}
+        </For>
+      </div>
+      <div style={initColumnStyle}>
+        <div style={initColPlaceholderStyle} />
+        <For each={receivers()}>
+          {(p) => <div style={initRowLabelStyle}>{nameOf(p)}</div>}
+        </For>
+      </div>
+    </div>
+  )
+}
+
+// Sits below the serve / umpire's-left grid, with room between them so the
+// two are read as separate questions rather than one wide table.
+const doublesGridStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'flex-start',
+  'justify-content': 'center',
+  gap: '12px',
+  'margin-top': '28px',
+  'padding-top': '24px',
+  'border-top': '1px solid rgba(255, 255, 255, 0.12)',
+  width: '100%',
+}
+
 const InitIcon = (props: {
   src: string
   active: boolean
@@ -2023,13 +2193,27 @@ const initParticipantsStyle: JSX.CSSProperties = {
 // Outer row holding the three vertical columns. Centered both
 // horizontally (justify-content) and vertically (align-items, since
 // flex-direction: row puts the cross axis on the vertical side).
+// Holds the serve / umpire's-left grid and, in doubles, the serve /
+// receive grid beneath it. This is the part that grows, so the two stay
+// together in the middle of the screen whichever is showing.
+const initBodyStyle: JSX.CSSProperties = {
+  flex: 1,
+  display: 'flex',
+  'flex-direction': 'column',
+  'justify-content': 'center',
+  'align-items': 'center',
+  width: '100%',
+  'min-height': 0,
+}
+
 const initColumnsStyle: JSX.CSSProperties = {
   display: 'flex',
   'flex-direction': 'row',
   'align-items': 'center',
   'justify-content': 'center',
   gap: '32px',
-  flex: 1,
+  flex: 'none',
+  width: '100%',
 }
 
 // Each column stacks top-to-bottom with consistent row spacing.

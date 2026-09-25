@@ -30,6 +30,13 @@ import {
   getHandicapStartingScore,
   createHandicapGameConfig,
 } from '../../shared/rules/matchRules'
+import {
+  isDoublesMatch,
+  getGameCycles,
+  getServerAndReceiver,
+  getServingSideForGame,
+  getSwapBlock,
+} from '../../shared/rules/doublesRotation.js'
 import { getGroupName } from '../../shared/rules/tournamentRules'
 
 interface GameResult {
@@ -95,6 +102,16 @@ interface GamePlayState {
   // Asked only when there is a real choice — see getMatchUmpireChoices.
   showUmpireDialog: boolean
   umpireChoices: UmpireChoice[]
+  // ---- Doubles (shared/rules/doublesRotation.js) ----
+  // Who the umpire named to serve each game, by game index, and the one
+  // receiver anyone chooses — game 1's. Everything after follows from
+  // these and the score.
+  doublesFirstServerIds: string[]
+  initialReceiverId: string | null
+  // Total points played when the deciding game changed ends, if it has.
+  decidingSwapTotal: number | null
+  // Games after the first ask only who serves; the side is already known.
+  showServerDialog: boolean
   // Whether the umpire has pressed Start on this match — the moment the
   // serving side and the ends are settled. On a Mirror it arrives with the
   // Scorer's snapshot; nothing is named before it.
@@ -102,6 +119,13 @@ interface GamePlayState {
 }
 
 export type TabletRole = 'scorer' | 'mirror'
+
+/** One line of a score box's name list, and that player's current role. */
+export interface ParticipantNameEntry {
+  text: string
+  serving: boolean
+  receiving: boolean
+}
 
 /** Someone who could be running this match, and in what capacity. */
 export interface UmpireChoice {
@@ -157,6 +181,10 @@ const getInitialState = (): GamePlayState => ({
   umpiredBy: null,
   showUmpireDialog: false,
   umpireChoices: [],
+  doublesFirstServerIds: [],
+  initialReceiverId: null,
+  decidingSwapTotal: null,
+  showServerDialog: false,
 })
 
 const [gamePlayState, setGamePlayState] =
@@ -562,6 +590,9 @@ const restoreMatchSetupIfExists = () => {
     setGamePlayState({
       initialServingSide: match.initialServingSide,
       leftSide: match.leftSide,
+      doublesFirstServerIds: match.doublesFirstServerIds ?? [],
+      initialReceiverId: match.initialReceiverId ?? null,
+      decidingSwapTotal: match.decidingSwapTotal ?? null,
       showInitDialog: false,
       // Already started, whoever started it — a Mirror joining now can name
       // both ends straight away.
@@ -680,7 +711,11 @@ const maybePromptLastGameSwitch = (
     setGamePlayState({
       leftSide: flipped,
       lastGameSideSwitched: true,
+      // In doubles the receiving pair swap here and stay swapped, and the
+      // score alone cannot say when it happened — so it is recorded.
+      decidingSwapTotal: score1 + score2,
     })
+    if (gamePlayActions.isDoubles()) saveMatchSetup()
   })
 }
 
@@ -714,7 +749,12 @@ const maybePromptLastGameSwitchBack = (
     leftSide: flipped,
     lastGameSideSwitched: false,
     lastGameSwitchPrompted: false,
+    // In doubles the receiving pair swapped when the ends changed, so
+    // unwinding the change of ends has to unwind that too — otherwise the
+    // sides go back but the wrong player keeps receiving.
+    decidingSwapTotal: null,
   })
+  if (gamePlayActions.isDoubles()) saveMatchSetup()
   void customAlert(
     'Scores dropped below the switching point\nplease switch back.',
     { modal: true },
@@ -869,6 +909,9 @@ const saveMatchSetup = async () => {
       matchId: gamePlayState.matchId,
       initialServingSide: gamePlayState.initialServingSide,
       leftSide: gamePlayState.leftSide,
+      doublesFirstServerIds: gamePlayState.doublesFirstServerIds,
+      initialReceiverId: gamePlayState.initialReceiverId ?? undefined,
+      decidingSwapTotal: gamePlayState.decidingSwapTotal ?? undefined,
     })
   } catch {
     // Silently fail - setup save is not critical
@@ -956,6 +999,10 @@ export const gamePlayActions = {
       umpiredBy: null,
       showUmpireDialog: false,
       umpireChoices: [],
+      doublesFirstServerIds: [],
+      initialReceiverId: null,
+      decidingSwapTotal: null,
+      showServerDialog: false,
       // Tablet entry without a match has nothing to load — drop the
       // loading flag immediately so the "No match assigned" screen
       // shows instead of the spinner.
@@ -1342,6 +1389,88 @@ export const gamePlayActions = {
 
   isMirror: (): boolean => gamePlayState.tabletRole === 'mirror',
 
+  // ---- Doubles: who is serving and who is receiving ----
+
+  isDoubles: (): boolean => isDoublesMatch(gamePlayActions.getCurrentMatch()),
+
+  // The player named to serve a given game. Game 0 is chosen on the setup
+  // screen alongside the receiver; later games are asked for on their own.
+  setGameServer: (gameIndex: number, playerId: string) => {
+    const servers = [...gamePlayState.doublesFirstServerIds]
+    servers[gameIndex] = playerId
+    setGamePlayState({ doublesFirstServerIds: servers, showServerDialog: false })
+    if (gameIndex > 0) saveMatchSetup()
+  },
+
+  setInitialReceiver: (playerId: string) =>
+    setGamePlayState({ initialReceiverId: playerId }),
+
+  getGameServerId: (gameIndex: number): string | undefined =>
+    gamePlayState.doublesFirstServerIds[gameIndex],
+
+  // Both choices are needed before a doubles match can start; a singles
+  // match has nothing to choose.
+  hasDoublesChoices: (): boolean =>
+    !gamePlayActions.isDoubles() ||
+    (!!gamePlayState.doublesFirstServerIds[0] &&
+      !!gamePlayState.initialReceiverId),
+
+  // The pair whose turn it is to serve this game — all the umpire has to
+  // choose between, since the side is already settled by the rotation.
+  getServerChoices: (): Player[] => {
+    const match = gamePlayActions.getCurrentMatch()
+    const cycles = gamePlayActions.getGameCycles()
+    return (
+      getServingSideForGame(
+        cycles,
+        gamePlayState.currentGameIndex,
+        match?.side1,
+        match?.side2,
+      ) ?? []
+    )
+  },
+
+  getGameCycles: (): string[][] => {
+    const match = gamePlayActions.getCurrentMatch()
+    return getGameCycles(
+      match?.side1,
+      match?.side2,
+      gamePlayState.doublesFirstServerIds,
+      gamePlayState.initialReceiverId ?? undefined,
+    )
+  },
+
+  getServerAndReceiverIds: (): { serverId?: string; receiverId?: string } => {
+    if (!gamePlayActions.isDoubles()) return {}
+    const match = gamePlayActions.getCurrentMatch()
+    const cycle = gamePlayActions.getGameCycles()[gamePlayState.currentGameIndex]
+    const targetPoints = match?.config?.gameConfig?.targetPoints ?? 11
+    return getServerAndReceiver({
+      cycle,
+      score1: gamePlayState.score1,
+      score2: gamePlayState.score2,
+      targetPoints,
+      swapAtBlock: gamePlayActions.isDecidingGame()
+        ? getSwapBlock(gamePlayState.decidingSwapTotal, targetPoints)
+        : null,
+    })
+  },
+
+  // The last game of the match, the only one where the ends — and with
+  // them the receiver — change part-way through.
+  isDecidingGame: (): boolean => {
+    const numberOfGames = gamePlayActions.getNumberOfGames()
+    return gamePlayState.currentGameIndex === numberOfGames - 1
+  },
+
+  isServingPlayer: (playerId?: string): boolean =>
+    !!playerId &&
+    gamePlayActions.getServerAndReceiverIds().serverId === playerId,
+
+  isReceivingPlayer: (playerId?: string): boolean =>
+    !!playerId &&
+    gamePlayActions.getServerAndReceiverIds().receiverId === playerId,
+
   // The umpire named on a finished match, for display.
   getUmpiredBy: (): string | undefined =>
     gamePlayActions.getCurrentMatch()?.umpiredBy,
@@ -1416,6 +1545,26 @@ export const gamePlayActions = {
 
   // One entry per player. Used by the in-score-box name display so
   // doubles render with each player on their own line.
+  // The same lines as getParticipantNameLines, but each carrying whether
+  // that player is the one serving or receiving — doubles only, where the
+  // score box marks them.
+  getParticipantNameEntries: (side: 1 | 2): ParticipantNameEntry[] => {
+    const players =
+      side === 1
+        ? gamePlayActions.getSide1Players()
+        : gamePlayActions.getSide2Players()
+    const lines = gamePlayActions.getParticipantNameLines(side)
+    const { serverId, receiverId } = gamePlayActions.getServerAndReceiverIds()
+    return lines.map((text, i) => {
+      const id = players?.[i]?._id?.toString()
+      return {
+        text,
+        serving: !!id && id === serverId,
+        receiving: !!id && id === receiverId,
+      }
+    })
+  },
+
   getParticipantNameLines: (side: 1 | 2): string[] => {
     const players =
       side === 1
@@ -1479,6 +1628,13 @@ export const gamePlayActions = {
     const numberOfGames = gamePlayActions.getNumberOfGames()
     const nextIndex = gamePlayState.currentGameIndex + 1
     if (nextIndex >= numberOfGames) return
+
+    // Each game of a doubles match opens with a server the umpire names.
+    // The side is already settled by the rotation, so that is the only
+    // question — see specs/rules/doubles.md.
+    if (gamePlayActions.isDoubles()) {
+      setGamePlayState({ showServerDialog: true })
+    }
 
     const winningSide = gamePlayActions.getGameWinningSide()
     const newGamesWon1 = gamePlayState.gamesWon1 + (winningSide === 1 ? 1 : 0)

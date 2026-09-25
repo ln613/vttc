@@ -4,7 +4,7 @@
 //
 //   npm run ratings:sync -- --club gvttc                  BC, with history
 //   npm run ratings:sync -- --club gvttc --prov ON
-//   npm run ratings:sync -- --club gvttc --national
+//   npm run ratings:sync -- --club gvttc --national   (see the caveat below)
 //   npm run ratings:sync -- --club gvttc --activity ALL   every player on record
 //   npm run ratings:sync -- --club gvttc --no-history     ratings only, fast
 //   npm run ratings:sync -- --club gvttc --dry-run        report, write nothing
@@ -117,6 +117,13 @@ const fetchPage = async (url, { attempts = 4 } = {}) => {
 // Every parameter the site's own pagination links carry. Sending a subset
 // loses the filter — asking for page 2 of BC with only Prov set returns the
 // national list instead.
+//
+// CAVEAT on --national: the site caps that listing at 11 pages (1100
+// players) and gives no hint that it has truncated. BC alone returns 729
+// and Alberta 847, so a national sync silently misses most of the country,
+// keeping only the highest-rated. Sync province by province when
+// completeness matters; --national is only good for "the top of the
+// national list".
 const listUrl = ({ province, period, activity, page }) =>
   `${LIST}?activity=${activity}&Category_code=1&Full_Name=&Period_Issued=${period}` +
   `&Prov=${province}&Reg=&Region=&Sex=&Formv_ctta_ratings_Page=${page}`

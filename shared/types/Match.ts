@@ -58,6 +58,22 @@ export interface Match {
   confirmed?: boolean // Whether the match result has been confirmed by both sides
   initialServingSide?: 1 | 2 // Which side serves first (set by umpire)
   leftSide?: 1 | 2 // Which side is on umpire's left (set by umpire)
+  /**
+   * Doubles only: which player serves first and which receives first,
+   * chosen by the umpire at the start. Everything after — who serves each
+   * point, who receives — follows from these and the score. See
+   * shared/rules/doublesRotation.js.
+   */
+  /** The player the umpire named to serve each game, by game index. */
+  doublesFirstServerIds?: string[]
+  /** The only receiver anyone chooses: game 1's. */
+  initialReceiverId?: string
+  /**
+   * Total points played when the deciding game changed ends. The current
+   * score cannot say when that was, and the receiving pair stay swapped
+   * from that moment on, so it is recorded when it happens.
+   */
+  decidingSwapTotal?: number
   homeSide?: 1 | 2 // Which side is the "home" team (team-event group matches)
   // Team-event extensions: when this Match represents a team-vs-team
   // contest, side1/side2 carry the full team rosters and the fields

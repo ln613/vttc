@@ -3493,7 +3493,10 @@ const deleteKnockoutScheduleIfExists = (updatedStages) => {
 export const saveMatchSetup = async (body) => {
   validateSaveMatchSetupInput(body)
 
-  const { _id, matchId, initialServingSide, leftSide } = body
+  const {
+    _id, matchId, initialServingSide, leftSide,
+    doublesFirstServerIds, initialReceiverId, decidingSwapTotal,
+  } = body
 
   const db = getDB()
   const collection = db.collection(EVENTS_COLLECTION)
@@ -3508,6 +3511,10 @@ export const saveMatchSetup = async (body) => {
       ...match,
       initialServingSide,
       leftSide,
+      // Doubles only; absent on singles, where there is nobody to choose.
+      doublesFirstServerIds,
+      initialReceiverId,
+      decidingSwapTotal,
     }),
   )
 

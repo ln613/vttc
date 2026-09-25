@@ -1,5 +1,6 @@
 import { getDB, toObjectId } from './db.js'
 import {
+  club,
   clubDate,
   getClubTimezone,
   getTableConfig,
@@ -663,6 +664,24 @@ const isLowTierEvent = (event) => eventIsInTier(event, 'low')
 const isHighTierEvent = (event) => eventIsInTier(event, 'high')
 
 
+// ---- TEMPORARY: Canada Winter Games final tryout, 25 Sep 2026 ----
+// The hall is split for the one evening — the boys' round robin runs on
+// tables 1-2 and the girls' on 3-4 — so the two events never compete for
+// the same court. Delete this block and its single use in
+// getAllowedTables once the night is over; nothing else depends on it.
+const TRYOUT_TABLE_SPLIT = [
+  { eventName: 'Canada Winter Games Final Tryout - Boys', tables: [1, 2] },
+  { eventName: 'Canada Winter Games Final Tryout - Girls', tables: [3, 4] },
+]
+const TRYOUT_CLUB = 'bctta'
+const TRYOUT_DATE = '2026-09-25'
+
+const confineToTryoutTables = (event, tables) => {
+  if (club.slug !== TRYOUT_CLUB || event?.date !== TRYOUT_DATE) return tables
+  const split = TRYOUT_TABLE_SPLIT.find((s) => s.eventName === event?.eventName)
+  return split ? tables.filter((t) => split.tables.includes(t)) : tables
+}
+
 /**
  * Get allowed tables for a match
  */
@@ -674,7 +693,7 @@ const getAllowedTables = (item, availableTables) => {
   const isFinal = item.roundName === 'Final'
   const isSemifinal = item.roundName === 'Semifinal'
 
-  let allowed = [...availableTables]
+  let allowed = confineToTryoutTables(event, [...availableTables])
 
   // Tables the club keeps off knockout matches.
   if (isKnockout) {

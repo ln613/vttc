@@ -1,5 +1,8 @@
 # Game Play Page
 
+A doubles match also names who serves and who receives, chosen at match
+setup — see `specs/rules/doubles.md`.
+
 A table whose event has Tablet Mirror enabled can be opened by two tablets,
 one scoring and one display-only — see `specs/rules/tablet mirror.md`. On
 the Mirror the hamburger menu offers only Exit, and no score can be
