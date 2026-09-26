@@ -100,6 +100,7 @@ export const ACCESS = {
     switchLeagueFixtureTable: ADMIN,
     resetLeagueRound: ADMIN,
     resetEvent: ADMIN,
+    resetEventResults: ADMIN,
     resetTeamMatch: ADMIN,
     startEvent: ADMIN,
     rebuildMatchQueue: ADMIN,
