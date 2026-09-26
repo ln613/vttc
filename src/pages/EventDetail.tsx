@@ -699,6 +699,19 @@ const EventHeader = () => {
     }
   }
 
+  const handleResetResults = async (e?: MouseEvent) => {
+    e?.stopPropagation()
+    e?.preventDefault()
+    if (
+      await customConfirm(
+        'Clear all scores for this event? The groups, the seeding order and the order of play are kept — only the results are cleared.',
+        { confirmColor: '#e67e22' },
+      )
+    ) {
+      eventDetailActions.resetEventResults()
+    }
+  }
+
   const handleStartEvent = async (e?: MouseEvent) => {
     e?.stopPropagation()
     e?.preventDefault()
@@ -725,6 +738,16 @@ const EventHeader = () => {
               disabled={eventDetailState.startingEvent}
             >
               {eventDetailState.startingEvent ? 'Starting...' : 'Start Event'}
+            </Button>
+          </Show>
+          <Show when={authState.isSuperAdmin && eventDetailActions.hasSchedule()}>
+            <Button
+              onClick={handleResetResults}
+              color="#e67e22"
+              size="small"
+              disabled={eventDetailState.resettingResults}
+            >
+              {eventDetailState.resettingResults ? 'Clearing...' : 'Reset Scores'}
             </Button>
           </Show>
           <Show when={authState.isSuperAdmin}>

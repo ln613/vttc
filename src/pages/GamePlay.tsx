@@ -952,9 +952,13 @@ const ScoreBox = (props: ScoreBoxProps) => {
       const boxWidth = pointBoxRef.offsetWidth
       const boxHeight = pointBoxRef.offsetHeight
       const padding = 32
-      // Reserve roughly three lines + top padding for the participant
-      // names that now live inside the point box.
-      const namesReserve = 80
+      // Reserve the room the participant names actually take inside the
+      // point box. Measured rather than assumed: the name block is sized
+      // in em against a font that scales with the viewport, so a fixed
+      // reserve would under-count it on a large tablet and let the score
+      // run over the names.
+      const namesEl = pointBoxRef.querySelector<HTMLElement>('[data-participant-names]')
+      const namesReserve = namesEl?.offsetHeight ?? 80
 
       const availableWidth = boxWidth - padding * 2
       const availableHeight = boxHeight - padding * 2 - namesReserve
@@ -1072,7 +1076,7 @@ const participantLineStyle = (line: {
 }): JSX.CSSProperties => ({
   display: 'inline-flex',
   'align-items': 'center',
-  gap: '4px',
+  gap: '0.3em',
   ...(line.serving
     ? { color: '#ffe082', 'font-weight': 700 }
     : line.receiving
@@ -1081,8 +1085,8 @@ const participantLineStyle = (line: {
 })
 
 const roleIconStyle: JSX.CSSProperties = {
-  width: '14px',
-  height: '14px',
+  width: '1em',
+  height: '1em',
   'box-sizing': 'border-box',
   padding: 0,
   flex: 'none',
@@ -1104,7 +1108,7 @@ const ParticipantNames = (props: ParticipantNamesProps) => {
       ? participantNamesStyle
       : { ...participantNamesStyle, 'padding-top': '24px' }
   return (
-    <div style={containerStyle()}>
+    <div data-participant-names style={containerStyle()}>
       <div style={participantNamesInnerStyle}>
         <Show when={gamePlayActions.showParticipantNames()}>
           <For each={lines()}>
@@ -2538,6 +2542,16 @@ const scoreBoxesOuterStyle: JSX.CSSProperties = {
 // Transparent backdrop — sits between the two score boxes. Keeps the
 // live-score table palette for the text (yellow table number, white
 // text on the dark page background) but no card/box around it.
+// The scoreboard runs on anything from a phone held sideways to a large
+// HD tablet mounted at the end of the table and read from across the room.
+// Text sized in fixed pixels for the phone is far too small on the tablet,
+// so every label scales with the viewport's short side (vh, since the
+// scoreboard is always landscape) and is clamped at both ends: the minimum
+// is what the phone used to show, the maximum stops a very tall screen
+// from turning a label into a headline.
+const scaledFont = (min: number, vh: number, max: number) =>
+  `clamp(${min}px, ${vh}vh, ${max}px)`
+
 const landscapeInfoBoxStyle: JSX.CSSProperties = {
   display: 'flex',
   'flex-direction': 'column',
@@ -2546,38 +2560,41 @@ const landscapeInfoBoxStyle: JSX.CSSProperties = {
   gap: '6px',
   flex: '0 0 auto',
   'min-width': '160px',
+  'max-width': 'clamp(160px, 18vw, 340px)',
   padding: '12px 16px',
   'text-align': 'center',
   'background-color': 'transparent',
 }
 
 const landscapeTableNumberStyle: JSX.CSSProperties = {
-  'font-size': '96px',
+  'font-size': scaledFont(96, 15, 220),
   'font-weight': 900,
   color: '#f1c40f',
   'line-height': 1,
 }
 
 const landscapeEventNameStyle: JSX.CSSProperties = {
-  'font-size': '20px',
+  'font-size': scaledFont(20, 3.6, 52),
   'font-weight': 600,
   color: '#fff',
+  'line-height': 1.15,
+  'overflow-wrap': 'break-word',
 }
 
 const landscapeStageNameStyle: JSX.CSSProperties = {
-  'font-size': '18px',
+  'font-size': scaledFont(18, 2.8, 40),
   'font-weight': 500,
   color: 'rgba(255,255,255,0.8)',
 }
 
 const landscapeSubMatchStyle: JSX.CSSProperties = {
-  'font-size': '18px',
+  'font-size': scaledFont(18, 2.8, 40),
   'font-weight': 500,
   color: 'rgba(255,255,255,0.8)',
 }
 
 const landscapeGameInfoStyle: JSX.CSSProperties = {
-  'font-size': '18px',
+  'font-size': scaledFont(18, 3, 44),
   'font-weight': 700,
   color: '#fff',
 }
@@ -2591,7 +2608,7 @@ const landscapeGameScoresStyle: JSX.CSSProperties = {
 }
 
 const landscapeGameScoreRowStyle: JSX.CSSProperties = {
-  'font-size': '18px',
+  'font-size': scaledFont(18, 2.8, 40),
   color: 'rgba(255,255,255,0.85)',
   'font-variant-numeric': 'tabular-nums',
 }
@@ -2630,12 +2647,15 @@ const getGamesWonBadgeStyle = (isLeft: boolean): JSX.CSSProperties => ({
   [isLeft ? 'right' : 'left']: 0,
   'background-color': 'rgba(255, 255, 255, 0.9)',
   color: '#333',
-  'font-size': '48px',
+  'font-size': scaledFont(48, 7.5, 104),
   'font-weight': 700,
-  'min-width': '64px',
-  display: 'flex',
-  'align-items': 'center',
-  'justify-content': 'center',
+  width: scaledFont(64, 10, 140),
+  height: scaledFont(64, 10, 140),
+  'box-sizing': 'border-box',
+  padding: 0,
+  flex: 'none',
+  display: 'grid',
+  'place-items': 'center',
   'border-radius': isLeft ? '0 0 0 8px' : '0 0 8px 0',
   'z-index': 10,
 })
@@ -2646,12 +2666,15 @@ const getTimeoutBadgeStyle = (isLeft: boolean, timeout: boolean): JSX.CSSPropert
   [isLeft ? 'left' : 'right']: 0,
   'background-color': timeout ? '#333' : 'rgba(255, 255, 255, 0.9)',
   color: timeout ? '#fff' : '#000',
-  'font-size': '48px',
+  'font-size': scaledFont(48, 7.5, 104),
   'font-weight': 700,
-  'min-width': '64px',
-  display: 'flex',
-  'align-items': 'center',
-  'justify-content': 'center',
+  width: scaledFont(64, 10, 140),
+  height: scaledFont(64, 10, 140),
+  'box-sizing': 'border-box',
+  padding: 0,
+  flex: 'none',
+  display: 'grid',
+  'place-items': 'center',
   'border-radius': isLeft ? '0 0 8px 0' : '0 0 0 8px',
   'z-index': 10,
   cursor: 'pointer',
@@ -2660,7 +2683,7 @@ const getTimeoutBadgeStyle = (isLeft: boolean, timeout: boolean): JSX.CSSPropert
 // Outer wrapper just owns the top padding; the inner block has a
 // fixed height so the score below stays at the same Y on both sides.
 const participantNamesStyle: JSX.CSSProperties = {
-  'font-size': '16px',
+  'font-size': scaledFont(16, 3, 44),
   'font-weight': 600,
   color: '#fff',
   'text-align': 'center',

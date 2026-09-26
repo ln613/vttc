@@ -74,6 +74,7 @@ interface EventDetailState {
   assigningTableNumber: number | null
   resettingMatchId: string | null
   resettingEvent: boolean
+  resettingResults: boolean
   startingEvent: boolean
   // Dragging a name around the first round of the bracket. Two components
   // read this — the card being dragged and the card being dragged over —
@@ -123,6 +124,7 @@ const getInitialState = (): EventDetailState => ({
   resettingMatchId: null,
   toastMessage: null,
   resettingEvent: false,
+  resettingResults: false,
   startingEvent: false,
   bracketDragFrom: null,
   bracketDragOver: null,
@@ -1030,6 +1032,37 @@ export const eventDetailActions = {
     } finally {
       setEventDetailState({ resettingEvent: false })
     }
+  },
+
+  // Clear the scores but keep the draw: the groups, their seeding order and
+  // the order of play all stay as they were made.
+  resetEventResults: async () => {
+    const { eventId } = eventDetailState
+    if (!eventId) return
+
+    setEventDetailState({ resettingResults: true })
+    try {
+      await apiPost('resetEventResults', { _id: eventId })
+      await fetchEvent(eventId, false)
+    } catch (err) {
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Failed to reset results',
+      )
+    } finally {
+      setEventDetailState({ resettingResults: false })
+    }
+  },
+
+  // Whether there is a drawn schedule to keep. Without one the results
+  // reset has nothing to do and the button is not offered.
+  hasSchedule: (): boolean => {
+    const stages = eventDetailState.data?.eventStages || []
+    return stages.some((s) =>
+      s.type === 'group'
+        ? s.groups.length > 0
+        : s.rounds.some((r) => r.matches.length > 0),
+    )
   },
 
   // The desk can start an event early, but only on the day itself, and only

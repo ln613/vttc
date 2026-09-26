@@ -1480,17 +1480,7 @@ export const generateGroups = async (body) => {
       index,
       participants: participants.map((p) => ({
         participant: p,
-        stats: {
-          matchesPlayed: 0,
-          matchesWon: 0,
-          matchesLost: 0,
-          gamesWon: 0,
-          gamesLost: 0,
-          gameDifference: 0,
-          pointsWon: 0,
-          pointsLost: 0,
-          pointDifference: 0,
-        },
+        stats: emptyGroupStats(),
       })),
       matches,
       isComplete: false,
@@ -1520,6 +1510,21 @@ export const getBestOfNumber = (bestOfOption) => {
 // Build a group-stage match record. For team events the match holds the
 // full team rosters and team-match metadata; sub-matches are not
 // expanded yet (that happens once both sides pick their order of play).
+// The standings of a group nobody has played yet. Shared so that a fresh
+// draw and a cleared one are the same thing — calculateGroupStats cannot be
+// used for this, because it counts every scheduled match as played.
+const emptyGroupStats = () => ({
+  matchesPlayed: 0,
+  matchesWon: 0,
+  matchesLost: 0,
+  gamesWon: 0,
+  gamesLost: 0,
+  gameDifference: 0,
+  pointsWon: 0,
+  pointsLost: 0,
+  pointDifference: 0,
+})
+
 const buildGroupMatchRecord = (event, schedule, numberOfGames) => {
   const base = {
     _id: generateId(),
@@ -4339,6 +4344,29 @@ const tallyTeamMatch = (parent) => {
 /**
  * Update a game in a match
  */
+// ---- TEMPORARY: Canada Winter Games final tryout, 25 Sep 2026 ----
+// A point scored normally does NOT broadcast: it changes no queue and no
+// other table, so per-point fan-out would have every client refetching all
+// evening (see the note on updateGame in handlers.js). A `simulated` event
+// is the standing exception, so the other screens can follow a demo being
+// umpired by hand. These two real events are shown on a big screen tonight
+// and want the same thing: Live Score, Schedule and Event Detail follow the
+// score instead of waiting for the 60s heartbeat.
+//
+// Delete this block, the `liveTicker` field in the updateGame return, and
+// the matching check in handlers.js once the night is over.
+const LIVE_TICKER_CLUB = 'bctta'
+const LIVE_TICKER_DATE = '2026-09-25'
+const LIVE_TICKER_EVENTS = [
+  'Canada Winter Games Final Tryout - Boys',
+  'Canada Winter Games Final Tryout - Girls',
+]
+
+const isLiveTickerEvent = (event) =>
+  club.slug === LIVE_TICKER_CLUB &&
+  event?.date === LIVE_TICKER_DATE &&
+  LIVE_TICKER_EVENTS.includes(event?.eventName)
+
 export const updateGame = async (body) => {
   validateUpdateGameInput(body)
 
@@ -4516,7 +4544,13 @@ export const updateGame = async (body) => {
   // Reported so the caller can decide whether this score change is worth a
   // broadcast, and can refresh the cached live-score copy of the match.
   // handlers.js strips `match` before the response goes out.
-  return { success: true, simulated: !!event.simulated, match: savedMatch }
+  return {
+    success: true,
+    simulated: !!event.simulated,
+    // TEMPORARY — see isLiveTickerEvent above.
+    liveTicker: isLiveTickerEvent(event),
+    match: savedMatch,
+  }
 }
 
 const validateUpdateGameInput = (body) => {
@@ -4994,6 +5028,33 @@ export const resetEvent = async (body) => {
   return { success: true }
 }
 
+// Clear every result but keep the draw — see buildResultsResetStages.
+// `startedAt` is deliberately left alone: the groups that starting depends
+// on are still there, so the event has not un-started.
+export const resetEventResults = async (body) => {
+  validateResetEventInput(body)
+
+  const db = getDB()
+  const collection = db.collection(EVENTS_COLLECTION)
+
+  const event = await collection.findOne({ _id: toObjectId(body._id) })
+  if (!event) throwError('Event not found')
+
+  const hasSchedule = (event.eventStages || []).some(
+    (s) =>
+      (s.type === 'group' && s.groups?.length > 0) ||
+      (s.type === 'knockout' && s.rounds?.some((r) => r.matches?.length > 0)),
+  )
+  if (!hasSchedule) throwError('There is no schedule to keep — nothing to reset')
+
+  await collection.updateOne(
+    { _id: toObjectId(body._id) },
+    { $set: { eventStages: buildResultsResetStages(event) } },
+  )
+
+  return { success: true }
+}
+
 // Begin an event ahead of its scheduled time. "Started" is otherwise purely
 // a clock comparison, so an explicit start is recorded as a timestamp that
 // both started-checks short-circuit on (see isEventStarted here and
@@ -5080,6 +5141,64 @@ const buildResetEventStages = (event) =>
     }
     return stage
   })
+
+// A results-only reset: the draw stays exactly as it was made — the groups,
+// who is in them, the order they were seeded in and the order of play — and
+// only what was played is cleared. The full reset above throws the draw away
+// with the results, which is wrong when the draw was arranged by hand.
+const buildResultsResetStages = (event) =>
+  event.eventStages.map((stage) => {
+    if (stage.type === 'group') {
+      return {
+        ...stage,
+        groups: stage.groups.map(resetGroupKeepingSchedule),
+      }
+    }
+    if (stage.type === 'knockout') return resetKnockoutKeepingDraw(stage)
+    return stage
+  })
+
+const resetOneMatch = (match) =>
+  match.isTeamMatch ? createResetTeamMatch(match) : createResetMatch(match)
+
+// Every match cleared and the table put back to all-zeroes — the same
+// standings a group is drawn with. The participants keep their order, which
+// is the seeding, and so does the order of play.
+const resetGroupKeepingSchedule = (group) => ({
+  ...group,
+  matches: group.matches.map(resetOneMatch),
+  participants: group.participants.map(({ ranking: _ranking, ...gp }) => ({
+    ...gp,
+    stats: emptyGroupStats(),
+  })),
+  isComplete: false,
+})
+
+// Only the first round holds the draw. Every later round is created empty
+// and filled in from results as they come in, so clearing its matches is
+// not losing a schedule — it is putting the round back where a freshly
+// generated bracket leaves it. Rounds are mapped in place, never filtered:
+// the array is positional, and dropping an entry would shift the rest of
+// the draw into the wrong bracket slots.
+const resetKnockoutKeepingDraw = (stage) => ({
+  ...stage,
+  rounds: stage.rounds.map((round, index) =>
+    index === 0
+      ? { ...round, matches: round.matches.map(resetKnockoutSlot), isComplete: false }
+      : { ...round, matches: [], isComplete: false },
+  ),
+})
+
+const resetKnockoutSlot = (km) => {
+  // A bye is part of the draw, not a result: nothing was played and its
+  // winner was settled when the bracket was made, so it survives untouched.
+  if (km.isBye1 || km.isBye2) return km
+  return {
+    ...km,
+    match: km.match ? resetOneMatch(km.match) : km.match,
+    winner: undefined,
+  }
+}
 
 // ==================== AUTO-GENERATION ====================
 
@@ -5205,17 +5324,7 @@ const buildGroupsWithMatches = (event, groupArrays, numberOfGames) =>
       index,
       participants: participants.map((p) => ({
         participant: p,
-        stats: {
-          matchesPlayed: 0,
-          matchesWon: 0,
-          matchesLost: 0,
-          gamesWon: 0,
-          gamesLost: 0,
-          gameDifference: 0,
-          pointsWon: 0,
-          pointsLost: 0,
-          pointDifference: 0,
-        },
+        stats: emptyGroupStats(),
       })),
       matches,
       isComplete: false,

@@ -33,6 +33,7 @@ import {
   resetTeamMatch,
   resetMatch,
   resetEvent,
+  resetEventResults,
   startEvent,
   deleteEvent,
   setParticipantDefault,
@@ -183,7 +184,7 @@ export const apiHandlers = {
     // Spectators' live scores refresh on the next queue-changing event
     // (assign/finish/confirm), which still go through withEventNotify.
     updateGame: async (body) => {
-      const { match, ...result } = await updateGame(body)
+      const { match, liveTicker, ...result } = await updateGame(body)
       // Keep the cached live-score copy of this match in step, or the
       // score on the Live Score page stops moving until something forces
       // a rebuild. Awaited so a client refetching on the broadcast below
@@ -192,7 +193,9 @@ export const apiHandlers = {
       // Awaited for the same reason as withEventNotify: a promise left in
       // flight when the Lambda returns is frozen, and on a quiet site it
       // only resumes on the next request — which is the heartbeat.
-      if (result?.simulated) await notifyLiveScoreUpdate(body?._id)
+      // `liveTicker` is the TEMPORARY tryout rule in eventHandlers.js
+      // (isLiveTickerEvent) — remove it together with that block.
+      if (result?.simulated || liveTicker) await notifyLiveScoreUpdate(body?._id)
       return result
     },
     saveMatchSetup: withEventNotify(saveMatchSetup),
@@ -202,6 +205,7 @@ export const apiHandlers = {
     resetTeamMatch: withEventNotify(resetTeamMatch),
     resetMatch: withEventNotify(resetMatch),
     resetEvent: withEventNotify(resetEvent),
+    resetEventResults: withEventNotify(resetEventResults),
     startEvent: withEventNotify(startEvent),
     deleteEvent: withEventNotify(deleteEvent),
     setParticipantDefault: withEventNotify(setParticipantDefault),
