@@ -4344,29 +4344,6 @@ const tallyTeamMatch = (parent) => {
 /**
  * Update a game in a match
  */
-// ---- TEMPORARY: Canada Winter Games final tryout, 25 Sep 2026 ----
-// A point scored normally does NOT broadcast: it changes no queue and no
-// other table, so per-point fan-out would have every client refetching all
-// evening (see the note on updateGame in handlers.js). A `simulated` event
-// is the standing exception, so the other screens can follow a demo being
-// umpired by hand. These two real events are shown on a big screen tonight
-// and want the same thing: Live Score, Schedule and Event Detail follow the
-// score instead of waiting for the 60s heartbeat.
-//
-// Delete this block, the `liveTicker` field in the updateGame return, and
-// the matching check in handlers.js once the night is over.
-const LIVE_TICKER_CLUB = 'bctta'
-const LIVE_TICKER_DATE = '2026-09-25'
-const LIVE_TICKER_EVENTS = [
-  'Canada Winter Games Final Tryout - Boys',
-  'Canada Winter Games Final Tryout - Girls',
-]
-
-const isLiveTickerEvent = (event) =>
-  club.slug === LIVE_TICKER_CLUB &&
-  event?.date === LIVE_TICKER_DATE &&
-  LIVE_TICKER_EVENTS.includes(event?.eventName)
-
 export const updateGame = async (body) => {
   validateUpdateGameInput(body)
 
@@ -4544,13 +4521,7 @@ export const updateGame = async (body) => {
   // Reported so the caller can decide whether this score change is worth a
   // broadcast, and can refresh the cached live-score copy of the match.
   // handlers.js strips `match` before the response goes out.
-  return {
-    success: true,
-    simulated: !!event.simulated,
-    // TEMPORARY — see isLiveTickerEvent above.
-    liveTicker: isLiveTickerEvent(event),
-    match: savedMatch,
-  }
+  return { success: true, simulated: !!event.simulated, match: savedMatch }
 }
 
 const validateUpdateGameInput = (body) => {

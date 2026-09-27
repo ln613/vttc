@@ -21,7 +21,6 @@ import {
   type EventSubscription,
 } from '../utils/pusher'
 import { createJitteredRefetch } from '../utils/refetch'
-import { countCall } from '../utils/counters' // TEMP diagnostic
 
 /** One round/week, as the league endpoint returns it. */
 export interface LeagueRoundView {
@@ -105,14 +104,12 @@ const subscribeForLeague = (leagueId: string) => {
   unsubscribeLeague()
   const refetch = createJitteredRefetch(() => fetchLeague(leagueId))
   subscription = subscribeToLiveScoreUpdates(() => {
-    countCall('broadcast→league') // TEMP diagnostic
     if (leagueState.leagueId !== leagueId) return
     refetch()
   })
 }
 
 const fetchLeague = async (leagueId: string) => {
-  countCall('fetchLeague') // TEMP diagnostic
   const data = await apiGet<LeagueView>('league', { leagueId })
   setLeagueState({ data, loading: false, error: null })
   return data

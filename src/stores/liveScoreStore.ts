@@ -8,7 +8,6 @@ import type { Player } from '../../shared/types/Player'
 import { apiGet, apiPost } from '../utils/api'
 import { authState } from './authStore'
 import { createJitteredRefetch } from '../utils/refetch'
-import { countCall } from '../utils/counters' // TEMP diagnostic
 import {
   subscribeToLiveScoreUpdates,
   type EventSubscription,
@@ -51,7 +50,6 @@ let autoStartHeartbeatTimer: ReturnType<typeof setInterval> | null = null
 export { liveScoreState }
 
 const fetchLiveScore = async (runAutoStart = false) => {
-  countCall('fetchLiveScore') // TEMP diagnostic
   try {
     const data = await apiGet<LiveScoreData>(
       'liveScore',
@@ -81,7 +79,6 @@ const refetchOnBroadcast = createJitteredRefetch(() => fetchLiveScore())
 const startSubscription = () => {
   stopUpdates()
   subscription = subscribeToLiveScoreUpdates(() => {
-    countCall('broadcast→liveScore') // TEMP diagnostic
     refetchOnBroadcast()
   })
 }

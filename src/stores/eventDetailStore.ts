@@ -15,7 +15,6 @@ import { apiGet, apiPost } from '../utils/api'
 import { waitForPendingSave } from './gamePlayStore'
 import { subscribeToLiveScoreUpdates, type EventSubscription } from '../utils/pusher'
 import { createJitteredRefetch } from '../utils/refetch'
-import { countCall } from '../utils/counters' // TEMP diagnostic
 import { eventState, eventActions } from './eventStore'
 import { leagueActions } from './leagueStore'
 import { authState } from './authStore'
@@ -152,7 +151,6 @@ const subscribeForEvent = (eventId: string) => {
   // event, or names none (a coalesced burst covering several events).
   const refetch = createJitteredRefetch(() => fetchEvent(eventId, true))
   currentSubscription = subscribeToLiveScoreUpdates((data) => {
-    countCall('broadcast→eventDetail') // TEMP diagnostic
     if (eventDetailState.eventId !== eventId) return
     if (data?.eventId && data.eventId !== eventId) return
     // A league round's tabs render from the league store, which has its own
@@ -243,7 +241,6 @@ const simulateGames = (
 }
 
 const fetchEvent = async (eventId: string, silent: boolean) => {
-  countCall('fetchEvent') // TEMP diagnostic
   if (!silent) {
     setEventDetailState({ loading: true, error: null })
   }

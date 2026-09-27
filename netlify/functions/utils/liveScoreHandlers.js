@@ -1,6 +1,5 @@
 import { getDB, toObjectId } from './db.js'
 import {
-  club,
   clubDate,
   getClubTimezone,
   getTableConfig,
@@ -603,6 +602,36 @@ export const syncCachedMatch = async (match) => {
   )
 }
 
+// Put back every table this event is holding. A results reset leaves its
+// matches unplayed but still sitting on the tables they had reached, and a
+// rebuild deliberately keeps an assignment whose match is still unfinished
+// (reconcileTableAssignments) — so without this the queue carries on from
+// the middle of the schedule instead of starting again at the top.
+//
+// Only this event's tables are touched; anything else on court is left
+// alone. Marking the queue dirty is the caller's job, as it is for every
+// other mutation.
+export const releaseEventTables = async (eventId) => {
+  if (!eventId) return
+  const id = eventId.toString()
+
+  const state = await loadTableState()
+  const tables = state?.tables || []
+  const holdsThisEvent = (t) =>
+    t.status === 'assigned' && t.match?.event?._id?.toString() === id
+  if (!tables.some(holdsThisEvent)) return
+
+  const released = tables.map((t) =>
+    holdsThisEvent(t) ? { tableNumber: t.tableNumber, status: 'available' } : t,
+  )
+
+  const db = getDB()
+  await db.collection(TABLE_STATE_COLLECTION).updateOne(
+    { docId: TABLE_STATE_DOC_ID },
+    { $set: { tables: released, updatedAt: new Date().toISOString() } },
+  )
+}
+
 // Every mutation that can move a match through the queue calls this, so the
 // next read knows the cached tables/queue are stale. One small document,
 // ~40 ms, against a rebuild that costs seconds.
@@ -664,24 +693,6 @@ const isLowTierEvent = (event) => eventIsInTier(event, 'low')
 const isHighTierEvent = (event) => eventIsInTier(event, 'high')
 
 
-// ---- TEMPORARY: Canada Winter Games final tryout, 25 Sep 2026 ----
-// The hall is split for the one evening — the boys' round robin runs on
-// tables 1-2 and the girls' on 3-4 — so the two events never compete for
-// the same court. Delete this block and its single use in
-// getAllowedTables once the night is over; nothing else depends on it.
-const TRYOUT_TABLE_SPLIT = [
-  { eventName: 'Canada Winter Games Final Tryout - Boys', tables: [1, 2] },
-  { eventName: 'Canada Winter Games Final Tryout - Girls', tables: [3, 4] },
-]
-const TRYOUT_CLUB = 'bctta'
-const TRYOUT_DATE = '2026-09-25'
-
-const confineToTryoutTables = (event, tables) => {
-  if (club.slug !== TRYOUT_CLUB || event?.date !== TRYOUT_DATE) return tables
-  const split = TRYOUT_TABLE_SPLIT.find((s) => s.eventName === event?.eventName)
-  return split ? tables.filter((t) => split.tables.includes(t)) : tables
-}
-
 /**
  * Get allowed tables for a match
  */
@@ -693,7 +704,7 @@ const getAllowedTables = (item, availableTables) => {
   const isFinal = item.roundName === 'Final'
   const isSemifinal = item.roundName === 'Semifinal'
 
-  let allowed = confineToTryoutTables(event, [...availableTables])
+  let allowed = [...availableTables]
 
   // Tables the club keeps off knockout matches.
   if (isKnockout) {

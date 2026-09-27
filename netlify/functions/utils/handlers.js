@@ -58,6 +58,7 @@ import {
   switchMatchTables,
   markQueueDirty,
   syncCachedMatch,
+  releaseEventTables,
 } from './liveScoreHandlers.js'
 import {
   getLeague,
@@ -184,7 +185,7 @@ export const apiHandlers = {
     // Spectators' live scores refresh on the next queue-changing event
     // (assign/finish/confirm), which still go through withEventNotify.
     updateGame: async (body) => {
-      const { match, liveTicker, ...result } = await updateGame(body)
+      const { match, ...result } = await updateGame(body)
       // Keep the cached live-score copy of this match in step, or the
       // score on the Live Score page stops moving until something forces
       // a rebuild. Awaited so a client refetching on the broadcast below
@@ -193,9 +194,7 @@ export const apiHandlers = {
       // Awaited for the same reason as withEventNotify: a promise left in
       // flight when the Lambda returns is frozen, and on a quiet site it
       // only resumes on the next request — which is the heartbeat.
-      // `liveTicker` is the TEMPORARY tryout rule in eventHandlers.js
-      // (isLiveTickerEvent) — remove it together with that block.
-      if (result?.simulated || liveTicker) await notifyLiveScoreUpdate(body?._id)
+      if (result?.simulated) await notifyLiveScoreUpdate(body?._id)
       return result
     },
     saveMatchSetup: withEventNotify(saveMatchSetup),
@@ -205,7 +204,14 @@ export const apiHandlers = {
     resetTeamMatch: withEventNotify(resetTeamMatch),
     resetMatch: withEventNotify(resetMatch),
     resetEvent: withEventNotify(resetEvent),
-    resetEventResults: withEventNotify(resetEventResults),
+    // Clearing the scores has to let go of the tables too, or the queue
+    // resumes from wherever play had reached instead of the top of the
+    // schedule — the matches are unplayed again, but still assigned.
+    resetEventResults: withEventNotify(async (body) => {
+      const result = await resetEventResults(body)
+      await releaseEventTables(body?._id)
+      return result
+    }),
     startEvent: withEventNotify(startEvent),
     deleteEvent: withEventNotify(deleteEvent),
     setParticipantDefault: withEventNotify(setParticipantDefault),
