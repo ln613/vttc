@@ -46,6 +46,8 @@ import {
   sendVerificationCode,
   verifyCode,
   signUp,
+  findSimilarPlayers,
+  googleSignIn,
   registerPlayerByAdmin,
   removePlayerFromEvent,
 } from './accountHandlers.js'
@@ -145,6 +147,8 @@ export const apiHandlers = {
     umpires: () => getUmpires(),
     umpireTableCounts: () => getUmpireTableCounts(),
     matchUmpireChoices: (params) => getMatchUmpireChoices(params),
+    // Sign-up wizard, step 4: who on file might this person already be.
+    similarPlayers: (params) => findSimilarPlayers(params),
     revenue: () => getRevenue(),
     revenueTemplates: () => getRevenueTemplates(),
   },
@@ -231,10 +235,13 @@ export const apiHandlers = {
     signIn: (body) => signIn(body),
     umpireSignIn: (body) => umpireSignIn(body),
     signUp: (body) => signUp(body),
+    googleSignIn: (body) => googleSignIn(body),
     sendVerificationCode: (body) => sendVerificationCode(body),
     verifyCode: (body) => verifyCode(body),
-    updateProfile: (body) => updateProfile(body),
-    changePassword: (body) => changePassword(body),
+    // Both check the caller is the player named in the body (or, for a
+    // profile, an admin) — see validateSelfOrAdmin in accountHandlers.
+    updateProfile: (body, auth) => updateProfile(body, auth),
+    changePassword: (body, auth) => changePassword(body, auth),
     registerPlayerByAdmin: (body) => registerPlayerByAdmin(body),
     removePlayerFromEvent: withEventNotify(removePlayerFromEvent),
     rebuildMatchQueue: async () => {

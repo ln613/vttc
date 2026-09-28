@@ -10,6 +10,11 @@ export interface AppSettings {
   allowPublicUmpire: boolean
   saveUmpireInfo: boolean
   maxUmpiresPerTable: number
+  // Not settings but facts about the site, from the server's environment,
+  // never saved: whether it can text a verification code, and the Google
+  // client id "Sign in with Google" needs (null when not set up).
+  smsEnabled: boolean
+  googleClientId: string | null
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -18,6 +23,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   allowPublicUmpire: true,
   saveUmpireInfo: false,
   maxUmpiresPerTable: 1,
+  smsEnabled: false,
+  googleClientId: null,
 }
 
 interface SettingsState {
@@ -98,7 +105,14 @@ export const settingsActions = {
         'saveSettings',
         settingsState.draft,
       )
-      const merged = { ...DEFAULT_SETTINGS, ...result.settings }
+      // The save response carries only what is saved, so the environment
+      // facts are carried over from what was fetched, not reset to defaults.
+      const merged = {
+        ...DEFAULT_SETTINGS,
+        ...result.settings,
+        smsEnabled: settingsState.settings.smsEnabled,
+        googleClientId: settingsState.settings.googleClientId,
+      }
       setSettingsState({
         settings: merged,
         draft: { ...merged },

@@ -465,7 +465,7 @@ const ProfileSection = () => (
     >
       <div style={changePasswordButtonContainerStyle}>
         <Button color="#3498db" onClick={accountPageActions.showChangePassword}>
-          Change Password
+          {accountPageActions.isSettingPassword() ? 'Set Password' : 'Change Password'}
         </Button>
       </div>
     </Show>
@@ -475,8 +475,10 @@ const ProfileSection = () => (
 const ChangePasswordDialog = () => (
   <div style={overlayStyle}>
     <div style={dialogStyle}>
-      <h3 style={dialogTitleStyle}>Change Password</h3>
-      <Show when={!authState.user?.pending}>
+      <h3 style={dialogTitleStyle}>
+        {accountPageActions.isSettingPassword() ? 'Set Password' : 'Change Password'}
+      </h3>
+      <Show when={!authState.user?.pending && !accountPageActions.isSettingPassword()}>
         <Input
           label="Current Password"
           name="oldPassword"

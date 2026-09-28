@@ -71,7 +71,7 @@ const vitePort = process.env.VITE_DEV_PORT
 const isNetlifyDev = argv[0] === 'netlify' && argv[1] === 'dev'
 if (isNetlifyDev) {
   if (apiPort && !argv.includes('--port')) argv.push('--port', apiPort)
-  if (vitePort && !argv.includes('--targetPort')) argv.push('--targetPort', vitePort)
+  if (vitePort && !argv.includes('--target-port')) argv.push('--target-port', vitePort)
 }
 
 console.log(

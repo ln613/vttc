@@ -13,6 +13,13 @@ interface InputProps {
   disabled?: boolean
   class?: string
   endAdornment?: JSX.Element
+  // Hints for the browser and the on-screen keyboard: "email", "tel",
+  // "new-password", or "one-time-code" so a phone can fill in a texted code.
+  autocomplete?: string
+  inputMode?: 'text' | 'numeric' | 'tel' | 'email'
+  maxLength?: number
+  // Focus the field as soon as it appears, e.g. on each step of a wizard.
+  autofocus?: boolean
 }
 
 const labelStyle: JSX.CSSProperties = {
@@ -74,6 +81,12 @@ const Input = (props: InputProps) => {
     target.style.boxShadow = 'none'
   }
 
+  // The `autofocus` attribute is only honoured on page load, not for a field
+  // that appears later, so focus is given once the element exists.
+  const focusIfAsked = (el: HTMLInputElement) => {
+    if (props.autofocus) queueMicrotask(() => el.focus())
+  }
+
   const handleChange = (e: Event) => {
     const target = e.target as HTMLInputElement | HTMLTextAreaElement
     props.onChange(target.value)
@@ -99,6 +112,10 @@ const Input = (props: InputProps) => {
               onInput={handleChange}
               placeholder={props.placeholder ?? ''}
               disabled={props.disabled}
+              autocomplete={props.autocomplete}
+              inputmode={props.inputMode}
+              maxLength={props.maxLength}
+              ref={focusIfAsked}
               style={inputStyle()}
               onFocus={handleFocus}
               onBlur={handleBlur}

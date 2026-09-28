@@ -82,6 +82,22 @@
   }
 }
 
+/* Sign-in icons (SignInIcons.tsx) grow on hover. The icon scales, not the
+ * button, so the hit area never moves; same pointer-only gate as above. */
+.vttc-icon-btn svg {
+  transition: transform 0.15s ease;
+}
+@media (hover: hover) {
+  .vttc-icon-btn:hover:not(:disabled) svg {
+    transform: scale(1.2);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vttc-icon-btn svg {
+    transition: none;
+  }
+}
+
 
 /* Icon tap-target: any element that opts in gets a 44x44px minimum hit
  * area and suppressed double-tap zoom — meets Apple HIG and stops iOS

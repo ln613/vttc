@@ -12,6 +12,7 @@ const PUBLIC_PLAYER_PROJECTION = {
   rating: 1,
   host: 1,
   password: 1, // reduced to hasAccount below, never returned
+  googleId: 1, // likewise — a Google-only account has no password
 }
 
 const ADMIN_ONLY_FIELDS = { email: 1, phone: 1, dateOfBirth: 1 }
@@ -23,9 +24,9 @@ export const getPlayers = async (_params, auth) => {
     : PUBLIC_PLAYER_PROJECTION
 
   const players = await get('players', {}, projection)
-  return players.map(({ password, ...rest }) => ({
+  return players.map(({ password, googleId, ...rest }) => ({
     ...rest,
-    hasAccount: !!password,
+    hasAccount: !!(password || googleId),
   }))
 }
 

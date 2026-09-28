@@ -1337,8 +1337,8 @@ const collectMatchPlayerIds = (match) => {
   return [...new Set(ids)]
 }
 
-// Of the given player ids, return those that have a user account — i.e. a
-// password has been set on the player document (sign-up complete).
+// Of the given player ids, return those that have a user account — a
+// password, or a linked Google account (which may have no password).
 const filterPlayerIdsWithAccount = async (playerIds) => {
   if (!Array.isArray(playerIds) || playerIds.length === 0) return []
   const db = getDB()
@@ -1347,7 +1347,10 @@ const filterPlayerIdsWithAccount = async (playerIds) => {
     .find(
       {
         _id: { $in: playerIds.map(toObjectId) },
-        password: { $exists: true, $ne: null },
+        $or: [
+          { password: { $exists: true, $ne: null } },
+          { googleId: { $exists: true, $ne: null } },
+        ],
       },
       { projection: { _id: 1 } },
     )

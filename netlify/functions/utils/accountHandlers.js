@@ -3,7 +3,22 @@ import { getSettings } from './settingsHandlers.js'
 import { createToken } from './authToken.js'
 import crypto from 'crypto'
 import argon2 from 'argon2'
-import { sendVerificationEmail, sendPendingPasswordEmail } from './email.js'
+import { sendPendingPasswordEmail } from './email.js'
+import {
+  validateChannel,
+  normalizeAddress,
+  sendCode,
+  checkCode,
+  readVerifiedContact,
+  createVerifiedContactToken,
+} from './verification.js'
+import { verifyGoogleSignInCode } from './googleAuth.js'
+import { normalizePhone } from '../../../shared/rules/contact.js'
+import {
+  isSimilarName,
+  candidateFamilyNames,
+  toTitleCase,
+} from '../../../shared/rules/nameMatch.js'
 import {
   validateRatingRequirement,
   meetsAgeRequirement,
@@ -11,9 +26,6 @@ import {
   deletePlayerFromTeam,
   calculateParticipantRating,
 } from './eventHandlers.js'
-
-// In-memory store for verification codes (per email)
-const verificationCodes = new Map()
 
 const PLAYERS_COLLECTION = 'players'
 const ADMIN_USERNAME = 'vttc'
@@ -66,8 +78,16 @@ const findPlayerByEmailOrPhone = async (emailOrPhone) => {
   const db = getDB()
   const collection = db.collection(PLAYERS_COLLECTION)
 
+  // Phones are stored as their bare 10 digits, so "604-555-1234" is looked
+  // up as "6045551234" too — otherwise the number someone signed up with
+  // would only work typed exactly the way it is stored.
+  const phone = normalizePhone(emailOrPhone)
   const player = await collection.findOne({
-    $or: [{ email: emailOrPhone }, { phone: emailOrPhone }],
+    $or: [
+      { email: emailOrPhone },
+      { phone: emailOrPhone },
+      ...(phone && phone !== emailOrPhone ? [{ phone }] : []),
+    ],
   })
 
   return player
@@ -207,18 +227,28 @@ const authenticatePlayer = async (emailOrPhone, password) => {
   const player = await findPlayerByEmailOrPhone(emailOrPhone)
   if (!player) throwError('Account not found')
 
-  if (!player.password) throwError('No password set for this account')
+  if (!player.password) {
+    throwError(
+      player.googleId
+        ? 'This account signs in with Google'
+        : 'No password set for this account',
+    )
+  }
 
   if (!(await verifyPassword(password, player.password))) throwError('Invalid password')
 
-  const token = generatePlayerToken(player)
-  // Players flagged as admin/super-admin in the players collection get
-  // the corresponding role on sign-in (super-admin implies admin).
+  return buildSignInResponse(player)
+}
+
+// What every successful sign-in returns, however it was done. Players flagged
+// as admin/super-admin in the players collection get the corresponding role
+// (super-admin implies admin). `hasPassword` tells the Account page whether to
+// ask for the current password or offer to set one.
+const buildSignInResponse = (player) => {
   const isSuperAdmin = !!player.isSuperAdmin
-  const isAdmin = isSuperAdmin || !!player.isAdmin
   return {
-    token,
-    isAdmin,
+    token: generatePlayerToken(player),
+    isAdmin: isSuperAdmin || !!player.isAdmin,
     isSuperAdmin,
     isTablet: false,
     player: {
@@ -232,6 +262,7 @@ const authenticatePlayer = async (emailOrPhone, password) => {
       rating: player.rating,
       pending: !!player.pending,
       host: !!player.host,
+      hasPassword: !!player.password,
     },
   }
 }
@@ -291,6 +322,49 @@ export const signIn = async (body) => {
   return authenticatePlayer(emailOrPhone, password)
 }
 
+// ==================== whose account ====================
+//
+// Both endpoints below take the player's id in the body. They used to trust
+// it, so any signed-in player could change anyone's email or set a password
+// on an account without one. With Google sign-in linking by email, that was
+// a way into someone else's account: point their email at your own Google
+// account and sign in.
+
+const isCaller = (auth, playerId) =>
+  !!auth?.playerId && auth.playerId === String(playerId)
+
+// A player edits their own profile; an admin edits anyone's.
+const validateSelfOrAdmin = (auth, playerId) => {
+  if (!auth?.isAdmin && !isCaller(auth, playerId)) {
+    throwError('You can only change your own account')
+  }
+}
+
+// A password is only ever set by the person it belongs to.
+const validateSelf = (auth, playerId) => {
+  if (!isCaller(auth, playerId)) throwError('You can only change your own password')
+}
+
+// An email or phone belongs to one account. Taking one another account
+// already uses would leave two accounts behind one sign-in.
+const validateContactNotTaken = async (collection, playerId, email, phone) => {
+  const others = { _id: { $ne: toObjectId(playerId) }, ...isAccountFilter }
+  const clashes = []
+  if (email?.trim()) clashes.push({ ...contactFilter('email', email.trim()), ...others })
+  const tenDigits = normalizePhone(phone)
+  if (tenDigits) clashes.push({ ...contactFilter('phone', tenDigits), ...others })
+
+  for (const filter of clashes) {
+    if (await collection.findOne(filter, { projection: { _id: 1 } })) {
+      throwError(
+        filter.email
+          ? 'That email is already used by another account'
+          : 'That phone number is already used by another account',
+      )
+    }
+  }
+}
+
 /**
  * Validate update profile input
  */
@@ -344,14 +418,16 @@ const validateRatingIfProvided = (rating) => {
 /**
  * Update player profile
  */
-export const updateProfile = async (body) => {
+export const updateProfile = async (body, auth) => {
   validateUpdateProfileInput(body)
+  validateSelfOrAdmin(auth, body._id)
   validateEmailIfProvided(body.email)
   validateNorthAmericanPhoneIfProvided(body.phone)
   validateRatingIfProvided(body.rating)
 
   const db = getDB()
   const collection = db.collection(PLAYERS_COLLECTION)
+  await validateContactNotTaken(collection, body._id, body.email, body.phone)
   const existing = await collection.findOne({ _id: toObjectId(body._id) })
 
   // Resolve the effective rating and dob the player would have after
@@ -397,8 +473,10 @@ export const updateProfile = async (body) => {
     lastName: body.lastName || '',
     sex: body.sex || '',
     dateOfBirth: newDateOfBirth,
-    email: body.email || '',
-    phone: body.phone || '',
+    email: (body.email || '').trim(),
+    // Stored as its bare 10 digits, like every phone on file, so sign-in
+    // finds it however it is typed.
+    phone: normalizePhone(body.phone) || '',
   }
 
   // Rating is only persisted when explicitly provided. When it changes,
@@ -595,8 +673,9 @@ const validateChangePasswordInput = (body) => {
 /**
  * Change password for a player
  */
-export const changePassword = async (body) => {
+export const changePassword = async (body, auth) => {
   validateChangePasswordInput(body)
+  validateSelf(auth, body._id)
 
   const { _id, oldPassword, newPassword } = body
 
@@ -634,7 +713,7 @@ export const registerPlayerByAdmin = async (body) => {
   const collection = db.collection(PLAYERS_COLLECTION)
   const player = await collection.findOne({ _id: toObjectId(body.playerId) })
   if (!player) throwError('Player not found')
-  if (player.password) {
+  if (hasAccount(player)) {
     throwError('This player already has an account')
   }
   if (!player.email) {
@@ -673,126 +752,191 @@ const generateRandomPassword = () => {
   return required.join('')
 }
 
-/**
- * Generate a 6-digit verification code
- */
-const generateVerificationCode = () =>
-  Math.floor(100000 + Math.random() * 900000).toString()
+// ==================== SIGN-UP ====================
+//
+// Sign-up is a wizard (specs/shared/header.md): choose email or phone, prove
+// you own it, then say who you are. The proving happens in verification.js;
+// what is here decides whether an address is free, who a new person might
+// already be, and writes the account.
+
+const MAX_SIMILAR_PLAYERS = 20
+
+const accountExistsMessage = (channel) =>
+  channel === 'phone'
+    ? 'An account with this phone number already exists. Please sign in.'
+    : 'An account with this email already exists. Please sign in.'
+
+// An account is a player someone can sign in as: one with a password, or one
+// linked to a Google account — which may have no password at all. A record
+// that merely has an address on file (imported, or entered by an admin) is
+// not an account; signing up with that address adopts it (see
+// createOrAdoptPlayer).
+const NON_EMPTY = { $exists: true, $nin: ['', null] }
+const isAccountFilter = { $or: [{ password: NON_EMPTY }, { googleId: NON_EMPTY }] }
+const hasAccount = (player) => !!(player?.password || player?.googleId)
+
+const contactFilter = (channel, address) =>
+  channel === 'email'
+    ? { email: { $regex: `^${escapeRegex(address)}$`, $options: 'i' } }
+    : { phone: address }
+
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+const findAccountByContact = (collection, channel, address, projection = { _id: 1 }) =>
+  collection.findOne(
+    { ...contactFilter(channel, address), ...isAccountFilter },
+    { projection },
+  )
+
+// Older clients sent `{ email }`; the wizard sends `{ channel, to }`. Both are
+// read so a page left open across a deploy still works.
+const readContactInput = (body) => {
+  if (!body) throwError('Request body is required')
+  const channel = body.channel || (body.email ? 'email' : undefined)
+  const raw = body.to ?? body.email
+  validateChannel(channel)
+  const address = normalizeAddress(channel, raw)
+  if (!address) {
+    throwError(channel === 'phone' ? 'Invalid Canadian/US phone number' : 'Invalid email address')
+  }
+  return { channel, address }
+}
 
 /**
- * Send verification code to email
+ * Send a verification code — unless the address already belongs to an
+ * account, in which case nothing is sent and the wizard sends the person to
+ * sign in instead.
  */
 export const sendVerificationCode = async (body) => {
-  validateSendVerificationCodeInput(body)
+  const { channel, address } = readContactInput(body)
 
-  const code = generateVerificationCode()
-  verificationCodes.set(body.email, {
-    code,
-    expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes
-  })
+  const collection = getDB().collection(PLAYERS_COLLECTION)
+  if (await findAccountByContact(collection, channel, address)) {
+    return { accountExists: true }
+  }
 
-  await sendVerificationEmail(body.email, code)
-
-  return { success: true }
+  const { resendIn } = await sendCode(channel, address)
+  return { sent: true, resendIn }
 }
 
 /**
- * Validate send verification code input
- */
-const validateSendVerificationCodeInput = (body) => {
-  if (!body) throwError('Request body is required')
-  if (!body.email) throwError('Email is required')
-  if (!isValidEmail(body.email)) throwError('Invalid email address')
-}
-
-/**
- * Verify the code sent to email
+ * Check a code. A right one returns the token signUp needs as proof.
  */
 export const verifyCode = async (body) => {
-  validateVerifyCodeInput(body)
-
-  const stored = verificationCodes.get(body.email)
-  if (!stored) throwError('No verification code found. Please request a new one.')
-  if (Date.now() > stored.expiresAt) {
-    verificationCodes.delete(body.email)
-    throwError('Verification code expired. Please request a new one.')
-  }
-  if (stored.code !== body.code) throwError('Invalid verification code')
-
-  verificationCodes.delete(body.email)
-  return { success: true }
+  const { channel, address } = readContactInput(body)
+  const verificationToken = await checkCode(channel, address, body.code)
+  return { verificationToken }
 }
 
+const validateFindSimilarPlayersInput = (params) => {
+  if (!params) throwError('First and last name are required')
+  if (!params.firstName?.trim()) throwError('First name is required')
+  if (!params.lastName?.trim()) throwError('Last name is required')
+}
+
+// Loose enough to find "O'Brien" from "obrien" and "Ding Hao" from
+// "dinghao": the letters in order, anything that is not a letter allowed in
+// between. The precise decision is isSimilarName's; this only narrows the
+// fetch to one family name's worth of players.
+const familyNamePattern = (normalized) => {
+  const letters = normalized.replace(/[^a-z]/g, '')
+  return new RegExp(`^[^a-z]*${letters.split('').join('[^a-z]*')}[^a-z]*$`, 'i')
+}
+
+// Only what the public player list already shows, plus whether a date of
+// birth is on file — the wizard skips asking for one that is.
+const toSimilarPlayer = (p) => ({
+  _id: p._id.toString(),
+  firstName: p.firstName,
+  lastName: p.lastName,
+  sex: p.sex || '',
+  rating: p.rating ?? 0,
+  hasDateOfBirth: !!p.dateOfBirth,
+})
+
+const byName = (a, b) =>
+  `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`)
+
 /**
- * Validate verify code input
+ * Players on file who may be the person signing up. Players who already have
+ * an account are left out: they are somebody else, or this person should be
+ * signing in.
  */
-const validateVerifyCodeInput = (body) => {
-  if (!body) throwError('Request body is required')
-  if (!body.email) throwError('Email is required')
-  if (!body.code) throwError('Verification code is required')
+export const findSimilarPlayers = async (params) => {
+  validateFindSimilarPlayersInput(params)
+  const typed = { firstName: params.firstName, lastName: params.lastName }
+
+  const families = candidateFamilyNames(typed)
+  const candidates = await getDB()
+    .collection(PLAYERS_COLLECTION)
+    .find(
+      { lastName: { $in: families.map(familyNamePattern) } },
+      {
+        projection: {
+          firstName: 1, lastName: 1, sex: 1, rating: 1, dateOfBirth: 1, password: 1, googleId: 1,
+        },
+      },
+    )
+    .toArray()
+
+  return candidates
+    .filter((p) => !hasAccount(p) && isSimilarName(typed, p))
+    .sort(byName)
+    .slice(0, MAX_SIMILAR_PLAYERS)
+    .map(toSimilarPlayer)
 }
 
 /**
- * Sign up - create a new account
+ * Sign up. The address comes from the verification token, never from the
+ * request body, so an account can only be made for an address someone
+ * proved they own.
  */
 export const signUp = async (body) => {
-  validateSignUpInput(body)
+  if (!body?.verificationToken) throwError('Please verify your email or phone first')
+  const { channel, address, googleId } = readVerifiedContact(body.verificationToken)
+  // Someone who came through Google can sign in with Google, so a password
+  // is theirs to add or not. Everyone else signs in with one.
+  validateSignUpInput(body, { passwordOptional: !!googleId })
 
-  const db = getDB()
-  const collection = db.collection(PLAYERS_COLLECTION)
-
-  // Check if email already has an account with a password
-  const existingByEmail = await collection.findOne({ email: body.email })
-  if (existingByEmail && existingByEmail.password) {
-    throwError('An account with this email already exists. Please sign in.')
+  const collection = getDB().collection(PLAYERS_COLLECTION)
+  // Asked again, not only when the code went out: someone may have finished
+  // signing up with this address in the meantime.
+  if (await findAccountByContact(collection, channel, address)) {
+    throwError(accountExistsMessage(channel))
+  }
+  if (googleId && (await collection.findOne({ googleId }, { projection: { _id: 1 } }))) {
+    throwError('This Google account is already signed up. Please sign in with Google.')
   }
 
-  // Check if phone already has an account with a password
-  if (body.phone) {
-    const existingByPhone = await collection.findOne({ phone: body.phone })
-    if (existingByPhone && existingByPhone.password) {
-      throwError('An account with this phone already exists. Please sign in.')
-    }
-  }
-
+  const credentials = await buildCredentials(body.password, googleId)
+  const contact = { channel, address, credentials }
   const playerDoc = body.playerId
-    ? await handleExistingPlayerSignUp(collection, body)
-    : await handleNewPlayerSignUp(collection, body, existingByEmail)
+    ? await claimExistingPlayer(collection, body, contact)
+    : await createOrAdoptPlayer(collection, body, contact)
 
-  const token = generatePlayerToken(playerDoc)
-
-  return {
-    token,
-    isAdmin: false,
-    isSuperAdmin: false,
-    player: {
-      _id: playerDoc._id.toString(),
-      firstName: playerDoc.firstName,
-      lastName: playerDoc.lastName,
-      email: playerDoc.email,
-      phone: playerDoc.phone,
-      sex: playerDoc.sex,
-      dateOfBirth: playerDoc.dateOfBirth,
-      rating: playerDoc.rating,
-      host: !!playerDoc.host,
-    },
-  }
+  return buildSignUpResponse(playerDoc)
 }
 
-/**
- * Validate sign up input
- */
-const validateSignUpInput = (body) => {
-  if (!body) throwError('Request body is required')
+// How the new account will sign in: a password, a Google account, or both.
+const buildCredentials = async (password, googleId) => ({
+  ...(password ? { password: await hashPassword(password) } : {}),
+  ...(googleId ? { googleId } : {}),
+})
 
+const SEX_VALUES = ['M', 'F']
+
+const validateSignUpInput = (body, { passwordOptional }) => {
   const errors = []
-  if (!body.firstName || !body.firstName.trim()) errors.push('First name is required')
-  if (!body.lastName || !body.lastName.trim()) errors.push('Last name is required')
-  if (!body.email || !body.email.trim()) errors.push('Email is required')
-  if (body.email && !isValidEmail(body.email)) errors.push('Invalid email address')
-  if (!body.password) errors.push('Password is required')
-  if (body.password && !isValidPasswordFormat(body.password)) errors.push('Password does not meet requirements')
-  if (body.phone && !isValidNorthAmericanPhone(body.phone)) errors.push('Invalid phone number')
+  if (!body.firstName?.trim()) errors.push('First name is required')
+  if (!body.lastName?.trim()) errors.push('Last name is required')
+  if (!body.password && !passwordOptional) errors.push('Password is required')
+  if (body.password && !isValidPasswordFormat(body.password)) {
+    errors.push('Password does not meet requirements')
+  }
+  if (body.sex && !SEX_VALUES.includes(body.sex)) errors.push('Invalid sex')
+  if (body.dateOfBirth && !isValidDateOfBirth(body.dateOfBirth)) {
+    errors.push('Invalid date of birth')
+  }
 
   if (errors.length > 0) throwError(errors.join('\n'))
 }
@@ -806,83 +950,127 @@ const isValidPasswordFormat = (password) =>
   /[A-Z]/.test(password) &&
   /[a-z]/.test(password)
 
-/**
- * Handle sign up for an existing player
- */
-const handleExistingPlayerSignUp = async (collection, body) => {
+// A real calendar date, not in the future, and not implausibly long ago.
+const isValidDateOfBirth = (value) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) return false
+  const [, y, m, d] = match.map(Number)
+  const date = new Date(Date.UTC(y, m - 1, d))
+  const isRealDate =
+    date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d
+  const thisYear = new Date().getUTCFullYear()
+  return isRealDate && date.getTime() <= Date.now() && y >= thisYear - 120
+}
+
+// Signing up as a player already on file. What the record already says wins:
+// the wizard only asks for a sex or date of birth that is missing, and the
+// name stays as it was imported.
+const claimExistingPlayer = async (collection, body, { channel, address, credentials }) => {
   const player = await collection.findOne({ _id: toObjectId(body.playerId) })
   if (!player) throwError('Player not found')
-  if (player.password) throwError('This player already has an account. Please sign in.')
+  if (hasAccount(player)) throwError('This player already has an account. Please sign in.')
+  // Anyone can pick any unclaimed player by name here. A record an admin has
+  // flagged as an admin is not one to hand over that way.
+  if (player.isAdmin || player.isSuperAdmin) {
+    throwError('Please contact the club to set up this account')
+  }
 
-  const hashedPassword = await hashPassword(body.password)
+  const updates = {
+    [channel]: address,
+    ...credentials,
+    sex: player.sex || body.sex || '',
+    dateOfBirth: player.dateOfBirth || body.dateOfBirth || '',
+  }
+  await collection.updateOne({ _id: player._id }, { $set: updates })
+  return { ...player, ...updates }
+}
 
-  await collection.updateOne(
-    { _id: toObjectId(body.playerId) },
-    {
-      $set: {
-        email: body.email,
-        phone: body.phone || player.phone || '',
-        password: hashedPassword,
-        dateOfBirth: body.dateOfBirth || player.dateOfBirth || '',
-        sex: body.sex || player.sex || '',
-      },
-    },
-  )
+// A new person — unless a record without an account already carries the
+// address they just proved, in which case that record is theirs. That record
+// takes the name they typed, and keeps any sex or date of birth it has.
+const createOrAdoptPlayer = async (collection, body, { channel, address, credentials }) => {
+  const names = {
+    firstName: toTitleCase(body.firstName),
+    lastName: toTitleCase(body.lastName),
+  }
 
+  const owner = await collection.findOne(contactFilter(channel, address))
+  if (owner) {
+    const updates = {
+      ...names,
+      ...credentials,
+      sex: owner.sex || body.sex || '',
+      dateOfBirth: owner.dateOfBirth || body.dateOfBirth || '',
+    }
+    await collection.updateOne({ _id: owner._id }, { $set: updates })
+    return { ...owner, ...updates }
+  }
+
+  const newPlayer = {
+    ...names,
+    email: channel === 'email' ? address : '',
+    phone: channel === 'phone' ? address : '',
+    sex: body.sex || '',
+    dateOfBirth: body.dateOfBirth || '',
+    ...credentials,
+    rating: 0,
+  }
+  const result = await collection.insertOne(newPlayer)
+  return { ...newPlayer, _id: result.insertedId }
+}
+
+const buildSignUpResponse = (playerDoc) => ({
+  ...buildSignInResponse(playerDoc),
+  // No rating yet: the wizard tells them who to ask for one before they can
+  // enter a rating-restricted event.
+  needsRating: !playerDoc.rating,
+})
+
+// ==================== SIGN IN WITH GOOGLE ====================
+
+/**
+ * A code from Google's sign-in popup. Either it belongs to an account —
+ * which is signed in — or it proves an email nobody has signed up with yet,
+ * and the sign-up wizard carries on from "What's your name?" with what
+ * Google told us.
+ */
+export const googleSignIn = async (body) => {
+  if (!body?.code) throwError('Google sign-in failed. Please try again.')
+  const claims = await verifyGoogleSignInCode(body.code)
+  // Only an address Google has verified proves anything.
+  if (claims.email_verified !== true && claims.email_verified !== 'true') {
+    throwError('Your Google email address is not verified')
+  }
+
+  const collection = getDB().collection(PLAYERS_COLLECTION)
+  const player = await findGoogleAccount(collection, claims)
+  if (player) return { signedIn: true, ...buildSignInResponse(player) }
+
+  const email = normalizeAddress('email', claims.email)
   return {
-    ...player,
-    email: body.email,
-    phone: body.phone || player.phone || '',
-    password: hashedPassword,
-    dateOfBirth: body.dateOfBirth || player.dateOfBirth || '',
-    sex: body.sex || player.sex || '',
+    needsSignUp: true,
+    verificationToken: createVerifiedContactToken({
+      channel: 'email',
+      address: email,
+      googleId: claims.sub,
+    }),
+    email,
+    firstName: claims.given_name || '',
+    lastName: claims.family_name || '',
   }
 }
 
-/**
- * Handle sign up for a new player (no existing player record)
- */
-const handleNewPlayerSignUp = async (collection, body, existingByEmail) => {
-  const hashedPassword = await hashPassword(body.password)
+// The account this Google identity signs in to: the one already linked to it,
+// or else the account with its Google-verified email — which is linked now,
+// so the two ways of signing in lead to the same place.
+const findGoogleAccount = async (collection, claims) => {
+  const linked = await collection.findOne({ googleId: claims.sub })
+  if (linked) return linked
 
-  if (existingByEmail) {
-    // Player record exists (without password) - update it
-    await collection.updateOne(
-      { _id: existingByEmail._id },
-      {
-        $set: {
-          firstName: body.firstName.trim(),
-          lastName: body.lastName.trim(),
-          phone: body.phone || existingByEmail.phone || '',
-          password: hashedPassword,
-          dateOfBirth: body.dateOfBirth || existingByEmail.dateOfBirth || '',
-          sex: body.sex || existingByEmail.sex || '',
-        },
-      },
-    )
-    return {
-      ...existingByEmail,
-      firstName: body.firstName.trim(),
-      lastName: body.lastName.trim(),
-      phone: body.phone || existingByEmail.phone || '',
-      password: hashedPassword,
-      dateOfBirth: body.dateOfBirth || existingByEmail.dateOfBirth || '',
-      sex: body.sex || existingByEmail.sex || '',
-    }
-  }
+  const byEmail = await findAccountByContact(collection, 'email', claims.email, {})
+  if (!byEmail) return null
+  if (byEmail.googleId) throwError('This email is linked to a different Google account')
 
-  // Brand new player
-  const newPlayer = {
-    firstName: body.firstName.trim(),
-    lastName: body.lastName.trim(),
-    email: body.email.trim(),
-    phone: body.phone || '',
-    dateOfBirth: body.dateOfBirth || '',
-    sex: body.sex || '',
-    password: hashedPassword,
-    rating: 0,
-  }
-
-  const result = await collection.insertOne(newPlayer)
-  return { ...newPlayer, _id: result.insertedId }
+  await collection.updateOne({ _id: byEmail._id }, { $set: { googleId: claims.sub } })
+  return { ...byEmail, googleId: claims.sub }
 }

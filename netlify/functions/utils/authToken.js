@@ -73,7 +73,11 @@ export const authFromHeaders = (headers = {}) => {
     headers.authorization || headers.Authorization || headers.AUTHORIZATION || ''
   const token = raw.startsWith('Bearer ') ? raw.slice(7).trim() : ''
   const payload = verifyToken(token)
-  if (!payload) {
+  // A token minted for one narrow job — proving an email or phone during
+  // sign-up (verification.js) — carries a `purpose` and is not a sign-in.
+  // Without this it would verify like any other token and read as an
+  // authenticated caller, which is enough to score matches.
+  if (!payload || payload.purpose) {
     return {
       isAuthenticated: false,
       isAdmin: false,

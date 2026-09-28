@@ -2,7 +2,6 @@ import {
   Show,
   Switch,
   Match,
-  For,
   createSignal,
   onMount,
   type JSX,
@@ -16,13 +15,12 @@ import {
 } from '../stores/liveScoreStore'
 import Input from './Input'
 import Button from './Button'
-import Select from './Select'
-import DatePicker from './DatePicker'
-import PasswordRules from './PasswordRules'
+import SignUpWizard from './SignUpWizard'
+import GoogleSignInIcon, { GoogleSignInStatus } from './GoogleSignInIcon'
+import { iconRowStyle } from './SignInIcons'
 import TablePickerDialog, {
   type TableCellStatus,
 } from './TablePickerDialog'
-import { parseLocalDate, formatLocalDate } from '../utils/date'
 import clubConfig from 'club-config'
 
 export const Header = () => (
@@ -371,7 +369,7 @@ const AuthDialog = () => {
 // Sign In Dialog Content
 
 const SignInDialogContent = () => {
-  const [emailOrPhone, setEmailOrPhone] = createSignal('')
+  const [emailOrPhone, setEmailOrPhone] = createSignal(authState.signInPrefill)
   const [password, setPassword] = createSignal('')
 
   const handleSignIn = () => {
@@ -379,8 +377,7 @@ const SignInDialogContent = () => {
   }
 
   const handleGoToSignUp = () => {
-    signUpActions.reset()
-    authActions.showSignUpDialog()
+    signUpActions.open()
   }
 
   return (
@@ -411,6 +408,12 @@ const SignInDialogContent = () => {
           {authState.loading ? 'Signing in...' : 'Sign in'}
         </Button>
       </div>
+      <div style={googleSignInRowStyle}>
+        <div style={iconRowStyle}>
+          <GoogleSignInIcon />
+        </div>
+        <GoogleSignInStatus />
+      </div>
       <div style={linkContainerStyle}>
         <span style={linkStyle} onClick={handleGoToSignUp}>
           Sign up
@@ -422,64 +425,24 @@ const SignInDialogContent = () => {
 
 // Sign Up Dialog Content
 
-const SignUpDialogContent = () => {
-  const handleGoToSignIn = () => {
-    signUpActions.reset()
-    authActions.showSignInDialog()
-  }
-
-  return (
-    <>
-      <h1 style={dialogTitleStyle}>
-        {signUpState.adminRegisterMode ? 'Register Player' : 'Sign up'}
-      </h1>
-      <Switch>
-        <Match when={signUpState.adminRegisterMode}>
-          <AdminRegisterSection />
-        </Match>
-        <Match when={signUpState.showNewPlayerSuccess}>
-          <NewPlayerSuccessSection />
-        </Match>
-        <Match when={signUpState.showMatchDialog}>
-          <MatchedPlayersSection />
-        </Match>
-        <Match when={true}>
-          <ExistingPlayerCheckbox />
-          <Show when={signUpState.existingPlayer}>
-            <PlayerDropdown />
-          </Show>
-          <Show when={signUpActions.playerAlreadySignedUp()}>
-            <div style={infoMsgStyle}>
-              You already signed up, please sign in.
-            </div>
-          </Show>
-          <Show when={!signUpActions.playerAlreadySignedUp()}>
-            <SignUpFormFields />
-            <Show when={signUpState.error}>
-              <div style={errorStyle}>{signUpState.error}</div>
-            </Show>
-            <div style={buttonContainerStyle}>
-              <Button
-                onClick={signUpActions.signUp}
-                color="#27ae60"
-                disabled={
-                  signUpState.loading
-                }
-              >
-                {signUpState.loading ? 'Signing up...' : 'Sign up'}
-              </Button>
-            </div>
-          </Show>
-          <div style={linkContainerStyle}>
-            <span style={linkStyle} onClick={handleGoToSignIn}>
-              Sign in
-            </span>
-          </div>
-        </Match>
-      </Switch>
-    </>
-  )
-}
+const SignUpDialogContent = () => (
+  <>
+    <h1 style={dialogTitleStyle}>
+      {signUpState.adminRegisterMode ? 'Register Player' : 'Sign up'}
+    </h1>
+    <Switch>
+      <Match when={signUpState.adminRegisterMode}>
+        <AdminRegisterSection />
+      </Match>
+      <Match when={signUpState.showNewPlayerSuccess}>
+        <NewPlayerSuccessSection />
+      </Match>
+      <Match when={true}>
+        <SignUpWizard />
+      </Match>
+    </Switch>
+  </>
+)
 
 const AdminRegisterSection = () => (
   <Show
@@ -536,320 +499,6 @@ const NewPlayerSuccessSection = () => (
       </Button>
     </div>
   </>
-)
-
-const MatchedPlayersSection = () => {
-  const players = () => signUpState.matchedPlayers
-  const showCol = (key: 'sex' | 'email' | 'phone' | 'rating'): boolean =>
-    players().some((p) => !!p[key])
-
-  return (
-    <>
-      <div style={infoMsgStyle}>
-        Player(s) with the same name already exist. Select one to sign up as,
-        or create a new player.
-      </div>
-      <div style={matchTableWrapperStyle}>
-      <table style={matchTableStyle}>
-        <thead>
-          <tr>
-            <th style={matchThStyle}></th>
-            <th style={matchThStyle}>First Name</th>
-            <th style={matchThStyle}>Last Name</th>
-            <Show when={showCol('sex')}>
-              <th style={matchThStyle}>Sex</th>
-            </Show>
-            <Show when={showCol('email')}>
-              <th style={matchThStyle}>Email</th>
-            </Show>
-            <Show when={showCol('phone')}>
-              <th style={matchThStyle}>Phone</th>
-            </Show>
-            <Show when={showCol('rating')}>
-              <th style={matchThStyle}>Rating</th>
-            </Show>
-          </tr>
-        </thead>
-        <tbody>
-          <For each={players()}>
-            {(player) => {
-              const id = player._id.toString()
-              const selected = () =>
-                signUpState.selectedMatchedPlayerId === id
-              return (
-                <tr
-                  style={selected() ? matchRowSelectedStyle : matchRowStyle}
-                  onClick={() => signUpActions.selectMatchedPlayer(id)}
-                >
-                  <td style={matchTdStyle}>
-                    <input
-                      type="radio"
-                      checked={selected()}
-                      onChange={() => signUpActions.selectMatchedPlayer(id)}
-                    />
-                  </td>
-                  <td style={matchTdStyle}>{player.firstName}</td>
-                  <td style={matchTdStyle}>{player.lastName}</td>
-                  <Show when={showCol('sex')}>
-                    <td style={matchTdStyle}>{player.sex ?? ''}</td>
-                  </Show>
-                  <Show when={showCol('email')}>
-                    <td style={matchTdStyle}>{player.email ?? ''}</td>
-                  </Show>
-                  <Show when={showCol('phone')}>
-                    <td style={matchTdStyle}>{player.phone ?? ''}</td>
-                  </Show>
-                  <Show when={showCol('rating')}>
-                    <td style={matchTdStyle}>{player.rating || ''}</td>
-                  </Show>
-                </tr>
-              )
-            }}
-          </For>
-        </tbody>
-      </table>
-      </div>
-      <Show when={signUpState.error}>
-        <div style={errorStyle}>{signUpState.error}</div>
-      </Show>
-      <div style={buttonContainerStyle}>
-        <Button
-          onClick={signUpActions.chooseNewPlayer}
-          color="#888"
-          disabled={signUpState.loading}
-        >
-          New Player
-        </Button>
-        <Button
-          onClick={signUpActions.confirmMatchedPlayer}
-          color="#27ae60"
-          disabled={
-            !signUpState.selectedMatchedPlayerId || signUpState.loading
-          }
-        >
-          Confirm
-        </Button>
-      </div>
-    </>
-  )
-}
-
-const ExistingPlayerCheckbox = () => {
-  const handleChange = () => {
-    signUpActions.setExistingPlayer(!signUpState.existingPlayer)
-  }
-
-  return (
-    <div style={checkboxContainerStyle}>
-      <input
-        type="checkbox"
-        id="existingPlayer"
-        checked={signUpState.existingPlayer}
-        onChange={handleChange}
-        style={checkboxStyle}
-      />
-      <label for="existingPlayer" style={checkboxLabelStyle}>
-        Existing Player
-      </label>
-    </div>
-  )
-}
-
-const PlayerDropdown = () => (
-  <Select
-    label="Player"
-    name="player"
-    value={signUpState.selectedPlayerId}
-    onChange={signUpActions.selectPlayer}
-    options={signUpActions.playerOptions()}
-    placeholder="-- Select a player --"
-  />
-)
-
-const FieldError = (props: { error?: string }) => (
-  <Show when={props.error}>
-    <div style={fieldErrorStyle}>{props.error}</div>
-  </Show>
-)
-
-const SignUpFormFields = () => (
-  <>
-    <Input
-      label="First Name"
-      name="signUpFirstName"
-      value={signUpState.firstName}
-      onChange={signUpActions.setFirstName}
-      disabled={signUpState.existingPlayer}
-    />
-    <FieldError error={signUpState.fieldErrors.firstName} />
-    <Input
-      label="Last Name"
-      name="signUpLastName"
-      value={signUpState.lastName}
-      onChange={signUpActions.setLastName}
-      disabled={signUpState.existingPlayer}
-    />
-    <FieldError error={signUpState.fieldErrors.lastName} />
-    <Select
-      label="Sex"
-      name="signUpSex"
-      value={signUpState.sex}
-      onChange={(value) =>
-        signUpActions.setSex(value as 'male' | 'female')
-      }
-      options={[
-        { value: 'male', label: 'Male' },
-        { value: 'female', label: 'Female' },
-      ]}
-      disabled={signUpState.existingPlayer}
-    />
-    <FieldError error={signUpState.fieldErrors.sex} />
-    <Input
-      label="Email"
-      name="signUpEmail"
-      value={signUpState.email}
-      onChange={signUpActions.setEmail}
-      type="email"
-      disabled={signUpActions.isEmailDisabled()}
-      endAdornment={
-        signUpState.emailVerified ? <EmailVerifiedCheckmark /> : undefined
-      }
-    />
-    <FieldError error={signUpState.fieldErrors.email} />
-    <EmailVerificationSection />
-    <Input
-      label="Phone"
-      name="signUpPhone"
-      value={signUpState.phone}
-      onChange={signUpActions.setPhone}
-      type="tel"
-    />
-    <FieldError error={signUpState.fieldErrors.phone} />
-    <DateOfBirthSection />
-    <PasswordSection />
-    <FieldError error={signUpState.fieldErrors.password} />
-  </>
-)
-
-const EmailVerifiedCheckmark = () => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="#27ae60"
-    stroke-width="3"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-  >
-    <polyline points="20 6 9 17 4 12" />
-  </svg>
-)
-
-const EmailVerificationSection = () => (
-  <Show when={!signUpState.emailVerified}>
-    <div style={verificationContainerStyle}>
-      <SendVerificationCodeLink />
-      <VerificationCodeInput />
-      <Show when={signUpState.verificationError}>
-        <div style={verificationErrorStyle}>
-          {signUpState.verificationError}
-        </div>
-      </Show>
-    </div>
-  </Show>
-)
-
-const SendVerificationCodeLink = () => {
-  const isDisabled = () =>
-    signUpActions.isVerificationDisabled() ||
-    signUpState.verificationSending ||
-    signUpState.verificationCountdown > 0
-
-  const label = () => {
-    if (signUpState.verificationSending) return 'Sending...'
-    if (signUpState.verificationCountdown > 0)
-      return `Resend in ${signUpState.verificationCountdown}s`
-    return 'Send verification code'
-  }
-
-  return (
-    <span
-      style={{
-        ...verificationLinkStyle,
-        opacity: isDisabled() ? 0.5 : 1,
-        cursor: isDisabled() ? 'default' : 'pointer',
-      }}
-      onClick={() => !isDisabled() && signUpActions.sendVerificationCode()}
-    >
-      {label()}
-    </span>
-  )
-}
-
-const VerificationCodeInput = () => {
-  const inputDisabled = () => signUpActions.isVerificationDisabled()
-  const buttonDisabled = () =>
-    inputDisabled() || !signUpState.verificationCode
-
-  return (
-    <div style={verificationCodeRowStyle}>
-      <input
-        type="text"
-        name="verificationCode"
-        value={signUpState.verificationCode}
-        onInput={(e) =>
-          signUpActions.setVerificationCode(e.currentTarget.value)
-        }
-        placeholder="Verification code"
-        disabled={inputDisabled()}
-        style={verificationCodeInputStyle(inputDisabled())}
-      />
-      <button
-        type="button"
-        onClick={signUpActions.verifyCode}
-        disabled={buttonDisabled()}
-        style={verifyButtonStyle(buttonDisabled())}
-      >
-        Verify
-      </button>
-    </div>
-  )
-}
-
-const DateOfBirthSection = () => (
-  <div>
-    <DatePicker
-      label="Date of Birth"
-      value={
-        signUpState.dateOfBirth
-          ? parseLocalDate(signUpState.dateOfBirth)
-          : null
-      }
-      onChange={(date) =>
-        signUpActions.setDateOfBirth(date ? formatLocalDate(date) : '')
-      }
-      minYear={new Date().getFullYear() - 100}
-      maxYear={new Date().getFullYear()}
-    />
-    <div style={dateOfBirthNoteStyle}>
-      Date of birth is required if you want to register for age-restricted
-      events
-    </div>
-  </div>
-)
-
-const PasswordSection = () => (
-  <div>
-    <Input
-      label="Password"
-      name="signUpPassword"
-      value={signUpState.password}
-      onChange={signUpActions.setPassword}
-      type="password"
-    />
-    <PasswordRules password={signUpState.password} />
-  </div>
 )
 
 // Styles
@@ -1013,19 +662,15 @@ const errorStyle: JSX.CSSProperties = {
   'text-align': 'center',
 }
 
-const fieldErrorStyle: JSX.CSSProperties = {
-  color: '#e74c3c',
-  'font-size': '12px',
-  'margin-top': '-12px',
-  'margin-bottom': '8px',
-  'text-align': 'left',
-}
-
 const buttonContainerStyle: JSX.CSSProperties = {
   'margin-top': '20px',
   display: 'flex',
   'justify-content': 'center',
   gap: '12px',
+}
+
+const googleSignInRowStyle: JSX.CSSProperties = {
+  'margin-top': '16px',
 }
 
 const linkContainerStyle: JSX.CSSProperties = {
@@ -1040,26 +685,6 @@ const linkStyle: JSX.CSSProperties = {
   'text-decoration': 'underline',
 }
 
-const checkboxContainerStyle: JSX.CSSProperties = {
-  display: 'flex',
-  'align-items': 'center',
-  gap: '8px',
-  'margin-bottom': '16px',
-}
-
-const checkboxStyle: JSX.CSSProperties = {
-  width: '18px',
-  height: '18px',
-  cursor: 'pointer',
-}
-
-const checkboxLabelStyle: JSX.CSSProperties = {
-  'font-size': '14px',
-  'font-weight': 600,
-  color: '#333',
-  cursor: 'pointer',
-}
-
 const infoMsgStyle: JSX.CSSProperties = {
   color: '#e67e22',
   'font-size': '14px',
@@ -1072,99 +697,4 @@ const infoMsgStyle: JSX.CSSProperties = {
   border: '1px solid #f9e79f',
 }
 
-const verificationContainerStyle: JSX.CSSProperties = {
-  'margin-bottom': '16px',
-}
 
-const verificationLinkStyle: JSX.CSSProperties = {
-  color: '#2185d0',
-  'font-size': '13px',
-  'text-decoration': 'underline',
-  display: 'inline-block',
-  'margin-bottom': '8px',
-}
-
-const verificationCodeRowStyle: JSX.CSSProperties = {
-  display: 'flex',
-  'align-items': 'stretch',
-}
-
-const verificationCodeInputStyle = (
-  disabled: boolean,
-): JSX.CSSProperties => ({
-  flex: '1',
-  padding: '12px 16px',
-  'font-size': '16px',
-  border: '1px solid #ddd',
-  'border-right': 'none',
-  'border-radius': '8px 0 0 8px',
-  outline: 'none',
-  'box-sizing': 'border-box',
-  'background-color': disabled ? '#f5f5f5' : '#fff',
-  color: '#333',
-  cursor: disabled ? 'not-allowed' : 'text',
-})
-
-const verifyButtonStyle = (disabled: boolean): JSX.CSSProperties => ({
-  padding: '0 20px',
-  'font-size': '14px',
-  'font-weight': 600,
-  border: '1px solid #2185d0',
-  'border-radius': '0 8px 8px 0',
-  'background-color': '#2185d0',
-  color: '#fff',
-  cursor: disabled ? 'not-allowed' : 'pointer',
-  opacity: disabled ? 0.6 : 1,
-  'white-space': 'nowrap',
-})
-
-const verificationErrorStyle: JSX.CSSProperties = {
-  color: '#e74c3c',
-  'font-size': '12px',
-  'margin-top': '4px',
-}
-
-
-const dateOfBirthNoteStyle: JSX.CSSProperties = {
-  'font-size': '12px',
-  color: '#666',
-  'margin-top': '-8px',
-  'margin-bottom': '8px',
-  'text-align': 'left',
-}
-
-const matchTableWrapperStyle: JSX.CSSProperties = {
-  'overflow-x': 'auto',
-  'margin-bottom': '12px',
-}
-
-const matchTableStyle: JSX.CSSProperties = {
-  width: '100%',
-  'border-collapse': 'collapse',
-}
-
-const matchThStyle: JSX.CSSProperties = {
-  padding: '8px',
-  'text-align': 'left',
-  'font-size': '13px',
-  'font-weight': 600,
-  'border-bottom': '2px solid #ddd',
-  color: '#333',
-}
-
-const matchTdStyle: JSX.CSSProperties = {
-  padding: '8px',
-  'text-align': 'left',
-  'font-size': '13px',
-  color: '#333',
-  'border-bottom': '1px solid #f0f0f0',
-}
-
-const matchRowStyle: JSX.CSSProperties = {
-  cursor: 'pointer',
-}
-
-const matchRowSelectedStyle: JSX.CSSProperties = {
-  cursor: 'pointer',
-  'background-color': '#e8f5e9',
-}

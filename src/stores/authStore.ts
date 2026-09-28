@@ -12,9 +12,12 @@ interface AuthUser {
   rating?: number
   pending?: boolean
   host?: boolean
+  // False for an account made with Google and no password: the Account page
+  // then offers to set one rather than asking for the current one.
+  hasPassword?: boolean
 }
 
-interface SignInResponse {
+export interface SignInResponse {
   token: string
   isAdmin: boolean
   isSuperAdmin: boolean
@@ -34,6 +37,9 @@ interface AuthState {
   error: string | null
   dialogView: DialogView
   showPendingModal: boolean
+  // What the sign-in box starts with, when the sign-up wizard has just found
+  // an account for the email or phone the person typed.
+  signInPrefill: string
 }
 
 const getInitialState = (): AuthState => ({
@@ -46,6 +52,7 @@ const getInitialState = (): AuthState => ({
   error: null,
   dialogView: null,
   showPendingModal: false,
+  signInPrefill: '',
 })
 
 const loadUserFromStorage = (): AuthUser | null => {
@@ -116,8 +123,13 @@ const [authState, setAuthState] = createStore<AuthState>(getInitialState())
 export { authState }
 
 export const authActions = {
-  showSignInDialog: () => {
-    setAuthState({ dialogView: 'signIn', error: null })
+  showSignInDialog: (prefill?: string) => {
+    setAuthState({
+      dialogView: 'signIn',
+      error: null,
+      // Guarded: passed straight to an onClick this would be a MouseEvent.
+      signInPrefill: typeof prefill === 'string' ? prefill : '',
+    })
   },
 
   showSignUpDialog: () => {
@@ -141,24 +153,7 @@ export const authActions = {
         emailOrPhone,
         password,
       })
-      saveToStorage(
-        result.token,
-        result.player,
-        result.isAdmin,
-        result.isSuperAdmin,
-        !!result.isTablet,
-      )
-      setAuthState({
-        user: result.player,
-        token: result.token,
-        isAdmin: result.isAdmin,
-        isSuperAdmin: result.isSuperAdmin,
-        isTablet: !!result.isTablet,
-        loading: false,
-        error: null,
-        dialogView: null,
-        showPendingModal: !!result.player?.pending,
-      })
+      authActions.completeSignIn(result)
     } catch (err) {
       setAuthState({
         loading: false,
@@ -205,6 +200,28 @@ export const authActions = {
       isTablet: false,
       dialogView: null,
       error: null,
+    })
+  },
+
+  // A successful sign-in, however it happened — password or Google.
+  completeSignIn: (result: SignInResponse) => {
+    saveToStorage(
+      result.token,
+      result.player,
+      result.isAdmin,
+      result.isSuperAdmin,
+      !!result.isTablet,
+    )
+    setAuthState({
+      user: result.player,
+      token: result.token,
+      isAdmin: result.isAdmin,
+      isSuperAdmin: result.isSuperAdmin,
+      isTablet: !!result.isTablet,
+      loading: false,
+      error: null,
+      dialogView: null,
+      showPendingModal: !!result.player?.pending,
     })
   },
 

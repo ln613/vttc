@@ -1,89 +1,128 @@
 import { createStore } from 'solid-js/store'
 import type { Player } from '../../shared/types/Player'
-import { apiPost } from '../utils/api'
+import { apiGet, apiPost } from '../utils/api'
 import { playerActions, playerState } from './playerStore'
 import { authActions } from './authStore'
+import { settingsActions, settingsState } from './settingsStore'
 import { normalizeSex, toDbSex, type FormSex } from '../../shared/rules/sex'
+import { isValidEmail, isValidPhone } from '../../shared/rules/contact'
+import { formatLocalDate, toIsoDate, daysInMonth, type DatePart } from '../utils/date'
 
-interface SignUpState {
-  existingPlayer: boolean
-  selectedPlayerId: string
+// ==================== the wizard ====================
+//
+// Sign-up is seven numbered steps (specs/shared/header.md). Some screens are
+// a branch of a step rather than a step of their own — "that email already
+// has an account" is what step 3 turns into, and "is one of these you?" is
+// the second half of step 4 — so each screen maps onto the number it belongs
+// to, and the progress shown is the number, not the screen.
+
+// 'google' skips steps 2 and 3: Google has already proved the email.
+export type SignUpMethod = 'email' | 'phone' | 'google'
+
+// Phone sign-up is built and works once SMS is set up (sms.js), but is not
+// offered for now. Flip this to offer it wherever smsEnabled is true.
+const OFFER_PHONE_SIGN_UP = false
+
+export type WizardStep =
+  | 'method'
+  | 'contact'
+  | 'code'
+  | 'accountExists'
+  | 'name'
+  | 'match'
+  | 'sex'
+  | 'dob'
+  | 'password'
+
+export const TOTAL_STEPS = 7
+
+const STEP_NUMBER: Record<WizardStep, number> = {
+  method: 1,
+  contact: 2,
+  code: 3,
+  accountExists: 3,
+  name: 4,
+  match: 4,
+  sex: 5,
+  dob: 6,
+  password: 7,
+}
+
+// A player on file who might be the person signing up — only what the public
+// player list shows, plus whether a date of birth is on file.
+export interface SimilarPlayer {
+  _id: string
   firstName: string
   lastName: string
+  sex: string
+  rating: number
+  hasDateOfBirth: boolean
+}
+
+interface SignUpState {
+  step: WizardStep
+  // The screens that led here, for Back. Skipped steps are never pushed, so
+  // Back returns to the last screen the person actually saw.
+  history: WizardStep[]
+  method: SignUpMethod | null
+  contact: string
+  // The address the running countdown belongs to, so going Back and
+  // Continuing with the same address returns to the code instead of
+  // bouncing off the resend cooldown.
+  codeSentTo: string
+  code: string
+  resendCountdown: number
+  verificationToken: string
+  firstName: string
+  lastName: string
+  similarPlayers: SimilarPlayer[]
+  // '' means a new player.
+  selectedPlayerId: string
   sex: FormSex
-  email: string
-  verificationCode: string
-  emailVerified: boolean
-  verificationSending: boolean
-  verificationError: string | null
-  verificationCountdown: number
-  phone: string
-  dateOfBirth: string
+  dobYear: string
+  dobMonth: string
+  dobDay: string
   password: string
   loading: boolean
   error: string | null
-  message: string | null
-  showMatchDialog: boolean
-  matchedPlayers: Player[]
-  selectedMatchedPlayerId: string
   showNewPlayerSuccess: boolean
-  fieldErrors: FieldErrors
+  // Admin "register this player" mode, opened from the Players page.
   adminRegisterMode: boolean
   adminRegisterSent: boolean
-}
-
-interface FieldErrors {
-  firstName?: string
-  lastName?: string
-  sex?: string
-  email?: string
-  phone?: string
-  password?: string
+  email: string
 }
 
 const getInitialState = (): SignUpState => ({
-  existingPlayer: false,
-  selectedPlayerId: '',
+  step: 'method',
+  history: [],
+  method: null,
+  contact: '',
+  codeSentTo: '',
+  code: '',
+  resendCountdown: 0,
+  verificationToken: '',
   firstName: '',
   lastName: '',
+  similarPlayers: [],
+  selectedPlayerId: '',
   sex: '',
-  email: '',
-  verificationCode: '',
-  emailVerified: false,
-  verificationSending: false,
-  verificationError: null,
-  verificationCountdown: 0,
-  phone: '',
-  dateOfBirth: '',
+  dobYear: '',
+  dobMonth: '',
+  dobDay: '',
   password: '',
   loading: false,
   error: null,
-  message: null,
-  showMatchDialog: false,
-  matchedPlayers: [],
-  selectedMatchedPlayerId: '',
   showNewPlayerSuccess: false,
-  fieldErrors: {},
   adminRegisterMode: false,
   adminRegisterSent: false,
+  email: '',
 })
 
 const [signUpState, setSignUpState] = createStore<SignUpState>(getInitialState())
 
 export { signUpState }
 
-// Validation utils
-
-const isValidEmail = (email: string): boolean =>
-  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-
-const isValidPhone = (phone: string): boolean => {
-  const digits = phone.replace(/\D/g, '')
-  if (digits.length === 10) return /^[2-9]\d{2}[2-9]\d{6}$/.test(digits)
-  if (digits.length === 11 && digits.startsWith('1'))
-    return /^1[2-9]\d{2}[2-9]\d{6}$/.test(digits)
-  return false
-}
+// ==================== rules ====================
 
 const isValidPassword = (password: string): boolean =>
   password.length >= 8 &&
@@ -91,92 +130,69 @@ const isValidPassword = (password: string): boolean =>
   /[A-Z]/.test(password) &&
   /[a-z]/.test(password)
 
-const passwordHasMinLength = (password: string): boolean =>
-  password.length >= 8
+const errorMessage = (err: unknown, fallback: string): string =>
+  err instanceof Error ? err.message : fallback
 
-const passwordHasNumber = (password: string): boolean =>
-  /[0-9]/.test(password)
+// ==================== derived ====================
 
-const passwordHasUppercase = (password: string): boolean =>
-  /[A-Z]/.test(password)
+const stepNumber = (): number => STEP_NUMBER[signUpState.step]
 
-const passwordHasLowercase = (password: string): boolean =>
-  /[a-z]/.test(password)
+const isPhone = (): boolean => signUpState.method === 'phone'
 
-// Derived state
+const phoneAvailable = (): boolean =>
+  OFFER_PHONE_SIGN_UP && settingsState.settings.smsEnabled
 
-const selectedPlayer = (): Player | null => {
-  if (!signUpState.selectedPlayerId || !playerState.data) return null
-  return (
-    playerState.data.find(
-      (p) => p._id.toString() === signUpState.selectedPlayerId,
-    ) ?? null
-  )
+// Someone who came through Google signs in with Google; a password is an
+// extra way in, theirs to add or not.
+const isPasswordOptional = (): boolean => signUpState.method === 'google'
+
+const selectedSimilarPlayer = (): SimilarPlayer | null =>
+  signUpState.similarPlayers.find((p) => p._id === signUpState.selectedPlayerId) ??
+  null
+
+// Steps 5 and 6 are skipped when the player being claimed already has the
+// answer on file.
+const needsSexStep = (): boolean => !normalizeSex(selectedSimilarPlayer()?.sex)
+
+const needsDobStep = (): boolean => !selectedSimilarPlayer()?.hasDateOfBirth
+
+// Once the address is proved there is no going back to change it — that
+// would mean proving a different one. Closing the dialog starts over.
+const canGoBack = (): boolean =>
+  signUpState.history.length > 0 && signUpState.step !== 'name'
+
+const dateOfBirth = (): string =>
+  toIsoDate(signUpState.dobYear, signUpState.dobMonth, signUpState.dobDay)
+
+// ==================== navigation ====================
+
+const goTo = (step: WizardStep) => {
+  setSignUpState({
+    history: [...signUpState.history, signUpState.step],
+    step,
+    error: null,
+  })
 }
 
-const playerAlreadySignedUp = (): boolean => {
-  const player = selectedPlayer()
-  return !!player?.hasAccount
+const back = () => {
+  if (!canGoBack()) return
+  const history = [...signUpState.history]
+  const previous = history.pop()!
+  setSignUpState({ step: previous, history, error: null })
 }
 
-const isEmailDisabled = (): boolean => signUpState.emailVerified
-
-const isVerificationDisabled = (): boolean =>
-  !signUpState.email || !isValidEmail(signUpState.email)
-
-const validateFields = (): FieldErrors => {
-  const errors: FieldErrors = {}
-  if (!signUpState.firstName.trim()) errors.firstName = 'First name is required'
-  if (!signUpState.lastName.trim()) errors.lastName = 'Last name is required'
-  if (signUpState.sex === '') errors.sex = 'Sex is required'
-  if (!isValidEmail(signUpState.email)) {
-    errors.email = 'Invalid email address'
-  } else if (!signUpState.emailVerified) {
-    errors.email = 'Email is not verified'
-  }
-  if (signUpState.phone !== '' && !isValidPhone(signUpState.phone)) {
-    errors.phone = 'Invalid phone number'
-  }
-  if (!isValidPassword(signUpState.password)) {
-    errors.password = 'Password does not meet requirements'
-  }
-  return errors
+// Where the wizard goes once it knows who the person is (step 4 done).
+const stepAfterIdentity = (): WizardStep => {
+  if (needsSexStep()) return 'sex'
+  if (needsDobStep()) return 'dob'
+  return 'password'
 }
 
-const clearFieldError = (field: keyof FieldErrors) => {
-  setSignUpState('fieldErrors', field, undefined)
-}
+const stepAfterSex = (): WizardStep => (needsDobStep() ? 'dob' : 'password')
 
-const toTitleCase = (s: string): string =>
-  s.toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase())
+const setError = (error: string) => setSignUpState('error', error)
 
-const findNameMatches = (firstName: string, lastName: string): Player[] => {
-  if (!playerState.data) return []
-  const fn = firstName.trim().toLowerCase()
-  const ln = lastName.trim().toLowerCase()
-  if (!fn || !ln) return []
-  return playerState.data.filter(
-    (p) =>
-      (p.firstName ?? '').trim().toLowerCase() === fn &&
-      (p.lastName ?? '').trim().toLowerCase() === ln,
-  )
-}
-
-const sortByName = (a: Player, b: Player): number => {
-  const nameA = `${a.firstName} ${a.lastName}`.toLowerCase()
-  const nameB = `${b.firstName} ${b.lastName}`.toLowerCase()
-  return nameA.localeCompare(nameB)
-}
-
-const playerOptions = (): { value: string; label: string }[] => {
-  if (!playerState.data) return []
-  return [...playerState.data].sort(sortByName).map((p) => ({
-    value: p._id.toString(),
-    label: `${p.firstName} ${p.lastName} (${p.rating})`,
-  }))
-}
-
-// Actions
+// ==================== resend countdown ====================
 
 let countdownTimer: ReturnType<typeof setInterval> | null = null
 
@@ -187,42 +203,321 @@ const clearCountdownTimer = () => {
   }
 }
 
-const startCountdown = () => {
-  setSignUpState('verificationCountdown', 60)
+const startCountdown = (seconds: number) => {
+  setSignUpState('resendCountdown', seconds)
   clearCountdownTimer()
   countdownTimer = setInterval(() => {
-    const current = signUpState.verificationCountdown
+    const current = signUpState.resendCountdown
     if (current <= 1) {
-      setSignUpState('verificationCountdown', 0)
+      setSignUpState('resendCountdown', 0)
       clearCountdownTimer()
     } else {
-      setSignUpState('verificationCountdown', current - 1)
+      setSignUpState('resendCountdown', current - 1)
     }
   }, 1000)
 }
 
-const setExistingPlayer = (value: boolean) => {
-  setSignUpState({
-    existingPlayer: value,
-    selectedPlayerId: '',
-    firstName: '',
-    lastName: '',
-    email: '',
-    emailVerified: false,
-    verificationCode: '',
-    verificationError: null,
-    message: null,
-    error: null,
+// ==================== step 1: method ====================
+
+const chooseMethod = (method: SignUpMethod) => {
+  if (method === 'phone' && !phoneAvailable()) return
+  if (method !== signUpState.method) {
+    setSignUpState({ method, contact: '', code: '', codeSentTo: '' })
+  }
+  goTo('contact')
+}
+
+// ==================== steps 2 and 3: prove the address ====================
+
+const setContact = (value: string) => {
+  setSignUpState({ contact: value, error: null })
+}
+
+const validateContact = (): string | null => {
+  const value = signUpState.contact.trim()
+  if (!value) return isPhone() ? 'Enter your phone number' : 'Enter your email'
+  if (isPhone() && !isValidPhone(value)) return 'Enter a valid Canadian/US phone number'
+  if (!isPhone() && !isValidEmail(value)) return 'Enter a valid email address'
+  return null
+}
+
+interface SendCodeResponse {
+  accountExists?: boolean
+  sent?: boolean
+  resendIn?: number
+}
+
+const requestCode = async (): Promise<SendCodeResponse> =>
+  apiPost<SendCodeResponse>('sendVerificationCode', {
+    channel: signUpState.method,
+    to: signUpState.contact.trim(),
   })
-  if (value && !playerState.data) {
-    playerActions.fetchPlayers()
+
+const submitContact = async () => {
+  const invalid = validateContact()
+  if (invalid) return setError(invalid)
+
+  const address = signUpState.contact.trim()
+  if (address === signUpState.codeSentTo && signUpState.resendCountdown > 0) {
+    return goTo('code')
+  }
+
+  setSignUpState({ loading: true, error: null })
+  try {
+    const result = await requestCode()
+    setSignUpState({ loading: false })
+    if (result.accountExists) return goTo('accountExists')
+    setSignUpState({ code: '', codeSentTo: address })
+    startCountdown(result.resendIn ?? 60)
+    goTo('code')
+  } catch (err) {
+    setSignUpState({ loading: false, error: errorMessage(err, 'Could not send the code') })
   }
 }
+
+const resendCode = async () => {
+  if (signUpState.resendCountdown > 0 || signUpState.loading) return
+  setSignUpState({ loading: true, error: null })
+  try {
+    const result = await requestCode()
+    setSignUpState({ loading: false, code: '' })
+    startCountdown(result.resendIn ?? 60)
+  } catch (err) {
+    setSignUpState({ loading: false, error: errorMessage(err, 'Could not send the code') })
+  }
+}
+
+const setCode = (value: string) => {
+  setSignUpState({ code: value.replace(/\D/g, '').slice(0, 6), error: null })
+}
+
+const submitCode = async () => {
+  if (signUpState.code.length !== 6) return setError('Enter the 6-digit code')
+  setSignUpState({ loading: true, error: null })
+  try {
+    const { verificationToken } = await apiPost<{ verificationToken: string }>(
+      'verifyCode',
+      {
+        channel: signUpState.method,
+        to: signUpState.contact.trim(),
+        code: signUpState.code,
+      },
+    )
+    clearCountdownTimer()
+    setSignUpState({ loading: false, verificationToken, resendCountdown: 0 })
+    goTo('name')
+  } catch (err) {
+    setSignUpState({ loading: false, error: errorMessage(err, 'That code is not right') })
+  }
+}
+
+// ==================== or: through Google ====================
+
+interface GoogleSignUpStart {
+  verificationToken: string
+  email: string
+  firstName: string
+  lastName: string
+}
+
+// Google has proved the email, so steps 2 and 3 are done: the wizard opens
+// at "What's your name?" with the name Google gave, still editable. There is
+// no Back from there, exactly as after verifying a code.
+const continueWithGoogle = (start: GoogleSignUpStart) => {
+  reset()
+  setSignUpState({
+    method: 'google',
+    contact: start.email,
+    verificationToken: start.verificationToken,
+    firstName: start.firstName,
+    lastName: start.lastName,
+    step: 'name',
+  })
+  authActions.showSignUpDialog()
+}
+
+// Step 3 found an account: sign in with the address already typed.
+const goToSignIn = () => {
+  const contact = signUpState.contact.trim()
+  reset()
+  authActions.showSignInDialog(contact)
+}
+
+// ==================== step 4: who are you ====================
+
+const setFirstName = (value: string) => setSignUpState({ firstName: value, error: null })
+
+const setLastName = (value: string) => setSignUpState({ lastName: value, error: null })
+
+const submitName = async () => {
+  const firstName = signUpState.firstName.trim()
+  const lastName = signUpState.lastName.trim()
+  if (!firstName) return setError('Enter your first name')
+  if (!lastName) return setError('Enter your last name')
+
+  setSignUpState({ loading: true, error: null })
+  try {
+    const matches = await apiGet<SimilarPlayer[]>('similarPlayers', { firstName, lastName })
+    setSignUpState({
+      loading: false,
+      similarPlayers: matches,
+      // One candidate is pre-selected; with several, the person has to pick.
+      selectedPlayerId: matches.length === 1 ? matches[0]._id : '',
+    })
+    goTo(matches.length > 0 ? 'match' : stepAfterIdentity())
+  } catch (err) {
+    setSignUpState({ loading: false, error: errorMessage(err, 'Could not look up your name') })
+  }
+}
+
+const selectSimilarPlayer = (id: string) => {
+  setSignUpState({ selectedPlayerId: id, error: null })
+}
+
+const confirmSimilarPlayer = () => {
+  if (!signUpState.selectedPlayerId) return setError('Select yourself, or choose "I\'m new"')
+  goTo(stepAfterIdentity())
+}
+
+const chooseNewPlayer = () => {
+  setSignUpState({ selectedPlayerId: '' })
+  goTo(stepAfterIdentity())
+}
+
+// ==================== step 5: sex ====================
+
+// Two choices and nothing else to fill in, so choosing one is the answer.
+const chooseSex = (value: FormSex) => {
+  if (!value) return setError('Choose one')
+  setSignUpState({ sex: value, error: null })
+  goTo(stepAfterSex())
+}
+
+// ==================== step 6: date of birth ====================
+
+// A day that no longer exists in the newly chosen month (the 31st, going to
+// April) is cleared rather than silently moved.
+const setDobPart = (part: DatePart, value: string) => {
+  const next = {
+    dobYear: part === 'year' ? value : signUpState.dobYear,
+    dobMonth: part === 'month' ? value : signUpState.dobMonth,
+    dobDay: part === 'day' ? value : signUpState.dobDay,
+  }
+  const max = next.dobMonth
+    ? daysInMonth(Number(next.dobMonth), Number(next.dobYear) || undefined)
+    : 31
+  if (Number(next.dobDay) > max) next.dobDay = ''
+  setSignUpState({ ...next, error: null })
+}
+
+const validateDob = (): string | null => {
+  const { dobYear, dobMonth, dobDay } = signUpState
+  const chosen = [dobYear, dobMonth, dobDay].filter(Boolean).length
+  if (chosen === 0) return null
+  if (chosen < 3) return 'Choose the year, month and day — or skip'
+  if (dateOfBirth() > formatLocalDate(new Date())) return 'That date is in the future'
+  return null
+}
+
+const submitDob = () => {
+  const invalid = validateDob()
+  if (invalid) return setError(invalid)
+  goTo('password')
+}
+
+const skipDob = () => {
+  setSignUpState({ dobYear: '', dobMonth: '', dobDay: '' })
+  goTo('password')
+}
+
+// ==================== step 7: password, and done ====================
+
+const setPassword = (value: string) => setSignUpState({ password: value, error: null })
+
+interface SignUpResponse {
+  token: string
+  isAdmin: boolean
+  isSuperAdmin: boolean
+  needsRating: boolean
+  player: {
+    _id: string
+    firstName: string
+    lastName: string
+    email?: string
+    phone?: string
+  }
+}
+
+// Only what was asked: a claimed player's sex or date of birth on file is
+// never sent, so there is nothing for the server to weigh against it.
+const buildSignUpBody = (): Record<string, string> => {
+  const body: Record<string, string> = {
+    verificationToken: signUpState.verificationToken,
+    firstName: signUpState.firstName.trim(),
+    lastName: signUpState.lastName.trim(),
+  }
+  if (signUpState.password) body.password = signUpState.password
+  if (signUpState.selectedPlayerId) body.playerId = signUpState.selectedPlayerId
+  const dbSex = toDbSex(signUpState.sex)
+  if (needsSexStep() && dbSex) body.sex = dbSex
+  if (needsDobStep() && dateOfBirth()) body.dateOfBirth = dateOfBirth()
+  return body
+}
+
+const storeSession = (result: SignUpResponse) => {
+  localStorage.setItem('vttc_token', result.token)
+  localStorage.setItem('vttc_user', JSON.stringify(result.player))
+  localStorage.setItem('vttc_isAdmin', String(result.isAdmin))
+  localStorage.setItem('vttc_isSuperAdmin', String(result.isSuperAdmin))
+}
+
+const submitSignUp = async () => {
+  const skippingPassword = isPasswordOptional() && !signUpState.password
+  if (!skippingPassword && !isValidPassword(signUpState.password)) {
+    return setError('Password does not meet the rules below')
+  }
+  setSignUpState({ loading: true, error: null })
+  try {
+    const result = await apiPost<SignUpResponse>('signUp', buildSignUpBody())
+    storeSession(result)
+    if (result.needsRating) {
+      setSignUpState({ loading: false, showNewPlayerSuccess: true })
+    } else {
+      authActions.hideDialog()
+      window.location.reload()
+    }
+  } catch (err) {
+    setSignUpState({ loading: false, error: errorMessage(err, 'Sign up failed') })
+  }
+}
+
+const dismissNewPlayerSuccess = () => {
+  authActions.hideDialog()
+  window.location.reload()
+}
+
+// ==================== opening and closing ====================
+
+const reset = () => {
+  clearCountdownTimer()
+  setSignUpState(getInitialState())
+}
+
+// Opens a fresh wizard. Settings are fetched here if nothing has fetched them
+// yet, because only they say whether "Sign up with Phone" can be offered.
+const open = () => {
+  reset()
+  if (!settingsState.loaded && !settingsState.loading) {
+    void settingsActions.fetchSettings()
+  }
+  authActions.showSignUpDialog()
+}
+
+// ==================== admin: register a player ====================
 
 const openAdminRegister = (player: Player) => {
   reset()
   setSignUpState({
-    existingPlayer: true,
     selectedPlayerId: player._id.toString(),
     firstName: player.firstName,
     lastName: player.lastName,
@@ -244,306 +539,41 @@ const runAdminRegister = async () => {
   } catch (err) {
     setSignUpState({
       loading: false,
-      error:
-        err instanceof Error ? err.message : 'Failed to register player',
+      error: errorMessage(err, 'Failed to register player'),
     })
   }
-}
-
-const selectPlayer = (playerId: string) => {
-  const player = playerState.data?.find(
-    (p) => p._id.toString() === playerId,
-  )
-  setSignUpState({
-    selectedPlayerId: playerId,
-    firstName: player?.firstName ?? '',
-    lastName: player?.lastName ?? '',
-    sex: normalizeSex(player?.sex),
-    email: player?.email ?? '',
-    emailVerified: false,
-    verificationCode: '',
-    verificationError: null,
-    message: null,
-    error: null,
-  })
-  if (player?.firstName) clearFieldError('firstName')
-  if (player?.lastName) clearFieldError('lastName')
-  if (normalizeSex(player?.sex)) clearFieldError('sex')
-  if (player?.email) clearFieldError('email')
-}
-
-const setFirstName = (value: string) => {
-  setSignUpState('firstName', value)
-  clearFieldError('firstName')
-}
-
-const setLastName = (value: string) => {
-  setSignUpState('lastName', value)
-  clearFieldError('lastName')
-}
-
-const setSex = (value: FormSex) => {
-  setSignUpState('sex', value)
-  clearFieldError('sex')
-}
-
-const setEmail = (value: string) => {
-  setSignUpState({
-    email: value,
-    emailVerified: false,
-    verificationCode: '',
-    verificationError: null,
-  })
-  clearFieldError('email')
-}
-
-const setVerificationCode = (value: string) => {
-  setSignUpState({ verificationCode: value, verificationError: null })
-}
-
-const setPhone = (value: string) => {
-  setSignUpState('phone', value)
-  clearFieldError('phone')
-}
-
-const setDateOfBirth = (value: string) => {
-  setSignUpState('dateOfBirth', value)
-}
-
-const setPassword = (value: string) => {
-  setSignUpState('password', value)
-  clearFieldError('password')
-}
-
-const sendVerificationCode = async () => {
-  if (!signUpState.email || !isValidEmail(signUpState.email)) return
-  if (signUpState.verificationCountdown > 0) return
-
-  setSignUpState({ verificationSending: true, verificationError: null })
-  try {
-    await apiPost('sendVerificationCode', { email: signUpState.email })
-    startCountdown()
-    setSignUpState({ verificationSending: false })
-  } catch (err) {
-    setSignUpState({
-      verificationSending: false,
-      verificationError:
-        err instanceof Error ? err.message : 'Failed to send code',
-    })
-  }
-}
-
-const verifyCode = async () => {
-  if (!signUpState.verificationCode) return
-
-  setSignUpState({ verificationSending: true, verificationError: null })
-  try {
-    await apiPost('verifyCode', {
-      email: signUpState.email,
-      code: signUpState.verificationCode,
-    })
-    setSignUpState({
-      emailVerified: true,
-      verificationSending: false,
-      verificationError: null,
-    })
-  } catch (err) {
-    setSignUpState({
-      verificationSending: false,
-      verificationError:
-        err instanceof Error ? err.message : 'Invalid verification code',
-    })
-  }
-}
-
-interface SignUpResponse {
-  token: string
-  isAdmin: boolean
-  isSuperAdmin: boolean
-  player: {
-    _id: string
-    firstName: string
-    lastName: string
-    email?: string
-    phone?: string
-  }
-}
-
-const buildSignUpBody = (): Record<string, string> => {
-  const body: Record<string, string> = {
-    firstName: toTitleCase(signUpState.firstName.trim()),
-    lastName: toTitleCase(signUpState.lastName.trim()),
-    email: signUpState.email.trim(),
-    password: signUpState.password,
-  }
-  if (signUpState.phone.trim()) body.phone = signUpState.phone.trim()
-  if (signUpState.dateOfBirth) body.dateOfBirth = signUpState.dateOfBirth
-  const dbSex = toDbSex(signUpState.sex)
-  if (dbSex) body.sex = dbSex
-  if (signUpState.existingPlayer && signUpState.selectedPlayerId) {
-    body.playerId = signUpState.selectedPlayerId
-  }
-  return body
-}
-
-const isBrandNewPlayerSignUp = (): boolean =>
-  !signUpState.existingPlayer && !signUpState.selectedPlayerId
-
-const doSignUp = async () => {
-  setSignUpState({ loading: true, error: null })
-  try {
-    const wasBrandNew = isBrandNewPlayerSignUp()
-    const result = await apiPost<SignUpResponse>('signUp', buildSignUpBody())
-
-    localStorage.setItem('vttc_token', result.token)
-    localStorage.setItem('vttc_user', JSON.stringify(result.player))
-    localStorage.setItem('vttc_isAdmin', String(result.isAdmin))
-    localStorage.setItem('vttc_isSuperAdmin', String(result.isSuperAdmin))
-
-    if (wasBrandNew) {
-      setSignUpState({ loading: false, showNewPlayerSuccess: true })
-    } else {
-      authActions.hideDialog()
-      window.location.reload()
-    }
-  } catch (err) {
-    setSignUpState({
-      loading: false,
-      error: err instanceof Error ? err.message : 'Sign up failed',
-    })
-  }
-}
-
-const isEmailTakenByAccount = (email: string): boolean => {
-  if (!playerState.data) return false
-  const target = email.trim().toLowerCase()
-  return playerState.data.some(
-    (p) => p.hasAccount && (p.email ?? '').trim().toLowerCase() === target,
-  )
-}
-
-const phoneDigits = (phone: string): string => phone.replace(/\D/g, '')
-
-const isPhoneTakenByAccount = (phone: string): boolean => {
-  if (!playerState.data) return false
-  const target = phoneDigits(phone)
-  if (!target) return false
-  return playerState.data.some(
-    (p) => p.hasAccount && phoneDigits(p.phone ?? '') === target,
-  )
-}
-
-const signUp = async () => {
-  const errors = validateFields()
-  if (Object.keys(errors).length > 0) {
-    setSignUpState({ fieldErrors: errors })
-    return
-  }
-  setSignUpState({ fieldErrors: {} })
-
-  if (!signUpState.existingPlayer) {
-    if (!playerState.data) await playerActions.fetchPlayers()
-    if (isEmailTakenByAccount(signUpState.email)) {
-      setSignUpState({
-        error: 'An account with this email already exists. Please sign in.',
-      })
-      return
-    }
-    if (
-      signUpState.phone.trim() &&
-      isPhoneTakenByAccount(signUpState.phone)
-    ) {
-      setSignUpState({
-        error: 'An account with this phone already exists. Please sign in.',
-      })
-      return
-    }
-    const matches = findNameMatches(
-      signUpState.firstName,
-      signUpState.lastName,
-    )
-    if (matches.length > 0) {
-      setSignUpState({
-        error: null,
-        showMatchDialog: true,
-        matchedPlayers: matches,
-        selectedMatchedPlayerId:
-          matches.length === 1 ? matches[0]._id.toString() : '',
-      })
-      return
-    }
-  }
-
-  await doSignUp()
-}
-
-const selectMatchedPlayer = (id: string) => {
-  setSignUpState('selectedMatchedPlayerId', id)
-}
-
-const confirmMatchedPlayer = async () => {
-  const id = signUpState.selectedMatchedPlayerId
-  if (!id) return
-  setSignUpState({
-    existingPlayer: true,
-    selectedPlayerId: id,
-    showMatchDialog: false,
-    matchedPlayers: [],
-    selectedMatchedPlayerId: '',
-  })
-  await doSignUp()
-}
-
-const chooseNewPlayer = async () => {
-  setSignUpState({
-    showMatchDialog: false,
-    matchedPlayers: [],
-    selectedMatchedPlayerId: '',
-  })
-  await doSignUp()
-}
-
-const dismissNewPlayerSuccess = () => {
-  authActions.hideDialog()
-  window.location.reload()
-}
-
-const reset = () => {
-  clearCountdownTimer()
-  setSignUpState(getInitialState())
 }
 
 export const signUpActions = {
-  setExistingPlayer,
-  openAdminRegister,
-  runAdminRegister,
-  selectPlayer,
+  open,
+  reset,
+  back,
+  chooseMethod,
+  setContact,
+  submitContact,
+  resendCode,
+  setCode,
+  submitCode,
+  goToSignIn,
+  continueWithGoogle,
   setFirstName,
   setLastName,
-  setSex,
-  setEmail,
-  setVerificationCode,
-  setPhone,
-  setDateOfBirth,
-  setPassword,
-  sendVerificationCode,
-  verifyCode,
-  signUp,
-  selectMatchedPlayer,
-  confirmMatchedPlayer,
+  submitName,
+  selectSimilarPlayer,
+  confirmSimilarPlayer,
   chooseNewPlayer,
+  chooseSex,
+  setDobPart,
+  submitDob,
+  skipDob,
+  setPassword,
+  submitSignUp,
   dismissNewPlayerSuccess,
-  reset,
-  selectedPlayer,
-  playerAlreadySignedUp,
-  isEmailDisabled,
-  isVerificationDisabled,
-  isValidEmail,
-  isValidPhone,
-  isValidPassword,
-  passwordHasMinLength,
-  passwordHasNumber,
-  passwordHasUppercase,
-  passwordHasLowercase,
-  playerOptions,
+  openAdminRegister,
+  runAdminRegister,
+  stepNumber,
+  isPhone,
+  phoneAvailable,
+  isPasswordOptional,
+  canGoBack,
 }

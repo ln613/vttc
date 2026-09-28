@@ -91,7 +91,13 @@ const [accountPageState, setAccountPageState] =
 
 export { accountPageState }
 
+// An account made with Google and no password sets its first one here:
+// there is no current password to ask for. (Only false counts — a user
+// signed in before this was recorded has one.)
+const isSettingPassword = (): boolean => authState.user?.hasPassword === false
+
 export const accountPageActions = {
+  isSettingPassword,
   init: async (playerId?: string) => {
     if (playerId) {
       if (!playerState.data) await playerActions.fetchPlayers()
@@ -303,9 +309,9 @@ export const accountPageActions = {
         newPassword: changePasswordData.newPassword,
         confirmPassword: changePasswordData.confirmPassword,
       })
-      if (authState.user?.pending) {
-        authActions.updateUser({ pending: false })
-      }
+      // Pending or not, and whether or not there was one before, the account
+      // now has a password of the player's own.
+      authActions.updateUser({ pending: false, hasPassword: true })
       setAccountPageState({
         changingPassword: false,
         showChangePasswordDialog: false,

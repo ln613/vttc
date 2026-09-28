@@ -32,6 +32,7 @@ export const ACCESS = {
     liveScore: PUBLIC,
     league: PUBLIC, // the league's rounds, standings and fixtures
     settings: PUBLIC, // read on app start, before anyone has signed in
+    similarPlayers: PUBLIC, // sign-up wizard; returns only what `players` already shows
     umpires: ADMIN, // the roster, with contact details
     umpireTableCounts: ADMIN, // for the assign-a-table dialog
     matchUmpireChoices: USER, // the tablet asks who is running this match
@@ -46,6 +47,7 @@ export const ACCESS = {
     signIn: PUBLIC,
     umpireSignIn: PUBLIC, // the match-day password, for umpires without an account
     signUp: PUBLIC,
+    googleSignIn: PUBLIC, // a code from Google's popup; exchanged and verified inside
     sendVerificationCode: PUBLIC,
     verifyCode: PUBLIC,
 

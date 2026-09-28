@@ -18,3 +18,24 @@ export const formatLocalDate = (date: Date): string => {
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
+
+/** Which of a date's three parts a dropdown sets. */
+export type DatePart = 'year' | 'month' | 'day'
+
+/**
+ * Days in a month (1-12). With no year, February allows the 29th, so a
+ * birthday can be picked before the year is.
+ */
+export const daysInMonth = (month: number, year?: number): number =>
+  new Date(year || 2000, month, 0).getDate()
+
+/**
+ * "YYYY-MM-DD" from three parts, or '' unless all three make a real date.
+ */
+export const toIsoDate = (year: string, month: string, day: string): string => {
+  const y = Number(year)
+  const m = Number(month)
+  const d = Number(day)
+  if (!y || !m || !d || d > daysInMonth(m, y)) return ''
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+}

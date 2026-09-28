@@ -1,5 +1,7 @@
 import { getDB } from './db.js'
 import { club } from './club.js'
+import { isSmsConfigured } from './sms.js'
+import { getGoogleClientId } from './googleAuth.js'
 
 const COLLECTION = 'settings'
 const DOC_ID = 'global'
@@ -36,7 +38,16 @@ const readSettingsDoc = async () => {
   return { ...defaultSettings(), ...(doc?.settings || {}) }
 }
 
-export const getSettings = async () => readSettingsDoc()
+// Along with the stored settings, two things that are not settings but facts
+// about this site's environment, which saveSettings never stores:
+//   smsEnabled      it can text a verification code (sms.js)
+//   googleClientId  "Sign in with Google" is set up (googleAuth.js). Public
+//                   by nature — the browser needs it to show the button.
+export const getSettings = async () => ({
+  ...(await readSettingsDoc()),
+  smsEnabled: isSmsConfigured(),
+  googleClientId: getGoogleClientId(),
+})
 
 export const saveSettings = async (body) => {
   if (!body) throwError('Request body is required')

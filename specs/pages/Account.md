@@ -36,6 +36,7 @@ Vertical
   - rating (non-negative integer)
 - confirm cancel
 - click "Change Password": show "Change Password" dialog, where user enters and confirms the new password (password rules are defined in header.md)
+- an account made with Google and no password shows "Set Password" instead: the same dialog, titled "Set Password", without the current password; once set, the user can also sign in with email and password, and the button becomes "Change Password"
 - rating admin adjustment history (with date/time) should be kept in db
 - before saving, if the new rating/birth date would render the player unqualified for any future events he has registered, ask the admin to confirm whether to remove the player from those events, if yes, remove the player from those events then save the rating, if no, do nothing
 - rating admin adjustment will affect the player's rating in already registered future events. the rating change from match results (between player's registration time of the event and event start time) will not.
