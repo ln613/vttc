@@ -8,6 +8,10 @@ interface ButtonProps {
   disabled?: boolean
   class?: string
   size?: 'small' | 'medium'
+  // Share a row with the buttons beside it: grow into the free space, never
+  // wrap the label, and use a narrower side padding. Without it, two medium
+  // buttons on a phone-width dialog don't fit and a label breaks in two.
+  fill?: boolean
 }
 
 const hexToHsl = (hex: string): { h: number; s: number; l: number } => {
@@ -88,6 +92,9 @@ const Button = (props: ButtonProps) => {
     // and stops the OS from re-classifying small taps as scroll gestures.
     'touch-action': 'manipulation',
     ...sizeStyles(),
+    ...(props.fill
+      ? { flex: '1 1 auto', 'white-space': 'nowrap', 'padding-left': '16px', 'padding-right': '16px' }
+      : {}),
   })
 
   // No JS mouseenter/mouseleave: those fire as synthesized events between

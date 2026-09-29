@@ -29,6 +29,7 @@ const DialogFooter = () => (
     <Button
       color="#27ae60"
       onClick={() => eventListActions.closeFeeDialog()}
+      fill
     >
       OK
     </Button>
@@ -152,7 +153,7 @@ const CopyButton = () => {
   }
 
   return (
-    <Button color="#2196F3" onClick={handleCopy}>
+    <Button color="#2196F3" onClick={handleCopy} fill>
       📋 Copy Info
     </Button>
   )
@@ -281,10 +282,13 @@ const totalValueStyle: JSX.CSSProperties = {
   'text-align': 'right',
 }
 
+// Both buttons share the row (see `fill` on Button), so neither label wraps
+// even on a phone, and stretch to one height — the clipboard emoji makes
+// Copy Info's line a little taller than OK's.
 const dialogFooterStyle: JSX.CSSProperties = {
   display: 'flex',
-  'justify-content': 'space-between',
-  'align-items': 'center',
+  gap: '12px',
+  'align-items': 'stretch',
   'margin-top': '16px',
 }
 
