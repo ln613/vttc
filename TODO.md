@@ -126,11 +126,13 @@ outstanding:
   1..6 and both tier lists are empty, so every event counts as mid-tier and
   no table is reserved for anything. Fill in once the court quality and the
   rating bands are known.
-- **Provisioning a new club is now scripted.** `npm run club:new --
-  .env.new-club.template` (see `.env.new-club.template` for the fields)
-  creates the Mongo Atlas project/cluster, `clubs/<slug>/config.json`, a
-  Netlify site with every env var set, and the matching local
-  `.env.<slug>`. Three things still need a human, because the provider
+- **Provisioning a new club is now scripted.** Copy `clubs/new-club.template`
+  (the guide, with every field explained) to `.env.new-club.template`, fill
+  it in, then `npm run club:new -- .env.new-club.template`. It creates the
+  Mongo Atlas project/cluster, `clubs/<slug>/config.json`, a Netlify site
+  with every env var set (including the admin/tablet passwords, the super
+  admin and the Google sign-in client), and the matching local
+  `.env.<slug>`. Re-running keeps the club's secrets. Three things still need a human, because the provider
   requires one (mostly to defeat exactly this kind of scripting): a Gmail
   account + app password, a Pusher app (Channels has no create-app API at
   all) **with "Enable client events" switched on in its dashboard** (also
@@ -140,7 +142,10 @@ outstanding:
   account is scriptable and the script does it). After running it, the
   Netlify site still needs linking to this repo by hand once (Site
   configuration -> Build & deploy -> Link repository — a GitHub OAuth
-  click, not scriptable) before a `git push` will deploy it.
+  click, not scriptable) before a `git push` will deploy it. And for Google
+  sign-in, the site's address has to be added to the OAuth client's
+  Authorized JavaScript origins in Google Cloud Console (no API for that
+  either); the script prints the exact origin.
 - **The rating system.** `rating.js` still carries VTTC's `RDELTA`/`RDIFF`
   tables. Deferred deliberately until a second club needs different ones.
 - **Tournament rules.** `shared/rules/tournamentRules.ts` (group counts,

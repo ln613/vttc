@@ -2,7 +2,8 @@
 // Provision a new club end to end: MongoDB Atlas project + cluster,
 // clubs/<slug>/config.json, a Netlify site with every env var set, and the
 // local .env.<slug> to match. Everything reads from one filled-in template —
-// copy .env.new-club.template, fill it in, then:
+// copy clubs/new-club.template (the guide) to .env.new-club.template, fill it
+// in, then:
 //
 //   npm run club:new -- .env.new-club.template
 //   npm run club:new -- .env.new-club.template --show-secrets
@@ -21,6 +22,13 @@
 //     never hear each other (specs/rules/tablet mirror.md)
 //   - a Netlify account + personal access token (site creation and env vars
 //     ARE scriptable once the account exists — that part this script does)
+//   - for "Sign in with Google": the new site's address added to the OAuth
+//     client's Authorized JavaScript origins in Google Cloud Console (no API
+//     edits those); the script prints the exact origin to add
+//
+// Secrets are kept, not rotated: AUTH_SECRET and the admin/tablet passwords
+// are read back from an existing .env.<slug> on a re-run, so running this
+// again to add a setting never logs everyone out or changes a password.
 //
 // Needs an Atlas API key with the Organization Project Creator role (see
 // TODO.md). That role grants Project Owner only on projects the key itself
@@ -110,6 +118,13 @@ const readClubInput = (template) => ({
   pusherCluster: template.PUSHER_CLUSTER?.trim(),
   netlifyToken: template.NETLIFY_AUTH_TOKEN?.trim(),
   netlifySiteName: template.NETLIFY_SITE_NAME?.trim(),
+  // Optional: blank means "keep the one in .env.<slug>, or generate one".
+  adminPassword: template.ADMIN_PASSWORD?.trim(),
+  tabletPassword: template.TABLET_PASSWORD?.trim(),
+  // Optional: a club's own Google OAuth client. Blank means the shared one
+  // (GMAIL_1_CLIENT_ID / GMAIL_1_CLIENT_SECRET in .env).
+  googleClientId: template.GOOGLE_CLIENT_ID?.trim(),
+  googleClientSecret: template.GOOGLE_CLIENT_SECRET?.trim(),
 })
 
 const validateInput = (club, env) => {
@@ -133,6 +148,12 @@ const validateInput = (club, env) => {
   }
   if (club.slug && !/^[a-z][a-z0-9-]{1,30}$/.test(club.slug)) {
     errors.push('CLUB_SLUG must be lowercase letters, digits and dashes')
+  }
+  for (const [key, value] of [['ADMIN_PASSWORD', club.adminPassword], ['TABLET_PASSWORD', club.tabletPassword]]) {
+    if (value && value.length < 8) errors.push(`${key} must be at least 8 characters`)
+  }
+  if (!!club.googleClientId !== !!club.googleClientSecret) {
+    errors.push('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET go together: set both or neither')
   }
   if (!env.MONGODB_PROJECT_CREATOR_PUBLIC_KEY) {
     errors.push('MONGODB_PROJECT_CREATOR_PUBLIC_KEY is not set in .env')
@@ -607,7 +628,7 @@ const writeLegacyEnv = async (netlify, site, env) => {
   })
 }
 
-const buildSiteEnv = (club, uri, siteUrl, authSecret) => ({
+const buildSiteEnv = (club, uri, siteUrl, secrets) => ({
   CLUB: club.slug,
   MONGODB_URI: uri,
   MONGODB_DB: club.slug,
@@ -618,47 +639,111 @@ const buildSiteEnv = (club, uri, siteUrl, authSecret) => ({
   GMAIL_1: club.gmailAddress,
   GMAIL_1_APP_PASSWORD: club.gmailAppPassword,
   VITE_PROD_HOST: siteUrl,
-  AUTH_SECRET: authSecret,
+  AUTH_SECRET: secrets.authSecret,
+  // Sign-in for the club's admin ("vttc" user) and its tablets / match-day
+  // umpires. Without these the site has no admin login of its own.
+  ADMIN_PASSWORD: secrets.adminPassword,
+  TABLET_PASSWORD: secrets.tabletPassword,
+  ...(secrets.superAdminHash && secrets.superAdminSalt
+    ? { SUPER_ADMIN_HASH: secrets.superAdminHash, SUPER_ADMIN_SALT: secrets.superAdminSalt }
+    : {}),
+  ...(secrets.google || {}),
 })
 
-const provisionNetlifySite = async (club, { uri, authSecret }) => {
+const provisionNetlifySite = async (club, { uri, secrets }) => {
   const netlify = createNetlifyClient(club.netlifyToken)
   const { site, created } = await findOrCreateSite(netlify, {
     name: club.netlifySiteName || club.slug,
   })
   const siteUrl = siteUrlOf(site)
-  const env = buildSiteEnv(club, uri, siteUrl, authSecret)
+  const env = buildSiteEnv(club, uri, siteUrl, secrets)
   const { envCount } = await configureSite(netlify, site, { env })
   return { site, created, url: siteUrl, envCount }
+}
+
+// ==================== secrets ====================
+
+// Letters and digits, minus the ones that look alike (0/O, 1/l/I): these get
+// typed on a tablet at the club, read out over a phone, written on paper.
+const READABLE = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+const generatePassword = (length = 12) =>
+  Array.from(randomBytes(length), (b) => READABLE[b % READABLE.length]).join('')
+
+const readLocalEnv = (slug) => {
+  const path = `.env.${slug}`
+  return existsSync(path) ? parseEnvFile(path) : {}
+}
+
+// Every secret the site needs, each taken from the first place that has it:
+// the template, then what this club already uses (.env.<slug>), then — for
+// what is shared across clubs — the shared .env, and only then a new one.
+const resolveSecrets = (club, localEnv, sharedEnv) => {
+  const usesOwnGoogle = !!club.googleClientId
+  return {
+    authSecret: localEnv.AUTH_SECRET || randomBytes(32).toString('hex'),
+    adminPassword: club.adminPassword || localEnv.ADMIN_PASSWORD || generatePassword(),
+    tabletPassword: club.tabletPassword || localEnv.TABLET_PASSWORD || generatePassword(),
+    // The super admin is the same person at every club.
+    superAdminHash: sharedEnv.SUPER_ADMIN_HASH,
+    superAdminSalt: sharedEnv.SUPER_ADMIN_SALT,
+    // googleAuth.js reads GOOGLE_* first and falls back to GMAIL_1_*, so a
+    // club's own client goes in under GOOGLE_*, the shared one under GMAIL_1_*.
+    google: usesOwnGoogle
+      ? { GOOGLE_CLIENT_ID: club.googleClientId, GOOGLE_CLIENT_SECRET: club.googleClientSecret }
+      : sharedEnv.GMAIL_1_CLIENT_ID && sharedEnv.GMAIL_1_CLIENT_SECRET
+        ? { GMAIL_1_CLIENT_ID: sharedEnv.GMAIL_1_CLIENT_ID, GMAIL_1_CLIENT_SECRET: sharedEnv.GMAIL_1_CLIENT_SECRET }
+        : null,
+    generated: {
+      authSecret: !localEnv.AUTH_SECRET,
+      adminPassword: !club.adminPassword && !localEnv.ADMIN_PASSWORD,
+      tabletPassword: !club.tabletPassword && !localEnv.TABLET_PASSWORD,
+    },
+  }
 }
 
 // ==================== local env file ====================
 
 // Never overwrites: a live .env.<slug> may carry values someone tuned by
 // hand (a rotated AUTH_SECRET, a different VITE_PROD_HOST during testing).
-const ensureLocalEnvFile = (club, { uri, siteUrl, authSecret }) => {
+// An existing file only gains the keys it is missing, so a club made before
+// a setting existed picks it up on a re-run.
+//
+// The super admin and the shared Google client are not written here: locally
+// they come from the shared .env, which with-club.mjs loads first.
+const buildLocalEnvEntries = (club, { uri, siteUrl, secrets }) => [
+  ['CLUB', club.slug],
+  ['MONGODB_URI', uri],
+  ['MONGODB_DB', club.slug],
+  ['PUSHER_APP_ID', club.pusherAppId],
+  ['PUSHER_SECRET', club.pusherSecret],
+  ['VITE_PUSHER_KEY', club.pusherKey],
+  ['VITE_PUSHER_CLUSTER', club.pusherCluster],
+  ['GMAIL_1', club.gmailAddress],
+  ['GMAIL_1_APP_PASSWORD', club.gmailAppPassword],
+  ['VITE_PROD_HOST', siteUrl],
+  ['AUTH_SECRET', secrets.authSecret],
+  ['ADMIN_PASSWORD', secrets.adminPassword],
+  ['TABLET_PASSWORD', secrets.tabletPassword],
+  ...(club.googleClientId
+    ? [['GOOGLE_CLIENT_ID', club.googleClientId], ['GOOGLE_CLIENT_SECRET', club.googleClientSecret]]
+    : []),
+]
+
+const ensureLocalEnvFile = (club, values) => {
   const path = `.env.${club.slug}`
-  if (existsSync(path)) return { path, created: false }
-  const lines = [
-    `CLUB=${club.slug}`,
-    '',
-    `MONGODB_URI=${uri}`,
-    `MONGODB_DB=${club.slug}`,
-    '',
-    `PUSHER_APP_ID=${club.pusherAppId}`,
-    `PUSHER_SECRET=${club.pusherSecret}`,
-    `VITE_PUSHER_KEY=${club.pusherKey}`,
-    `VITE_PUSHER_CLUSTER=${club.pusherCluster}`,
-    '',
-    `GMAIL_1=${club.gmailAddress}`,
-    `GMAIL_1_APP_PASSWORD=${club.gmailAppPassword}`,
-    '',
-    `VITE_PROD_HOST=${siteUrl}`,
-    `AUTH_SECRET=${authSecret}`,
-    '',
-  ]
-  writeFileSync(path, lines.join('\n'))
-  return { path, created: true }
+  const entries = buildLocalEnvEntries(club, values)
+  if (!existsSync(path)) {
+    writeFileSync(path, entries.map(([k, v]) => `${k}=${v}`).join('\n') + '\n')
+    return { path, created: true, added: [] }
+  }
+  const existing = parseEnvFile(path)
+  const missing = entries.filter(([k]) => existing[k] === undefined)
+  if (missing.length) {
+    const current = readFileSync(path, 'utf8')
+    const lead = current.endsWith('\n') ? '' : '\n'
+    writeFileSync(path, current + lead + missing.map(([k, v]) => `${k}=${v}`).join('\n') + '\n')
+  }
+  return { path, created: false, added: missing.map(([k]) => k) }
 }
 
 // ==================== run ====================
@@ -766,9 +851,15 @@ const run = async () => {
   )
 
   // ---- Netlify site + env vars ----
-  const authSecret = randomBytes(32).toString('hex')
+  const secrets = resolveSecrets(club, readLocalEnv(club.slug), process.env)
+  if (!secrets.superAdminHash) {
+    console.log('\nnote:         SUPER_ADMIN_HASH/SALT not in .env — the site gets no super admin login')
+  }
+  if (!secrets.google) {
+    console.log('note:         no Google client (GMAIL_1_CLIENT_ID/SECRET in .env) — Google sign-in stays off')
+  }
   console.log('\nnetlify site...')
-  const site = await provisionNetlifySite(club, { uri, authSecret })
+  const site = await provisionNetlifySite(club, { uri, secrets })
   console.log(
     `site:         ${site.site.name} ${site.created ? '(created)' : '(existing)'}`,
   )
@@ -781,26 +872,48 @@ const run = async () => {
   const localEnv = ensureLocalEnvFile(club, {
     uri,
     siteUrl: site.url,
-    authSecret,
+    secrets,
   })
   console.log(
-    `\nlocal env:    ${localEnv.path} ${localEnv.created ? '(written)' : '(already exists, left alone)'}`,
+    `\nlocal env:    ${localEnv.path} ${
+      localEnv.created
+        ? '(written)'
+        : localEnv.added.length
+          ? `(kept; added ${localEnv.added.join(', ')})`
+          : '(already exists, left alone)'
+    }`,
   )
+  const madeNow = Object.entries(secrets.generated).filter(([, made]) => made).map(([k]) => k)
+  if (madeNow.length) {
+    console.log(`generated:    ${madeNow.join(', ')} (in ${localEnv.path}; --show-secrets prints them)`)
+  }
 
+  const origin = site.url.replace(/\/$/, '')
   console.log(
-    `\n${club.name} is provisioned. Two things still need a human:\n` +
+    `\n${club.name} is provisioned. Still for a human:\n` +
       '  1. Link the Netlify site to this repo, so a git push deploys it:\n' +
       `     ${site.url.replace('https://', 'https://app.netlify.com/sites/').replace('.netlify.app', '')}` +
       ' -> Site configuration -> Build & deploy -> Link repository\n' +
       '     (needs a GitHub OAuth click in the browser — no API for that step)\n' +
-      `  2. Review clubs/${club.slug}/config.json: table order / tier lists start\n` +
+      '  2. In the Pusher dashboard for this app, App Settings -> turn on\n' +
+      '     "Enable client events" (paired Scorer/Mirror tablets need it)\n' +
+      (secrets.google
+        ? '  3. Google sign-in: Google Cloud Console -> Google Auth Platform -> Clients\n' +
+          '     -> the OAuth client -> Authorized JavaScript origins -> add\n' +
+          `     ${origin}\n` +
+          '     (and any custom domain the club will use). Until then the Google\n' +
+          '     icon shows but its popup refuses the site.\n'
+        : '') +
+      `  ${secrets.google ? 4 : 3}. Review clubs/${club.slug}/config.json: table order / tier lists start\n` +
       '     as sequential / empty placeholders until the hall and rating bands\n' +
       '     are known — same gap TODO.md already notes for GVTTC.\n',
   )
 
   if (args.showSecrets) {
     console.log(`MONGODB_URI=${uri}`)
-    console.log(`AUTH_SECRET=${authSecret}`)
+    console.log(`AUTH_SECRET=${secrets.authSecret}`)
+    console.log(`ADMIN_PASSWORD=${secrets.adminPassword}`)
+    console.log(`TABLET_PASSWORD=${secrets.tabletPassword}`)
   }
 }
 

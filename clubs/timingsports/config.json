@@ -1,0 +1,79 @@
+{
+  "slug": "timingsports",
+  "name": "Timing Sports",
+  "appName": "Timing Sports",
+  "timezone": "America/Vancouver",
+  "branding": {
+    "bannerUrl": "https://res.cloudinary.com/vttc/image/upload/v1790976391/752213d7-6b00-4922-ad7a-2d277a030252_v6gdnd.jpg",
+    "bannerAlt": "Timing Sports Banner",
+    "contactName": "Timing Sports",
+    "faviconUrl": "/images/logo.png",
+    "pageTitle": "Timing Sports"
+  },
+  "tables": {
+    "all": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "rows": [
+      [
+        1,
+        2,
+        3,
+        4
+      ],
+      [
+        5,
+        6,
+        7,
+        8
+      ]
+    ],
+    "order": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "lowTierOrder": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "highTierOrder": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "knockoutExcluded": [],
+    "generalExcluded": [],
+    "highTierExcluded": [],
+    "highTierSemifinalExcluded": [],
+    "highTierFinalOnly": [],
+    "lowTierBigMatchPreferred": []
+  },
+  "tiers": {
+    "low": [],
+    "high": []
+  }
+}

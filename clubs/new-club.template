@@ -1,0 +1,181 @@
+# The guide for setting up a new club. This blank copy lives in git as
+# clubs/new-club.template; copy it to .env.new-club.template (a name git
+# ignores), fill that in for ONE new club, then run:
+#
+#   cp clubs/new-club.template .env.new-club.template
+#   npm run club:new -- .env.new-club.template
+#
+# Running it again later is safe: it finds what already exists, keeps the
+# club's secrets, and only adds what is missing.
+#
+# Keep this filled-in file OUTSIDE git — it holds real secrets (Gmail app
+# password, Pusher secret, Netlify token). It matches .env.* in .gitignore
+# already, so `git status` should never show it, but double-check before
+# any `git add -A`.
+#
+# Everything the script can create for you (MongoDB project/cluster,
+# Netlify site, clubs/<slug>/config.json, .env.<slug>) it creates. What it
+# genuinely cannot — because the provider has no API for it, or because
+# Google requires a human to prove they're not a script — you do by hand
+# first and paste the result in below. Each of those sections says which.
+
+# ============================================================
+# Club identity — used for clubs/<slug>/config.json, the Mongo
+# project/cluster name, and the Netlify site name.
+# ============================================================
+
+# Lowercase letters, digits, dashes. e.g. gvttc
+CLUB_SLUG=
+
+# Display name shown in the app. e.g. GVTTC
+CLUB_NAME=
+
+# Browser tab / PWA name. e.g. GVTTC Live
+APP_NAME=
+
+# Optional — defaults to CLUB_NAME.
+CONTACT_NAME=
+
+# Optional — defaults to America/Vancouver.
+TIMEZONE=
+
+# ============================================================
+# Branding
+# ============================================================
+
+# Required. Upload the banner image somewhere first (Cloudinary, etc.)
+# and paste the URL here.
+BANNER_URL=
+
+# Optional second crop for phones (screens 768px and narrower).
+# Left blank, the wide banner above is used everywhere.
+BANNER_URL_MOBILE=
+
+# Optional — defaults to "<CLUB_NAME> Banner".
+BANNER_ALT=
+
+# Optional — defaults to the shared logo at /images/logo.png. Only set
+# this once the club has its own favicon file in public/images/.
+FAVICON_URL=
+
+# Optional — defaults to CLUB_NAME.
+PAGE_TITLE=
+
+# ============================================================
+# Table layout
+# ============================================================
+
+# Physical rows of table numbers, top row first, as a JSON array of
+# arrays. e.g. two rows of three tables: [[1,2,3],[4,5,6]]
+# The script derives "all" (the flat list) from this. Table order for
+# assignment (order / lowTierOrder / highTierOrder) starts as the same
+# sequence — edit clubs/<slug>/config.json by hand afterward once you
+# know which tables are the good ones. Tier rules (tiers.low / tiers.high)
+# start empty for the same reason.
+TABLE_ROWS=
+
+# ============================================================
+# MongoDB Atlas
+# Needs MONGODB_PROJECT_CREATOR_PUBLIC_KEY / _PRIVATE_KEY and MONGODB_URI
+# already set in the shared .env — see TODO.md. No per-club action here.
+# ============================================================
+
+# Which existing club to copy as a starting point — its tournament formats
+# and its player roster are both copied into the new club's databases.
+# Optional — defaults to vttc.
+MONGODB_SOURCE_DB=
+
+# Only needed when the source db above lives on a DIFFERENT cluster than the
+# one this machine's MONGODB_URI points at — which is the case for every club
+# except vttc, since each gets its own cluster. Copy it from .env.<source>.
+# Leave blank to read the source db off the shared MONGODB_URI.
+MONGODB_SOURCE_URI=
+
+# Optional — defaults to US_WEST_2.
+MONGODB_REGION=
+
+# ============================================================
+# Gmail — for sending verification codes and notifications.
+# No API creates a Google account or an app password; do this by hand:
+#   1. accounts.google.com — create the account
+#   2. Enable 2-Step Verification
+#   3. myaccount.google.com/apppasswords — generate an app password
+#      for "Mail", paste the 16-character result below (spaces are fine,
+#      the script strips them)
+# ============================================================
+
+GMAIL_ADDRESS=
+GMAIL_APP_PASSWORD=
+
+# ============================================================
+# Pusher — for live score / table updates.
+# Pusher Channels has no public API to create an app; the dashboard is
+# the only way. Do this by hand:
+#   1. dashboard.pusher.com — sign in (the same Google account is fine)
+#   2. Channels → Create app
+#   3. Pick a cluster close to the club — us3 is what VTTC and GVTTC use
+#   4. App Keys tab has all four values below
+# ============================================================
+
+PUSHER_APP_ID=
+PUSHER_KEY=
+PUSHER_SECRET=
+PUSHER_CLUSTER=
+
+# While you are in the Pusher dashboard for this app: turn on
+# "Enable client events" (App Settings). There is no API for it, and
+# without it the paired Scorer/Mirror tablets cannot talk to each
+# other — see specs/rules/tablet mirror.md.
+
+# ============================================================
+# Netlify — hosts the site.
+# Site creation and env vars ARE automatable with a token; only the
+# account itself needs a human (same CAPTCHA/SSO wall as Gmail):
+#   1. app.netlify.com — create the account (same Google account is fine)
+#   2. User settings → Applications → Personal access tokens → New token
+#   3. Paste it below — the script uses it once to create the site and
+#      set every env var, then you can delete the token if you'd rather
+#      not leave it lying around
+# ============================================================
+
+NETLIFY_AUTH_TOKEN=
+
+# Optional — defaults to CLUB_SLUG. The site's URL becomes
+# https://<this>.netlify.app unless that name is already taken on
+# Netlify, in which case Netlify appends digits and the script tells you
+# the final URL after creating it.
+NETLIFY_SITE_NAME=
+
+# ============================================================
+# Admin and tablet passwords — the club's own sign-ins.
+# ADMIN_PASSWORD is the admin login (user name "vttc"). TABLET_PASSWORD is
+# for the club's tablets, and is also the match-day password umpires use.
+# Optional: left blank, the script keeps the ones already in .env.<slug>,
+# or generates new ones and writes them there (add --show-secrets to the
+# command to print them). At least 8 characters.
+# The super admin needs nothing here: it is the same person at every club
+# and comes from SUPER_ADMIN_HASH / SUPER_ADMIN_SALT in the shared .env.
+# ============================================================
+
+ADMIN_PASSWORD=
+TABLET_PASSWORD=
+
+# ============================================================
+# Google sign-in
+# Optional. Blank uses the shared Google client (GMAIL_1_CLIENT_ID /
+# GMAIL_1_CLIENT_SECRET in the shared .env), so people see that client's
+# app name on Google's sign-in screen. Fill both to give the club its own
+# Google Cloud OAuth client (type "Web application").
+#
+# Either way, one step has no API and is yours, AFTER the script has run
+# and printed the site address:
+#   1. console.cloud.google.com -> Google Auth Platform -> Clients -> the
+#      client -> Authorized JavaScript origins -> add
+#      https://<site>.netlify.app (and any custom domain the club uses)
+#   2. Google Auth Platform -> Audience: publishing status "In production",
+#      or only the listed test users can sign in with Google
+# Until step 1 is done the Google icon shows, but its popup refuses the site.
+# ============================================================
+
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
