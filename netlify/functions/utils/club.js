@@ -72,6 +72,55 @@ export const clubDate = (date = new Date()) =>
     day: '2-digit',
   }).format(date)
 
+// Minutes since midnight, now, on the club's clock.
+export const clubMinutesOfDay = (date = new Date()) => {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: getClubTimezone(),
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date)
+  const part = (type) => parseInt(parts.find((p) => p.type === type).value, 10)
+  return part('hour') * 60 + part('minute')
+}
+
+// The instant a club wall-clock time happens: "2026-10-04" at 1170 minutes
+// (7:30 PM) in the club's timezone. Minutes past 24:00 roll into the next
+// day, so a booking that ends at midnight ends at the start of tomorrow.
+export const clubTimeToDate = (date, minutes) => {
+  const [y, m, d] = String(date).split('-').map(Number)
+  const wallAsUtc = Date.UTC(y, m - 1, d) + minutes * 60 * 1000
+  // The zone's offset at that moment, measured twice so a guess that lands
+  // on the other side of a daylight-saving change corrects itself.
+  const first = wallAsUtc - zoneOffsetMs(new Date(wallAsUtc))
+  return new Date(wallAsUtc - zoneOffsetMs(new Date(first)))
+}
+
+// How far the club's clock is ahead of UTC at a given instant.
+const zoneOffsetMs = (instant) => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: getClubTimezone(),
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(instant)
+  const part = (type) => parseInt(parts.find((p) => p.type === type).value, 10)
+  const wall = Date.UTC(part('year'), part('month') - 1, part('day'), part('hour'), part('minute'), part('second'))
+  return wall - Math.floor(instant.getTime() / 1000) * 1000
+}
+
+// "7:45 PM" on the club's clock.
+export const formatClubTime = (instant) =>
+  new Intl.DateTimeFormat('en-US', {
+    timeZone: getClubTimezone(),
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(instant)
+
 // Does an event match one of a tier's rules? Each rule is a set of
 // conditions that must all hold, so the tier lists read as "any of these".
 const eventMatchesTierRule = (event, rule) => {

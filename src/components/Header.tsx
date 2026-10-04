@@ -147,6 +147,10 @@ const TopBar = () => {
     navigate('/schedule')
   }
 
+  const handleBookingClick = () => {
+    navigate('/booking')
+  }
+
   const handleAccountClick = () => {
     if (authActions.isSignedIn()) {
       navigate('/account')
@@ -160,9 +164,9 @@ const TopBar = () => {
   }
 
   return (
-    <div style={topBarStyle}>
+    <div class="vttc-topbar" style={topBarStyle}>
       <div style={topBarContentStyle}>
-        <div style={navLeftStyle}>
+        <div class="vttc-nav-left" style={navLeftStyle}>
           <button
             style={
               authState.isTablet ? navLinkStyle : liveScoreButtonStyle
@@ -201,23 +205,29 @@ const TopBar = () => {
               onClose={() => setShowTablePicker(false)}
             />
           </Show>
-          <button style={navLinkStyle} onClick={handleEventsClick}>
+          <button class="vttc-nav-link" style={navLinkStyle} onClick={handleEventsClick}>
             Events
           </button>
-          <button style={navLinkStyle} onClick={handleScheduleClick}>
+          <button class="vttc-nav-link" style={navLinkStyle} onClick={handleScheduleClick}>
             Schedule
           </button>
-          <button style={navLinkStyle} onClick={handlePlayersClick}>
+          <button class="vttc-nav-link" style={navLinkStyle} onClick={handlePlayersClick}>
             Players
           </button>
+          {/* Clubs with a court to book: see `booking` in the club config. */}
+          <Show when={clubConfig.booking?.enabled && !authState.isTablet}>
+            <button class="vttc-nav-link" style={navLinkStyle} onClick={handleBookingClick}>
+              Booking
+            </button>
+          </Show>
         </div>
         <div style={navRightStyle}>
           <Show when={authState.isAdmin}>
-            <button style={accountButtonStyle} onClick={handleSettingsClick}>
+            <button class="vttc-topbar-icon" style={accountButtonStyle} onClick={handleSettingsClick}>
               <SettingsIcon />
             </button>
           </Show>
-          <button style={accountButtonStyle} onClick={handleAccountClick}>
+          <button class="vttc-topbar-icon" style={accountButtonStyle} onClick={handleAccountClick}>
             <AccountIcon />
           </button>
         </div>
@@ -519,19 +529,26 @@ const topBarContentStyle: JSX.CSSProperties = {
   'justify-content': 'space-between',
 }
 
+// Shrinks before the account icon does; past that it scrolls within itself
+// rather than pushing the page wider than the phone.
 const navLeftStyle: JSX.CSSProperties = {
   display: 'flex',
   'align-items': 'center',
   gap: '4px',
+  'min-width': 0,
+  'overflow-x': 'auto',
+  'scrollbar-width': 'none',
 }
 
 const navRightStyle: JSX.CSSProperties = {
   display: 'flex',
   'align-items': 'center',
   gap: '4px',
+  flex: 'none',
 }
 
 const liveScoreButtonStyle: JSX.CSSProperties = {
+  flex: 'none',
   background: 'none',
   border: 'none',
   cursor: 'pointer',
@@ -608,6 +625,8 @@ const navLinkStyle: JSX.CSSProperties = {
   cursor: 'pointer',
   padding: '12px 8px',
   'letter-spacing': '0.3px',
+  'white-space': 'nowrap',
+  flex: 'none',
 }
 
 const accountButtonStyle: JSX.CSSProperties = {

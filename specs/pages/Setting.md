@@ -14,6 +14,7 @@ Vertical
     - edit mode: "Cancel" and "Save" icons (exit edit mode)
     - saving indicator (spinning circle, while saving)
 - Event Setting Section
+- Court Booking Section (only at a club with `booking.enabled`)
 - Revenue Section
 
 ## Event Setting Section
@@ -33,6 +34,14 @@ Vertical
 ### Interaction
 
 - on save click: save the settings to db
+
+## Court Booking Section
+
+- "Opens at" dropdown: every half hour, 12:00 AM to 11:00 PM
+- "Closes at" dropdown: from an hour after opening to "12:00 AM (midnight)"
+- defaults from the club config's `booking.openTime` / `booking.closeTime` (8:00 AM to midnight for Timing Sports)
+- a later opening that leaves closing too soon moves closing with it
+- validated on save: half-hour times, closing at least the minimum booking length after opening. See `specs/rules/booking.md`
 
 ## Umpire Section
 

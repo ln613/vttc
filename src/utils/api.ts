@@ -102,9 +102,30 @@ const clearStoredSession = () => {
   }
 }
 
+// Clearing storage alone leaves the page in memory still believing it is
+// signed in until a reload. authStore registers here (it can't be imported
+// from this module) to sign the page out and ask for a sign-in.
+let sessionRejectedHandler: (() => void) | null = null
+
+export const onSessionRejected = (handler: () => void) => {
+  sessionRejectedHandler = handler
+}
+
+const rejectSession = () => {
+  const hadSession = (() => {
+    try {
+      return !!localStorage.getItem('vttc_token')
+    } catch {
+      return false
+    }
+  })()
+  clearStoredSession()
+  if (hadSession) sessionRejectedHandler?.()
+}
+
 const handleResponse = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
-    if (response.status === 401) clearStoredSession()
+    if (response.status === 401) rejectSession()
     const error = await response.json().catch(() => ({}))
     throw new Error(error.error || 'API request failed')
   }

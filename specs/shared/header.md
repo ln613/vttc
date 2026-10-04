@@ -16,6 +16,8 @@
   - Events: go to the Home/Events List page
   - Schedule: go to the schedule page
   - Players: go to the Players page
+  - "Booking": go to the Booking page — only at a club that takes court bookings (`booking.enabled` in the club config), and not for the tablet
+  - on a phone (480px and narrower) the bar tightens its spacing so the links fit beside the icons; on a screen too narrow even for that, the links scroll sideways within the bar, never the page
   - Setting Icon (align right, admin only)
   - Account Icon (align right)
     - if not signed in, show sign in dialog

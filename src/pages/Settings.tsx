@@ -5,6 +5,13 @@ import { authState } from '../stores/authStore'
 import { settingsState, settingsActions } from '../stores/settingsStore'
 import type { AppSettings } from '../stores/settingsStore'
 import clubConfig from 'club-config'
+import Select from '../components/Select'
+import {
+  bookingRules,
+  formatClock,
+  toMinutes,
+  toTimeOfDay,
+} from '../../shared/rules/booking'
 
 const Settings = () => {
   onMount(() => {
@@ -22,6 +29,9 @@ const Settings = () => {
             <div style={errorStyle}>{settingsState.error}</div>
           </Show>
           <EventSettingSection />
+          <Show when={clubConfig.booking?.enabled}>
+            <BookingSection />
+          </Show>
           {/* Only where the club records who umpired — otherwise there is
               no roster to keep. */}
           <Show when={settingsState.settings.saveUmpireInfo}>
@@ -167,6 +177,72 @@ const EventSettingSection = () => (
     </Show>
   </div>
 )
+
+// Court booking hours: every half hour of the day. Closing can be as late as
+// midnight, and offers only times that leave room for the shortest booking.
+const bookingSlotRules = bookingRules(clubConfig.booking)
+
+const timeOption = (minutes: number) => ({
+  value: toTimeOfDay(minutes),
+  label: minutes === 24 * 60 ? '12:00 AM (midnight)' : formatClock(minutes),
+})
+
+const timesBetween = (from: number, to: number) => {
+  const out = []
+  for (let t = from; t <= to; t += bookingSlotRules.slotMinutes) out.push(timeOption(t))
+  return out
+}
+
+const openTimeOptions = () =>
+  timesBetween(0, 24 * 60 - bookingSlotRules.minMinutes)
+
+const closeTimeOptions = () =>
+  timesBetween(
+    toMinutes(settingsValue('bookingOpenTime')) + bookingSlotRules.minMinutes,
+    24 * 60,
+  )
+
+// A later opening can leave closing too soon after it; closing moves with it.
+const setBookingOpenTime = (openTime: string) => {
+  settingsActions.setDraft('bookingOpenTime', openTime)
+  const earliestClose = toMinutes(openTime) + bookingSlotRules.minMinutes
+  if (toMinutes(settingsValue('bookingCloseTime')) < earliestClose) {
+    settingsActions.setDraft('bookingCloseTime', toTimeOfDay(earliestClose))
+  }
+}
+
+const BookingSection = () => (
+  <div style={sectionStyle}>
+    <h4 style={sectionHeaderStyle}>Court Booking</h4>
+    <div style={hoursRowStyle}>
+      <Select
+        label="Opens at"
+        name="bookingOpenTime"
+        value={settingsValue('bookingOpenTime')}
+        onChange={setBookingOpenTime}
+        options={openTimeOptions()}
+        disabled={!settingsState.editing}
+        noPlaceholder
+      />
+      <Select
+        label="Closes at"
+        name="bookingCloseTime"
+        value={settingsValue('bookingCloseTime')}
+        onChange={(v) => settingsActions.setDraft('bookingCloseTime', v)}
+        options={closeTimeOptions()}
+        disabled={!settingsState.editing}
+        noPlaceholder
+      />
+    </div>
+  </div>
+)
+
+const hoursRowStyle: JSX.CSSProperties = {
+  display: 'grid',
+  'grid-template-columns': 'repeat(auto-fit, minmax(160px, 1fr))',
+  gap: '0 16px',
+  'max-width': '480px',
+}
 
 const settingsValue = <K extends keyof AppSettings>(field: K): AppSettings[K] =>
   settingsState.editing

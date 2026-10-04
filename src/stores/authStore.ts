@@ -1,5 +1,5 @@
 import { createStore } from 'solid-js/store'
-import { apiPost, setUmpireToken } from '../utils/api'
+import { apiPost, setUmpireToken, onSessionRejected } from '../utils/api'
 
 interface AuthUser {
   _id: string
@@ -233,9 +233,25 @@ export const authActions = {
   },
 
   isSignedIn: (): boolean => authState.user !== null && authState.token !== null,
+
+  // Signed in as a player — whether or not that player is also an admin —
+  // rather than one of the shared admin, super admin or tablet logins,
+  // which have no player record behind them (their _id is a word, not a
+  // database id).
+  hasPlayerRecord: (): boolean =>
+    authActions.isSignedIn() && /^[0-9a-f]{24}$/.test(authState.user?._id ?? ''),
 }
 
 const validateSignInInput = (emailOrPhone: string, password: string) => {
   if (!emailOrPhone) throw new Error('Email or phone is required')
   if (!password) throw new Error('Password is required')
 }
+
+// The server turned down this device's token: it expired, or it was issued
+// with another secret (a different club on the same localhost port, or a
+// rotated AUTH_SECRET). Sign the page out and ask again, rather than keep
+// showing a signed-in page whose every action fails with "Sign in to do that".
+onSessionRejected(() => {
+  authActions.signOut()
+  setAuthState({ dialogView: 'signIn', error: 'Your session has ended. Please sign in again.' })
+})

@@ -12,58 +12,21 @@
   },
   "tables": {
     "all": [
-      1,
-      2,
-      3,
-      4,
-      5,
-      6,
-      7,
-      8
+      1
     ],
     "rows": [
       [
-        1,
-        2,
-        3,
-        4
-      ],
-      [
-        5,
-        6,
-        7,
-        8
+        1
       ]
     ],
     "order": [
-      1,
-      2,
-      3,
-      4,
-      5,
-      6,
-      7,
-      8
+      1
     ],
     "lowTierOrder": [
-      1,
-      2,
-      3,
-      4,
-      5,
-      6,
-      7,
-      8
+      1
     ],
     "highTierOrder": [
-      1,
-      2,
-      3,
-      4,
-      5,
-      6,
-      7,
-      8
+      1
     ],
     "knockoutExcluded": [],
     "generalExcluded": [],
@@ -75,5 +38,19 @@
   "tiers": {
     "low": [],
     "high": []
+  },
+  "booking": {
+    "enabled": true,
+    "courtLabel": "Pickleball Court",
+    "openTime": "08:00",
+    "closeTime": "24:00",
+    "slotMinutes": 30,
+    "minMinutes": 60,
+    "creditsPerSlot": 2500,
+    "creditsPerDollar": 100,
+    "minTopUpDollars": 10,
+    "guestHoldMinutes": 15,
+    "doorCodeLeadMinutes": 15,
+    "doorCodeTrailMinutes": 15
   }
 }

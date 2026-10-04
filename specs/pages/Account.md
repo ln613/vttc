@@ -6,14 +6,17 @@ Vertical
 
 - shared header
 - "{name} ({rating})" (h1, align left)
-- Profile Section
+- collapsible sections, each a header row (arrow, title) that opens / closes it:
+  - Profile Section (open by default)
+  - Credits Section (closed)
+  - My Bookings Section (closed)
 - "Sign Out" button (hide in edit mode)
 
 ## Profile Section
 
-- title row
-  - "Profile" (h3, align left)
-  - action icons (align right), hidden for admin and super admin
+- header row
+  - "Profile"
+  - action icons (align right, only while open), for anyone with a player record — including a player who is an admin or super admin. Hidden for the shared admin / super admin logins, which have no profile of their own (they edit other players' profiles)
     - read only mode: Edit Icon (enter edit mode)
     - edit mode: "Cancel" and "Save" icons (exit edit mode)
     - saving indicator (spinning circle, while saving)
@@ -26,7 +29,7 @@ Vertical
 - rating row (admin only)
   - Rating input
   - History button (align right)
-- "Change Password" button (hide in edit mode)
+- "Change Password" link (hide in edit mode; only for a player record, as the action icons)
 
 ### Interaction
 
@@ -41,3 +44,28 @@ Vertical
 - before saving, if the new rating/birth date would render the player unqualified for any future events he has registered, ask the admin to confirm whether to remove the player from those events, if yes, remove the player from those events then save the rating, if no, do nothing
 - rating admin adjustment will affect the player's rating in already registered future events. the rating change from match results (between player's registration time of the event and event start time) will not.
 - rating history button will show a dialog of the rating admin adjustment history for this player
+## Credits Section
+
+Only at a club that takes court bookings (`booking.enabled`), on the signed-in player's own account (not when an admin views someone else's, not for the admin or tablet logins, which have no player record).
+
+- header: "Credits", and the balance "{credits} credits" at the right, so it shows while closed
+- open: balance "{credits}" (large) "credits", "Top up" button (green): opens the Top up dialog (see rules/booking.md)
+
+## My Bookings Section
+
+Shown with the Credits Section (same rule).
+
+- header: "My Bookings"
+- loaded each time it is opened, not before
+- open: the player's confirmed court bookings
+  - "Upcoming": today and later, soonest first; "Past": most recent first
+  - each booking (card): date ("Sun, Oct 4, 2026"), "{start} – {end} · {court}", "{credits} credits"
+  - door code: "Door code" {code} "Works {from} – {to}"; once that has passed, "Expired" (dimmed)
+  - an upcoming booking without a code: "Door code not ready yet. Please check back, or contact the club." (opening the section asks the server to try again — rules/booking.md, Door code)
+  - "Receipt" link: shows / hides the receipt (the same lines as the email); one open at a time
+  - no bookings: "You have no bookings yet."
+  - "Book a Court" button: go to the Booking page
+
+### Interaction
+
+- `/account?open=myBookings` (the booking confirmation's "My Bookings" link) opens the page with only My Bookings open

@@ -33,6 +33,9 @@ export const ACCESS = {
     league: PUBLIC, // the league's rounds, standings and fixtures
     settings: PUBLIC, // read on app start, before anyone has signed in
     similarPlayers: PUBLIC, // sign-up wizard; returns only what `players` already shows
+    bookingDay: PUBLIC, // who booked is shown only to them and to admins
+    myBookings: USER,
+    myCredits: USER,
     umpires: ADMIN, // the roster, with contact details
     umpireTableCounts: ADMIN, // for the assign-a-table dialog
     matchUmpireChoices: USER, // the tablet asks who is running this match
@@ -48,6 +51,10 @@ export const ACCESS = {
     umpireSignIn: PUBLIC, // the match-day password, for umpires without an account
     signUp: PUBLIC,
     googleSignIn: PUBLIC, // a code from Google's popup; exchanged and verified inside
+    bookCourt: USER, // paid in the caller's own credits
+    bookCourtAsGuest: PUBLIC, // held until paid
+    topUpCredits: USER,
+    confirmPayment: PUBLIC, // a guest pays too; a top-up is checked against the caller
     sendVerificationCode: PUBLIC,
     verifyCode: PUBLIC,
 

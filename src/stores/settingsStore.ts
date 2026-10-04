@@ -1,5 +1,7 @@
 import { createStore } from 'solid-js/store'
+import clubConfig from 'club-config'
 import { apiGet, apiPost } from '../utils/api'
+import { DEFAULT_BOOKING } from '../../shared/rules/booking'
 
 export interface AppSettings {
   ignoreUnpaidInGeneration: boolean
@@ -10,6 +12,10 @@ export interface AppSettings {
   allowPublicUmpire: boolean
   saveUmpireInfo: boolean
   maxUmpiresPerTable: number
+  // Court booking hours, "HH:MM" ("24:00" = midnight). See
+  // specs/rules/booking.md.
+  bookingOpenTime: string
+  bookingCloseTime: string
   // Not settings but facts about the site, from the server's environment,
   // never saved: whether it can text a verification code, and the Google
   // client id "Sign in with Google" needs (null when not set up).
@@ -23,6 +29,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   allowPublicUmpire: true,
   saveUmpireInfo: false,
   maxUmpiresPerTable: 1,
+  bookingOpenTime: clubConfig.booking?.openTime || DEFAULT_BOOKING.openTime,
+  bookingCloseTime: clubConfig.booking?.closeTime || DEFAULT_BOOKING.closeTime,
   smsEnabled: false,
   googleClientId: null,
 }

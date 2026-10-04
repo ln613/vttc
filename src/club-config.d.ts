@@ -42,6 +42,26 @@ declare module 'club-config' {
      */
     saveUmpireInfo?: boolean
     maxUmpiresPerTable?: number
+    /**
+     * Court booking — see specs/rules/booking.md. Absent or not enabled =
+     * no Booking page, no credits. Every number is optional and falls
+     * back to DEFAULT_BOOKING in shared/rules/booking.js.
+     */
+    booking?: {
+      enabled?: boolean
+      /** What one bookable court is called, e.g. "Pickleball Court". */
+      courtLabel?: string
+      openTime?: string
+      closeTime?: string
+      slotMinutes?: number
+      minMinutes?: number
+      creditsPerSlot?: number
+      creditsPerDollar?: number
+      minTopUpDollars?: number
+      guestHoldMinutes?: number
+    doorCodeLeadMinutes?: number
+    doorCodeTrailMinutes?: number
+    }
     branding: {
       bannerUrl: string
       /** Optional narrow-screen crop; the wide banner is used without it. */

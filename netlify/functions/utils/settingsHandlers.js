@@ -2,6 +2,7 @@ import { getDB } from './db.js'
 import { club } from './club.js'
 import { isSmsConfigured } from './sms.js'
 import { getGoogleClientId } from './googleAuth.js'
+import { DEFAULT_BOOKING, bookingHoursError } from '../../../shared/rules/booking.js'
 
 const COLLECTION = 'settings'
 const DOC_ID = 'global'
@@ -26,6 +27,10 @@ const defaultSettings = () => ({
   // that does not track who umpired should not be asked about it.
   saveUmpireInfo: !!club.saveUmpireInfo,
   maxUmpiresPerTable: club.maxUmpiresPerTable ?? 1,
+  // Court booking hours ("HH:MM", "24:00" = midnight) — see
+  // specs/rules/booking.md. The club config's are the default.
+  bookingOpenTime: club.booking?.openTime || DEFAULT_BOOKING.openTime,
+  bookingCloseTime: club.booking?.closeTime || DEFAULT_BOOKING.closeTime,
 })
 
 const throwError = (msg) => {
@@ -49,6 +54,21 @@ export const getSettings = async () => ({
   googleClientId: getGoogleClientId(),
 })
 
+// The court's opening hours as the booking rules want them.
+export const getBookingHours = async () => {
+  const s = await readSettingsDoc()
+  return { openTime: s.bookingOpenTime, closeTime: s.bookingCloseTime }
+}
+
+const validateBookingHours = (settings) => {
+  const error = bookingHoursError(
+    { ...club.booking },
+    settings.bookingOpenTime,
+    settings.bookingCloseTime,
+  )
+  if (error) throwError(error)
+}
+
 export const saveSettings = async (body) => {
   if (!body) throwError('Request body is required')
   const defaults = defaultSettings()
@@ -57,6 +77,7 @@ export const saveSettings = async (body) => {
   for (const k of allowedKeys) {
     if (k in body) settings[k] = body[k]
   }
+  validateBookingHours({ ...defaults, ...settings })
   const db = getDB()
   await db.collection(COLLECTION).updateOne(
     { docId: DOC_ID },

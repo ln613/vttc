@@ -52,6 +52,15 @@ import {
   removePlayerFromEvent,
 } from './accountHandlers.js'
 import {
+  getBookingDay,
+  getMyBookings,
+  getMyCredits,
+  bookCourt,
+  bookCourtAsGuest,
+  topUpCredits,
+  confirmPayment,
+} from './bookingHandlers.js'
+import {
   getLiveScore,
   rebuildMatchQueue,
   postponeMatch,
@@ -149,6 +158,10 @@ export const apiHandlers = {
     matchUmpireChoices: (params) => getMatchUmpireChoices(params),
     // Sign-up wizard, step 4: who on file might this person already be.
     similarPlayers: (params) => findSimilarPlayers(params),
+    // Court booking — see specs/rules/booking.md.
+    bookingDay: (params, auth) => getBookingDay(params, auth),
+    myBookings: (params, auth) => getMyBookings(params, auth),
+    myCredits: (params, auth) => getMyCredits(params, auth),
     revenue: () => getRevenue(),
     revenueTemplates: () => getRevenueTemplates(),
   },
@@ -236,6 +249,10 @@ export const apiHandlers = {
     umpireSignIn: (body) => umpireSignIn(body),
     signUp: (body) => signUp(body),
     googleSignIn: (body) => googleSignIn(body),
+    bookCourt: (body, auth) => bookCourt(body, auth),
+    bookCourtAsGuest: (body) => bookCourtAsGuest(body),
+    topUpCredits: (body, auth) => topUpCredits(body, auth),
+    confirmPayment: (body, auth) => confirmPayment(body, auth),
     sendVerificationCode: (body) => sendVerificationCode(body),
     verifyCode: (body) => verifyCode(body),
     // Both check the caller is the player named in the body (or, for a

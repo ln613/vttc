@@ -16,6 +16,8 @@ interface SelectProps {
   disabled?: boolean
   class?: string
   noMargin?: boolean
+  // Leave out the "-- Select --" entry, for a choice that always has a value.
+  noPlaceholder?: boolean
 }
 
 const labelStyle: JSX.CSSProperties = {
@@ -93,9 +95,11 @@ const Select = (props: SelectProps) => {
         onFocus={handleFocus}
         onBlur={handleBlur}
       >
-        <option value="" disabled>
-          {props.placeholder ?? '-- Select --'}
-        </option>
+        <Show when={!props.noPlaceholder}>
+          <option value="" disabled>
+            {props.placeholder ?? '-- Select --'}
+          </option>
+        </Show>
         <For each={props.options}>
           {(option) => (
             <option value={option.value} selected={option.value === props.value}>

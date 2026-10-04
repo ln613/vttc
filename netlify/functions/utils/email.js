@@ -99,3 +99,59 @@ const buildVerificationEmailHtml = (code) => `
     <p style="font-size: 14px; color: #666;">If you did not request this code, please ignore this email.</p>
   </div>
 `
+
+/**
+ * A court booking's receipt — see bookingReceipt.js for what it says.
+ */
+export const sendBookingReceiptEmail = async (to, receipt) => {
+  if (!to) throw new Error('Recipient email is required')
+  if (!receipt) throw new Error('Receipt is required')
+
+  const subject = `${receipt.title} — ${receipt.ref}`
+  const html = buildBookingReceiptHtml(receipt)
+
+  await sendEmail({ to, subject, html })
+}
+
+const escapeHtml = (value) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+
+const buildReceiptRowsHtml = (lines) =>
+  lines
+    .map(
+      (line) => `
+      <tr>
+        <td style="padding: 6px 0; color: #666; font-size: 14px;">${escapeHtml(line.label)}</td>
+        <td style="padding: 6px 0; color: #333; font-size: 14px; text-align: right; font-weight: bold;">${escapeHtml(line.value)}</td>
+      </tr>`,
+    )
+    .join('')
+
+const buildDoorCodeHtml = (doorCode) =>
+  doorCode
+    ? `
+    <p style="font-size: 15px; color: #333; margin: 24px 0 8px; text-align: center;">Your door code</p>
+    <div style="text-align: center; margin: 0 0 8px;">
+      <span style="display: inline-block; font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #2c3e50; background: #f0f4f8; padding: 12px 24px; border-radius: 8px;">
+        ${escapeHtml(doorCode.code)}
+      </span>
+    </div>
+    <p style="font-size: 14px; color: #666; text-align: center; margin: 12px 0 0;">Works ${escapeHtml(doorCode.window)}</p>`
+    : `
+    <p style="font-size: 14px; color: #666; text-align: center; margin: 24px 0 0;">Your door code is not ready yet. Please contact the club before your booking.</p>`
+
+export const buildBookingReceiptHtml = (receipt) => `
+  <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+    <h2 style="color: #2185d0; text-align: center; margin: 0 0 4px;">${escapeHtml(receipt.title)}</h2>
+    <p style="font-size: 14px; color: #666; text-align: center; margin: 0 0 20px;">Receipt</p>
+    <table style="width: 100%; border-collapse: collapse; border-top: 1px solid #eee; border-bottom: 1px solid #eee;">
+      ${buildReceiptRowsHtml(receipt.lines)}
+    </table>
+    ${buildDoorCodeHtml(receipt.doorCode)}
+    <p style="font-size: 13px; color: #999; text-align: center; margin-top: 24px;">Keep this email for your records.</p>
+  </div>
+`

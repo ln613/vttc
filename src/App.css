@@ -99,6 +99,36 @@
 }
 
 
+/* A free half hour on the Booking page. Inline styles can't do :hover. */
+@media (hover: hover) {
+  .vttc-booking-free:hover {
+    background-color: #d4f5e2 !important;
+    border-color: #27ae60 !important;
+  }
+}
+
+/* The header's top bar on a phone: less side padding and tighter nav links,
+ * so Events / Schedule / Players / Booking fit beside the icons. */
+@media (max-width: 480px) {
+  .vttc-topbar {
+    padding: 0 8px !important;
+  }
+  .vttc-nav-left {
+    gap: 2px !important;
+  }
+  .vttc-nav-link {
+    padding: 12px 4px !important;
+    font-size: 14px !important;
+    letter-spacing: 0 !important;
+  }
+  .vttc-topbar-icon {
+    padding: 4px !important;
+  }
+}
+.vttc-nav-left::-webkit-scrollbar {
+  display: none;
+}
+
 /* Icon tap-target: any element that opts in gets a 44x44px minimum hit
  * area and suppressed double-tap zoom — meets Apple HIG and stops iOS
  * from re-classifying small taps as scroll gestures. */

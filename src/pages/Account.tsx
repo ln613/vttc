@@ -1,14 +1,23 @@
 import { Show, For, onMount, onCleanup, type JSX } from 'solid-js'
-import { useNavigate, useParams } from '@solidjs/router'
+import { useNavigate, useParams, useSearchParams } from '@solidjs/router'
 import { Header } from '../components/Header'
 import Input from '../components/Input'
 import Select from '../components/Select'
 import DatePicker from '../components/DatePicker'
 import PasswordRules from '../components/PasswordRules'
 import Button from '../components/Button'
+import TopUpDialog from '../components/TopUpDialog'
+import CollapsibleSection from '../components/CollapsibleSection'
+import MyBookingsList from '../components/MyBookingsList'
 import { parseLocalDate, formatLocalDate } from '../utils/date'
 import { accountPageState, accountPageActions } from '../stores/accountPageStore'
 import { authState, authActions } from '../stores/authStore'
+import { creditsState, creditsActions } from '../stores/creditsStore'
+import {
+  accountSectionsState,
+  accountSectionsActions,
+} from '../stores/accountSectionsStore'
+import { formatCredits } from '../../shared/rules/booking'
 
 const containerStyle: JSX.CSSProperties = {
   display: 'flex',
@@ -27,21 +36,6 @@ const titleStyle: JSX.CSSProperties = {
   'margin-top': '0',
   'margin-bottom': '24px',
   color: '#333',
-}
-
-const sectionHeaderStyle: JSX.CSSProperties = {
-  display: 'flex',
-  'align-items': 'center',
-  'justify-content': 'space-between',
-  'margin-bottom': '16px',
-}
-
-const sectionTitleStyle: JSX.CSSProperties = {
-  'font-size': '1.17em',
-  'font-weight': 700,
-  color: '#333',
-  margin: '0',
-  'text-align': 'left',
 }
 
 const actionIconsStyle: JSX.CSSProperties = {
@@ -148,7 +142,17 @@ const dialogButtonContainerStyle: JSX.CSSProperties = {
 }
 
 const changePasswordButtonContainerStyle: JSX.CSSProperties = {
-  'margin-top': '20px',
+  'margin-top': '4px',
+}
+
+const passwordLinkStyle: JSX.CSSProperties = {
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  color: '#2185d0',
+  'font-size': '15px',
+  'text-decoration': 'underline',
+  cursor: 'pointer',
 }
 
 // Rating row mirrors the sign-up dialog's verification-code field:
@@ -201,13 +205,17 @@ const ratingHistoryButtonStyle: JSX.CSSProperties = {
 const Account = () => {
   const navigate = useNavigate()
   const params = useParams()
+  const [searchParams] = useSearchParams()
 
   onMount(() => {
     accountPageActions.init(params.playerId)
+    accountSectionsActions.init(searchParams.open)
+    void creditsActions.fetchBalance()
   })
 
   onCleanup(() => {
     accountPageActions.reset()
+    accountSectionsActions.reset()
   })
 
   const handleSignOut = () => {
@@ -222,7 +230,11 @@ const Account = () => {
       <SavedOverlay />
       <div style={contentStyle}>
         <h1 style={titleStyle}>{accountPageActions.getTitle()}</h1>
-        <ProfileSection />
+        <div style={sectionsStyle}>
+          <ProfileSection />
+          <CreditsSection />
+          <MyBookingsSection />
+        </div>
         <Show
           when={!accountPageState.editing && !accountPageState.targetPlayerId}
         >
@@ -239,6 +251,7 @@ const Account = () => {
       <Show when={accountPageState.showRatingHistoryDialog}>
         <RatingHistoryDialog />
       </Show>
+      <TopUpDialog />
       <SpinnerKeyframes />
     </div>
   )
@@ -317,8 +330,14 @@ const SaveIcon = () => (
 
 const isAdminOrSuperAdmin = () => authState.isAdmin || authState.isSuperAdmin
 
+// Anyone can edit their own profile if they have one — a player who is also
+// an admin included. The shared admin logins have no profile of their own;
+// they edit other players' (targetPlayerId).
+const canEditProfile = () =>
+  authActions.hasPlayerRecord() || !!accountPageState.targetPlayerId
+
 const ProfileActionIcons = () => (
-  <Show when={!isAdminOrSuperAdmin() || accountPageState.targetPlayerId}>
+  <Show when={canEditProfile()}>
     <div style={actionIconsStyle}>
       <Show when={accountPageState.saving}>
         <div style={spinnerStyle} />
@@ -357,11 +376,16 @@ const ProfileActionIcons = () => (
 )
 
 const ProfileSection = () => (
-  <>
-    <div style={sectionHeaderStyle}>
-      <h3 style={sectionTitleStyle}>Profile</h3>
-      <ProfileActionIcons />
-    </div>
+  <CollapsibleSection
+    title="Profile"
+    open={accountSectionsState.profile}
+    onToggle={() => accountSectionsActions.toggle('profile')}
+    actions={
+      <Show when={accountSectionsState.profile}>
+        <ProfileActionIcons />
+      </Show>
+    }
+  >
     <Input
       label="First Name"
       name="firstName"
@@ -458,18 +482,78 @@ const ProfileSection = () => (
     </Show>
     <Show
       when={
-        !isAdminOrSuperAdmin() &&
+        authActions.hasPlayerRecord() &&
         !accountPageState.editing &&
         !accountPageState.targetPlayerId
       }
     >
       <div style={changePasswordButtonContainerStyle}>
-        <Button color="#3498db" onClick={accountPageActions.showChangePassword}>
+        <button
+          type="button"
+          style={passwordLinkStyle}
+          onClick={accountPageActions.showChangePassword}
+        >
           {accountPageActions.isSettingPassword() ? 'Set Password' : 'Change Password'}
-        </Button>
+        </button>
       </div>
     </Show>
-  </>
+  </CollapsibleSection>
+)
+
+// Court-booking credits and bookings, on the player's own account at a club
+// that takes bookings — not the admin or tablet logins, which have no player
+// record, and not someone else's account viewed by an admin.
+const showCredits = () =>
+  creditsActions.isBookingEnabled() &&
+  creditsActions.isPlayer() &&
+  !accountPageState.targetPlayerId
+
+// The balance shows in the header, so it can be read with the section closed.
+const creditsSummary = () =>
+  creditsState.balance !== null
+    ? `${formatCredits(creditsState.balance)} credits`
+    : ''
+
+const CreditsSection = () => (
+  <Show when={showCredits()}>
+    <CollapsibleSection
+      title="Credits"
+      open={accountSectionsState.credits}
+      onToggle={() => accountSectionsActions.toggle('credits')}
+      summary={creditsSummary()}
+    >
+      <div style={creditsBalanceStyle}>
+        <Show
+          when={creditsState.balance !== null}
+          fallback={
+            <span style={creditsMutedStyle}>
+              {creditsState.error || 'Loading...'}
+            </span>
+          }
+        >
+          <strong style={creditsAmountStyle}>
+            {formatCredits(creditsState.balance ?? 0)}
+          </strong>
+          <span style={creditsMutedStyle}>credits</span>
+        </Show>
+      </div>
+      <Button color="#27ae60" onClick={creditsActions.openTopUp}>
+        Top up
+      </Button>
+    </CollapsibleSection>
+  </Show>
+)
+
+const MyBookingsSection = () => (
+  <Show when={showCredits()}>
+    <CollapsibleSection
+      title="My Bookings"
+      open={accountSectionsState.myBookings}
+      onToggle={() => accountSectionsActions.toggle('myBookings')}
+    >
+      <MyBookingsList />
+    </CollapsibleSection>
+  </Show>
 )
 
 const ChangePasswordDialog = () => (
@@ -592,6 +676,28 @@ const formatRatingChangedAt = (iso: string): string => {
   const d = new Date(iso)
   if (isNaN(d.getTime())) return iso
   return d.toLocaleString()
+}
+
+const sectionsStyle: JSX.CSSProperties = {
+  'border-top': '1px solid #e5e7eb',
+  'text-align': 'left',
+}
+
+const creditsBalanceStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'align-items': 'baseline',
+  gap: '8px',
+  margin: '0 0 16px',
+}
+
+const creditsAmountStyle: JSX.CSSProperties = {
+  'font-size': '28px',
+  color: '#333',
+}
+
+const creditsMutedStyle: JSX.CSSProperties = {
+  'font-size': '14px',
+  color: '#666',
 }
 
 const ratingHistoryListStyle: JSX.CSSProperties = {
