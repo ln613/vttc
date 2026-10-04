@@ -3,7 +3,7 @@
 ## Layout
 
 - banner https://res.cloudinary.com/vttc/image/upload/v1767957616/banner.jpg
-- Top bar (blue bg, white text)
+- Top bar (blue bg, white text). Every link and button follows its module (rules/modules.md); one that is off is not shown
   - Live score icon (for tablet, show Tablet)
   - "Umpire" button (green bg), next to the live score icon
     - publicly accessible — no sign in required
@@ -16,7 +16,7 @@
   - Events: go to the Home/Events List page
   - Schedule: go to the schedule page
   - Players: go to the Players page
-  - "Booking": go to the Booking page — only at a club that takes court bookings (`booking.enabled` in the club config), and not for the tablet
+  - "Booking": go to the Booking page — Calendar module, not for the tablet
   - on a phone (480px and narrower) the bar tightens its spacing so the links fit beside the icons; on a screen too narrow even for that, the links scroll sideways within the bar, never the page
   - Setting Icon (align right, admin only)
   - Account Icon (align right)

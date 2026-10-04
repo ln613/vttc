@@ -2,6 +2,7 @@ import { createStore } from 'solid-js/store'
 import clubConfig from 'club-config'
 import { apiGet, apiPost } from '../utils/api'
 import { authState, authActions } from './authStore'
+import { modulesActions } from './modulesStore'
 import {
   bookingRules,
   isValidTopUp,
@@ -56,12 +57,20 @@ const errorMessage = (err: unknown, fallback: string) =>
 
 // ==================== derived ====================
 
-const isBookingEnabled = (): boolean => !!clubConfig.booking?.enabled
+// The Credit module (specs/rules/modules.md): balances, top-ups, and paying
+// for a booking with credits.
+const isCreditOn = (): boolean => modulesActions.on('credit')
 
 // A signed-in player with a player record: not a guest, not the tablet, and
 // not the club-admin login, which has no player behind it.
 const isPlayer = (): boolean =>
   authActions.hasPlayerRecord() && !authState.isTablet
+
+// A player who books with credits; with Credit off, they pay by card.
+const paysWithCredits = (): boolean => isPlayer() && isCreditOn()
+
+// A player who has My Booking to go back to.
+const hasMyBookings = (): boolean => isPlayer() && modulesActions.on('myBooking')
 
 const dollarsValue = (): number => Number(creditsState.dollars)
 
@@ -71,7 +80,7 @@ const topUpPreviewCredits = (): number =>
 // ==================== balance ====================
 
 const fetchBalance = async () => {
-  if (!isBookingEnabled() || !isPlayer()) return
+  if (!paysWithCredits()) return
   setCreditsState({ loading: true, error: null })
   try {
     const data = await apiGet<{ credits: number; paymentsAvailable: boolean }>('myCredits')
@@ -143,7 +152,9 @@ const payTopUp = async () => {
 const reset = () => setCreditsState(getInitialState())
 
 export const creditsActions = {
-  isBookingEnabled,
+  isCreditOn,
+  paysWithCredits,
+  hasMyBookings,
   isPlayer,
   topUpPreviewCredits,
   fetchBalance,

@@ -13,9 +13,10 @@ Vertical
     - read only mode: Edit Icon (enter edit mode)
     - edit mode: "Cancel" and "Save" icons (exit edit mode)
     - saving indicator (spinning circle, while saving)
-- Event Setting Section
-- Court Booking Section (only at a club with `booking.enabled`)
-- Revenue Section
+- Event Setting Section (Tournament module)
+- Court Booking Section (Booking module)
+- Revenue Section (Tournament module)
+- Modules Section (super admin only): link to the Modules page
 
 ## Event Setting Section
 

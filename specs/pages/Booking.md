@@ -1,6 +1,6 @@
 # Booking Page
 
-Route `/booking`. Only at a club with `booking.enabled`. See rules/booking.md.
+Route `/booking`. Calendar module (rules/modules.md). See rules/booking.md.
 
 ## Layout
 
@@ -28,14 +28,14 @@ Vertical
 - "Book {court}" (h2), the date and time range (updates with the length)
 - details step
   - "Length" dropdown, one option per allowed length with its time range: "3 hours (4:30pm to 7:30pm)"; 1 hour selected
-  - signed-in player:
+  - signed-in player, Credit module on:
     - "Cost" {credits} credits, "Your balance: {balance} credits"
     - not enough: "Not enough credits. Top up to book this time." and "Top up" instead of "Book"
     - "Cancel", "Book"
   - otherwise:
     - "Price" ${dollars}
     - not signed in: "Have an account? Sign in to book with credits." (Sign in closes the dialog and opens the sign-in dialog)
-    - "Cancel", "Book as guest"
+    - "Cancel", "Book as guest" ("Pay by card" for a signed-in player — Credit off — whose name, email and phone are filled in)
 - guest step: First Name, Last Name, Email, Phone (all required), "Back", "Continue to payment"
 - payment step: "We're holding this time for you until {time}.", then the payment placeholder (rules/booking.md), "Back", "Simulate payment" (placeholder mode only)
 - done: "You're booked!"

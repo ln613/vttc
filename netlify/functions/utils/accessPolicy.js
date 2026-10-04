@@ -11,12 +11,14 @@
 //           tablet umpires without being an admin.
 //   ADMIN   a token that verifies as an admin. Running the tournament,
 //           anything destructive, and anything about money.
+//   SUPER_ADMIN  a super admin only. Which modules the club uses.
 //
 // Every registered handler must appear here — api.js refuses to serve one
 // that doesn't, so a new endpoint can't quietly arrive unprotected.
 export const PUBLIC = 'public'
 export const USER = 'user'
 export const ADMIN = 'admin'
+export const SUPER_ADMIN = 'superAdmin'
 
 export const ACCESS = {
   get: {
@@ -32,6 +34,7 @@ export const ACCESS = {
     liveScore: PUBLIC,
     league: PUBLIC, // the league's rounds, standings and fixtures
     settings: PUBLIC, // read on app start, before anyone has signed in
+    modules: PUBLIC, // which parts of the app to show, read on app start
     similarPlayers: PUBLIC, // sign-up wizard; returns only what `players` already shows
     bookingDay: PUBLIC, // who booked is shown only to them and to admins
     myBookings: USER,
@@ -123,6 +126,7 @@ export const ACCESS = {
     assignUmpireTable: ADMIN,
     unassignUmpire: ADMIN,
     saveSettings: ADMIN,
+    saveModules: SUPER_ADMIN,
     saveRevenueTemplate: ADMIN,
   },
 }
@@ -137,6 +141,9 @@ export const denyReason = (policy, auth) => {
   }
   if (policy === ADMIN && !auth.isAdmin) {
     return { status: 403, error: 'That action is for admins' }
+  }
+  if (policy === SUPER_ADMIN && !auth.isSuperAdmin) {
+    return { status: 403, error: 'That action is for super admins' }
   }
   return null
 }

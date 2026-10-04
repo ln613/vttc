@@ -8,7 +8,11 @@ import {
   myBookingsActions,
   type MyBooking,
 } from '../stores/myBookingsStore'
-import { formatClock, formatCredits } from '../../shared/rules/booking'
+import {
+  formatClock,
+  formatCredits,
+  formatDollars,
+} from '../../shared/rules/booking'
 
 // The signed-in player's court bookings, in the Account page's My Bookings
 // section: upcoming, then past, each with its door code and receipt. The
@@ -78,7 +82,9 @@ const BookingCard = (props: { booking: MyBooking }) => (
         </span>
       </div>
       <span style={creditsStyle}>
-        {formatCredits(props.booking.credits)} credits
+        {props.booking.paidWith === 'card'
+          ? formatDollars(props.booking.amountCents ?? 0)
+          : `${formatCredits(props.booking.credits ?? 0)} credits`}
       </span>
     </div>
     <DoorCodeLine booking={props.booking} />

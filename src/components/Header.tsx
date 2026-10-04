@@ -22,6 +22,7 @@ import TablePickerDialog, {
   type TableCellStatus,
 } from './TablePickerDialog'
 import clubConfig from 'club-config'
+import { modulesActions } from '../stores/modulesStore'
 
 export const Header = () => (
   <header>
@@ -167,20 +168,27 @@ const TopBar = () => {
     <div class="vttc-topbar" style={topBarStyle}>
       <div style={topBarContentStyle}>
         <div class="vttc-nav-left" style={navLeftStyle}>
-          <button
-            style={
-              authState.isTablet ? navLinkStyle : liveScoreButtonStyle
-            }
-            onClick={handleLiveScoreClick}
+          {/* Each link follows its module (specs/rules/modules.md). The
+              tablet's button is Game Play; everyone else's is Live Score. */}
+          <Show
+            when={modulesActions.on(authState.isTablet ? 'gamePlay' : 'liveScore')}
           >
-            <Show when={authState.isTablet} fallback={<LiveScoreIcon />}>
-              Tablet
-            </Show>
-          </button>
+            <button
+              style={
+                authState.isTablet ? navLinkStyle : liveScoreButtonStyle
+              }
+              onClick={handleLiveScoreClick}
+            >
+              <Show when={authState.isTablet} fallback={<LiveScoreIcon />}>
+                Tablet
+              </Show>
+            </button>
+          </Show>
           {/* For umpires without an account. Admins reach Game Play from the
               match rows, and the tablet has its own button. */}
           <Show
             when={
+              modulesActions.on('gamePlay') &&
               !authState.isTablet &&
               !authState.isAdmin &&
               liveScoreState.allowPublicUmpire &&
@@ -205,17 +213,22 @@ const TopBar = () => {
               onClose={() => setShowTablePicker(false)}
             />
           </Show>
-          <button class="vttc-nav-link" style={navLinkStyle} onClick={handleEventsClick}>
-            Events
-          </button>
-          <button class="vttc-nav-link" style={navLinkStyle} onClick={handleScheduleClick}>
-            Schedule
-          </button>
-          <button class="vttc-nav-link" style={navLinkStyle} onClick={handlePlayersClick}>
-            Players
-          </button>
-          {/* Clubs with a court to book: see `booking` in the club config. */}
-          <Show when={clubConfig.booking?.enabled && !authState.isTablet}>
+          <Show when={modulesActions.on('events')}>
+            <button class="vttc-nav-link" style={navLinkStyle} onClick={handleEventsClick}>
+              Events
+            </button>
+          </Show>
+          <Show when={modulesActions.on('schedule')}>
+            <button class="vttc-nav-link" style={navLinkStyle} onClick={handleScheduleClick}>
+              Schedule
+            </button>
+          </Show>
+          <Show when={modulesActions.on('players')}>
+            <button class="vttc-nav-link" style={navLinkStyle} onClick={handlePlayersClick}>
+              Players
+            </button>
+          </Show>
+          <Show when={modulesActions.on('calendar') && !authState.isTablet}>
             <button class="vttc-nav-link" style={navLinkStyle} onClick={handleBookingClick}>
               Booking
             </button>

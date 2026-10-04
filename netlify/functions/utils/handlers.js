@@ -88,6 +88,7 @@ import {
   releaseMatchSession,
 } from './matchSessionHandlers.js'
 import { getSettings, saveSettings } from './settingsHandlers.js'
+import { getModules, saveModules } from './modulesHandlers.js'
 import { updateRatings, getPlayerHistory } from './rating.js'
 import {
   getUmpires,
@@ -153,6 +154,7 @@ export const apiHandlers = {
     liveScore: (params) => getLiveScore(params),
     league: (params) => getLeague(params),
     settings: () => getSettings(),
+    modules: () => getModules(),
     umpires: () => getUmpires(),
     umpireTableCounts: () => getUmpireTableCounts(),
     matchUmpireChoices: (params) => getMatchUmpireChoices(params),
@@ -233,6 +235,7 @@ export const apiHandlers = {
     deleteEvent: withEventNotify(deleteEvent),
     setParticipantDefault: withEventNotify(setParticipantDefault),
     saveSettings: (body) => saveSettings(body),
+    saveModules: (body) => saveModules(body),
     saveUmpire: (body) => saveUmpire(body),
     deleteUmpire: (body) => deleteUmpire(body),
     assignUmpireTable: (body) => assignUmpireTable(body),
@@ -250,7 +253,7 @@ export const apiHandlers = {
     signUp: (body) => signUp(body),
     googleSignIn: (body) => googleSignIn(body),
     bookCourt: (body, auth) => bookCourt(body, auth),
-    bookCourtAsGuest: (body) => bookCourtAsGuest(body),
+    bookCourtAsGuest: (body, auth) => bookCourtAsGuest(body, auth),
     topUpCredits: (body, auth) => topUpCredits(body, auth),
     confirmPayment: (body, auth) => confirmPayment(body, auth),
     sendVerificationCode: (body) => sendVerificationCode(body),

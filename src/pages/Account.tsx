@@ -13,6 +13,7 @@ import { parseLocalDate, formatLocalDate } from '../utils/date'
 import { accountPageState, accountPageActions } from '../stores/accountPageStore'
 import { authState, authActions } from '../stores/authStore'
 import { creditsState, creditsActions } from '../stores/creditsStore'
+import { modulesActions } from '../stores/modulesStore'
 import {
   accountSectionsState,
   accountSectionsActions,
@@ -220,7 +221,7 @@ const Account = () => {
 
   const handleSignOut = () => {
     authActions.signOut()
-    navigate('/events')
+    navigate('/')
   }
 
   return (
@@ -503,10 +504,14 @@ const ProfileSection = () => (
 // Court-booking credits and bookings, on the player's own account at a club
 // that takes bookings — not the admin or tablet logins, which have no player
 // record, and not someone else's account viewed by an admin.
-const showCredits = () =>
-  creditsActions.isBookingEnabled() &&
-  creditsActions.isPlayer() &&
-  !accountPageState.targetPlayerId
+const isOwnPlayerAccount = () =>
+  creditsActions.isPlayer() && !accountPageState.targetPlayerId
+
+// Each follows its module (specs/rules/modules.md).
+const showCredits = () => isOwnPlayerAccount() && creditsActions.isCreditOn()
+
+const showMyBookings = () =>
+  isOwnPlayerAccount() && modulesActions.on('myBooking')
 
 // The balance shows in the header, so it can be read with the section closed.
 const creditsSummary = () =>
@@ -545,7 +550,7 @@ const CreditsSection = () => (
 )
 
 const MyBookingsSection = () => (
-  <Show when={showCredits()}>
+  <Show when={showMyBookings()}>
     <CollapsibleSection
       title="My Bookings"
       open={accountSectionsState.myBookings}

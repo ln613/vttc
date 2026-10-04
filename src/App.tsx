@@ -1,5 +1,5 @@
 import { HashRouter, Route } from '@solidjs/router'
-import { Show, type JSX } from 'solid-js'
+import { Show, onMount, type Component, type JSX } from 'solid-js'
 import './App.css'
 import TournamentEdit from './pages/TournamentEdit'
 import EventEdit from './pages/EventEdit'
@@ -17,7 +17,11 @@ import Revenue from './pages/Revenue'
 import RevenueCalculator from './pages/RevenueCalculator'
 import History from './pages/History'
 import Booking from './pages/Booking'
+import Modules from './pages/Modules'
 import ConfirmDialog from './components/ConfirmDialog'
+import { ModuleGate, Home } from './components/ModuleGate'
+import { modulesActions } from './stores/modulesStore'
+import type { ModuleKey } from '../shared/rules/modules'
 import UserNotifications from './components/UserNotifications'
 import NotificationToasts from './components/NotificationToasts'
 
@@ -26,7 +30,12 @@ import NotificationToasts from './components/NotificationToasts'
 const notificationsEnabled =
   import.meta.env.VITE_NOTIFICATIONS_ENABLED === '1'
 
-const RootLayout = (props: { children?: JSX.Element }) => (
+const RootLayout = (props: { children?: JSX.Element }) => {
+  onMount(() => void modulesActions.load())
+  return <Layout>{props.children}</Layout>
+}
+
+const Layout = (props: { children?: JSX.Element }) => (
   <>
     {props.children}
     <ConfirmDialog />
@@ -37,28 +46,48 @@ const RootLayout = (props: { children?: JSX.Element }) => (
   </>
 )
 
+// A page that belongs to a module (specs/rules/modules.md) is only there
+// while the module is on.
+const gated =
+  (module: ModuleKey, Page: Component): Component =>
+  () => (
+    <ModuleGate module={module}>
+      <Page />
+    </ModuleGate>
+  )
+
+const TournamentEditPage = () => <TournamentEdit isEdit />
+const EventEditPage = () => <EventEdit isEdit />
+
+const HomePage = () => (
+  <Home>
+    <EventList />
+  </Home>
+)
+
 const App = () => (
   <HashRouter root={RootLayout}>
-    <Route path="/" component={EventList} />
-    <Route path="/events" component={EventList} />
-    <Route path="/players" component={Players} />
-    <Route path="/schedule" component={Schedule} />
+    <Route path="/" component={HomePage} />
+    <Route path="/events" component={gated('events', EventList)} />
+    <Route path="/players" component={gated('players', Players)} />
+    <Route path="/schedule" component={gated('schedule', Schedule)} />
     <Route path="/account" component={Account} />
     <Route path="/account/:playerId" component={Account} />
-    <Route path="/tournament/new" component={TournamentEdit} />
-    <Route path="/tournament/:id/edit" component={() => <TournamentEdit isEdit />} />
-    <Route path="/event/new" component={EventEdit} />
-    <Route path="/event/:id/edit" component={() => <EventEdit isEdit />} />
-    <Route path="/event/participants" component={EventParticipantEdit} />
-    <Route path="/event/:id" component={EventDetail} />
-    <Route path="/game-play" component={GamePlay} />
-    <Route path="/live-score" component={LiveScore} />
+    <Route path="/tournament/new" component={gated('events', TournamentEdit)} />
+    <Route path="/tournament/:id/edit" component={gated('events', TournamentEditPage)} />
+    <Route path="/event/new" component={gated('events', EventEdit)} />
+    <Route path="/event/:id/edit" component={gated('events', EventEditPage)} />
+    <Route path="/event/participants" component={gated('events', EventParticipantEdit)} />
+    <Route path="/event/:id" component={gated('events', EventDetail)} />
+    <Route path="/game-play" component={gated('gamePlay', GamePlay)} />
+    <Route path="/live-score" component={gated('liveScore', LiveScore)} />
     <Route path="/settings" component={Settings} />
-    <Route path="/umpires" component={Umpires} />
-    <Route path="/revenue" component={Revenue} />
-    <Route path="/revenue-calculator" component={RevenueCalculator} />
-    <Route path="/history/:playerId" component={History} />
-    <Route path="/booking" component={Booking} />
+    <Route path="/modules" component={Modules} />
+    <Route path="/umpires" component={gated('gamePlay', Umpires)} />
+    <Route path="/revenue" component={gated('events', Revenue)} />
+    <Route path="/revenue-calculator" component={gated('events', RevenueCalculator)} />
+    <Route path="/history/:playerId" component={gated('players', History)} />
+    <Route path="/booking" component={gated('calendar', Booking)} />
   </HashRouter>
 )
 

@@ -3,7 +3,7 @@ import clubConfig from 'club-config'
 import { apiGet, apiPost } from '../utils/api'
 import { parseLocalDate, formatLocalDate } from '../utils/date'
 import { creditsState, creditsActions } from './creditsStore'
-import { authActions } from './authStore'
+import { authState, authActions } from './authStore'
 import {
   bookingRules,
   startTimes,
@@ -327,7 +327,19 @@ const signInForCredits = () => {
   authActions.showSignInDialog()
 }
 
-const startGuest = () => setBookingState({ step: 'guest', dialogError: null })
+// A signed-in player paying by card (Credit turned off) starts with their
+// own details filled in; anything already typed is kept.
+const startGuest = () => {
+  const user = authActions.hasPlayerRecord() ? authState.user : null
+  setBookingState({
+    step: 'guest',
+    dialogError: null,
+    firstName: bookingState.firstName || user?.firstName || '',
+    lastName: bookingState.lastName || user?.lastName || '',
+    email: bookingState.email || user?.email || '',
+    phone: bookingState.phone || user?.phone || '',
+  })
+}
 
 type GuestField = 'firstName' | 'lastName' | 'email' | 'phone'
 

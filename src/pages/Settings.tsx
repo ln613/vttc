@@ -5,6 +5,7 @@ import { authState } from '../stores/authStore'
 import { settingsState, settingsActions } from '../stores/settingsStore'
 import type { AppSettings } from '../stores/settingsStore'
 import clubConfig from 'club-config'
+import { modulesActions } from '../stores/modulesStore'
 import Select from '../components/Select'
 import {
   bookingRules,
@@ -28,20 +29,35 @@ const Settings = () => {
           <Show when={settingsState.error}>
             <div style={errorStyle}>{settingsState.error}</div>
           </Show>
-          <EventSettingSection />
-          <Show when={clubConfig.booking?.enabled}>
+          {/* Each section follows its module (specs/rules/modules.md). */}
+          <Show when={modulesActions.on('tournament')}>
+            <EventSettingSection />
+          </Show>
+          <Show when={modulesActions.on('booking')}>
             <BookingSection />
           </Show>
           {/* Only where the club records who umpired — otherwise there is
               no roster to keep. */}
-          <Show when={settingsState.settings.saveUmpireInfo}>
+          <Show
+            when={
+              modulesActions.on('gamePlay') &&
+              settingsState.settings.saveUmpireInfo
+            }
+          >
             <UmpireSection />
           </Show>
-          <RevenueSection />
+          <Show when={modulesActions.on('tournament')}>
+            <RevenueSection />
+          </Show>
           {/* Only for a club that actually uses the app's rating system —
               see enableUpdateRating in clubs/<slug>/config.json. */}
-          <Show when={clubConfig.enableUpdateRating}>
+          <Show
+            when={modulesActions.on('tournament') && clubConfig.enableUpdateRating}
+          >
             <UpdateSection />
+          </Show>
+          <Show when={authState.isSuperAdmin}>
+            <ModulesSection />
           </Show>
         </div>
       </Show>
@@ -61,6 +77,25 @@ const UmpireSection = () => {
           onClick={() => navigate('/umpires')}
         >
           Umpires
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Super admin only: which parts of the app this club uses.
+const ModulesSection = () => {
+  const navigate = useNavigate()
+  return (
+    <div style={sectionStyle}>
+      <h4 style={sectionHeaderStyle}>Modules</h4>
+      <div style={linkColumnStyle}>
+        <button
+          type="button"
+          style={linkButtonStyle}
+          onClick={() => navigate('/modules')}
+        >
+          Modules
         </button>
       </div>
     </div>

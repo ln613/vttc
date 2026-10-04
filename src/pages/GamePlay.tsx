@@ -18,6 +18,7 @@ import { customConfirm } from '../stores/confirmDialogStore'
 import { authState } from '../stores/authStore'
 import { clearUmpireToken, getUmpireId } from '../utils/api'
 import { FULL_HEIGHT } from '../utils/viewport'
+import { modulesActions } from '../stores/modulesStore'
 import {
   getTeamSubMatchTitle,
   getTeamMatchLineupLabels,
@@ -312,7 +313,7 @@ const goBackOrSchedule = (navigate: ReturnType<typeof useNavigate>) => {
   if (window.history.length > 1) {
     navigate(-1)
   } else {
-    navigate('/schedule')
+    navigate(modulesActions.on('schedule') ? '/schedule' : '/')
   }
 }
 

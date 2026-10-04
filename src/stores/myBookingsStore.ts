@@ -17,7 +17,9 @@ export interface MyBooking {
   court: number
   start: number
   minutes: number
-  credits: number
+  credits?: number
+  paidWith: 'credits' | 'card'
+  amountCents?: number
   createdAt: string
   doorCode: DoorCode | null
   receipt: { title: string; ref: string; lines: ReceiptLine[] }

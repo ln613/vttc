@@ -80,7 +80,7 @@ const HoursLine = () => (
 )
 
 const BalanceLine = () => (
-  <Show when={creditsActions.isPlayer() && creditsState.balance !== null}>
+  <Show when={creditsActions.paysWithCredits() && creditsState.balance !== null}>
     <div style={balanceRowStyle}>
       <span>
         Your credits:{' '}
@@ -335,7 +335,7 @@ const DetailsStep = () => (
       noPlaceholder
     />
     <Switch>
-      <Match when={creditsActions.isPlayer()}>
+      <Match when={creditsActions.paysWithCredits()}>
         <PlayerPayment />
       </Match>
       <Match when={true}>
@@ -412,7 +412,7 @@ const GuestPayment = () => (
         Cancel
       </Button>
       <Button fill color="#27ae60" onClick={bookingActions.startGuest}>
-        Book as guest
+        {creditsActions.isPlayer() ? 'Pay by card' : 'Book as guest'}
       </Button>
     </div>
   </>
@@ -506,7 +506,7 @@ const DoorCodeBox = () => (
     when={bookingState.doorCode}
     fallback={
       <div style={noCodeStyle}>
-        {creditsActions.isPlayer()
+        {creditsActions.hasMyBookings()
           ? "Your door code isn't ready yet. It will appear in My Bookings."
           : "Your door code isn't ready yet. Please contact the club before your booking."}
       </div>
@@ -539,7 +539,7 @@ const DoneStep = () => (
   <>
     <div style={doneStyle}>You're booked!</div>
     <DoorCodeBox />
-    <Show when={creditsActions.isPlayer() && bookingState.bookedCredits > 0}>
+    <Show when={creditsActions.paysWithCredits() && bookingState.bookedCredits > 0}>
       <div style={balanceNoteStyle}>
         {formatCredits(bookingState.bookedCredits)} credits used. Your balance
         is {formatCredits(creditsState.balance ?? 0)} credits.
@@ -550,7 +550,7 @@ const DoneStep = () => (
         A receipt has been sent to {bookingState.receiptSentTo}.
       </div>
     </Show>
-    <Show when={creditsActions.isPlayer()}>
+    <Show when={creditsActions.hasMyBookings()}>
       <div style={balanceNoteStyle}>
         Your code and receipt are always in <MyBookingsLink />.
       </div>

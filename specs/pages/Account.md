@@ -46,20 +46,20 @@ Vertical
 - rating history button will show a dialog of the rating admin adjustment history for this player
 ## Credits Section
 
-Only at a club that takes court bookings (`booking.enabled`), on the signed-in player's own account (not when an admin views someone else's, not for the admin or tablet logins, which have no player record).
+Credit module (rules/modules.md), on the signed-in player's own account (not when an admin views someone else's, not for the admin or tablet logins, which have no player record).
 
 - header: "Credits", and the balance "{credits} credits" at the right, so it shows while closed
 - open: balance "{credits}" (large) "credits", "Top up" button (green): opens the Top up dialog (see rules/booking.md)
 
 ## My Bookings Section
 
-Shown with the Credits Section (same rule).
+My Booking module, on the signed-in player's own account (as Credits).
 
 - header: "My Bookings"
 - loaded each time it is opened, not before
 - open: the player's confirmed court bookings
   - "Upcoming": today and later, soonest first; "Past": most recent first
-  - each booking (card): date ("Sun, Oct 4, 2026"), "{start} – {end} · {court}", "{credits} credits"
+  - each booking (card): date ("Sun, Oct 4, 2026"), "{start} – {end} · {court}", "{credits} credits" (or "${amount}" when paid by card)
   - door code: "Door code" {code} "Works {from} – {to}"; once that has passed, "Expired" (dimmed)
   - an upcoming booking without a code: "Door code not ready yet. Please check back, or contact the club." (opening the section asks the server to try again — rules/booking.md, Door code)
   - "Receipt" link: shows / hides the receipt (the same lines as the email); one open at a time

@@ -17,6 +17,7 @@ import { issueDoorCode, doorAccessAvailable } from './doorAccess.js'
 import { buildReceipt, doorCodeView } from './bookingReceipt.js'
 import { sendBookingReceiptEmail } from './email.js'
 import { getBookingHours } from './settingsHandlers.js'
+import { requireModules } from './modulesHandlers.js'
 import {
   bookingRules,
   isValidBookingTime,
@@ -56,9 +57,8 @@ const loadRules = async () => bookingRules({ ...club.booking, ...(await getBooki
 // books courts are its courts.
 const courts = () => club.tables?.all || [1]
 
-const validateBookingEnabled = () => {
-  if (!club.booking?.enabled) throwError('Court booking is not available at this club')
-}
+// Each endpoint names the modules it belongs to (specs/rules/modules.md):
+// a super admin can turn booking, credits or My Booking off.
 
 // ==================== slots ====================
 
@@ -159,7 +159,7 @@ const playerName = (p) => `${p?.firstName || ''} ${p?.lastName || ''}`.trim()
  * an admin sees whose every booking is.
  */
 export const getBookingDay = async (params, auth) => {
-  validateBookingEnabled()
+  await requireModules('booking', 'calendar')
   if (!isClubDate(params?.date)) throwError('Choose a date')
   const slots = await getSlots()
   for (const court of courts()) await releaseExpiredHolds(slots, { court, date: params.date })
@@ -198,7 +198,7 @@ export const getBookingDay = async (params, auth) => {
 
 /** The signed-in player's bookings, newest first. */
 export const getMyBookings = async (_params, auth) => {
-  validateBookingEnabled()
+  await requireModules('myBooking')
   validatePlayer(auth)
   const bookings = await getDB()
     .collection(BOOKINGS)
@@ -213,6 +213,8 @@ export const getMyBookings = async (_params, auth) => {
     start: b.start,
     minutes: b.minutes,
     credits: b.credits,
+    paidWith: b.paidWith,
+    amountCents: b.amountCents,
     createdAt: b.createdAt,
     doorCode: doorCodeView(b),
     receipt: buildReceipt(b),
@@ -221,7 +223,7 @@ export const getMyBookings = async (_params, auth) => {
 
 /** The signed-in player's credit balance, and what credits cost. */
 export const getMyCredits = async (_params, auth) => {
-  validateBookingEnabled()
+  await requireModules('credit')
   validatePlayer(auth)
   const player = await getDB()
     .collection(PLAYERS)
@@ -255,7 +257,7 @@ const spendCredits = async (playerId, credits) => {
  * step that fails undoes the ones before it.
  */
 export const bookCourt = async (body, auth) => {
-  validateBookingEnabled()
+  await requireModules('booking', 'calendar', 'credit')
   validatePlayer(auth)
   const request = validateBookingRequest(body, await loadRules())
   const credits = bookingCredits(rules(), request.minutes)
@@ -303,8 +305,8 @@ export const bookCourt = async (body, auth) => {
  * Hold a court for a guest while they pay. Returns the payment to complete;
  * the booking is only confirmed once it is paid.
  */
-export const bookCourtAsGuest = async (body) => {
-  validateBookingEnabled()
+export const bookCourtAsGuest = async (body, auth) => {
+  await requireModules('booking', 'calendar')
   const r = await loadRules()
   const request = validateBookingRequest(body, r)
   validateGuest(body)
@@ -321,6 +323,9 @@ export const bookCourtAsGuest = async (body) => {
   const { insertedId: bookingId } = await db.collection(BOOKINGS).insertOne({
     ...request,
     guest,
+    // A signed-in player paying by card (Credit turned off) still sees the
+    // booking as theirs: on the calendar and in My Booking.
+    ...(auth?.playerId ? { playerId: toObjectId(auth.playerId) } : {}),
     name: `${guest.firstName} ${guest.lastName}`,
     amountCents,
     status: 'pending_payment',
@@ -351,7 +356,7 @@ export const bookCourtAsGuest = async (body) => {
 
 /** Start a top-up for the signed-in player. Credits arrive once it is paid. */
 export const topUpCredits = async (body, auth) => {
-  validateBookingEnabled()
+  await requireModules('credit')
   validatePlayer(auth)
   const r = rules()
   const dollars = Number(body?.dollars)
@@ -523,11 +528,11 @@ const APPLY = { guestBooking: applyGuestBookingPayment, topUp: applyTopUpPayment
  * only be completed by the player it is for.
  */
 export const confirmPayment = async (body, auth) => {
-  validateBookingEnabled()
   if (!isPlaceholderPaymentAllowed()) throwError('Online payment is not available yet')
   if (!body?.paymentId) throwError('Payment is required')
   const payment = await findPayment(body.paymentId)
   if (!payment) throwError('Payment not found')
+  await requireModules(payment.kind === 'topUp' ? 'credit' : 'booking')
   if (payment.kind === 'topUp' && payment.playerId?.toString() !== auth?.playerId) {
     throwError('Payment not found')
   }
