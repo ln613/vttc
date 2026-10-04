@@ -11,6 +11,7 @@ export type ModuleKey =
   | 'profile'
   | 'credit'
   | 'myBooking'
+  | 'rating'
 
 export interface ModuleDefinition {
   key: ModuleKey
@@ -30,4 +31,5 @@ export declare const normalizeModules: (
   stored: Partial<Record<string, unknown>> | null | undefined,
   clubConfig?: { booking?: { enabled?: boolean } } | null,
 ) => Modules
+export declare const offAncestor: (modules: Partial<Modules> | null | undefined, key: ModuleKey) => ModuleDefinition | null
 export declare const isModuleOn: (modules: Partial<Modules> | null | undefined, key: ModuleKey) => boolean

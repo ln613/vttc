@@ -5,6 +5,7 @@ import { authState } from '../stores/authStore'
 import { modulesState, modulesActions } from '../stores/modulesStore'
 import {
   MODULES,
+  offAncestor,
   type ModuleDefinition,
   type ModuleKey,
 } from '../../shared/rules/modules'
@@ -73,34 +74,37 @@ const TitleRow = () => (
 
 const ModuleCard = (props: { module: ModuleDefinition }) => (
   <div style={sectionStyle}>
-    <ModuleSwitch module={props.module} />
-    <div style={childrenStyle}>
-      <For each={props.module.children}>
-        {(child) => <ModuleSwitch module={child} parent={props.module.key} />}
-      </For>
-    </div>
+    <ModuleTree module={props.module} depth={0} />
   </div>
 )
 
-const isParentOff = (parent?: ModuleKey) =>
-  !!parent && !modulesActions.shown()[parent]
+// A module's switch, then the modules under it, indented a level further.
+const ModuleTree = (props: { module: ModuleDefinition; depth: number }) => (
+  <>
+    <ModuleSwitch module={props.module} depth={props.depth} />
+    <Show when={props.module.children?.length}>
+      <div style={childrenStyle(props.depth)}>
+        <For each={props.module.children}>
+          {(child) => <ModuleTree module={child} depth={props.depth + 1} />}
+        </For>
+      </div>
+    </Show>
+  </>
+)
 
-// Why the box can't be changed: locked by the rules, or its section is off.
-// A section that is off outranks a lock: Events is "always on" only while
-// Tournament is.
-const switchNote = (key: ModuleKey, parent?: ModuleKey) => {
-  if (isParentOff(parent)) {
-    const parentLabel = MODULES.find((m) => m.key === parent)?.label
-    return `Off while ${parentLabel} is off`
-  }
+// The nearest module above this one that is off, which turns this one off.
+const offAbove = (key: ModuleKey) => offAncestor(modulesActions.shown(), key)
+
+// Why the box can't be changed. A module above that is off outranks a lock:
+// Events is "always on" only while Tournament is.
+const switchNote = (key: ModuleKey) => {
+  const above = offAbove(key)
+  if (above) return `Off while ${above.label} is off`
   return modulesActions.lockReason(key)
 }
 
-const ModuleSwitch = (props: {
-  module: ModuleDefinition
-  parent?: ModuleKey
-}) => (
-  <label style={rowStyle(!props.parent)}>
+const ModuleSwitch = (props: { module: ModuleDefinition; depth: number }) => (
+  <label style={rowStyle(props.depth === 0)}>
     <input
       type="checkbox"
       name={`module-${props.module.key}`}
@@ -108,7 +112,7 @@ const ModuleSwitch = (props: {
       disabled={
         !modulesState.editing ||
         !!modulesActions.lockReason(props.module.key) ||
-        isParentOff(props.parent)
+        !!offAbove(props.module.key)
       }
       onChange={(e) =>
         modulesActions.setDraft(
@@ -118,13 +122,11 @@ const ModuleSwitch = (props: {
       }
       style={checkboxStyle}
     />
-    <span style={labelStyle(isParentOff(props.parent))}>
+    <span style={labelStyle(!!offAbove(props.module.key))}>
       {props.module.label}
     </span>
-    <Show when={switchNote(props.module.key, props.parent)}>
-      <span style={noteStyle}>
-        {switchNote(props.module.key, props.parent)}
-      </span>
+    <Show when={switchNote(props.module.key)}>
+      <span style={noteStyle}>{switchNote(props.module.key)}</span>
     </Show>
   </label>
 )
@@ -175,13 +177,14 @@ const sectionStyle: JSX.CSSProperties = {
   padding: '14px 18px',
 }
 
-const childrenStyle: JSX.CSSProperties = {
+// Deeper levels already sit in a list with its own gap.
+const childrenStyle = (depth: number): JSX.CSSProperties => ({
   display: 'flex',
   'flex-direction': 'column',
   gap: '10px',
-  'margin-top': '12px',
+  'margin-top': depth === 0 ? '12px' : '0',
   'padding-left': '28px',
-}
+})
 
 const rowStyle = (top: boolean): JSX.CSSProperties => ({
   display: 'flex',

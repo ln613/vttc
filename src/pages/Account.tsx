@@ -447,7 +447,7 @@ const ProfileSection = () => (
       onChange={(value) => accountPageActions.setField('phone', value)}
       disabled={!accountPageState.editing}
     />
-    <Show when={isAdminOrSuperAdmin()}>
+    <Show when={isAdminOrSuperAdmin() && modulesActions.on('rating')}>
       <div style={ratingFieldStyle}>
         <label for="rating" style={ratingLabelStyle}>
           Rating

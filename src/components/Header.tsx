@@ -513,8 +513,13 @@ const AdminRegisterSection = () => (
 const NewPlayerSuccessSection = () => (
   <>
     <div style={infoMsgStyle}>
-      Contact {clubConfig.branding.contactName} to get an initial rating
-      before you can register for rating-restricted events.
+      <Show
+        when={modulesActions.on('rating')}
+        fallback={<>You're signed up. Welcome!</>}
+      >
+        Contact {clubConfig.branding.contactName} to get an initial rating
+        before you can register for rating-restricted events.
+      </Show>
     </div>
     <div style={buttonContainerStyle}>
       <Button onClick={signUpActions.dismissNewPlayerSuccess} color="#27ae60">

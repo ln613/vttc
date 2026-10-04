@@ -13,6 +13,7 @@ import {
   type WizardStep,
 } from '../stores/signUpStore'
 import { formatPhone } from '../../shared/rules/contact'
+import { modulesActions } from '../stores/modulesStore'
 
 // The self sign-up wizard (specs/shared/header.md). One screen per step, all
 // state and every decision in signUpStore; this file only draws.
@@ -244,7 +245,9 @@ const SimilarPlayerRow = (props: {
         {props.player.firstName} {props.player.lastName}
       </span>
       <span style={matchMetaStyle}>
-        {[sexLabel(props.player.sex), ratingLabel(props.player.rating)].filter(Boolean).join(' · ')}
+        {[sexLabel(props.player.sex), modulesActions.on('rating') ? ratingLabel(props.player.rating) : '']
+          .filter(Boolean)
+          .join(' · ')}
       </span>
     </label>
   )
@@ -258,8 +261,8 @@ const MatchStep = () => (
   >
     <Heading>Is one of these you?</Heading>
     <Hint>
-      We found players with a similar name. If one is you, select it so your
-      results and rating stay with you.
+      We found players with a similar name. If one is you, select it so your{' '}
+      {modulesActions.on('rating') ? 'results and rating stay' : 'history stays'} with you.
     </Hint>
     <div style={matchListStyle}>
       <For each={signUpState.similarPlayers}>

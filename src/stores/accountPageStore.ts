@@ -4,6 +4,7 @@ import { apiGet, apiPost } from '../utils/api'
 import { normalizeSex, toDbSex } from '../../shared/rules/sex'
 import { playerState, playerActions } from './playerStore'
 import { customConfirm } from './confirmDialogStore'
+import { modulesActions } from './modulesStore'
 import type { Player } from '../../shared/types/Player'
 
 interface AccountProfileData {
@@ -139,7 +140,10 @@ export const accountPageActions = {
     const data = accountPageState.initialFormData
     const name = [data.firstName, data.lastName].filter(Boolean).join(' ')
     const rating = data.rating
-    if (name && rating !== '') return `${name} (${rating})`
+    // The Rating module (specs/rules/modules.md) can be off.
+    if (name && rating !== '' && modulesActions.on('rating')) {
+      return `${name} (${rating})`
+    }
     return name || 'Account'
   },
 

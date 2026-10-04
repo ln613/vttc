@@ -6,9 +6,9 @@
 //   required          always on
 //   requiredWhen: X   on whenever X is on
 //
-// A second-level module is only in effect when its first-level module is:
-// turning Tournament off turns off Events, Players, Live Score and the rest,
-// without losing what each of them was set to.
+// A module is only in effect when every module above it is: turning
+// Tournament off turns off Events, Players, Live Score and the rest, without
+// losing what each of them was set to.
 
 export const MODULES = [
   {
@@ -32,18 +32,28 @@ export const MODULES = [
     label: 'Account',
     required: true,
     children: [
-      { key: 'profile', label: 'Profile', required: true },
+      {
+        key: 'profile',
+        label: 'Profile',
+        required: true,
+        children: [
+          { key: 'rating', label: 'Rating', requiredWhen: 'tournament' },
+        ],
+      },
       { key: 'credit', label: 'Credit' },
       { key: 'myBooking', label: 'My Booking', requiredWhen: 'booking' },
     ],
   },
 ]
 
-const allModules = () =>
-  MODULES.flatMap((top) => [
-    { ...top, parent: null },
-    ...top.children.map((child) => ({ ...child, parent: top.key })),
+// Every module at every level, each with the key of the one above it.
+const flatten = (modules, parent) =>
+  modules.flatMap((m) => [
+    { ...m, parent },
+    ...flatten(m.children || [], m.key),
   ])
+
+const allModules = () => flatten(MODULES, null)
 
 export const moduleKeys = () => allModules().map((m) => m.key)
 
@@ -84,9 +94,16 @@ export const normalizeModules = (stored, clubConfig) => {
   return modules
 }
 
-// Whether a module is in effect: its own switch, and its parent's.
+// Whether a module is in effect: its own switch, and every one above it.
 export const isModuleOn = (modules, key) => {
   const m = findModule(key)
   if (!m || !modules?.[key]) return false
-  return m.parent ? !!modules[m.parent] : true
+  return m.parent ? isModuleOn(modules, m.parent) : true
+}
+
+// The nearest module above this one that is switched off, if any.
+export const offAncestor = (modules, key) => {
+  const parent = findModule(key)?.parent
+  if (!parent) return null
+  return modules?.[parent] ? offAncestor(modules, parent) : findModule(parent)
 }
