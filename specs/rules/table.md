@@ -88,3 +88,13 @@ for team events
 - put the sub-matches into the queue, and mark them current table only, and have the highest priority on that table
 - delete the current team match on the table
 - if one side/team reaches the "Team Match" winning score, e.g., reaches 2 for best of 3, reaches 3 for best of 5, finish the team match and delete the remaining sub-matches in queue
+
+### French League
+
+A French League team match (match.md, "French League") has no order to select: its 14 sub-matches exist from the start. It is played on 2 tables at once:
+- the first two sub-matches go on two tables; those become the team match's tables until it is over, and no other match is put on them, even while one sits empty waiting
+- each table then plays its own sub-matches in order (odd on the first table, even on the second). If a player of the next one is still playing on the other table, it waits on its table for them
+- the 2 doubles are only queued once all of the first 6 singles are finished, and go on together — both, one on each table, or neither, so they start at the same time
+- the last 6 singles are queued once both doubles are finished
+- from when the team match takes its tables until it is over, its 8 players are kept for it: none of them is put on another table, even between their matches, so nothing elsewhere can hold up the doubles
+- in a league, the fixture is pinned to one table, so it is played one sub-match at a time in the same order

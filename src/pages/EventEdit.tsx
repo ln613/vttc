@@ -25,6 +25,7 @@ import type {
 } from '../../shared/types'
 import { DAY_NAMES, LEAGUE_FORMATS } from '../../shared/types'
 import { getSupportedTeamSizes } from '../../shared/rules/leagueRules'
+import { isFrenchLeagueTournament } from '../../shared/rules/frenchLeague'
 import { customConfirm } from '../stores/confirmDialogStore'
 
 const GROUP_GAMES_OPTIONS: BestOfOption[] = ['Best of 3', 'Best of 5']
@@ -615,12 +616,31 @@ const LeagueMatchesSection = () => (
   </>
 )
 
+// A French League tie is always the same 14 matches (match.md).
+const FrenchLeagueMatchesSection = () => (
+  <>
+    <h3 style={sectionTitleStyle}>Number of Matches</h3>
+    <div style={noteStyle}>
+      14 (12 singles, 2 doubles) — set by French League
+    </div>
+  </>
+)
+
 const NumberOfMatchesSection = () => {
   const tournament = () => eventEditActions.getSelectedTournament()
 
   return (
     <Show when={!isLeague()} fallback={<LeagueMatchesSection />}>
-      <Show when={tournament()?.type === 'Team' && tournament()}>
+      <Show when={isFrenchLeagueTournament(tournament())}>
+        <FrenchLeagueMatchesSection />
+      </Show>
+      <Show
+        when={
+          tournament()?.type === 'Team' &&
+          !isFrenchLeagueTournament(tournament()) &&
+          tournament()
+        }
+      >
       {(t) => (
         <>
           <h3 style={sectionTitleStyle}>Number of Matches</h3>

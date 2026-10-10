@@ -214,6 +214,9 @@ export interface Tournament {
   sex: ParticipantSex
   type: TournamentType
   teamSize?: number // Required if type = Team
+  // A Team tournament played as a French League: teams of 4, 14 sub-matches
+  // laid out in advance (specs/rules/match.md, "French League")
+  teamFormat?: 'French League'
   nop: number // Derived: 1 for Single, 2 for Double, teamSize for Team
   restriction: TournamentRestriction
   ratingLimit?: number // Required if restriction = Rated

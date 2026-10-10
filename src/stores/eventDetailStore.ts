@@ -21,6 +21,7 @@ import { authState } from './authStore'
 import { liveScoreActions } from './liveScoreStore'
 import { isEventStarted, isStartableToday } from '../utils/eventTiming'
 import { getProvisionalMatchResult } from '../../shared/rules/matchRules'
+import { teamSubMatchesUnderWay } from '../../shared/rules/frenchLeague'
 import {
   getFixedParticipantIds,
   participantIdOf,
@@ -1141,14 +1142,15 @@ const resolveEventForMatch = (
 const matchIsStarted = (m?: {
   winningSide?: number | null
   games?: unknown[]
-  subMatches?: unknown[]
+  subMatches?: Match[]
+  autoScheduled?: boolean
   initialServingSide?: number | null
   leftSide?: number | null
 }): boolean =>
   !!m &&
   (m.winningSide != null ||
     (Array.isArray(m.games) && m.games.length > 0) ||
-    (Array.isArray(m.subMatches) && m.subMatches.length > 0) ||
+    teamSubMatchesUnderWay(m) ||
     (m.initialServingSide != null && m.leftSide != null))
 
 const canResetGroupMatch = (event: { eventStages?: Stage[] }, matchId: string): boolean => {

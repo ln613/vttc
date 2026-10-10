@@ -7,12 +7,35 @@ import type {
   AgeLimitType,
 } from '../../shared/types'
 import { apiPost } from '../utils/api'
+import { tournamentActions } from './tournamentStore'
+import {
+  FRENCH_LEAGUE,
+  FRENCH_LEAGUE_TEAM_SIZE,
+  isFrenchLeagueTournament,
+} from '../../shared/rules/frenchLeague'
+
+/**
+ * The Type choices on the form. French League is a Team tournament with its
+ * own format, stored as type Team + teamFormat, but picked as a type of its
+ * own.
+ */
+export type TournamentTypeOption = TournamentType | typeof FRENCH_LEAGUE
+
+export const TOURNAMENT_TYPE_OPTIONS: TournamentTypeOption[] = [
+  'Single',
+  'Double',
+  'Team',
+  FRENCH_LEAGUE,
+]
+
+export const isTeamOption = (type: TournamentTypeOption) =>
+  type === 'Team' || type === FRENCH_LEAGUE
 
 export interface TournamentEditFormData {
   _id?: string
   name: string
   sex: ParticipantSex
-  type: TournamentType
+  type: TournamentTypeOption
   teamSize: string | null
   restriction: TournamentRestriction
   ratingLimit: string
@@ -57,9 +80,11 @@ const [tournamentEditState, setTournamentEditState] =
 export { tournamentEditState }
 
 export const tournamentEditActions = {
-  initForm: (initialData?: Partial<TournamentEditFormData>) => {
+  initForm: (
+    initialData?: Partial<TournamentEditFormData> & { teamFormat?: string },
+  ) => {
     setTournamentEditState({
-      formData: { ...defaultFormData, ...initialData },
+      formData: { ...defaultFormData, ...withTypeOption(initialData) },
       saving: false,
       error: null,
     })
@@ -72,7 +97,7 @@ export const tournamentEditActions = {
     const newFormData = { ...tournamentEditState.formData, [field]: value }
 
     if (field === 'type') {
-      handleTypeChange(newFormData, value as TournamentType)
+      handleTypeChange(newFormData, value as TournamentTypeOption)
     }
 
     if (field === 'teamSize') {
@@ -95,6 +120,9 @@ export const tournamentEditActions = {
     try {
       const payload = buildSavePayload(formData)
       await apiPost('saveTournament', payload)
+      // The tournament list is fetched once and kept; drop it so Add Event
+      // fetches it again and offers the one just saved.
+      tournamentActions.reset()
       setTournamentEditState({ saving: false })
       onSuccess?.(formData)
     } catch (err) {
@@ -108,14 +136,26 @@ export const tournamentEditActions = {
   resetForm: () => setTournamentEditState(getInitialState()),
 }
 
+// A saved French League comes back as type Team + teamFormat; show it as the
+// French League choice.
+const withTypeOption = (
+  data?: Partial<TournamentEditFormData> & { teamFormat?: string },
+) =>
+  data && isFrenchLeagueTournament(data)
+    ? { ...data, type: FRENCH_LEAGUE as TournamentTypeOption }
+    : data
+
 const handleTypeChange = (
   formData: TournamentEditFormData,
-  newType: TournamentType,
+  newType: TournamentTypeOption,
 ) => {
+  if (newType === FRENCH_LEAGUE) {
+    formData.teamSize = String(FRENCH_LEAGUE_TEAM_SIZE)
+  }
   if (newType === 'Team' && !formData.teamSize) {
     formData.teamSize = '3'
   }
-  if (newType !== 'Team') {
+  if (!isTeamOption(newType)) {
     formData.teamSize = null
   }
 }
@@ -137,15 +177,21 @@ const validateForm = (formData: TournamentEditFormData): boolean =>
 const buildSavePayload = (formData: TournamentEditFormData) => {
   const isRated = formData.restriction === 'Rated'
   const isAge = formData.restriction === 'Age'
-  const isTeam = formData.type === 'Team'
+  const isTeam = isTeamOption(formData.type)
+  const isFrenchLeague = formData.type === FRENCH_LEAGUE
   const hasTopPlayersRating = isRated && isTeam && formData.topPlayersRatingEnabled
 
   return {
     _id: formData._id,
     name: formData.name,
     sex: formData.sex,
-    type: formData.type,
-    teamSize: isTeam ? parseInt(formData.teamSize!, 10) : undefined,
+    type: isTeam ? 'Team' : formData.type,
+    teamFormat: isFrenchLeague ? FRENCH_LEAGUE : undefined,
+    teamSize: isFrenchLeague
+      ? FRENCH_LEAGUE_TEAM_SIZE
+      : isTeam
+        ? parseInt(formData.teamSize!, 10)
+        : undefined,
     restriction: formData.restriction,
     ratingLimit: isRated ? parseInt(formData.ratingLimit, 10) : undefined,
     topPlayersRatingEnabled: hasTopPlayersRating,

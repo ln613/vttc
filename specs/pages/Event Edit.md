@@ -59,6 +59,8 @@ The number of games in each match.
 
 Same as Number of Games Section, but indicate the number of matches in each team match, only visible if selected type is Team. For both group and knockout stage, default is "Best of 5"
 
+For a French League tournament, no choice: always 14 matches (12 singles, 2 doubles), shown as a note.
+
 For league, determined by the format. E.g., RR singles with team of 3, total 9 matches, so best of 9. Singles and Doubles with team of 2, best of 5 matches (A-Y, B-X, AB-XY, A-X, B-Y)
 
 ## Number of Qualifiers Section

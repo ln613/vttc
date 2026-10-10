@@ -1,3 +1,5 @@
+export * from './frenchLeague'
+
 // Types for leagueSchedule.js. The implementation is plain JavaScript so the
 // Netlify functions and the browser can share one copy; this file is what
 // the TypeScript side sees.
@@ -51,6 +53,10 @@ export declare const LEAGUE_FORMATS: LeagueFormat[]
 export declare const getRoundRobinSinglesLineup: (
   teamSize: number,
 ) => { homeSlots: number[]; awaySlots: number[] }[]
+
+export declare const getLeagueLineup: (
+  type: string | undefined,
+) => { homeSlots: number[]; awaySlots: number[] }[] | undefined
 
 export declare const getLeagueSubMatchCount: (
   format: LeagueFormat,

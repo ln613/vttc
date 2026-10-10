@@ -5,6 +5,14 @@
 // build. Types live alongside in leagueSchedule.d.ts. Everything here is
 // pure — no db, no dates beyond arithmetic on YYYY-MM-DD strings.
 
+import {
+  FRENCH_LEAGUE_MATCH_TYPE,
+  FRENCH_LEAGUE_TEAM_SIZE,
+  getFrenchLeagueLineup,
+} from './frenchLeague.js'
+
+export * from './frenchLeague.js'
+
 // ==================== Length of league ====================
 
 /**
@@ -372,7 +380,11 @@ export const generateLeagueSchedule = ({
 
 // ==================== Format ====================
 
-export const LEAGUE_FORMATS = ['RR Singles', 'Singles and Doubles']
+export const LEAGUE_FORMATS = [
+  'RR Singles',
+  'Singles and Doubles',
+  'French League',
+]
 
 /**
  * RR Singles: every player in team 1 plays every player in team 2. Round d
@@ -390,12 +402,30 @@ export const getRoundRobinSinglesLineup = (teamSize) => {
 }
 
 /**
- * Sub-matches per team match. RR Singles is every pairing of players;
- * Singles and Doubles reuses the tournament team-match schedules in
- * specs/rules/match.md, which are best of 5 for teams of 2 and 3.
+ * The slot lineup of a league team-match type: "rr{n}" (RR Singles) or
+ * "fl4" (French League). Undefined for the tournament types, which have
+ * their own fixed schedules.
  */
-export const getLeagueSubMatchCount = (format, teamSize) =>
-  format === 'RR Singles' ? teamSize * teamSize : 5
+export const getLeagueLineup = (type) => {
+  if (typeof type !== 'string') return undefined
+  if (type === FRENCH_LEAGUE_MATCH_TYPE) return getFrenchLeagueLineup()
+  if (!type.startsWith('rr')) return undefined
+  const teamSize = Number(type.slice(2))
+  if (!Number.isFinite(teamSize) || teamSize < 2) return undefined
+  return getRoundRobinSinglesLineup(teamSize)
+}
+
+/**
+ * Sub-matches per team match. RR Singles is every pairing of players;
+ * French League is its fixed 14; Singles and Doubles reuses the tournament
+ * team-match schedules in specs/rules/match.md, which are best of 5 for
+ * teams of 2 and 3.
+ */
+export const getLeagueSubMatchCount = (format, teamSize) => {
+  if (format === 'RR Singles') return teamSize * teamSize
+  if (format === 'French League') return getFrenchLeagueLineup().length
+  return 5
+}
 
 /** "Best of 9", "Best of 5"… as shown on the Number of Matches section. */
 export const getLeagueMatchesLabel = (format, teamSize) =>
@@ -404,10 +434,14 @@ export const getLeagueMatchesLabel = (format, teamSize) =>
 /**
  * Team sizes the format has a defined schedule for. specs/rules/match.md
  * only lays out team matches for 2 and 3 players, so Singles and Doubles
- * stops there; RR Singles is generated and works for any size.
+ * stops there; RR Singles is generated and works for any size; French
+ * League is always teams of 4.
  */
-export const getSupportedTeamSizes = (format) =>
-  format === 'RR Singles' ? ['2', '3', '4'] : ['2', '3']
+export const getSupportedTeamSizes = (format) => {
+  if (format === 'RR Singles') return ['2', '3', '4']
+  if (format === 'French League') return [String(FRENCH_LEAGUE_TEAM_SIZE)]
+  return ['2', '3']
+}
 
 // ==================== Ratings ====================
 

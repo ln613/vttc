@@ -10,12 +10,15 @@ export type EventType = 'tournament' | 'league'
  * League formats (specs/rules/league.md, "Format")
  * - RR Singles: every player in team 1 plays every player in team 2
  * - Singles and Doubles: same format as the team matches in tournaments
+ * - French League: teams of 4, 12 singles and 2 doubles
  */
-export type LeagueFormat = 'RR Singles' | 'Singles and Doubles'
+export type LeagueFormat =
+  'RR Singles' | 'Singles and Doubles' | 'French League'
 
 export const LEAGUE_FORMATS: LeagueFormat[] = [
   'RR Singles',
   'Singles and Doubles',
+  'French League',
 ]
 
 /** 0 = Sunday, matching Date.prototype.getDay(). */

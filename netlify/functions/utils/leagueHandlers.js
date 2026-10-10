@@ -14,6 +14,7 @@ import {
   getRoundsPerPhase,
   getTotalRounds,
   getLeagueSubMatchCount,
+  FRENCH_LEAGUE_MATCH_TYPE,
   isRoundSelectionComplete,
   findDoubleBookedPlayers,
   ratingAtDate,
@@ -22,6 +23,7 @@ import {
   generateId,
   getBestOfNumber,
   getTeamMatchType,
+  autoScheduleTeamMatch,
   buildLeagueRoundsFrom,
 } from './eventHandlers.js'
 
@@ -720,15 +722,24 @@ const selectedPlayers = (event, participantId) => {
   return (selection?.playerIds || []).map((id) => byId.get(id.toString()))
 }
 
-const getLeagueTeamMatchType = (event) =>
-  event.league?.format === 'RR Singles'
-    ? `rr${event.nop}`
-    : getTeamMatchType(
-        event.nop,
-        getLeagueSubMatchCount(event.league?.format, event.nop),
-      )
+const getLeagueTeamMatchType = (event) => {
+  const format = event.league?.format
+  if (format === 'RR Singles') return `rr${event.nop}`
+  if (format === 'French League') return FRENCH_LEAGUE_MATCH_TYPE
+  return getTeamMatchType(event.nop, getLeagueSubMatchCount(format, event.nop))
+}
+
+// French League's schedule is generated for now: the selection order is the
+// order of play (first picked is A / X, then B / Y…), so both orders are set
+// and the 14 sub-matches laid out as soon as the round's matches are made.
+const isAutoScheduled = (event) => event.league?.format === 'French League'
 
 const buildLeagueTeamMatch = (event, pairing) => {
+  const match = buildUnassignedLeagueTeamMatch(event, pairing)
+  return isAutoScheduled(event) ? autoScheduleTeamMatch(match) : match
+}
+
+const buildUnassignedLeagueTeamMatch = (event, pairing) => {
   const home = selectedPlayers(event, pairing.homeParticipantId)
   const away = selectedPlayers(event, pairing.awayParticipantId)
   const numberOfMatches = getLeagueSubMatchCount(
@@ -762,7 +773,8 @@ const buildLeagueTeamMatch = (event, pairing) => {
       side2: pairing.awayParticipantId,
     },
     // No assignments yet: each side sets its own order of play, and the
-    // sub-matches are expanded when the second one is saved.
+    // sub-matches are expanded when the second one is saved (French League
+    // fills them in straight away, see autoScheduleTeamMatch).
     lockedTableNumber: pairing.tableNumber,
   }
 }

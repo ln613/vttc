@@ -1,4 +1,5 @@
 import { Show, onMount, onCleanup, type JSX } from 'solid-js'
+import { useNavigate } from '@solidjs/router'
 import { Header } from '../components/Header'
 import Input from '../components/Input'
 import SingleSelectTags from '../components/SingleSelectTags'
@@ -10,17 +11,18 @@ import {
   tournamentEditState,
   tournamentEditActions,
   generateTopPlayersCountOptions,
+  TOURNAMENT_TYPE_OPTIONS,
+  isTeamOption,
   type TournamentEditFormData,
+  type TournamentTypeOption,
 } from '../stores/tournamentEditStore'
 import type {
   ParticipantSex,
-  TournamentType,
   TournamentRestriction,
   StagesType,
 } from '../../shared/types'
 
 const SEX_OPTIONS: ParticipantSex[] = ['All', 'Man', 'Woman', 'Mixed']
-const TYPE_OPTIONS: TournamentType[] = ['Single', 'Double', 'Team']
 const TEAM_SIZE_OPTIONS = ['2', '3', '4']
 const RESTRICTION_OPTIONS: TournamentRestriction[] = ['Open', 'Rated', 'Age']
 const STAGES_OPTIONS: StagesType[] = [
@@ -76,6 +78,14 @@ const sectionTitleStyle: JSX.CSSProperties = {
   'text-align': 'left',
 }
 
+const errorMessageStyle: JSX.CSSProperties = {
+  color: '#e74c3c',
+  'font-size': '14px',
+  'font-weight': 500,
+  'margin-top': '16px',
+  'text-align': 'left',
+}
+
 const buttonContainerStyle: JSX.CSSProperties = {
   display: 'flex',
   gap: '16px',
@@ -103,6 +113,15 @@ interface TournamentEditProps {
 }
 
 const TournamentEdit = (props: TournamentEditProps) => {
+  const navigate = useNavigate()
+  // Opened as its own page (/tournament/new) there is no caller to hand
+  // back to, so both buttons return to the Events page — where the new
+  // tournament is picked on Add Event.
+  const handleCancel = () =>
+    props.onCancel ? props.onCancel() : navigate('/events')
+  const handleSaved = (data: TournamentEditFormData) =>
+    props.onSave ? props.onSave(data) : navigate('/events')
+
   onMount(() => {
     tournamentEditActions.initForm(props.initialData)
   })
@@ -135,10 +154,10 @@ const TournamentEdit = (props: TournamentEditProps) => {
         />
         <SingleSelectTags
           label="Type"
-          options={TYPE_OPTIONS}
+          options={TOURNAMENT_TYPE_OPTIONS}
           selectedValue={tournamentEditState.formData.type}
           onChange={(value) =>
-            tournamentEditActions.setField('type', value as TournamentType)
+            tournamentEditActions.setField('type', value as TournamentTypeOption)
           }
         />
         <Show when={tournamentEditState.formData.type === 'Team'}>
@@ -165,12 +184,16 @@ const TournamentEdit = (props: TournamentEditProps) => {
         <RatingSection />
         <AgeSection />
         <StagesSection />
+        <Show when={tournamentEditState.error}>
+          <div style={errorMessageStyle}>{tournamentEditState.error}</div>
+        </Show>
         <div style={buttonContainerStyle}>
-          <Button color="#e74c3c" onClick={props.onCancel}>
+          <Button color="#e74c3c" onClick={handleCancel}>
             Cancel
           </Button>
           <Button
             color="#27ae60"
+            disabled={tournamentEditState.saving}
             onClick={async (e) => {
               e?.stopPropagation()
               e?.preventDefault()
@@ -180,10 +203,10 @@ const TournamentEdit = (props: TournamentEditProps) => {
                 ))
               )
                 return
-              void tournamentEditActions.saveTournament(props.onSave)
+              void tournamentEditActions.saveTournament(handleSaved)
             }}
           >
-            Save
+            {tournamentEditState.saving ? 'Saving...' : 'Save'}
           </Button>
         </div>
       </div>
@@ -207,7 +230,7 @@ const RatingSection = () => (
         noMargin
       />
     </div>
-    <Show when={tournamentEditState.formData.type === 'Team'}>
+    <Show when={isTeamOption(tournamentEditState.formData.type)}>
       <TopPlayersRatingSection />
     </Show>
   </Show>

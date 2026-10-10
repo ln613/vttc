@@ -14,6 +14,9 @@ export interface Tournament {
   stagesType: StagesType
   restriction?: TournamentRestriction
   ratingLimit?: number
+  teamSize?: number
+  teamFormat?: 'French League'
+  nop?: number
 }
 
 interface TournamentState {

@@ -70,6 +70,28 @@ C vs Y
 2. Singles and Doubles
 Same format as the team matches in tournaments
 
+3. French League
+Team of 4 only. Same team match as a French League tournament (match.md, "French League"): 14 sub matches, 6 singles, 2 doubles, then 6 singles; every player plays 3 singles and 1 doubles. A league fixture has one table, so they are played one at a time in this order (Home team ABCD, away team XYZW):
+
+A vs Y
+B vs X
+C vs W
+D vs Z
+B vs W
+A vs Z
+AC vs XZ
+BD vs WY
+C vs X
+D vs Y
+A vs W
+B vs Z
+C vs Y
+D vs X
+
+The 4 singles pairings not played are A vs X, B vs Y, C vs Z, D vs W.
+
+For now the order of play is generated, not picked: when the matches of a round are generated, each team's selection order is its order of play (first selected is A / X, then B / Y, C / Z, D / W), and the 14 sub matches are created straight away.
+
 ## Players
 
 Team Size = n, and team of {n} means n players from each team will play on a given match day, but each team can have more than n players on the roster.

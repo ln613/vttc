@@ -1,4 +1,8 @@
 import { getDB, toObjectId } from './db.js'
+import {
+  FRENCH_LEAGUE,
+  FRENCH_LEAGUE_TEAM_SIZE,
+} from '../../../shared/rules/frenchLeague.js'
 
 const COLLECTION = 'tournaments'
 
@@ -55,6 +59,7 @@ export const saveTournament = async (body) => {
     sex = 'All',
     type = 'Single',
     teamSize,
+    teamFormat,
     restriction = 'Open',
     ratingLimit,
     topPlayersRatingEnabled = false,
@@ -87,6 +92,7 @@ export const saveTournament = async (body) => {
   if (type === 'Team' && !teamSize) {
     throwError('Team size is required for team tournaments')
   }
+  validateTeamFormat(type, teamSize, teamFormat)
   if (restriction === 'Rated' && !ratingLimit) {
     throwError('Rating limit is required for rated tournaments')
   }
@@ -106,6 +112,7 @@ export const saveTournament = async (body) => {
     sex,
     type,
     teamSize: type === 'Team' ? teamSize : undefined,
+    teamFormat: type === 'Team' ? teamFormat || undefined : undefined,
     nop,
     restriction,
     ratingLimit: restriction === 'Rated' ? ratingLimit : undefined,
@@ -126,6 +133,17 @@ export const saveTournament = async (body) => {
     tournament.createdAt = new Date().toISOString()
     const result = await collection.insertOne(tournament)
     return { ...tournament, _id: result.insertedId.toString() }
+  }
+}
+
+// French League is the only team format besides the standard one, and it is
+// always teams of 4 (specs/rules/match.md).
+const validateTeamFormat = (type, teamSize, teamFormat) => {
+  if (!teamFormat) return
+  if (teamFormat !== FRENCH_LEAGUE) throwError(`Unknown team format: ${teamFormat}`)
+  if (type !== 'Team') throwError('French League is a team tournament')
+  if (Number(teamSize) !== FRENCH_LEAGUE_TEAM_SIZE) {
+    throwError(`French League is played with teams of ${FRENCH_LEAGUE_TEAM_SIZE}`)
   }
 }
 

@@ -3,16 +3,23 @@
 // through to the CLI, so the two can't drift apart.
 const DEV_API_PORT = import.meta.env.VITE_DEV_API_PORT || '7004'
 
-// In dev → point at the local netlify dev server.
+// In dev → point at the local netlify dev server, unless the page came
+// through an https tunnel (ngrok): then the functions port isn't reachable,
+// so call the page's own origin and let Vite forward it (vite.config.ts).
 // In a Cordova/APK build (no real origin) → use VITE_PROD_HOST so the
 // WebView can hit the live API. In a regular web build → same-origin
 // (empty string).
 const getApiHost = () => {
   if (import.meta.env.DEV) {
-    return `http://${window.location.hostname}:${DEV_API_PORT}`
+    return isTunnelled()
+      ? ''
+      : `http://${window.location.hostname}:${DEV_API_PORT}`
   }
   return import.meta.env.VITE_PROD_HOST || ''
 }
+
+// The local dev servers are plain http; https in dev means a tunnel.
+const isTunnelled = () => window.location.protocol === 'https:'
 
 // An umpire working from the match-day password is not signed in: they get
 // no session and nothing is stored. The token lives here, in memory only,

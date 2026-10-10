@@ -86,6 +86,18 @@ export interface Match {
   // is decided, because the standings rank on total matches and games won
   // across the season (specs/pages/Event Detail.md, Standing tab).
   playAllMatches?: boolean
+  // French League: both orders of play are generated and the sub-matches
+  // laid out when the tie is made, so having sub-matches doesn't mean it
+  // has started (shared/rules/frenchLeague.js).
+  autoScheduled?: boolean
+  // A French League tournament tie is played on this many tables at once.
+  parallelTables?: number
+  // On a sub-match of such a tie: its phase (6 singles, the 2 doubles, 6
+  // singles), which of the tie's tables it is played on, and whether it
+  // starts together with the rest of its phase.
+  phase?: number
+  lane?: number
+  startTogether?: boolean
   participantIds?: { side1: string; side2: string }
   // Handshake: which sides have clicked "Start" (team events only).
   side1Started?: boolean
@@ -112,7 +124,9 @@ export interface Match {
 /**
  * Team match types
  */
-export type TeamMatchType = 'type1' | 'type2' | 'type3'
+// type1-3: tournament team matches (match.md). League and French League
+// ties add 'rr{n}' (RR Singles) and 'fl4' (French League).
+export type TeamMatchType = 'type1' | 'type2' | 'type3' | 'fl4' | `rr${number}`
 
 /**
  * Team member assignment labels

@@ -26,6 +26,10 @@ const clubHtmlPlugin = {
       .replace('%CLUB_FAVICON%', clubConfig.branding?.faviconUrl ?? '/images/logo.png'),
 }
 
+// Where netlify dev serves the functions — the same default and override
+// as src/utils/api.ts.
+const devApiPort = process.env.VITE_DEV_API_PORT || '7004'
+
 // https://vite.dev/config/
 export default defineConfig({
   // Relative asset paths so the bundle works when loaded from
@@ -42,6 +46,15 @@ export default defineConfig({
     // same value to the CLI so the two can't drift.
     port: Number(process.env.VITE_DEV_PORT) || 7344,
     strictPort: true,
+    // Reached from outside through an ngrok tunnel to this port: accept its
+    // hostnames, and forward the API calls (made same-origin there, see
+    // src/utils/api.ts) to the functions. Going through netlify dev's own
+    // port doesn't work in dev — the /* rewrite in public/_redirects also
+    // catches Vite's module requests.
+    allowedHosts: ['.ngrok-free.app', '.ngrok-free.dev', '.ngrok.app', '.ngrok.io'],
+    proxy: {
+      '/.netlify/functions': `http://localhost:${devApiPort}`,
+    },
   },
   optimizeDeps: {
     include: ['pusher-js'],

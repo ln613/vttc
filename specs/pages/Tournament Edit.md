@@ -8,14 +8,16 @@ Vertical
 - title "Add Tournament" or "Edit Tournament" (h1, align left)
 - Name: input *
 - Sex: single select tags "All", "Man", "Woman", "Mixed"
-- Type: single select tags "Single", "Double", "Team"
+- Type: single select tags "Single", "Double", "Team", "French League"
 - Team Size (visible if selected type is Team): single select tags "2", "3", "4" 
+  - French League is a team tournament with team size 4, saved as type Team with team format French League (see match.md, "French League")
 - Restriction: single select tags "Open", "Rated", "Age"
 - Rating section 
 - Age section 
 - Stages section
-- button "Cancel" (red)
-- button "Save" (green)
+- error message (red, above the buttons) when the save fails, e.g. a tournament with the same name already exists
+- button "Cancel" (red): back to the Events page
+- button "Save" (green): after confirming, saves and goes back to the Events page; shows "Saving..." and is disabled while saving
 
 ## Rating Section
 

@@ -14,11 +14,21 @@ import { getSettings as readGlobalSettings } from './settingsHandlers.js'
 import { club, clubDate, getClubTimezone } from './club.js'
 import { sanitizeForOutput, sanitizeForStorage } from './embeddedPlayers.js'
 import {
-  getRoundRobinSinglesLineup,
+  LEAGUE_FORMATS,
+  getLeagueLineup,
   getLeagueSubMatchCount,
+  getSupportedTeamSizes,
   getTotalRounds,
   getRoundsPerPhase,
 } from '../../../shared/rules/leagueSchedule.js'
+import {
+  FRENCH_LEAGUE_MATCH_COUNT,
+  FRENCH_LEAGUE_MATCH_TYPE,
+  FRENCH_LEAGUE_TABLES,
+  FRENCH_LEAGUE_TEAM_SIZE,
+  isFrenchLeagueTournament,
+  teamSubMatchesUnderWay,
+} from '../../../shared/rules/frenchLeague.js'
 import {
   getFixedParticipantIds,
   participantIdOf,
@@ -148,8 +158,11 @@ export const saveEvent = async (body) => {
     eventName,
     groupGames,
     knockoutGames,
-    groupMatches: tournament.type === 'Team' ? groupMatches : undefined,
-    knockoutMatches: tournament.type === 'Team' ? knockoutMatches : undefined,
+    // French League fixes its own 14 matches, so there is nothing to pick.
+    groupMatches: hasMatchCountChoice(tournament) ? groupMatches : undefined,
+    knockoutMatches: hasMatchCountChoice(tournament)
+      ? knockoutMatches
+      : undefined,
     qualifiers,
     handicapEnabled,
     handicapDifference,
@@ -282,6 +295,7 @@ const validateLeagueInput = (input) => {
   if (!input.time) errors.push('Time is required')
   if (!input.startDate) errors.push('Start date is required')
   if (!input.teamSize) errors.push('Team size is required')
+  errors.push(...leagueFormatErrors(input.format, input.teamSize))
   if (input.startDate && input.dayOfWeek != null) {
     const [y, m, d] = input.startDate.split('-').map(Number)
     if (new Date(y, m - 1, d).getDay() !== Number(input.dayOfWeek)) {
@@ -289,6 +303,14 @@ const validateLeagueInput = (input) => {
     }
   }
   throwErrors(errors)
+}
+
+const leagueFormatErrors = (format, teamSize) => {
+  if (!format || !teamSize) return []
+  if (!LEAGUE_FORMATS.includes(format)) return [`Unknown format: ${format}`]
+  return getSupportedTeamSizes(format).includes(String(teamSize))
+    ? []
+    : [`${format} is not played with teams of ${teamSize}`]
 }
 
 // A league round is a Team event whose matches live in a single group, so
@@ -661,7 +683,7 @@ const simulateLeague = async (body) => {
 // Simulating the same format twice in a day is normal while testing, and
 // the name + start date have to stay unique.
 const uniqueSimulatedLeagueName = async (db, format, date) => {
-  const base = `${format} League - test`
+  const base = `${format.endsWith('League') ? format : `${format} League`} - test`
   const taken = new Set(
     (
       await db
@@ -1540,19 +1562,16 @@ const buildGroupMatchRecord = (event, schedule, numberOfGames) => {
     winningSide: undefined,
   }
   if (event.type === 'Team') {
-    const numberOfMatches = getBestOfNumber(event.groupMatches || 'Best of 3')
-    return {
+    return withEventTeamFormat(event, {
       ...base,
       side1: schedule.side1.players,
       side2: schedule.side2.players,
-      isTeamMatch: true,
-      teamMatchType: getTeamMatchType(event.nop, numberOfMatches),
-      numberOfMatches,
+      ...teamMatchShape(event, event.groupMatches || 'Best of 3'),
       participantIds: {
         side1: schedule.side1._id,
         side2: schedule.side2._id,
       },
-    }
+    })
   }
   // Singles/doubles — keep current behaviour (first player only).
   return {
@@ -1590,12 +1609,9 @@ const buildKnockoutMatchRecord = (event, top, bottom, numberOfGames) => {
     winningSide: undefined,
   }
   if (event.type === 'Team') {
-    const numberOfMatches = getBestOfNumber(event.knockoutMatches || 'Best of 5')
-    return {
+    return withEventTeamFormat(event, {
       ...base,
-      isTeamMatch: true,
-      teamMatchType: getTeamMatchType(event.nop, numberOfMatches),
-      numberOfMatches,
+      ...teamMatchShape(event, event.knockoutMatches || 'Best of 5'),
       // Top seed (side1) is home, mirroring the group schedule. Without
       // this every order-of-play check (homeSide === 1/2) falls through to
       // "away", so both teams render with X/Y labels and no A/B.
@@ -1604,9 +1620,89 @@ const buildKnockoutMatchRecord = (event, top, bottom, numberOfGames) => {
         side1: top.participant._id,
         side2: bottom.participant._id,
       },
-    }
+    })
   }
   return base
+}
+
+const hasMatchCountChoice = (tournament) =>
+  tournament.type === 'Team' && !isFrenchLeagueTournament(tournament)
+
+// Which team-match schedule a tie follows and how many sub-matches it has:
+// French League's fixed 14, otherwise the event's "Best of" choice.
+const teamMatchShape = (event, bestOf) => {
+  if (isFrenchLeagueTournament(event)) {
+    return {
+      isTeamMatch: true,
+      teamMatchType: FRENCH_LEAGUE_MATCH_TYPE,
+      numberOfMatches: FRENCH_LEAGUE_MATCH_COUNT,
+      // Played on two tables at once (match.md, "French League"). A league
+      // fixture is pinned to one table, so it doesn't get this and plays
+      // the same order one match at a time.
+      parallelTables: FRENCH_LEAGUE_TABLES,
+    }
+  }
+  const numberOfMatches = getBestOfNumber(bestOf)
+  return {
+    isTeamMatch: true,
+    teamMatchType: getTeamMatchType(event.nop, numberOfMatches),
+    numberOfMatches,
+  }
+}
+
+const withEventTeamFormat = (event, match) =>
+  isFrenchLeagueTournament(event)
+    ? autoScheduleTeamMatch(inRatingOrder(match))
+    : match
+
+// A French League tournament plays each team in rating order, highest rated
+// first (A / X), the same order the team is listed in.
+const inRatingOrder = (match) => ({
+  ...match,
+  side1: byRatingDesc(match.side1),
+  side2: byRatingDesc(match.side2),
+})
+
+const byRatingDesc = (players) =>
+  [...(players || [])].sort((a, b) => (b.rating || 0) - (a.rating || 0))
+
+const ORDER_SLOTS = ['A', 'B', 'C', 'D']
+
+const toAssignment = (players) =>
+  Object.fromEntries(
+    players.slice(0, FRENCH_LEAGUE_TEAM_SIZE).map((p, i) => [ORDER_SLOTS[i], p]),
+  )
+
+const hasFullTeams = (match) =>
+  (match.side1 || []).length >= FRENCH_LEAGUE_TEAM_SIZE &&
+  (match.side2 || []).length >= FRENCH_LEAGUE_TEAM_SIZE
+
+/**
+ * French League: the order of play is generated rather than picked (for
+ * now). Each team plays in the order its side is listed — A, B, C, D at
+ * home, X, Y, Z, W away: rating order in a tournament, selection order in a
+ * league — and the 14 sub-matches are laid out straight away, so the
+ * schedule shows who plays whom before the tie starts.
+ *
+ * Marked autoScheduled so having sub-matches doesn't count as the tie being
+ * under way (teamSubMatchesUnderWay); the started flags stay off for the
+ * same reason. A tie still missing a team (a knockout slot waiting on a
+ * winner) is left as it is until both are known.
+ */
+export const autoScheduleTeamMatch = (match) => {
+  if (!hasFullTeams(match)) {
+    return { ...match, autoScheduled: true, subMatches: undefined }
+  }
+  const assigned = {
+    ...match,
+    autoScheduled: true,
+    side1Assignment: toAssignment(match.side1),
+    side2Assignment: toAssignment(match.side2),
+  }
+  return {
+    ...assigned,
+    subMatches: buildTeamSubMatches(assigned, match.lockedTableNumber),
+  }
 }
 
 const validateGenerateGroupsRules = (event, { ignoreUnpaid = true } = {}) => {
@@ -2038,7 +2134,10 @@ const withSwappedSide = (match, slot, entry, event) => {
     // would have been refused — so there is nothing under way to lose.
     updated[`${side}Assignment`] = undefined
   }
-  return updated
+  if (!match.autoScheduled) return updated
+  return autoScheduleTeamMatch(
+    isFrenchLeagueTournament(event) ? inRatingOrder(updated) : updated,
+  )
 }
 
 // hasBye follows the position too: after a swap it is whoever moved into
@@ -3448,7 +3547,12 @@ const validateNoNextRoundStartedForGroup = (updatedStages, groupStage) => {
 // Team-match reset wipes the regular match state plus the handshake,
 // per-side assignment, sub-match list, and tallied scores so the team
 // match returns to its initial "not started" state.
-const createResetTeamMatch = (match) => ({
+const createResetTeamMatch = (match) => {
+  const reset = clearTeamMatch(match)
+  return match.autoScheduled ? autoScheduleTeamMatch(reset) : reset
+}
+
+const clearTeamMatch = (match) => ({
   ...createResetMatch(match),
   side1Started: undefined,
   side2Started: undefined,
@@ -3790,8 +3894,22 @@ export const buildTeamSubMatches = (parent, lockedTableNumber) => {
     winningSide: undefined,
     parentMatchId: parent._id,
     lockedTableNumber: effectiveLockedTable,
+    ...playingPlan(entry),
   }))
 }
+
+// Where a sub-match sits in a tie played on more than one table (French
+// League): its phase, which of the tie's tables it is played on, and
+// whether it starts together with the rest of its phase. The queue reads
+// these (liveScoreHandlers.js, pushTeamSubMatchItems).
+const playingPlan = (entry) =>
+  entry.phase == null
+    ? {}
+    : {
+        phase: entry.phase,
+        lane: entry.lane,
+        ...(entry.startTogether ? { startTogether: true } : {}),
+      }
 
 // Admin action triggered from EventDetail's MatchRow for a not-started
 // team sub-match that's already on a table. Deletes the parent's
@@ -3814,6 +3932,9 @@ export const resetTeamMatch = async (body) => {
   const parentInfo = findTeamParentOfSub(event.eventStages || [], matchId)
   if (!parentInfo) throwError('Parent team match not found')
   const { parent } = parentInfo
+  if (parent.autoScheduled) {
+    throwError('A French League order of play is generated, not picked')
+  }
 
   // Remember which table to hand the parent. Preference order:
   //   1) The table the picked sub-match is currently on.
@@ -4021,13 +4142,12 @@ const validateSaveTeamMatchAssignmentInput = (body) => {
 // Per match.md "Team Match Schedules". Kept in sync with the TS helper
 // in shared/rules/matchRules.ts.
 //
-// League events add the "rr{n}" types: RR Singles, where every player of one
-// team plays every player of the other (league.md, "Format"). Those are
-// generated rather than listed, so any team size works.
+// League events add their own types (league.md, "Format"): "rr{n}" for RR
+// Singles, where every player of one team plays every player of the other,
+// and "fl4" for French League. Their slot lineups live in leagueSchedule.js.
 export const getTeamMatchLineupJS = (type, home, away) => {
-  if (typeof type === 'string' && type.startsWith('rr')) {
-    return getRoundRobinSinglesLineupJS(Number(type.slice(2)), home, away)
-  }
+  const leagueLineup = getLeagueLineup(type)
+  if (leagueLineup) return mapLeagueLineup(leagueLineup, home, away)
   const { A, B, C } = home
   const { A: X, B: Y, C: Z } = away
   if (type === 'type1') {
@@ -4061,15 +4181,21 @@ export const getTeamMatchLineupJS = (type, home, away) => {
 
 const ASSIGNMENT_SLOTS = ['A', 'B', 'C', 'D']
 
-const getRoundRobinSinglesLineupJS = (teamSize, home, away) => {
-  if (!teamSize || teamSize < 2) throwError('RR Singles needs a team size')
+// Turn a slot lineup ({ homeSlots: [0], awaySlots: [1] }…) into players
+// from each side's order of play.
+const mapLeagueLineup = (lineup, home, away) => {
+  const teamSize =
+    Math.max(...lineup.flatMap((e) => [...e.homeSlots, ...e.awaySlots])) + 1
   const slots = ASSIGNMENT_SLOTS.slice(0, teamSize)
   const missing = slots.find((slot) => !home[slot] || !away[slot])
-  if (missing) throwError(`RR Singles requires ${teamSize} players per team`)
-  return getRoundRobinSinglesLineup(teamSize).map((entry) => ({
+  if (missing) throwError(`This team match needs ${teamSize} players per team`)
+  return lineup.map((entry) => ({
     home: entry.homeSlots.map((i) => home[slots[i]]),
     away: entry.awaySlots.map((i) => away[slots[i]]),
     isDoubles: entry.homeSlots.length > 1,
+    phase: entry.phase,
+    lane: entry.lane,
+    startTogether: entry.startTogether,
   }))
 }
 
@@ -4888,7 +5014,7 @@ const matchHasStarted = (match) =>
   match.winningSide != null ||
   (Array.isArray(match.games) && match.games.length > 0) ||
   (match.initialServingSide != null && match.leftSide != null) ||
-  (Array.isArray(match.subMatches) && match.subMatches.length > 0)
+  teamSubMatchesUnderWay(match)
 
 const participantHasStartedMatch = (group, participant) => {
   for (const match of group.matches || []) {

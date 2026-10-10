@@ -114,3 +114,26 @@ A team match is a series of matches (MS) between 2 teams with 2 or more players 
   - 3rd: single match C vs Z
   - 4th: single match A vs Y
   - 5th: single match B vs X
+
+#### French League
+
+- team of 4 (home ABCD, away XYZW)
+- each team match is played on 2 tables at the same time
+- 14 matches: 6 singles, then 2 doubles, then 6 singles. Every player plays 3 singles and 1 doubles. Odd matches are on the team match's 1st table, even ones on its 2nd:
+
+| Table 1 | Table 2 |
+|---|---|
+| 1st: single A vs Y | 2nd: single B vs X |
+| 3rd: single C vs W | 4th: single D vs Z |
+| 5th: single B vs W | 6th: single A vs Z |
+| 7th: double AC vs XZ | 8th: double BD vs WY |
+| 9th: single C vs X | 10th: single D vs Y |
+| 11th: single A vs W | 12th: single B vs Z |
+| 13th: single C vs Y | 14th: single D vs X |
+
+- the doubles don't start until all of the first 6 singles are finished, and the 2 doubles start at the same time, one on each table. The last 6 singles start after both doubles are finished
+- each table plays its own matches in order; a match whose player is still playing on the other table waits on its table for them
+- the 4 singles pairings not played are A vs X, B vs Y, C vs Z, D vs W
+- with 2 tables nobody can always rest between singles: W (3rd, 5th) and Z (4th, 6th) play twice in a row, each on the same table, and everyone goes from the singles straight into the doubles
+- a league plays French League on its fixture's one table: the same 14 matches in the same order, one at a time
+- for now the order of play is generated, not picked: each team plays in rating order, the order the team is listed in (highest rated is A / X, then B / Y, C / Z, D / W; a league uses its selection order instead, see league.md), and the 14 matches are created together with the team match, so the schedule shows who plays whom before it starts. Having these matches doesn't mean the team match has started; only playing one does

@@ -25,7 +25,8 @@ import ToggleButton from '../components/ToggleButton'
 import SingleSelectTags from '../components/SingleSelectTags'
 import { leagueState, leagueActions, describeTeam, formatRoundLabel } from '../stores/leagueStore'
 import type { LeagueStandingRow } from '../../shared/types/League'
-import { getRoundRobinSinglesLineup } from '../../shared/rules/leagueRules'
+import { getLeagueLineup } from '../../shared/rules/leagueRules'
+import { teamSubMatchesUnderWay } from '../../shared/rules/frenchLeague'
 import type { Match, Game } from '../../shared/types/Match'
 import { parseLocalDate } from '../utils/date'
 import clubConfig from 'club-config'
@@ -1214,10 +1215,8 @@ export const getTeamSubMatchTitle = (
   isLeague = false,
 ): string => {
   if (isLeague) return `Match ${subMatchIndex + 1}`
-  const type =
-    (parent.teamMatchType as keyof typeof TEAM_SUB_MATCH_LABELS | undefined) ||
-    deriveTeamMatchType(parent)
-  const pair = type ? TEAM_SUB_MATCH_LABELS[type]?.[subMatchIndex] : undefined
+  const type = parent.teamMatchType || deriveTeamMatchType(parent)
+  const pair = getTeamMatchLineupLabels(type)[subMatchIndex]
   if (!pair) return `Team Match ${subMatchIndex + 1}`
   return `Team Match ${subMatchIndex + 1} - ${pair.home} vs ${pair.away}`
 }
@@ -1229,19 +1228,18 @@ const AWAY_SLOT_LABELS = ['X', 'Y', 'Z', 'W'] as const
  * The order of play a team-match type produces, as slot labels: "A vs X",
  * "B vs Y"…
  *
- * The tournament types are listed in TEAM_SUB_MATCH_LABELS. A league's RR
- * Singles ("rr3") is generated instead — every player meets every opponent,
- * so the list is teamSize² long and grows with the team size rather than
- * being one of a handful of fixed schedules.
+ * The tournament types are listed in TEAM_SUB_MATCH_LABELS. A league's own
+ * types come from leagueSchedule.js: RR Singles ("rr3") is generated —
+ * every player meets every opponent, so the list is teamSize² long — and
+ * French League ("fl4") is its fixed 14-match order.
  */
 export const getTeamMatchLineupLabels = (
   type: string | undefined,
 ): { home: string; away: string }[] => {
   if (!type) return []
-  if (!type.startsWith('rr')) return TEAM_SUB_MATCH_LABELS[type] || []
-  const teamSize = Number(type.slice(2))
-  if (!Number.isFinite(teamSize) || teamSize < 2) return []
-  return getRoundRobinSinglesLineup(teamSize).map((entry) => ({
+  const leagueLineup = getLeagueLineup(type)
+  if (!leagueLineup) return TEAM_SUB_MATCH_LABELS[type] || []
+  return leagueLineup.map((entry) => ({
     home: entry.homeSlots.map((i) => HOME_SLOT_LABELS[i]).join(''),
     away: entry.awaySlots.map((i) => AWAY_SLOT_LABELS[i]).join(''),
   }))
@@ -1371,7 +1369,7 @@ export const MatchRow = (props: MatchRowProps) => {
     // Team match parent: only the sub-match expansion counts as
     // "started". Opening the order dialog (which sets side1Started /
     // side2Started) shouldn't take the Set Order button away.
-    (Array.isArray(props.match.subMatches) && props.match.subMatches.length > 0)
+    teamSubMatchesUnderWay(props.match)
   const isConfirming = () =>
     eventDetailState.confirmingMatchId === props.match._id
   const isResetting = () =>
@@ -1384,8 +1382,7 @@ export const MatchRow = (props: MatchRowProps) => {
     // whole team match — no next round can exist yet.
     if (
       isTeamParent() &&
-      Array.isArray(props.match.subMatches) &&
-      props.match.subMatches.length > 0 &&
+      teamSubMatchesUnderWay(props.match) &&
       !hasResult()
     ) {
       return true
@@ -1415,9 +1412,7 @@ export const MatchRow = (props: MatchRowProps) => {
     // header it stays on screen throughout, and a tie whose order is set
     // and whose sub-matches exist is plainly under way.
     if (props.match.isTeamMatch) {
-      return (props.match.subMatches?.length ?? 0) > 0
-        ? 'in_progress'
-        : 'not_started'
+      return teamSubMatchesUnderWay(props.match) ? 'in_progress' : 'not_started'
     }
     if (hasStarted()) return 'in_progress'
     return 'not_started'
@@ -1646,6 +1641,8 @@ export const MatchRow = (props: MatchRowProps) => {
   const showResetTeam = () =>
     authState.isAdmin &&
     !!props.match.parentMatchId &&
+    // A French League order is generated — there is no fresh order to pick.
+    !props.parent?.autoScheduled &&
     !hasStarted() &&
     assignedTable() !== undefined &&
     !props.adminManage
@@ -2992,7 +2989,7 @@ const groupMatchHasStarted = (match: Match): boolean =>
   match.winningSide != null ||
   (Array.isArray(match.games) && match.games.length > 0) ||
   (match.initialServingSide != null && match.leftSide != null) ||
-  (Array.isArray(match.subMatches) && match.subMatches.length > 0)
+  teamSubMatchesUnderWay(match)
 
 const participantHasStartedGroupMatch = (
   group: Group,

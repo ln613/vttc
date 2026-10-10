@@ -413,38 +413,43 @@ const pushTeamSubMatchItems = (parent, items, ctx) => {
     side1Assignment: parent.side1Assignment,
     side2Assignment: parent.side2Assignment,
   }
-  // A team match is played in order, one sub-match at a time, so only the
-  // next pending sub-match is ever queued. Queueing them all let the table
-  // assigner pick whichever sub-match happened to have two free players,
-  // which is how a tie jumped from sub-match 1 straight to sub-match 4.
+  // A team match is played in order, so only the next pending sub-match is
+  // ever queued — one per table the tie is played on. Queueing them all let
+  // the table assigner pick whichever sub-match happened to have two free
+  // players, which is how a tie jumped from sub-match 1 straight to
+  // sub-match 4.
   const pending = parent.subMatches
     .map((sub, idx) => ({ sub, idx }))
     .filter(({ sub }) => subMatchIsPending(sub))
-  // Normally the earliest pending sub-match is next. An admin can pull a
-  // different one forward (playLeagueSubMatchNow) — that only changes which
-  // is queued, never the order they are listed or numbered in.
-  const chosen = pending.findIndex(({ sub }) => sub.playNextAt)
-  const current = chosen === -1 ? pending[0] : pending[chosen]
-  if (!current) return
+  const parallel = isParallelTie(parent)
+  const current = pickCurrentSubMatches(pending, parallel)
+  if (current.length === 0) return
 
   // Sub-matches inherit the tie's table, so one pinned to a different table
   // was put there deliberately by an admin (RR Singles only — see
   // pinSubMatchToTable). It has to stay in the item list or the next rebuild
-  // would reconcile it straight off that table again.
+  // would reconcile it straight off that table again. A tie on two tables
+  // pins each table's sub-matches on purpose, so this doesn't apply there.
   const tieTable = parent.lockedTableNumber
-  const pinned = pending.filter(
-    ({ sub, idx }) =>
-      idx !== current.idx &&
-      sub.lockedTableNumber != null &&
-      sub.lockedTableNumber !== tieTable,
-  )
+  const isCurrent = (idx) => current.some((c) => c.idx === idx)
+  const pinned = parallel
+    ? []
+    : pending.filter(
+        ({ sub, idx }) =>
+          !isCurrent(idx) &&
+          sub.lockedTableNumber != null &&
+          sub.lockedTableNumber !== tieTable,
+      )
 
-  // The sub-match after this one decides whether its players may start
-  // somewhere else in the meantime (see isPotentialMatchEndingGame).
-  const following = pending.find(({ idx }) => idx !== current.idx)
-  const nextSubPlayerIds = following ? collectSidePlayerIds(following.sub) : []
-
-  ;[current, ...pinned].forEach(({ sub, idx }) => {
+  ;[...current, ...pinned].forEach(({ sub, idx }) => {
+    // The sub-match after this one decides whether its players may start
+    // somewhere else in the meantime (see isPotentialMatchEndingGame).
+    const following = findFollowingSubMatch(
+      pending,
+      idx,
+      parallel ? sub.lane : undefined,
+    )
+    const nextSubPlayerIds = following ? collectSidePlayerIds(following.sub) : []
     items.push({
       matchId: sub._id,
       eventId: ctx.eventId,
@@ -465,9 +470,77 @@ const pushTeamSubMatchItems = (parent, items, ctx) => {
       subMatchIndex: idx,
       nextSubPlayerIds,
       parent: parentSummary,
+      ...(parallel ? parallelItemFields(parent, sub) : {}),
     })
   })
 }
+
+// A tie played on more than one table at once (a French League tournament,
+// match.md): its sub-matches say which of the tie's tables they belong to.
+const isParallelTie = (parent) =>
+  (parent.parallelTables ?? 1) > 1 &&
+  (parent.subMatches || []).some((s) => s.lane != null)
+
+/**
+ * The sub-matches to queue now.
+ *
+ * A tie with phases (French League: 6 singles, the doubles, 6 singles) plays
+ * only its earliest unfinished phase — the doubles wait for every singles
+ * before them. On one table that is the next sub-match; on two, the next on
+ * each table.
+ *
+ * Otherwise the earliest pending sub-match, unless an admin pulled a
+ * different one forward (playLeagueSubMatchNow) — that only changes which is
+ * queued, never the order they are listed or numbered in.
+ */
+const pickCurrentSubMatches = (pending, parallel) => {
+  const inPhase = currentPhaseSubMatches(pending)
+  if (parallel) return firstOnEachLane(inPhase)
+  const chosen = inPhase.find(({ sub }) => sub.playNextAt)
+  return [chosen || inPhase[0]].filter(Boolean)
+}
+
+const currentPhaseSubMatches = (pending) => {
+  const phases = pending.map(({ sub }) => sub.phase).filter((p) => p != null)
+  if (phases.length === 0) return pending
+  const phase = Math.min(...phases)
+  return pending.filter(({ sub }) => sub.phase === phase)
+}
+
+const firstOnEachLane = (entries) => {
+  const seen = new Set()
+  return entries.filter(({ sub }) => {
+    if (seen.has(sub.lane)) return false
+    seen.add(sub.lane)
+    return true
+  })
+}
+
+// The next sub-match after this one: on the same table for a tie played on
+// two, otherwise simply the next one still to play.
+const findFollowingSubMatch = (pending, idx, lane) =>
+  (lane != null &&
+    pending.find((p) => p.idx > idx && p.sub.lane === lane)) ||
+  pending.find((p) => p.idx !== idx)
+
+// Which of the tie's tables this sub-match is played on (its key in
+// teamTableMap), and the group it must start together with, if any.
+const parallelItemFields = (parent, sub) => ({
+  teamTableKey: teamTableKeyOf(parent._id, sub.lane),
+  ...(sub.startTogether
+    ? { togetherKey: `${parent._id}:phase${sub.phase}` }
+    : {}),
+})
+
+// teamTableMap key: the parent's id for a tie on one table (and the first
+// table of a tie on two), "<id>:<lane>" for its other tables.
+const teamTableKeyOf = (parentId, lane) =>
+  lane ? `${parentId}:${lane}` : parentId.toString()
+
+const teamKeyOf = (item) =>
+  item?.teamTableKey ?? item?.parentMatchId?.toString()
+
+const parentIdOfTeamKey = (key) => key.split(':')[0]
 
 const extractKnockoutMatches = (event, eventSummary, items) => {
   const knockoutStage = event.eventStages?.find((s) => s.type === 'knockout')
@@ -893,6 +966,10 @@ const hasPlayerConflict = (item, playersOnTables) => {
 // Which table each live team match owns. The tie keeps it for its whole
 // run, so when one sub-match ends and the next can't start yet the table is
 // held empty rather than handed to someone else.
+//
+// A tie on two tables keeps both for as long as it is live, even while one
+// of them has nothing to play yet (its table finished the phase first), so
+// the doubles start on the same two tables.
 const pruneTeamTableMap = (map, allItems) => {
   const liveTeams = new Set()
   for (const it of allItems) {
@@ -900,10 +977,48 @@ const pruneTeamTableMap = (map, allItems) => {
   }
   const next = {}
   for (const [key, val] of Object.entries(map)) {
-    if (liveTeams.has(key)) next[key] = val
+    if (liveTeams.has(parentIdOfTeamKey(key))) next[key] = val
   }
   return next
 }
+
+// A tie on two tables (French League) keeps its 8 players from the moment
+// it takes a table until it is over: they sit out between their matches,
+// and one of them starting something elsewhere would hold up the tie — the
+// doubles can't start until all 8 are free. playerId -> the tie's id.
+const collectLiveTieRosters = (allItems, teamTableMap) => {
+  const liveTies = new Set(Object.keys(teamTableMap).map(parentIdOfTeamKey))
+  const held = new Map()
+  for (const item of allItems) {
+    if (!item.teamTableKey) continue
+    const tieId = item.parentMatchId.toString()
+    if (!liveTies.has(tieId)) continue
+    for (const id of collectSidePlayerIds(item.parent)) held.set(id, tieId)
+  }
+  return held
+}
+
+const isHeldByAnotherTie = (item, allItems, teamTableMap) => {
+  const held = collectLiveTieRosters(allItems, teamTableMap)
+  if (held.size === 0) return false
+  const ownTie = item.parentMatchId?.toString()
+  return collectSidePlayerIds(item.match).some(
+    (id) => held.has(id) && held.get(id) !== ownTie,
+  )
+}
+
+// Matches that start together (a French League tie's two doubles) go on
+// only when every one of them can: all their players are free and the
+// tie's tables for them are empty.
+const togetherGroupCanStart = (members, { playersOnTables, tables, teamTableMap }) =>
+  members.every((m) => !hasPlayerConflict(m, playersOnTables)) &&
+  members.every((m) => {
+    const tableNumber = teamTableMap[teamKeyOf(m)]
+    if (tableNumber == null) return true
+    return tables.some(
+      (t) => t.tableNumber === tableNumber && t.status === 'available',
+    )
+  })
 
 // Players a live team match may need the moment its current game ends.
 // Only collected while that game could actually end the sub-match — before
@@ -948,6 +1063,7 @@ const assignTablesToMatches = (
   const updatedGroupTableMap = pruneGroupTableMap(groupTableMap || {}, allItems)
   const updatedTeamTableMap = pruneTeamTableMap(teamTableMap || {}, allItems)
   const heldPlayerIds = collectTeamHeldPlayerIds(allItems)
+  const togetherDecisions = new Map()
 
   for (const item of queue) {
     const isGroupOfThree = item.groupKey && item.groupSize === 3
@@ -958,8 +1074,27 @@ const assignTablesToMatches = (
       remainingQueue.push(item)
       continue
     }
-    const myParentId = item.parentMatchId?.toString()
-    const myTeamTable = myParentId ? updatedTeamTableMap[myParentId] : undefined
+    // Matches that start together are decided as a group, once per pass:
+    // all of them go on now, or none does.
+    if (item.togetherKey) {
+      if (!togetherDecisions.has(item.togetherKey)) {
+        const members = queue.filter((q) => q.togetherKey === item.togetherKey)
+        togetherDecisions.set(
+          item.togetherKey,
+          togetherGroupCanStart(members, {
+            playersOnTables,
+            tables: updatedTables,
+            teamTableMap: updatedTeamTableMap,
+          }),
+        )
+      }
+      if (!togetherDecisions.get(item.togetherKey)) {
+        remainingQueue.push(item)
+        continue
+      }
+    }
+    const myTeamKey = teamKeyOf(item)
+    const myTeamTable = myTeamKey ? updatedTeamTableMap[myTeamKey] : undefined
 
     // A match is skipped only when one of its own two players is already
     // playing — a busy third group member no longer blocks the match
@@ -1006,8 +1141,14 @@ const assignTablesToMatches = (
       remainingQueue.push(item)
       continue
     }
+    if (isHeldByAnotherTie(item, allItems, updatedTeamTableMap)) {
+      remainingQueue.push(item)
+      continue
+    }
 
     // Tables reserved for other groups of 3 are off-limits to this item.
+    // So are tables held by other team matches — including this tie's other
+    // table, when it is played on two.
     const myLockedTable = isGroupOfThree
       ? updatedGroupTableMap[item.groupKey]
       : undefined
@@ -1018,7 +1159,7 @@ const assignTablesToMatches = (
       // Tables held by other live team matches, including one sitting empty
       // between sub-matches while it waits for a player.
       ...Object.entries(updatedTeamTableMap)
-        .filter(([key]) => key !== myParentId)
+        .filter(([key]) => key !== myTeamKey)
         .map(([, table]) => table),
     ])
 
@@ -1058,7 +1199,7 @@ const assignTablesToMatches = (
         match: { ...item, tableNumber },
         status: 'assigned',
       }
-      if (myParentId) updatedTeamTableMap[myParentId] = tableNumber
+      if (myTeamKey) updatedTeamTableMap[myTeamKey] = tableNumber
       const match = item.match
       if (match) {
         for (const p of [...(match.side1 || []), ...(match.side2 || [])]) {
@@ -1120,7 +1261,7 @@ const assignTablesToMatches = (
       assignedGroupKeys.add(item.groupKey)
       updatedGroupTableMap[item.groupKey] = tableNumber
     }
-    if (myParentId) updatedTeamTableMap[myParentId] = tableNumber
+    if (myTeamKey) updatedTeamTableMap[myTeamKey] = tableNumber
   }
 
   return {
@@ -1725,8 +1866,8 @@ const findTopLevelMatch = (event, matchId) =>
 // matches across.
 const swapTeamTableEntries = (teamTableMap, moving, displaced, { fromTable, toTable }) => {
   const map = { ...(teamTableMap || {}) }
-  if (moving.parentMatchId) map[moving.parentMatchId] = toTable
-  if (displaced?.parentMatchId) map[displaced.parentMatchId] = fromTable
+  if (moving.parentMatchId) map[teamKeyOf(moving)] = toTable
+  if (displaced?.parentMatchId) map[teamKeyOf(displaced)] = fromTable
   return map
 }
 
@@ -1741,14 +1882,28 @@ const relockMatchTable = async (item, tableNumber) => {
 
   const parentId = item.parentMatchId
   const targetId = parentId || item.matchId
+  // A tie on two tables moves one table at a time: only the sub-matches
+  // played on the moving one follow it.
+  const lane = item.teamTableKey ? item.match?.lane : undefined
   const stages = updateMatchInStages(event.eventStages, targetId, (match) =>
-    withRelockedTable(match, tableNumber),
+    lane != null
+      ? withRelockedLane(match, tableNumber, lane)
+      : withRelockedTable(match, tableNumber),
   )
   await collection.updateOne(
     { _id: toObjectId(item.eventId) },
     { $set: { eventStages: stages } },
   )
 }
+
+const withRelockedLane = (match, tableNumber, lane) => ({
+  ...match,
+  subMatches: (match.subMatches || []).map((sub) =>
+    sub.lane === lane && sub.winningSide == null
+      ? { ...sub, lockedTableNumber: tableNumber }
+      : sub,
+  ),
+})
 
 const withRelockedTable = (match, tableNumber) => ({
   ...match,
