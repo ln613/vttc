@@ -17,6 +17,7 @@
   - Schedule: go to the schedule page
   - Players: go to the Players page
   - "Booking": go to the Booking page — Calendar module, not for the tablet
+  - a club with its own website (specs/pages/Club Site.md): "Home", "Coaches", "Pricing", "About", in the club's top bar colour, and a language toggle (align right) when the site has more than one language
   - on a phone (480px and narrower) the bar tightens its spacing so the links fit beside the icons; on a screen too narrow even for that, the links scroll sideways within the bar, never the page
   - Setting Icon (align right, admin only)
   - Account Icon (align right)

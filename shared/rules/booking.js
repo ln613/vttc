@@ -12,8 +12,12 @@ export const DEFAULT_BOOKING = {
   slotMinutes: 30,
   minMinutes: 60,
   // A registered player pays in credits; a guest pays the same price in
-  // dollars, at the top-up rate.
+  // dollars, at the top-up rate. With `rates` (below) the price follows the
+  // day and the time; `creditsPerSlot` is the flat price otherwise, and for
+  // any half hour no rate covers.
   creditsPerSlot: 2500,
+  // [{ days: ['mon', 'tue'], from: '09:00', to: '18:00', dollarsPerHour: 30 }]
+  rates: [],
   creditsPerDollar: 100,
   minTopUpDollars: 10,
   // How long a guest's slot is held while they pay.
@@ -47,6 +51,12 @@ export const bookingRules = (config) => {
     minMinutes: c.minMinutes,
     creditsPerSlot: c.creditsPerSlot,
     creditsPerDollar: c.creditsPerDollar,
+    rates: (c.rates || []).map((r) => ({
+      days: r.days,
+      fromMinutes: toMinutes(r.from),
+      toMinutes: toMinutes(r.to),
+      dollarsPerHour: r.dollarsPerHour,
+    })),
     minTopUpDollars: c.minTopUpDollars,
     guestHoldMinutes: c.guestHoldMinutes,
     doorCodeLeadMinutes: c.doorCodeLeadMinutes,
@@ -61,7 +71,8 @@ export const toTimeOfDay = (minutes) =>
 // Why opening and closing times can't be used, or null when they can: both
 // on a slot boundary, and open long enough for at least one booking.
 export const bookingHoursError = (config, openTime, closeTime) => {
-  if (!isTimeOfDay(openTime) || !isTimeOfDay(closeTime)) return 'Choose the booking opening and closing times'
+  if (!isTimeOfDay(openTime) || !isTimeOfDay(closeTime))
+    return 'Choose the booking opening and closing times'
   const r = bookingRules({ ...(config || {}), openTime, closeTime })
   if (r.openMinutes % r.slotMinutes || r.closeMinutes % r.slotMinutes) {
     return `Booking hours must be on the ${r.slotMinutes}-minute mark`
@@ -76,7 +87,11 @@ export const bookingHoursError = (config, openTime, closeTime) => {
 // the last start that still leaves the minimum length before closing.
 export const startTimes = (rules) => {
   const out = []
-  for (let t = rules.openMinutes; t + rules.minMinutes <= rules.closeMinutes; t += rules.slotMinutes) {
+  for (
+    let t = rules.openMinutes;
+    t + rules.minMinutes <= rules.closeMinutes;
+    t += rules.slotMinutes
+  ) {
     out.push(t)
   }
   return out
@@ -85,7 +100,12 @@ export const startTimes = (rules) => {
 // Every half-hour row of the day, opening to closing — what the calendar draws.
 export const daySlots = (rules) => {
   const out = []
-  for (let t = rules.openMinutes; t < rules.closeMinutes; t += rules.slotMinutes) out.push(t)
+  for (
+    let t = rules.openMinutes;
+    t < rules.closeMinutes;
+    t += rules.slotMinutes
+  )
+    out.push(t)
   return out
 }
 
@@ -94,7 +114,8 @@ export const daySlots = (rules) => {
 export const lengthOptions = (rules, start, nextBusyStart = Infinity) => {
   const limit = Math.min(rules.closeMinutes, nextBusyStart)
   const out = []
-  for (let m = rules.minMinutes; start + m <= limit; m += rules.slotMinutes) out.push(m)
+  for (let m = rules.minMinutes; start + m <= limit; m += rules.slotMinutes)
+    out.push(m)
   return out
 }
 
@@ -113,12 +134,54 @@ export const isValidBookingTime = (rules, start, minutes) =>
   minutes % rules.slotMinutes === 0 &&
   start + minutes <= rules.closeMinutes
 
-export const bookingCredits = (rules, minutes) =>
-  (minutes / rules.slotMinutes) * rules.creditsPerSlot
+// ==================== prices ====================
 
-// What a guest pays for the same booking, in cents.
-export const bookingPriceCents = (rules, minutes) =>
-  Math.round((bookingCredits(rules, minutes) / rules.creditsPerDollar) * 100)
+export const WEEK_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+
+// "2026-10-09" → "fri". The date is the club's own, so no timezone applies.
+export const weekdayOf = (date) =>
+  WEEK_DAYS[(new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7]
+
+// The rate that covers a half hour on a day, if one does.
+export const rateAt = (rules, date, minute) => {
+  const day = weekdayOf(date)
+  return rules.rates.find(
+    (r) =>
+      r.days.includes(day) && minute >= r.fromMinutes && minute < r.toMinutes,
+  )
+}
+
+// One half hour's price in cents: its rate, or the flat price.
+export const slotPriceCents = (rules, date, start) => {
+  const rate = date != null ? rateAt(rules, date, start) : null
+  return rate
+    ? Math.round((rate.dollarsPerHour * 100 * rules.slotMinutes) / 60)
+    : Math.round((rules.creditsPerSlot / rules.creditsPerDollar) * 100)
+}
+
+// What a booking costs a guest, in cents: the sum of its half hours, so one
+// that runs past 6 PM pays each rate for its own part.
+export const bookingPriceCents = (
+  rules,
+  minutes,
+  date,
+  start = rules.openMinutes,
+) =>
+  slotsCovered(rules, start, minutes).reduce(
+    (sum, t) => sum + slotPriceCents(rules, date, t),
+    0,
+  )
+
+// The same price in credits, at the top-up rate.
+export const bookingCredits = (rules, minutes, date, start) =>
+  Math.round(
+    (bookingPriceCents(rules, minutes, date, start) / 100) *
+      rules.creditsPerDollar,
+  )
+
+// The hourly rate a half hour is charged at, in dollars.
+export const hourlyRateAt = (rules, date, start) =>
+  (slotPriceCents(rules, date, start) * 60) / rules.slotMinutes / 100
 
 export const topUpCredits = (rules, dollars) => dollars * rules.creditsPerDollar
 

@@ -62,7 +62,19 @@ declare module 'club-config' {
     doorCodeLeadMinutes?: number
     doorCodeTrailMinutes?: number
     }
+    /**
+     * A public website (Home, Coaches, Pricing, About & Contact) whose
+     * content and images live in clubs/<slug>/site. `languages` lists the
+     * ones it is written in; with more than one, the top bar offers a
+     * language toggle. See specs/pages/Club Site.md.
+     */
+    site?: {
+      enabled?: boolean
+      languages?: Array<'en' | 'zh'>
+    }
     branding: {
+      /** The top bar's colour; VTTC blue without it. */
+      topBarColor?: string
       bannerUrl: string
       /** Optional narrow-screen crop; the wide banner is used without it. */
       bannerUrlMobile?: string

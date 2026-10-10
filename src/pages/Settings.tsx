@@ -9,23 +9,45 @@ import { modulesActions } from '../stores/modulesStore'
 import Select from '../components/Select'
 import {
   bookingRules,
-  formatClock,
   toMinutes,
   toTimeOfDay,
 } from '../../shared/rules/booking'
+import ThemeButton from '../components/ThemeButton'
+import { langActions } from '../stores/langStore'
+import { hasSite, loadSiteFonts } from '../site/siteContent'
+import { themed } from '../site/themed'
+import './booking.css'
+
+// A club with its own website shows Settings in its site's look (heading
+// band, cards, site buttons — booking.css) and in its languages.
+const t = langActions.t
 
 const Settings = () => {
   onMount(() => {
+    loadSiteFonts()
     if (!authState.isAdmin) return
     void settingsActions.fetchSettings()
   })
 
   return (
-    <div style={containerStyle}>
+    <div {...themed(containerStyle, 'bk bk-site')}>
       <Header />
       <Show when={authState.isAdmin}>
-        <div style={contentStyle}>
-          <TitleRow />
+        <Show when={hasSite()}>
+          <header class="bk-head">
+            <div class="bk-head-inner bk-head-row">
+              <div>
+                <p class="bk-kicker">{t('settings.kicker')}</p>
+                <h1 class="bk-title">{t('settings.title')}</h1>
+              </div>
+              <EditIcons />
+            </div>
+          </header>
+        </Show>
+        <div {...themed(contentStyle, 'bk-wrap')}>
+          <Show when={!hasSite()}>
+            <TitleRow />
+          </Show>
           <Show when={settingsState.error}>
             <div style={errorStyle}>{settingsState.error}</div>
           </Show>
@@ -52,7 +74,9 @@ const Settings = () => {
           {/* Only for a club that actually uses the app's rating system —
               see enableUpdateRating in clubs/<slug>/config.json. */}
           <Show
-            when={modulesActions.on('tournament') && clubConfig.enableUpdateRating}
+            when={
+              modulesActions.on('tournament') && clubConfig.enableUpdateRating
+            }
           >
             <UpdateSection />
           </Show>
@@ -68,15 +92,17 @@ const Settings = () => {
 const UmpireSection = () => {
   const navigate = useNavigate()
   return (
-    <div style={sectionStyle}>
-      <h4 style={sectionHeaderStyle}>Umpires</h4>
-      <div style={linkColumnStyle}>
+    <div {...themed(sectionStyle, 'bk-card')}>
+      <h4 {...themed(sectionHeaderStyle, 'bk-section-title')}>
+        {t('settings.umpires')}
+      </h4>
+      <div {...themed(linkColumnStyle, 'bk-links')}>
         <button
           type="button"
-          style={linkButtonStyle}
+          {...themed(linkButtonStyle, 'bk-link')}
           onClick={() => navigate('/umpires')}
         >
-          Umpires
+          {t('settings.umpires')}
         </button>
       </div>
     </div>
@@ -87,15 +113,17 @@ const UmpireSection = () => {
 const ModulesSection = () => {
   const navigate = useNavigate()
   return (
-    <div style={sectionStyle}>
-      <h4 style={sectionHeaderStyle}>Modules</h4>
-      <div style={linkColumnStyle}>
+    <div {...themed(sectionStyle, 'bk-card')}>
+      <h4 {...themed(sectionHeaderStyle, 'bk-section-title')}>
+        {t('settings.modules')}
+      </h4>
+      <div {...themed(linkColumnStyle, 'bk-links')}>
         <button
           type="button"
-          style={linkButtonStyle}
+          {...themed(linkButtonStyle, 'bk-link')}
           onClick={() => navigate('/modules')}
         >
-          Modules
+          {t('settings.modules')}
         </button>
       </div>
     </div>
@@ -105,22 +133,24 @@ const ModulesSection = () => {
 const RevenueSection = () => {
   const navigate = useNavigate()
   return (
-    <div style={sectionStyle}>
-      <h4 style={sectionHeaderStyle}>Revenue</h4>
-      <div style={linkColumnStyle}>
+    <div {...themed(sectionStyle, 'bk-card')}>
+      <h4 {...themed(sectionHeaderStyle, 'bk-section-title')}>
+        {t('settings.revenue')}
+      </h4>
+      <div {...themed(linkColumnStyle, 'bk-links')}>
         <button
           type="button"
-          style={linkButtonStyle}
+          {...themed(linkButtonStyle, 'bk-link')}
           onClick={() => navigate('/revenue')}
         >
-          Revenue
+          {t('settings.revenue')}
         </button>
         <button
           type="button"
-          style={linkButtonStyle}
+          {...themed(linkButtonStyle, 'bk-link')}
           onClick={() => navigate('/revenue-calculator')}
         >
-          Revenue Calculator
+          {t('settings.revenueCalculator')}
         </button>
       </div>
     </div>
@@ -128,25 +158,54 @@ const RevenueSection = () => {
 }
 
 const UpdateSection = () => (
-  <div style={sectionStyle}>
-    <h4 style={sectionHeaderStyle}>Update</h4>
-    <button
-      type="button"
-      style={updateButtonStyle}
-      disabled={settingsState.updatingRating}
-      onClick={() => void settingsActions.updateRatings()}
+  <div {...themed(sectionStyle, 'bk-card')}>
+    <h4 {...themed(sectionHeaderStyle, 'bk-section-title')}>
+      {t('settings.update')}
+    </h4>
+    <Show
+      when={hasSite()}
+      fallback={
+        <button
+          type="button"
+          style={updateButtonStyle}
+          disabled={settingsState.updatingRating}
+          onClick={() => void settingsActions.updateRatings()}
+        >
+          {settingsState.updatingRating
+            ? t('settings.updating')
+            : t('settings.updateRating')}
+        </button>
+      }
     >
-      {settingsState.updatingRating ? 'Updating...' : 'Update Rating'}
-    </button>
+      <ThemeButton
+        variant="accent"
+        small
+        disabled={settingsState.updatingRating}
+        onClick={() => void settingsActions.updateRatings()}
+      >
+        {settingsState.updatingRating
+          ? t('settings.updating')
+          : t('settings.updateRating')}
+      </ThemeButton>
+    </Show>
     <Show when={settingsState.ratingResult}>
-      <div style={ratingResultStyle}>{settingsState.ratingResult}</div>
+      <div {...themed(ratingResultStyle, 'bk-success')}>
+        {settingsState.ratingResult}
+      </div>
     </Show>
   </div>
 )
 
 const TitleRow = () => (
   <div style={titleRowStyle}>
-    <h3 style={titleStyle}>Settings</h3>
+    <h3 style={titleStyle}>{t('settings.title')}</h3>
+    <EditIcons />
+  </div>
+)
+
+// Edit, then Cancel and Save, beside the page title.
+const EditIcons = () => (
+  <>
     <div style={actionIconsStyle}>
       <Show when={settingsState.saving}>
         <SpinnerIcon />
@@ -156,7 +215,7 @@ const TitleRow = () => (
         fallback={
           <Show when={authState.isAdmin && !settingsState.saving}>
             <IconButton
-              label="Edit"
+              label={t('common.edit')}
               onClick={() => settingsActions.startEditing()}
             >
               <EditGlyph />
@@ -166,13 +225,13 @@ const TitleRow = () => (
       >
         <Show when={!settingsState.saving}>
           <IconButton
-            label="Cancel"
+            label={t('common.cancel')}
             onClick={() => settingsActions.cancelEditing()}
           >
             <CancelGlyph />
           </IconButton>
           <IconButton
-            label="Save"
+            label={t('common.save')}
             onClick={() => void settingsActions.save()}
           >
             <SaveGlyph />
@@ -180,32 +239,34 @@ const TitleRow = () => (
         </Show>
       </Show>
     </div>
-  </div>
+  </>
 )
 
 const EventSettingSection = () => (
-  <div style={sectionStyle}>
-    <h4 style={sectionHeaderStyle}>Event Setting</h4>
+  <div {...themed(sectionStyle, 'bk-card')}>
+    <h4 {...themed(sectionHeaderStyle, 'bk-section-title')}>
+      {t('settings.eventSetting')}
+    </h4>
     <SettingCheckbox
       field="ignoreUnpaidInGeneration"
-      label="Ignore unpaid players when generating groups, RR or first round knockout if no group stage"
+      label={t('settings.ignoreUnpaid')}
     />
     <SettingCheckbox
       field="tabletMirrorEnabled"
-      label="Enable Tablet Mirror — a table may be run by two tablets, one facing the umpire and one facing the players. Applies to any event that has not started yet."
+      label={t('settings.tabletMirror')}
     />
     <SettingCheckbox
       field="allowPublicUmpire"
-      label="Allow Public Umpire — anyone with the match day password can score a match without an account."
+      label={t('settings.publicUmpire')}
     />
     <SettingCheckbox
       field="saveUmpireInfo"
-      label="Save Umpire Info — record who umpired each match, and let umpires be assigned to tables for the day."
+      label={t('settings.saveUmpireInfo')}
     />
     <Show when={settingsValue('saveUmpireInfo')}>
       <SettingNumber
         field="maxUmpiresPerTable"
-        label="Max umpires on a table"
+        label={t('settings.maxUmpires')}
         min={1}
         max={4}
       />
@@ -219,12 +280,16 @@ const bookingSlotRules = bookingRules(clubConfig.booking)
 
 const timeOption = (minutes: number) => ({
   value: toTimeOfDay(minutes),
-  label: minutes === 24 * 60 ? '12:00 AM (midnight)' : formatClock(minutes),
+  label:
+    minutes === 24 * 60
+      ? t('common.midnight', { time: langActions.clock(minutes) })
+      : langActions.clock(minutes),
 })
 
 const timesBetween = (from: number, to: number) => {
   const out = []
-  for (let t = from; t <= to; t += bookingSlotRules.slotMinutes) out.push(timeOption(t))
+  for (let t = from; t <= to; t += bookingSlotRules.slotMinutes)
+    out.push(timeOption(t))
   return out
 }
 
@@ -247,11 +312,13 @@ const setBookingOpenTime = (openTime: string) => {
 }
 
 const BookingSection = () => (
-  <div style={sectionStyle}>
-    <h4 style={sectionHeaderStyle}>Court Booking</h4>
+  <div {...themed(sectionStyle, 'bk-card')}>
+    <h4 {...themed(sectionHeaderStyle, 'bk-section-title')}>
+      {t('settings.courtBooking')}
+    </h4>
     <div style={hoursRowStyle}>
       <Select
-        label="Opens at"
+        label={t('settings.opensAt')}
         name="bookingOpenTime"
         value={settingsValue('bookingOpenTime')}
         onChange={setBookingOpenTime}
@@ -260,7 +327,7 @@ const BookingSection = () => (
         noPlaceholder
       />
       <Select
-        label="Closes at"
+        label={t('settings.closesAt')}
         name="bookingCloseTime"
         value={settingsValue('bookingCloseTime')}
         onChange={(v) => settingsActions.setDraft('bookingCloseTime', v)}
@@ -279,7 +346,9 @@ const hoursRowStyle: JSX.CSSProperties = {
   'max-width': '480px',
 }
 
-const settingsValue = <K extends keyof AppSettings>(field: K): AppSettings[K] =>
+const settingsValue = <K extends keyof AppSettings>(
+  field: K,
+): AppSettings[K] =>
   settingsState.editing
     ? settingsState.draft[field]
     : settingsState.settings[field]
@@ -290,7 +359,7 @@ const SettingNumber = (props: {
   min: number
   max: number
 }) => (
-  <label style={checkboxRowStyle}>
+  <label {...themed(checkboxRowStyle, 'bk-row')}>
     <input
       type="number"
       min={props.min}
@@ -317,7 +386,7 @@ const SettingCheckbox = (props: {
   label: string
 }) => {
   return (
-    <label style={checkboxRowStyle}>
+    <label {...themed(checkboxRowStyle, 'bk-row')}>
       <input
         type="checkbox"
         checked={!!settingsValue(props.field)}
@@ -344,7 +413,7 @@ const IconButton = (props: {
     type="button"
     aria-label={props.label}
     title={props.label}
-    style={iconButtonStyle}
+    {...themed(iconButtonStyle, 'bk-icon-btn')}
     onClick={props.onClick}
   >
     {props.children}

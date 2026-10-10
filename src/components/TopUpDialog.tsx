@@ -1,36 +1,46 @@
-import { Show, Switch, Match, type JSX } from 'solid-js'
+import { Show, Switch, Match } from 'solid-js'
 import Input from './Input'
-import Button from './Button'
 import PaymentPlaceholder from './PaymentPlaceholder'
 import { creditsState, creditsActions } from '../stores/creditsStore'
 import { formatCredits } from '../../shared/rules/booking'
+import { langActions } from '../stores/langStore'
+import '../pages/booking.css'
 
-// Top up court-booking credits: an amount in dollars, then payment.
+const t = langActions.t
+
+// Top up court-booking credits: an amount in dollars, then payment. Opens
+// above the booking dialog, and takes the look of the page it is on.
 const TopUpDialog = () => (
   <Show when={creditsState.topUpOpen}>
-    <div style={overlayStyle} onClick={creditsActions.closeTopUp}>
-      <div style={dialogStyle} onClick={(e) => e.stopPropagation()}>
-        <h2 style={titleStyle}>Top up credits</h2>
-        <Switch>
-          <Match when={creditsState.topUpStep === 'amount'}>
-            <AmountStep />
-          </Match>
-          <Match when={creditsState.topUpStep === 'pay'}>
-            <PaymentPlaceholder
-              amountCents={creditsState.amountCents}
-              available={creditsState.paymentsAvailable}
-              busy={creditsState.busy}
-              onPay={creditsActions.payTopUp}
-              onBack={creditsActions.closeTopUp}
-            />
-          </Match>
-          <Match when={creditsState.topUpStep === 'done'}>
-            <DoneStep />
-          </Match>
-        </Switch>
-        <Show when={creditsState.topUpError}>
-          <div style={errorStyle}>{creditsState.topUpError}</div>
-        </Show>
+    <div class="bk-overlay is-top" onClick={creditsActions.closeTopUp}>
+      <div class="bk-dialog" onClick={(e) => e.stopPropagation()}>
+        <div class="bk-dialog-head">
+          <h2 class="bk-dialog-title">{t('topUp.title')}</h2>
+        </div>
+        <div class="bk-dialog-body">
+          <Switch>
+            <Match when={creditsState.topUpStep === 'amount'}>
+              <AmountStep />
+            </Match>
+            <Match when={creditsState.topUpStep === 'pay'}>
+              <PaymentPlaceholder
+                amountCents={creditsState.amountCents}
+                available={creditsState.paymentsAvailable}
+                busy={creditsState.busy}
+                onPay={creditsActions.payTopUp}
+                onBack={creditsActions.closeTopUp}
+              />
+            </Match>
+            <Match when={creditsState.topUpStep === 'done'}>
+              <DoneStep />
+            </Match>
+          </Switch>
+          <Show when={creditsState.topUpError}>
+            <p class="bk-error" style={{ 'text-align': 'center', margin: 0 }}>
+              {creditsState.topUpError}
+            </p>
+          </Show>
+        </div>
       </div>
     </div>
   </Show>
@@ -40,27 +50,45 @@ const AmountStep = () => {
   const r = creditsActions.rules()
   return (
     <>
-      <p style={hintStyle}>
-        $1 = {r.creditsPerDollar} credits. Minimum ${r.minTopUpDollars}.
+      <p class="bk-note">
+        {t('topUp.rate', {
+          credits: r.creditsPerDollar,
+          min: r.minTopUpDollars,
+        })}
       </p>
       <Input
-        label="Amount ($)"
+        label={t('topUp.amount')}
         name="topUpDollars"
         value={creditsState.dollars}
         onChange={creditsActions.setDollars}
         inputMode="numeric"
         autofocus
       />
-      <div style={previewStyle}>
-        You get <strong>{formatCredits(creditsActions.topUpPreviewCredits())}</strong> credits
+      <div class="bk-price-row" style={{ 'border-top': 0, 'padding-top': 0 }}>
+        <span>{t('topUp.youGet')}</span>
+        <span class="bk-price">
+          {t('booking.creditsAmount', {
+            credits: formatCredits(creditsActions.topUpPreviewCredits()),
+          })}
+        </span>
       </div>
-      <div style={actionsStyle}>
-        <Button color="#888" onClick={creditsActions.closeTopUp} disabled={creditsState.busy}>
-          Cancel
-        </Button>
-        <Button color="#27ae60" onClick={creditsActions.startTopUp} disabled={creditsState.busy}>
-          {creditsState.busy ? 'Please wait...' : 'Continue'}
-        </Button>
+      <div class="bk-actions">
+        <button
+          type="button"
+          class="bk-btn bk-btn-secondary bk-btn-fill"
+          onClick={creditsActions.closeTopUp}
+          disabled={creditsState.busy}
+        >
+          {t('common.cancel')}
+        </button>
+        <button
+          type="button"
+          class="bk-btn bk-btn-primary bk-btn-fill"
+          onClick={creditsActions.startTopUp}
+          disabled={creditsState.busy}
+        >
+          {creditsState.busy ? t('common.pleaseWait') : t('common.continue')}
+        </button>
       </div>
     </>
   )
@@ -68,65 +96,24 @@ const AmountStep = () => {
 
 const DoneStep = () => (
   <>
-    <p style={doneStyle}>
-      {formatCredits(creditsState.creditsBought)} credits added. Your balance is{' '}
-      <strong>{formatCredits(creditsState.balance ?? 0)}</strong> credits.
+    <p class="bk-done">
+      {t('topUp.added', { credits: formatCredits(creditsState.creditsBought) })}
     </p>
-    <div style={actionsStyle}>
-      <Button color="#27ae60" onClick={creditsActions.closeTopUp}>
-        Done
-      </Button>
+    <p class="bk-note" style={{ 'text-align': 'center' }}>
+      {t('topUp.balanceIs', {
+        balance: formatCredits(creditsState.balance ?? 0),
+      })}
+    </p>
+    <div class="bk-actions is-center">
+      <button
+        type="button"
+        class="bk-btn bk-btn-primary"
+        onClick={creditsActions.closeTopUp}
+      >
+        {t('common.done')}
+      </button>
     </div>
   </>
 )
-
-const overlayStyle: JSX.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  'background-color': 'rgba(0, 0, 0, 0.5)',
-  display: 'flex',
-  'align-items': 'center',
-  'justify-content': 'center',
-  'z-index': 1100,
-  padding: '16px',
-}
-
-const dialogStyle: JSX.CSSProperties = {
-  'background-color': '#fff',
-  'border-radius': '12px',
-  padding: '24px',
-  width: '100%',
-  'max-width': '380px',
-  'box-sizing': 'border-box',
-  'box-shadow': '0 8px 32px rgba(0, 0, 0, 0.2)',
-}
-
-const titleStyle: JSX.CSSProperties = {
-  'font-size': '20px',
-  'font-weight': 700,
-  color: '#333',
-  margin: '0 0 12px',
-  'text-align': 'center',
-}
-
-const hintStyle: JSX.CSSProperties = { 'font-size': '14px', color: '#666', margin: '0 0 12px' }
-
-const previewStyle: JSX.CSSProperties = { 'font-size': '15px', color: '#333', 'margin-top': '-4px' }
-
-const doneStyle: JSX.CSSProperties = { 'font-size': '15px', color: '#333', 'text-align': 'center' }
-
-const actionsStyle: JSX.CSSProperties = {
-  display: 'flex',
-  'justify-content': 'center',
-  gap: '12px',
-  'margin-top': '16px',
-}
-
-const errorStyle: JSX.CSSProperties = {
-  color: '#e74c3c',
-  'font-size': '14px',
-  'text-align': 'center',
-  'margin-top': '10px',
-}
 
 export default TopUpDialog

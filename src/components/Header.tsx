@@ -23,6 +23,8 @@ import TablePickerDialog, {
 } from './TablePickerDialog'
 import clubConfig from 'club-config'
 import { modulesActions } from '../stores/modulesStore'
+import { langState, langActions } from '../stores/langStore'
+import { hasSite } from '../site/siteContent'
 
 export const Header = () => (
   <header>
@@ -152,6 +154,9 @@ const TopBar = () => {
     navigate('/booking')
   }
 
+  // The club's own website pages (specs/pages/Club Site.md).
+  const goTo = (path: string) => () => navigate(path)
+
   const handleAccountClick = () => {
     if (authActions.isSignedIn()) {
       navigate('/account')
@@ -213,28 +218,49 @@ const TopBar = () => {
               onClose={() => setShowTablePicker(false)}
             />
           </Show>
+          <Show when={hasSite()}>
+            <button class="vttc-nav-link" style={navLinkStyle} onClick={goTo('/')}>
+              {langActions.t('nav.home')}
+            </button>
+          </Show>
           <Show when={modulesActions.on('events')}>
             <button class="vttc-nav-link" style={navLinkStyle} onClick={handleEventsClick}>
-              Events
+              {langActions.t('nav.events')}
             </button>
           </Show>
           <Show when={modulesActions.on('schedule')}>
             <button class="vttc-nav-link" style={navLinkStyle} onClick={handleScheduleClick}>
-              Schedule
+              {langActions.t('nav.schedule')}
             </button>
           </Show>
           <Show when={modulesActions.on('players')}>
             <button class="vttc-nav-link" style={navLinkStyle} onClick={handlePlayersClick}>
-              Players
+              {langActions.t('nav.players')}
+            </button>
+          </Show>
+          <Show when={hasSite()}>
+            <button class="vttc-nav-link" style={navLinkStyle} onClick={goTo('/coaches')}>
+              {langActions.t('nav.coaches')}
+            </button>
+            <button class="vttc-nav-link" style={navLinkStyle} onClick={goTo('/pricing')}>
+              {langActions.t('nav.pricing')}
             </button>
           </Show>
           <Show when={modulesActions.on('calendar') && !authState.isTablet}>
             <button class="vttc-nav-link" style={navLinkStyle} onClick={handleBookingClick}>
-              Booking
+              {langActions.t('nav.booking')}
+            </button>
+          </Show>
+          <Show when={hasSite()}>
+            <button class="vttc-nav-link" style={navLinkStyle} onClick={goTo('/about')}>
+              {langActions.t('nav.about')}
             </button>
           </Show>
         </div>
         <div style={navRightStyle}>
+          <Show when={langActions.canToggle()}>
+            <LanguageToggle />
+          </Show>
           <Show when={authState.isAdmin}>
             <button class="vttc-topbar-icon" style={accountButtonStyle} onClick={handleSettingsClick}>
               <SettingsIcon />
@@ -248,6 +274,30 @@ const TopBar = () => {
     </div>
   )
 }
+
+// Switches the top bar and the club's website between its languages. It
+// shows the language it switches *to*, the way bilingual sites usually do.
+const LanguageToggle = () => (
+  <button
+    type="button"
+    class="vttc-lang-toggle"
+    style={languageToggleStyle}
+    onClick={langActions.toggle}
+    aria-label={langActions.t('language.label')}
+    title={langActions.t('language.label')}
+    lang={langState.lang === 'en' ? 'zh-Hans' : 'en'}
+  >
+    <GlobeIcon />
+    <span>{langActions.t('language.switchTo')}</span>
+  </button>
+)
+
+const GlobeIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="9" />
+    <path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z" />
+  </svg>
+)
 
 /**
  * The match-day password, which anyone running a table can be given. It
@@ -531,7 +581,7 @@ const NewPlayerSuccessSection = () => (
 
 // Styles
 const topBarStyle: JSX.CSSProperties = {
-  'background-color': '#2185d0',
+  'background-color': clubConfig.branding.topBarColor || '#2185d0',
   padding: '0 20px',
   display: 'flex',
   'align-items': 'center',
@@ -645,6 +695,24 @@ const navLinkStyle: JSX.CSSProperties = {
   'letter-spacing': '0.3px',
   'white-space': 'nowrap',
   flex: 'none',
+}
+
+const languageToggleStyle: JSX.CSSProperties = {
+  display: 'inline-flex',
+  'align-items': 'center',
+  gap: '5px',
+  height: '32px',
+  'box-sizing': 'border-box',
+  flex: 'none',
+  padding: '0 10px',
+  border: '1px solid rgba(255, 255, 255, 0.55)',
+  'border-radius': '16px',
+  background: 'none',
+  color: '#fff',
+  'font-size': '14px',
+  'font-weight': 600,
+  cursor: 'pointer',
+  'white-space': 'nowrap',
 }
 
 const accountButtonStyle: JSX.CSSProperties = {

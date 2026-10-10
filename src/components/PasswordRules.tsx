@@ -1,10 +1,12 @@
 import { Show, For, type JSX } from 'solid-js'
+import { langActions } from '../stores/langStore'
 
-const RULES: { label: string; check: (pwd: string) => boolean }[] = [
-  { label: 'At least 8 characters', check: (p) => p.length >= 8 },
-  { label: 'Contains at least 1 number', check: (p) => /[0-9]/.test(p) },
-  { label: 'Contains at least 1 uppercase', check: (p) => /[A-Z]/.test(p) },
-  { label: 'Contains at least 1 lowercase', check: (p) => /[a-z]/.test(p) },
+// Labels are resource keys (src/i18n), shown in the current language.
+const RULES: { key: string; check: (pwd: string) => boolean }[] = [
+  { key: 'password.min8', check: (p) => p.length >= 8 },
+  { key: 'password.number', check: (p) => /[0-9]/.test(p) },
+  { key: 'password.upper', check: (p) => /[A-Z]/.test(p) },
+  { key: 'password.lower', check: (p) => /[a-z]/.test(p) },
 ]
 
 const PasswordRules = (props: { password: string }) => (
@@ -14,7 +16,7 @@ const PasswordRules = (props: { password: string }) => (
         {(rule) => (
           <PasswordRule
             met={rule.check(props.password)}
-            label={rule.label}
+            label={langActions.t(rule.key)}
           />
         )}
       </For>

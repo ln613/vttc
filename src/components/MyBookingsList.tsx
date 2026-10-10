@@ -1,22 +1,24 @@
 import { Show, For, type JSX } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import clubConfig from 'club-config'
-import Button from './Button'
-import { parseLocalDate } from '../utils/date'
+import ThemeButton from './ThemeButton'
 import {
   myBookingsState,
   myBookingsActions,
   type MyBooking,
 } from '../stores/myBookingsStore'
-import {
-  formatClock,
-  formatCredits,
-  formatDollars,
-} from '../../shared/rules/booking'
+import { langActions } from '../stores/langStore'
+import { themed } from '../site/themed'
+import { formatCredits, formatDollars } from '../../shared/rules/booking'
 
 // The signed-in player's court bookings, in the Account page's My Bookings
 // section: upcoming, then past, each with its door code and receipt. The
-// list is loaded when the section opens (accountSectionsStore).
+// list is loaded when the section opens (accountSectionsStore). Everything
+// shown follows the current language; the receipt is put together here from
+// the booking itself, so it does too (the emailed one is English).
+
+const t = langActions.t
+
 const MyBookingsList = () => {
   const navigate = useNavigate()
   return (
@@ -26,23 +28,26 @@ const MyBookingsList = () => {
       </Show>
       <Show
         when={!myBookingsState.loading}
-        fallback={<div style={emptyStyle}>Loading...</div>}
+        fallback={<div style={emptyStyle}>{t('common.loading')}</div>}
       >
         <Show
           when={myBookingsState.bookings.length > 0}
-          fallback={<div style={emptyStyle}>You have no bookings yet.</div>}
+          fallback={<div style={emptyStyle}>{t('myBookings.none')}</div>}
         >
           <BookingList
-            title="Upcoming"
+            title={t('myBookings.upcoming')}
             bookings={myBookingsActions.upcoming()}
           />
-          <BookingList title="Past" bookings={myBookingsActions.past()} />
+          <BookingList
+            title={t('myBookings.past')}
+            bookings={myBookingsActions.past()}
+          />
         </Show>
       </Show>
       <div style={actionsStyle}>
-        <Button color="#27ae60" onClick={() => navigate('/booking')}>
-          Book a Court
-        </Button>
+        <ThemeButton variant="primary" onClick={() => navigate('/booking')}>
+          {t('myBookings.bookCourt')}
+        </ThemeButton>
       </div>
     </>
   )
@@ -58,7 +63,7 @@ const BookingList = (props: { title: string; bookings: MyBooking[] }) => (
 )
 
 const longDate = (date: string) =>
-  parseLocalDate(date).toLocaleDateString('en-US', {
+  langActions.date(date, {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
@@ -66,36 +71,38 @@ const longDate = (date: string) =>
   })
 
 const courtName = (court: number) => {
-  const label = clubConfig.booking?.courtLabel || 'Court'
+  const label = langActions.courtName()
   return clubConfig.tables.all.length > 1 ? `${label} ${court}` : label
 }
 
+const timeRange = (b: MyBooking) =>
+  `${langActions.clock(b.start)} – ${langActions.clock(b.start + b.minutes)}`
+
+const paidText = (b: MyBooking) =>
+  b.paidWith === 'card'
+    ? t('myBookings.paidCard', { amount: formatDollars(b.amountCents ?? 0) })
+    : t('myBookings.paidCredits', { credits: formatCredits(b.credits ?? 0) })
+
 const BookingCard = (props: { booking: MyBooking }) => (
-  <div style={cardStyle}>
+  <div {...themed(cardStyle, 'mb-card')}>
     <div style={rowStyle}>
       <div style={rowMainStyle}>
         <strong>{longDate(props.booking.date)}</strong>
         <span>
-          {formatClock(props.booking.start)} –{' '}
-          {formatClock(props.booking.start + props.booking.minutes)} ·{' '}
-          {courtName(props.booking.court)}
+          {timeRange(props.booking)} · {courtName(props.booking.court)}
         </span>
       </div>
-      <span style={creditsStyle}>
-        {props.booking.paidWith === 'card'
-          ? formatDollars(props.booking.amountCents ?? 0)
-          : `${formatCredits(props.booking.credits ?? 0)} credits`}
-      </span>
+      <span style={creditsStyle}>{paidText(props.booking)}</span>
     </div>
     <DoorCodeLine booking={props.booking} />
     <button
-      style={receiptToggleStyle}
+      {...themed(receiptToggleStyle, 'bk-link mb-toggle')}
       onClick={() => myBookingsActions.toggleReceipt(props.booking._id)}
       aria-expanded={myBookingsActions.isReceiptOpen(props.booking._id)}
     >
       {myBookingsActions.isReceiptOpen(props.booking._id)
-        ? 'Hide receipt'
-        : 'Receipt'}
+        ? t('myBookings.hideReceipt')
+        : t('myBookings.receipt')}
     </button>
     <Show when={myBookingsActions.isReceiptOpen(props.booking._id)}>
       <Receipt booking={props.booking} />
@@ -108,34 +115,74 @@ const DoorCodeLine = (props: { booking: MyBooking }) => (
     when={props.booking.doorCode}
     fallback={
       <Show when={!myBookingsActions.isPast(props.booking)}>
-        <div style={noCodeStyle}>
-          Door code not ready yet. Please check back, or contact the club.
-        </div>
+        <div style={noCodeStyle}>{t('myBookings.notReady')}</div>
       </Show>
     }
   >
     {(door) => (
-      <div style={codeRowStyle(myBookingsActions.isCodeExpired(props.booking))}>
-        <span style={codeLabelStyle}>Door code</span>
-        <span style={codeStyle}>{door().code}</span>
+      <div
+        {...themed(
+          codeRowStyle(myBookingsActions.isCodeExpired(props.booking)),
+          myBookingsActions.isCodeExpired(props.booking)
+            ? 'mb-code is-expired'
+            : 'mb-code',
+        )}
+      >
+        <span style={codeLabelStyle}>{t('myBookings.doorCode')}</span>
+        <span class="mb-code-digits" style={codeStyle}>
+          {door().code}
+        </span>
         <span style={codeLabelStyle}>
           {myBookingsActions.isCodeExpired(props.booking)
-            ? 'Expired'
-            : `Works ${door().window}`}
+            ? t('myBookings.expired')
+            : t('myBookings.works', { window: langActions.doorWindow(door()) })}
         </span>
       </div>
     )}
   </Show>
 )
 
+// The same lines as the emailed receipt (bookingReceipt.js), in the shown
+// language.
+const receiptLines = (b: MyBooking) => [
+  [t('myBookings.ref'), b.receipt.ref],
+  [t('myBookings.name'), b.name],
+  [
+    t('myBookings.date'),
+    langActions.date(b.date, {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    }),
+  ],
+  [t('myBookings.time'), timeRange(b)],
+  [t('myBookings.length'), langActions.length(b.minutes)],
+  [t('myBookings.court'), courtName(b.court)],
+  [t('myBookings.paid'), paidText(b)],
+  ...(b.paidWith !== 'card' && b.balanceAfter != null
+    ? [
+        [
+          t('myBookings.balanceAfter'),
+          t('myBookings.paidCredits', {
+            credits: formatCredits(b.balanceAfter),
+          }),
+        ],
+      ]
+    : []),
+  [t('myBookings.bookedOn'), langActions.instant(b.paidAt)],
+]
+
 const Receipt = (props: { booking: MyBooking }) => (
-  <div style={receiptStyle}>
-    <div style={receiptTitleStyle}>{props.booking.receipt.title}</div>
-    <For each={props.booking.receipt.lines}>
-      {(line) => (
+  <div {...themed(receiptStyle, 'mb-receipt')}>
+    <div style={receiptTitleStyle}>
+      {clubConfig.name} — {t('myBookings.receiptTitle')}
+    </div>
+    <For each={receiptLines(props.booking)}>
+      {([label, value]) => (
         <div style={receiptLineStyle}>
-          <span style={receiptLabelStyle}>{line.label}</span>
-          <strong>{line.value}</strong>
+          <span style={receiptLabelStyle}>{label}</span>
+          <strong>{value}</strong>
         </div>
       )}
     </For>
@@ -197,13 +244,12 @@ const codeRowStyle = (expired: boolean): JSX.CSSProperties => ({
   opacity: expired ? 0.55 : 1,
 })
 
-const codeLabelStyle: JSX.CSSProperties = { 'font-size': '13px', color: '#666' }
+const codeLabelStyle: JSX.CSSProperties = { 'font-size': '13px', opacity: 0.75 }
 
 const codeStyle: JSX.CSSProperties = {
   'font-size': '22px',
   'font-weight': 700,
   'letter-spacing': '4px',
-  color: '#2c3e50',
   'font-variant-numeric': 'tabular-nums',
 }
 
@@ -242,10 +288,10 @@ const receiptLineStyle: JSX.CSSProperties = {
   'justify-content': 'space-between',
   gap: '12px',
   padding: '4px 0',
-  'border-bottom': '1px solid #f0f0f0',
+  'border-bottom': '1px solid rgba(0, 0, 0, 0.06)',
 }
 
-const receiptLabelStyle: JSX.CSSProperties = { color: '#666' }
+const receiptLabelStyle: JSX.CSSProperties = { opacity: 0.7 }
 
 const emptyStyle: JSX.CSSProperties = {
   padding: '24px',

@@ -2,6 +2,7 @@ import { createStore } from 'solid-js/store'
 import { apiGet } from '../utils/api'
 import { formatLocalDate } from '../utils/date'
 import type { DoorCode } from './bookingStore'
+import { langActions } from './langStore'
 
 // The signed-in player's court bookings, newest first, each with its door
 // code and receipt. See specs/pages/My Bookings.md.
@@ -20,6 +21,9 @@ export interface MyBooking {
   credits?: number
   paidWith: 'credits' | 'card'
   amountCents?: number
+  balanceAfter: number | null
+  name: string
+  paidAt: string
   createdAt: string
   doorCode: DoorCode | null
   receipt: { title: string; ref: string; lines: ReceiptLine[] }
@@ -79,7 +83,7 @@ const init = async () => {
   } catch (err) {
     setMyBookingsState({
       loading: false,
-      error: errorMessage(err, 'Could not load your bookings'),
+      error: errorMessage(err, langActions.t('myBookings.loadFailed')),
     })
   }
 }

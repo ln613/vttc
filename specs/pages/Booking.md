@@ -2,6 +2,8 @@
 
 Route `/booking`. Calendar module (rules/modules.md). See rules/booking.md.
 
+A club with its own website (specs/pages/Club Site.md) gets this page, and its top-up and payment dialogs, in the site's look: a purple heading band ("Court booking", "BOOK A COURT", the hours and a link to Pricing), lilac page, white rounded cards, purple selected day, your bookings in yellow, others' in purple, yellow buttons and prices. Every other club keeps the plain look. Styles: src/pages/booking.css (`--bk-*` variables, set under `.bk-site`).
+
 ## Layout
 
 Vertical
@@ -19,7 +21,7 @@ Vertical
   - a row per half hour from opening to the last half hour before closing (8:00 AM to 11:30 PM by default), time on the left — the hours come from the admin setting, with the day
   - with more than one court, one column per court with its name on top
   - a booking is one block spanning its length: "Your booking" (blue) or "Booked" (gray; an admin sees the name), with its time range
-  - a free half hour that can start a booking: "Available" (green), clickable
+  - a free half hour that can start a booking: "Available" and its hourly rate ("$30/hr"), clickable
   - a past half hour, or one too close to closing to start a booking: gray, not clickable
   - legend: Available, Your booking, Booked
 

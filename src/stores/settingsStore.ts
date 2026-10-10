@@ -1,6 +1,7 @@
 import { createStore } from 'solid-js/store'
 import clubConfig from 'club-config'
 import { apiGet, apiPost } from '../utils/api'
+import { langActions } from './langStore'
 import { DEFAULT_BOOKING } from '../../shared/rules/booking'
 
 export interface AppSettings {
@@ -144,7 +145,10 @@ export const settingsActions = {
       )
       setSettingsState({
         updatingRating: false,
-        ratingResult: `Rated ${r.matchesRated} new match(es); updated ${r.playersUpdated} player rating(s).`,
+        ratingResult: langActions.t('settings.ratingResult', {
+          matches: r.matchesRated,
+          players: r.playersUpdated,
+        }),
       })
     } catch (err) {
       setSettingsState({

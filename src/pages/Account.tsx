@@ -5,12 +5,15 @@ import Input from '../components/Input'
 import Select from '../components/Select'
 import DatePicker from '../components/DatePicker'
 import PasswordRules from '../components/PasswordRules'
-import Button from '../components/Button'
+import ThemeButton from '../components/ThemeButton'
 import TopUpDialog from '../components/TopUpDialog'
 import CollapsibleSection from '../components/CollapsibleSection'
 import MyBookingsList from '../components/MyBookingsList'
 import { parseLocalDate, formatLocalDate } from '../utils/date'
-import { accountPageState, accountPageActions } from '../stores/accountPageStore'
+import {
+  accountPageState,
+  accountPageActions,
+} from '../stores/accountPageStore'
 import { authState, authActions } from '../stores/authStore'
 import { creditsState, creditsActions } from '../stores/creditsStore'
 import { modulesActions } from '../stores/modulesStore'
@@ -19,6 +22,14 @@ import {
   accountSectionsActions,
 } from '../stores/accountSectionsStore'
 import { formatCredits } from '../../shared/rules/booking'
+import { langActions } from '../stores/langStore'
+import { hasSite, loadSiteFonts } from '../site/siteContent'
+import { themed } from '../site/themed'
+import './booking.css'
+
+// A club with its own website shows this page in its site's look (heading
+// band, card sections, site buttons — booking.css) and in its languages.
+const t = langActions.t
 
 const containerStyle: JSX.CSSProperties = {
   display: 'flex',
@@ -209,6 +220,7 @@ const Account = () => {
   const [searchParams] = useSearchParams()
 
   onMount(() => {
+    loadSiteFonts()
     accountPageActions.init(params.playerId)
     accountSectionsActions.init(searchParams.open)
     void creditsActions.fetchBalance()
@@ -225,13 +237,23 @@ const Account = () => {
   }
 
   return (
-    <div style={containerStyle}>
+    <div {...themed(containerStyle, 'bk bk-site')}>
       <Header />
       <SavingOverlay />
       <SavedOverlay />
-      <div style={contentStyle}>
-        <h1 style={titleStyle}>{accountPageActions.getTitle()}</h1>
-        <div style={sectionsStyle}>
+      <Show when={hasSite()}>
+        <header class="bk-head">
+          <div class="bk-head-inner">
+            <p class="bk-kicker">{t('account.kicker')}</p>
+            <h1 class="bk-title">{accountPageActions.getTitle()}</h1>
+          </div>
+        </header>
+      </Show>
+      <div {...themed(contentStyle, 'bk-wrap')}>
+        <Show when={!hasSite()}>
+          <h1 style={titleStyle}>{accountPageActions.getTitle()}</h1>
+        </Show>
+        <div {...themed(sectionsStyle, 'bk-sections')}>
           <ProfileSection />
           <CreditsSection />
           <MyBookingsSection />
@@ -240,9 +262,9 @@ const Account = () => {
           when={!accountPageState.editing && !accountPageState.targetPlayerId}
         >
           <div style={signOutContainerStyle}>
-            <Button color="#e74c3c" onClick={handleSignOut}>
-              Sign Out
-            </Button>
+            <ThemeButton variant="danger" onClick={handleSignOut}>
+              {t('account.signOut')}
+            </ThemeButton>
           </div>
         </Show>
       </div>
@@ -269,7 +291,7 @@ const SpinnerKeyframes = () => (
 const SavingOverlay = () => (
   <Show when={accountPageState.saving}>
     <div style={overlayStyle}>
-      <div style={overlayMessageStyle}>Saving...</div>
+      <div style={overlayMessageStyle}>{t('common.saving')}</div>
     </div>
   </Show>
 )
@@ -277,7 +299,7 @@ const SavingOverlay = () => (
 const SavedOverlay = () => (
   <Show when={accountPageState.saved}>
     <div style={overlayStyle}>
-      <div style={savedMessageStyle}>Saved!</div>
+      <div style={savedMessageStyle}>{t('account.saved')}</div>
     </div>
   </Show>
 )
@@ -349,7 +371,7 @@ const ProfileActionIcons = () => (
             class="vttc-tap"
             style={iconButtonStyle}
             onClick={accountPageActions.enterEditMode}
-            title="Edit"
+            title={t('common.edit')}
           >
             <EditIcon />
           </button>
@@ -359,14 +381,14 @@ const ProfileActionIcons = () => (
             class="vttc-tap"
             style={cancelIconStyle}
             onClick={() => void accountPageActions.exitEditMode()}
-            title="Cancel"
+            title={t('common.cancel')}
           >
             <CancelIcon />
           </button>
           <button
             style={saveIconStyle}
             onClick={accountPageActions.save}
-            title="Save"
+            title={t('common.save')}
           >
             <SaveIcon />
           </button>
@@ -378,7 +400,7 @@ const ProfileActionIcons = () => (
 
 const ProfileSection = () => (
   <CollapsibleSection
-    title="Profile"
+    title={t('account.profile')}
     open={accountSectionsState.profile}
     onToggle={() => accountSectionsActions.toggle('profile')}
     actions={
@@ -388,34 +410,34 @@ const ProfileSection = () => (
     }
   >
     <Input
-      label="First Name"
+      label={t('account.firstName')}
       name="firstName"
       value={accountPageState.formData.firstName}
       onChange={(value) => accountPageActions.setField('firstName', value)}
       disabled={!accountPageState.editing}
     />
     <Input
-      label="Last Name"
+      label={t('account.lastName')}
       name="lastName"
       value={accountPageState.formData.lastName}
       onChange={(value) => accountPageActions.setField('lastName', value)}
       disabled={!accountPageState.editing}
     />
     <Select
-      label="Sex"
+      label={t('account.sex')}
       name="sex"
       value={accountPageState.formData.sex}
       onChange={(value) =>
         accountPageActions.setField('sex', value as 'male' | 'female')
       }
       options={[
-        { value: 'male', label: 'Male' },
-        { value: 'female', label: 'Female' },
+        { value: 'male', label: t('account.male') },
+        { value: 'female', label: t('account.female') },
       ]}
       disabled={!accountPageState.editing}
     />
     <DatePicker
-      label="Birth Date"
+      label={t('account.birthDate')}
       value={
         accountPageState.formData.dateOfBirth
           ? parseLocalDate(accountPageState.formData.dateOfBirth)
@@ -432,7 +454,7 @@ const ProfileSection = () => (
       disabled={!accountPageState.editing}
     />
     <Input
-      label="Email"
+      label={t('account.email')}
       name="email"
       type="email"
       value={accountPageState.formData.email}
@@ -440,7 +462,7 @@ const ProfileSection = () => (
       disabled={!accountPageState.editing}
     />
     <Input
-      label="Phone"
+      label={t('account.phone')}
       name="phone"
       type="tel"
       value={accountPageState.formData.phone}
@@ -450,7 +472,7 @@ const ProfileSection = () => (
     <Show when={isAdminOrSuperAdmin() && modulesActions.on('rating')}>
       <div style={ratingFieldStyle}>
         <label for="rating" style={ratingLabelStyle}>
-          Rating
+          {t('account.rating')}
         </label>
         <div style={ratingRowStyle}>
           <input
@@ -473,7 +495,7 @@ const ProfileSection = () => (
             }}
             style={ratingHistoryButtonStyle}
           >
-            History
+            {t('account.history')}
           </button>
         </div>
       </div>
@@ -491,10 +513,12 @@ const ProfileSection = () => (
       <div style={changePasswordButtonContainerStyle}>
         <button
           type="button"
-          style={passwordLinkStyle}
+          {...themed(passwordLinkStyle, 'bk-link')}
           onClick={accountPageActions.showChangePassword}
         >
-          {accountPageActions.isSettingPassword() ? 'Set Password' : 'Change Password'}
+          {accountPageActions.isSettingPassword()
+            ? t('account.setPassword')
+            : t('account.changePassword')}
         </button>
       </div>
     </Show>
@@ -516,35 +540,37 @@ const showMyBookings = () =>
 // The balance shows in the header, so it can be read with the section closed.
 const creditsSummary = () =>
   creditsState.balance !== null
-    ? `${formatCredits(creditsState.balance)} credits`
+    ? t('account.creditsSummary', {
+        credits: formatCredits(creditsState.balance),
+      })
     : ''
 
 const CreditsSection = () => (
   <Show when={showCredits()}>
     <CollapsibleSection
-      title="Credits"
+      title={t('account.credits')}
       open={accountSectionsState.credits}
       onToggle={() => accountSectionsActions.toggle('credits')}
       summary={creditsSummary()}
     >
-      <div style={creditsBalanceStyle}>
+      <div {...themed(creditsBalanceStyle, 'bk-balance-big')}>
         <Show
           when={creditsState.balance !== null}
           fallback={
             <span style={creditsMutedStyle}>
-              {creditsState.error || 'Loading...'}
+              {creditsState.error || t('common.loading')}
             </span>
           }
         >
-          <strong style={creditsAmountStyle}>
+          <strong style={hasSite() ? undefined : creditsAmountStyle}>
             {formatCredits(creditsState.balance ?? 0)}
           </strong>
-          <span style={creditsMutedStyle}>credits</span>
+          <span style={creditsMutedStyle}>{t('account.creditsUnit')}</span>
         </Show>
       </div>
-      <Button color="#27ae60" onClick={creditsActions.openTopUp}>
-        Top up
-      </Button>
+      <ThemeButton variant="primary" onClick={creditsActions.openTopUp}>
+        {t('account.topUp')}
+      </ThemeButton>
     </CollapsibleSection>
   </Show>
 )
@@ -552,7 +578,7 @@ const CreditsSection = () => (
 const MyBookingsSection = () => (
   <Show when={showMyBookings()}>
     <CollapsibleSection
-      title="My Bookings"
+      title={t('account.myBookings')}
       open={accountSectionsState.myBookings}
       onToggle={() => accountSectionsActions.toggle('myBookings')}
     >
@@ -562,14 +588,20 @@ const MyBookingsSection = () => (
 )
 
 const ChangePasswordDialog = () => (
-  <div style={overlayStyle}>
-    <div style={dialogStyle}>
-      <h3 style={dialogTitleStyle}>
-        {accountPageActions.isSettingPassword() ? 'Set Password' : 'Change Password'}
+  <div {...themed(overlayStyle, 'bk-overlay')}>
+    <div {...themed(dialogStyle, 'bk-dialog bk-dialog-padded')}>
+      <h3 {...themed(dialogTitleStyle, 'bk-section-title')}>
+        {accountPageActions.isSettingPassword()
+          ? t('account.setPassword')
+          : t('account.changePassword')}
       </h3>
-      <Show when={!authState.user?.pending && !accountPageActions.isSettingPassword()}>
+      <Show
+        when={
+          !authState.user?.pending && !accountPageActions.isSettingPassword()
+        }
+      >
         <Input
-          label="Current Password"
+          label={t('account.currentPassword')}
           name="oldPassword"
           type="password"
           value={accountPageState.changePasswordData.oldPassword}
@@ -579,7 +611,7 @@ const ChangePasswordDialog = () => (
         />
       </Show>
       <Input
-        label="New Password"
+        label={t('account.newPassword')}
         name="newPassword"
         type="password"
         value={accountPageState.changePasswordData.newPassword}
@@ -591,7 +623,7 @@ const ChangePasswordDialog = () => (
         password={accountPageState.changePasswordData.newPassword}
       />
       <Input
-        label="Confirm Password"
+        label={t('account.confirmPassword')}
         name="confirmPassword"
         type="password"
         value={accountPageState.changePasswordData.confirmPassword}
@@ -604,20 +636,25 @@ const ChangePasswordDialog = () => (
           {accountPageState.changePasswordError}
         </div>
       </Show>
-      <div style={dialogButtonContainerStyle}>
-        <Button
-          color="#e74c3c"
+      <div {...themed(dialogButtonContainerStyle, 'bk-actions')}>
+        <ThemeButton
+          variant="secondary"
+          plainColor="#e74c3c"
+          fill={hasSite()}
           onClick={accountPageActions.hideChangePassword}
         >
-          Cancel
-        </Button>
-        <Button
-          color="#27ae60"
+          {t('common.cancel')}
+        </ThemeButton>
+        <ThemeButton
+          variant="primary"
+          fill={hasSite()}
           onClick={accountPageActions.changePassword}
           disabled={accountPageState.changingPassword}
         >
-          {accountPageState.changingPassword ? 'Saving...' : 'Save'}
-        </Button>
+          {accountPageState.changingPassword
+            ? t('common.saving')
+            : t('common.save')}
+        </ThemeButton>
       </div>
     </div>
   </div>
@@ -625,23 +662,32 @@ const ChangePasswordDialog = () => (
 
 const RatingHistoryDialog = () => (
   <div
-    style={overlayStyle}
+    {...themed(overlayStyle, 'bk-overlay')}
     onClick={(e) => {
       e.stopPropagation()
       e.preventDefault()
       accountPageActions.hideRatingHistory()
     }}
   >
-    <div style={dialogStyle} onClick={(e) => e.stopPropagation()}>
-      <h3 style={dialogTitleStyle}>Rating Adjustment History</h3>
+    <div
+      {...themed(dialogStyle, 'bk-dialog bk-dialog-padded')}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <h3 {...themed(dialogTitleStyle, 'bk-section-title')}>
+        {t('account.ratingHistory')}
+      </h3>
       <Show
         when={!accountPageState.loadingRatingHistory}
-        fallback={<div style={ratingHistoryEmptyStyle}>Loading...</div>}
+        fallback={
+          <div style={ratingHistoryEmptyStyle}>{t('common.loading')}</div>
+        }
       >
         <Show
           when={accountPageState.ratingHistory.length > 0}
           fallback={
-            <div style={ratingHistoryEmptyStyle}>No rating changes yet.</div>
+            <div style={ratingHistoryEmptyStyle}>
+              {t('account.noRatingChanges')}
+            </div>
           }
         >
           <div style={ratingHistoryListStyle}>
@@ -664,13 +710,13 @@ const RatingHistoryDialog = () => (
           </div>
         </Show>
       </Show>
-      <div style={dialogButtonContainerStyle}>
-        <Button
-          color="#3498db"
+      <div {...themed(dialogButtonContainerStyle, 'bk-actions is-center')}>
+        <ThemeButton
+          variant="accent"
           onClick={accountPageActions.hideRatingHistory}
         >
-          Close
-        </Button>
+          {t('common.close')}
+        </ThemeButton>
       </div>
     </div>
   </div>
@@ -680,7 +726,7 @@ const formatRatingChangedAt = (iso: string): string => {
   if (!iso) return ''
   const d = new Date(iso)
   if (isNaN(d.getTime())) return iso
-  return d.toLocaleString()
+  return d.toLocaleString(langActions.locale())
 }
 
 const sectionsStyle: JSX.CSSProperties = {

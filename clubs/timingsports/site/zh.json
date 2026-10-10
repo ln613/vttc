@@ -1,0 +1,205 @@
+{
+  "brand": {
+    "name": "Timing Sports",
+    "club": "匹克球俱乐部",
+    "tagline": "Play · Connect · Enjoy",
+    "services": "室内匹克球 · 专业教练 · 场地预订",
+    "courtLabel": "匹克球场"
+  },
+  "home": {
+    "heroTitle": [
+      "Timing",
+      "Sports"
+    ],
+    "bookCourt": "预订场地",
+    "seePricing": "查看价格",
+    "introKicker": "球馆介绍",
+    "introTitle": "你的室内匹克球主场",
+    "intro": "Timing Sports 是一家集匹克球、羽毛球及高尔夫模拟体验于一体的综合运动场馆。我们致力于为不同年龄和运动水平的爱好者提供舒适、专业的运动环境。无论是初学入门、技术提升、朋友约球，还是参加比赛与社交活动，都能在这里找到属于自己的运动乐趣。",
+    "features": [
+      {
+        "icon": "court",
+        "title": "专业室内场地",
+        "text": "高品质运动环境"
+      },
+      {
+        "icon": "shield",
+        "title": "安全舒适",
+        "text": "室内恒温　全年开放"
+      },
+      {
+        "icon": "ball",
+        "title": "多元项目",
+        "text": "匹克球"
+      },
+      {
+        "icon": "coach",
+        "title": "专业教练",
+        "text": "技术指导　课程培训"
+      },
+      {
+        "icon": "calendar",
+        "title": "场地预订",
+        "text": "便捷预约　灵活安排"
+      }
+    ],
+    "slogan": "更多运动 · 更多朋友 · 更精彩的生活",
+    "coachKicker": "专业教练",
+    "coachTitle": "跟冠军一起学球",
+    "coachText": "一对一、一对二及团体课程，教练均在国家级和省级赛事中取得优异成绩。",
+    "coachCta": "认识我们的教练",
+    "venueKicker": "场馆环境",
+    "venueTitle": "球场、休息区、装备，一应俱全"
+  },
+  "coaches": {
+    "kicker": "专业匹克球教练",
+    "title": "从新手到高手，让每一次击球都有进步",
+    "formats": [
+      "一对一",
+      "一对二",
+      "团体课"
+    ],
+    "formatsNote": "个性化定制 · 针对性训练 · 专业指导",
+    "audienceTitle": "适合人群",
+    "audience": [
+      {
+        "icon": "cap",
+        "title": "初学者",
+        "text": "掌握基本技术，建立信心"
+      },
+      {
+        "icon": "run",
+        "title": "进阶者",
+        "text": "提升稳定性和战术意识"
+      },
+      {
+        "icon": "trophy",
+        "title": "比赛选手",
+        "text": "针对性训练，提升竞技水平"
+      },
+      {
+        "icon": "group",
+        "title": "团体课程",
+        "text": "更多交流，更有乐趣"
+      }
+    ],
+    "credentialsTitle": "教练资历",
+    "achievementsTitle": "比赛成绩",
+    "teachingTitle": "教学特色",
+    "list": [
+      {
+        "id": "nathan",
+        "name": "Nathan Choi",
+        "photo": "coach-nathan",
+        "rating": "DUPR 5.2",
+        "headline": "前 CNPL 职业球员",
+        "credentials": [
+          "2023 及 2024 年两个赛季效力于 CNPL（加拿大国家匹克球联赛）职业队",
+          "DUPR 等级 5.2"
+        ],
+        "achievements": [
+          "多次获得加拿大全国青少年羽毛球锦标赛冠军",
+          "2011 年加拿大冬季运动会羽毛球混双冠军"
+        ],
+        "teaching": [
+          {
+            "title": "快速提升",
+            "text": "擅长帮助学员从入门快速提升到 4.5 水平"
+          },
+          {
+            "title": "注重技术细节",
+            "text": "强调动作规范与技术细节"
+          },
+          {
+            "title": "实战导向",
+            "text": "培养比赛心态，帮助你在赛场上发挥最大潜力"
+          }
+        ]
+      },
+      {
+        "id": "summer",
+        "name": "Summer Xia",
+        "photo": "coach-summer",
+        "rating": "DUPR 4.2",
+        "headline": "PFCA 匹克球高级教练",
+        "credentials": [
+          "PFCA 匹克球高级教练",
+          "乒乓球一级运动员、高级教练",
+          "20 年乒乓球教练经验"
+        ],
+        "achievements": [
+          "BC 省赛匹克球 3.5 级单打冠军（第一个单打冠军）",
+          "BC 省赛匹克球 3.5 混双冠军",
+          "Douglas Park 4.5 男双亚军",
+          "DPA 3.5 男双、混双冠军",
+          "BC 省级赛事多次参赛并取得优异成绩"
+        ],
+        "teaching": [
+          {
+            "title": "量身定制",
+            "text": "根据年龄和水平制定个性化训练计划"
+          },
+          {
+            "title": "全面提升",
+            "text": "基本技术：发球、接发球、吊球、第三拍、截击、落点控制"
+          },
+          {
+            "title": "注重细节",
+            "text": "脚步移动、稳定性、击球质量、场上移动、战术运用、选位、临场调整"
+          },
+          {
+            "title": "实战导向",
+            "text": "从基础到实战，全面提升您的比赛能力"
+          },
+          {
+            "title": "乒乓转型匹克",
+            "text": "擅长乒乓球运动员转型匹克球的技术训练"
+          }
+        ],
+        "quote": "丰富的比赛经验，让我更懂比赛，也更懂如何帮助你在球场上取得进步。"
+      }
+    ],
+    "motto": "专业 · 专注 · 成就更好的你！",
+    "joinTitle": "现在就加入我们！",
+    "joinText": "更好的教练，更好的你，在 Timing Sports。",
+    "joinCta": "联系我们预约课程"
+  },
+  "pricing": {
+    "kicker": "Court rental pricing",
+    "title": "场地价格",
+    "headers": {
+      "days": "日期",
+      "time": "时间",
+      "price": "价格"
+    },
+    "perHour": "/ 小时",
+    "tagline": "一起来打匹克球吧！",
+    "bookCta": "预订场地",
+    "coachingNote": "想上课？",
+    "coachingCta": "查看教练课程"
+  },
+  "about": {
+    "kicker": "关于我们 · 联系方式",
+    "title": "欢迎来打球",
+    "intro": "Timing Sports 是一家集匹克球、羽毛球及高尔夫模拟体验于一体的综合运动场馆，为不同年龄和水平的爱好者提供舒适、专业的运动环境。",
+    "contactTitle": "联系我们",
+    "address": "地址",
+    "email": "邮箱",
+    "phone": "电话",
+    "instagram": "Instagram",
+    "map": "在谷歌地图中打开",
+    "copy": "复制",
+    "copied": "已复制",
+    "scanTitle": "扫码联系",
+    "whatsapp": "WhatsApp",
+    "whatsappNote": "用 WhatsApp 扫描，添加为联系人",
+    "wechat": "微信",
+    "wechatNote": "用微信扫一扫，添加我为朋友"
+  },
+  "contact": {
+    "address": "8-2668 Simpson Rd",
+    "email": "timingsports2668@gmail.com",
+    "phone": "778-788-1155",
+    "instagram": "timingsportsclub"
+  }
+}

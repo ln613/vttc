@@ -11,9 +11,9 @@ import {
   lengthOptions,
   bookingCredits,
   bookingPriceCents,
-  formatLength,
-  formatClockShort,
+  hourlyRateAt,
 } from '../../shared/rules/booking'
+import { langActions } from './langStore'
 import { isValidEmail, isValidPhone } from '../../shared/rules/contact'
 
 // The Booking page: a week of days to pick from, the chosen day's court
@@ -149,7 +149,7 @@ const canGoBack = (): boolean => bookingState.weekStart > today()
 const courts = (): number[] => bookingState.day?.courts ?? clubConfig.tables.all
 
 const courtLabel = (court: number): string => {
-  const label = clubConfig.booking?.courtLabel || 'Court'
+  const label = langActions.courtName()
   return courts().length > 1 ? `${label} ${court}` : label
 }
 
@@ -214,13 +214,33 @@ const lengthChoices = (): number[] =>
 const lengthSelectOptions = () =>
   lengthChoices().map((minutes) => ({
     value: String(minutes),
-    label: `${formatLength(minutes)} (${formatClockShort(bookingState.start)} to ${formatClockShort(bookingState.start + minutes)})`,
+    label: langActions.t('booking.lengthOption', {
+      length: langActions.length(minutes),
+      from: langActions.shortClock(bookingState.start),
+      to: langActions.shortClock(bookingState.start + minutes),
+    }),
   }))
 
-const costCredits = (): number => bookingCredits(rules(), bookingState.minutes)
+// What a half hour on the chosen day costs per hour, in dollars.
+const hourlyRate = (slot: number): number =>
+  hourlyRateAt(rules(), bookingState.date, slot)
+
+// Priced by the day and the time it covers (shared/rules/booking.js).
+const costCredits = (): number =>
+  bookingCredits(
+    rules(),
+    bookingState.minutes,
+    bookingState.date,
+    bookingState.start,
+  )
 
 const priceCents = (): number =>
-  bookingPriceCents(rules(), bookingState.minutes)
+  bookingPriceCents(
+    rules(),
+    bookingState.minutes,
+    bookingState.date,
+    bookingState.start,
+  )
 
 const hasEnoughCredits = (): boolean =>
   (creditsState.balance ?? 0) >= costCredits()
@@ -236,7 +256,7 @@ const fetchDay = async (date: string) => {
   } catch (err) {
     setBookingState({
       loading: false,
-      error: errorMessage(err, 'Could not load bookings'),
+      error: errorMessage(err, langActions.t('booking.loadFailed')),
     })
     return null
   }
@@ -350,11 +370,11 @@ const setGuestField = (field: GuestField, value: string) =>
   } as Partial<BookingState>)
 
 const validateGuest = (): string | null => {
-  if (!bookingState.firstName.trim()) return 'Enter your first name'
-  if (!bookingState.lastName.trim()) return 'Enter your last name'
-  if (!isValidEmail(bookingState.email)) return 'Enter a valid email address'
-  if (!isValidPhone(bookingState.phone))
-    return 'Enter a valid Canadian/US phone number'
+  const t = langActions.t
+  if (!bookingState.firstName.trim()) return t('booking.enterFirstName')
+  if (!bookingState.lastName.trim()) return t('booking.enterLastName')
+  if (!isValidEmail(bookingState.email)) return t('booking.enterEmail')
+  if (!isValidPhone(bookingState.phone)) return t('booking.enterPhone')
   return null
 }
 
@@ -444,6 +464,7 @@ export const bookingActions = {
   lengthChoices,
   lengthSelectOptions,
   costCredits,
+  hourlyRate,
   priceCents,
   hasEnoughCredits,
   gridSlots,

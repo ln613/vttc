@@ -12,6 +12,9 @@ const clubConfigPath = fileURLToPath(
   new URL(`./clubs/${CLUB}/config.json`, import.meta.url),
 )
 const clubConfig = JSON.parse(readFileSync(clubConfigPath, 'utf8'))
+// The club's public website, if it has one: content in each language and its
+// images (clubs/<slug>/site). Only this club's files are bundled.
+const clubSitePath = fileURLToPath(new URL(`./clubs/${CLUB}/site`, import.meta.url))
 
 // index.html is static, so the club's title and favicon are substituted at
 // build time rather than being set from script after first paint.
@@ -30,7 +33,7 @@ export default defineConfig({
   base: './',
   plugins: [solid(), clubHtmlPlugin],
   resolve: {
-    alias: { 'club-config': clubConfigPath },
+    alias: { 'club-config': clubConfigPath, 'club-site': clubSitePath },
   },
   server: {
     host: true,

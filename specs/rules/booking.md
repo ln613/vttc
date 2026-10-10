@@ -23,7 +23,7 @@ The courts are the club's tables (`tables.all`). Timing Sports has one picklebal
 
 ## Times
 
-- open 8:00 AM to 12:00 AM midnight (club time), or whatever an admin has set
+- open 9:00 AM to 12:00 AM midnight for Timing Sports (club time), or whatever an admin has set
 - the hours must be on the half hour, with closing at least the minimum booking length after opening (as late as midnight)
 - a booking starts on the half hour: 7:00, 7:30, 8:00 ...
 - minimum length 1 hour, then in half-hour steps, up to closing or the next booking on that court, whichever comes first
@@ -34,8 +34,23 @@ The courts are the club's tables (`tables.all`). Timing Sports has one picklebal
 
 ## Price
 
-- registered player: 2500 credits per half hour (5000 for the minimum hour)
-- guest: the same in dollars at the top-up rate: $25 per half hour
+Prices follow the day of the week and the time of day, from `booking.rates` in the club config:
+
+```json
+"rates": [
+  { "days": ["mon", "tue", "wed", "thu"], "from": "09:00", "to": "18:00", "dollarsPerHour": 30 },
+  { "days": ["mon", "tue", "wed", "thu"], "from": "18:00", "to": "24:00", "dollarsPerHour": 40 },
+  { "days": ["fri", "sat", "sun"], "from": "09:00", "to": "12:00", "dollarsPerHour": 40 },
+  { "days": ["fri", "sat", "sun"], "from": "12:00", "to": "24:00", "dollarsPerHour": 45 }
+]
+```
+
+- each half hour is charged at the rate covering it, so a booking across 6 PM (or noon) pays each rate for its own part: Mon 5–7 PM is $30 + $40 = $70
+- a half hour no rate covers is charged the flat `creditsPerSlot` (the price for a club without rates)
+- registered player: the price in credits, at the top-up rate ($1 = 100 credits): Mon 9–10 AM is 3,000 credits
+- guest: the same price in dollars
+- the Booking page shows each free half hour's hourly rate; the Pricing page (specs/pages/Club Site.md) is built from the same rates, so the two always agree
+- Timing Sports opens at 9:00 AM, where its rates begin
 
 ## Booking as a registered player
 

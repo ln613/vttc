@@ -3,6 +3,7 @@ import clubConfig from 'club-config'
 import { apiGet, apiPost } from '../utils/api'
 import { authState, authActions } from './authStore'
 import { modulesActions } from './modulesStore'
+import { langActions } from './langStore'
 import {
   bookingRules,
   isValidTopUp,
@@ -46,7 +47,8 @@ const getInitialState = (): CreditsState => ({
   topUpError: null,
 })
 
-const [creditsState, setCreditsState] = createStore<CreditsState>(getInitialState())
+const [creditsState, setCreditsState] =
+  createStore<CreditsState>(getInitialState())
 
 export { creditsState }
 
@@ -70,7 +72,8 @@ const isPlayer = (): boolean =>
 const paysWithCredits = (): boolean => isPlayer() && isCreditOn()
 
 // A player who has My Booking to go back to.
-const hasMyBookings = (): boolean => isPlayer() && modulesActions.on('myBooking')
+const hasMyBookings = (): boolean =>
+  isPlayer() && modulesActions.on('myBooking')
 
 const dollarsValue = (): number => Number(creditsState.dollars)
 
@@ -83,10 +86,19 @@ const fetchBalance = async () => {
   if (!paysWithCredits()) return
   setCreditsState({ loading: true, error: null })
   try {
-    const data = await apiGet<{ credits: number; paymentsAvailable: boolean }>('myCredits')
-    setCreditsState({ balance: data.credits, paymentsAvailable: data.paymentsAvailable, loading: false })
+    const data = await apiGet<{ credits: number; paymentsAvailable: boolean }>(
+      'myCredits',
+    )
+    setCreditsState({
+      balance: data.credits,
+      paymentsAvailable: data.paymentsAvailable,
+      loading: false,
+    })
   } catch (err) {
-    setCreditsState({ loading: false, error: errorMessage(err, 'Could not load your credits') })
+    setCreditsState({
+      loading: false,
+      error: errorMessage(err, 'Could not load your credits'),
+    })
   }
 }
 
@@ -119,11 +131,16 @@ interface TopUpResponse {
 
 const startTopUp = async () => {
   if (!isValidTopUp(rules, dollarsValue())) {
-    return setCreditsState('topUpError', `Top up at least $${rules.minTopUpDollars}, in whole dollars`)
+    return setCreditsState(
+      'topUpError',
+      langActions.t('topUp.minimum', { min: rules.minTopUpDollars }),
+    )
   }
   setCreditsState({ busy: true, topUpError: null })
   try {
-    const result = await apiPost<TopUpResponse>('topUpCredits', { dollars: dollarsValue() })
+    const result = await apiPost<TopUpResponse>('topUpCredits', {
+      dollars: dollarsValue(),
+    })
     setCreditsState({
       busy: false,
       topUpStep: 'pay',
@@ -133,7 +150,10 @@ const startTopUp = async () => {
       paymentsAvailable: result.paymentsAvailable,
     })
   } catch (err) {
-    setCreditsState({ busy: false, topUpError: errorMessage(err, 'Could not start the top-up') })
+    setCreditsState({
+      busy: false,
+      topUpError: errorMessage(err, 'Could not start the top-up'),
+    })
   }
 }
 
@@ -145,7 +165,10 @@ const payTopUp = async () => {
     })
     setCreditsState({ busy: false, topUpStep: 'done', balance: result.balance })
   } catch (err) {
-    setCreditsState({ busy: false, topUpError: errorMessage(err, 'Payment failed') })
+    setCreditsState({
+      busy: false,
+      topUpError: errorMessage(err, 'Payment failed'),
+    })
   }
 }
 

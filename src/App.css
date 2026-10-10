@@ -99,13 +99,6 @@
 }
 
 
-/* A free half hour on the Booking page. Inline styles can't do :hover. */
-@media (hover: hover) {
-  .vttc-booking-free:hover {
-    background-color: #d4f5e2 !important;
-    border-color: #27ae60 !important;
-  }
-}
 
 /* The header's top bar on a phone: less side padding and tighter nav links,
  * so Events / Schedule / Players / Booking fit beside the icons. */
@@ -123,6 +116,10 @@
   }
   .vttc-topbar-icon {
     padding: 4px !important;
+  }
+  .vttc-lang-toggle {
+    padding: 0 7px !important;
+    font-size: 13px !important;
   }
 }
 .vttc-nav-left::-webkit-scrollbar {

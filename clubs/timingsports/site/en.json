@@ -1,0 +1,205 @@
+{
+  "brand": {
+    "name": "Timing Sports",
+    "club": "Pickleball Club",
+    "tagline": "Play · Connect · Enjoy",
+    "services": "Indoor pickleball · Coaching · Court bookings",
+    "courtLabel": "Pickleball Court"
+  },
+  "home": {
+    "heroTitle": [
+      "Timing",
+      "Sports"
+    ],
+    "bookCourt": "Book a Court",
+    "seePricing": "See Pricing",
+    "introKicker": "About the club",
+    "introTitle": "Your indoor pickleball home",
+    "intro": "Timing Sports is an all-in-one sports venue bringing together pickleball, badminton and golf simulation. We give players of every age and level a comfortable, professional place to play. Whether you're picking up a paddle for the first time, sharpening your game, meeting friends for a match, or competing in tournaments and social events, you'll find your kind of fun here.",
+    "features": [
+      {
+        "icon": "court",
+        "title": "Pro indoor court",
+        "text": "A high-quality playing environment"
+      },
+      {
+        "icon": "shield",
+        "title": "Safe & comfortable",
+        "text": "Climate-controlled, open year-round"
+      },
+      {
+        "icon": "ball",
+        "title": "More than one sport",
+        "text": "Pickleball"
+      },
+      {
+        "icon": "coach",
+        "title": "Expert coaching",
+        "text": "Technique coaching and structured lessons"
+      },
+      {
+        "icon": "calendar",
+        "title": "Easy booking",
+        "text": "Quick to book, flexible scheduling"
+      }
+    ],
+    "slogan": "More sport · More friends · A better life",
+    "coachKicker": "Coaching",
+    "coachTitle": "Learn from champions",
+    "coachText": "Private, semi-private and group lessons with coaches who have won at the national and provincial level.",
+    "coachCta": "Meet the coaches",
+    "venueKicker": "The venue",
+    "venueTitle": "Courts, lounge and gear, all under one roof"
+  },
+  "coaches": {
+    "kicker": "Pickleball coaching",
+    "title": "From beginner to advanced, make every shot count",
+    "formats": [
+      "Private 1-on-1",
+      "Semi-private 1-on-2",
+      "Group classes"
+    ],
+    "formatsNote": "Personalized plans · Targeted training · Expert guidance",
+    "audienceTitle": "Who it's for",
+    "audience": [
+      {
+        "icon": "cap",
+        "title": "Beginners",
+        "text": "Learn the fundamentals and build confidence"
+      },
+      {
+        "icon": "run",
+        "title": "Improvers",
+        "text": "More consistency and tactical awareness"
+      },
+      {
+        "icon": "trophy",
+        "title": "Competitors",
+        "text": "Targeted training to raise your level"
+      },
+      {
+        "icon": "group",
+        "title": "Groups",
+        "text": "More interaction, more fun"
+      }
+    ],
+    "credentialsTitle": "Credentials",
+    "achievementsTitle": "Competition results",
+    "teachingTitle": "Coaching style",
+    "list": [
+      {
+        "id": "nathan",
+        "name": "Nathan Choi",
+        "photo": "coach-nathan",
+        "rating": "DUPR 5.2",
+        "headline": "Former CNPL professional",
+        "credentials": [
+          "Played professionally for two seasons in the CNPL (Canadian National Pickleball League), 2023 and 2024",
+          "DUPR rating 5.2"
+        ],
+        "achievements": [
+          "Multi-time Canadian Junior National Badminton Champion",
+          "2011 Canada Winter Games Mixed Doubles Badminton Champion"
+        ],
+        "teaching": [
+          {
+            "title": "Fast progress",
+            "text": "Specializes in fast skill development, from beginner to 4.5"
+          },
+          {
+            "title": "Technical detail",
+            "text": "A strong emphasis on clean, precise technique"
+          },
+          {
+            "title": "Tournament ready",
+            "text": "A competitive mindset and getting the most out of your tournament play"
+          }
+        ]
+      },
+      {
+        "id": "summer",
+        "name": "Summer Xia",
+        "photo": "coach-summer",
+        "rating": "DUPR 4.2",
+        "headline": "PFCA Advanced Pickleball Coach",
+        "credentials": [
+          "PFCA Advanced Pickleball Coach",
+          "National Level 1 table tennis athlete and senior coach",
+          "20 years of table tennis coaching"
+        ],
+        "achievements": [
+          "BC Provincial Pickleball Championships, 3.5 Singles: Champion (first singles title)",
+          "BC Provincial Pickleball Championships, 3.5 Mixed Doubles: Champion",
+          "Douglas Park 4.5 Men's Doubles: Runner-up",
+          "DPA 3.5 Men's Doubles and Mixed Doubles: Champion",
+          "Many strong results at BC provincial-level tournaments"
+        ],
+        "teaching": [
+          {
+            "title": "Tailored",
+            "text": "A personal training plan for your age and level"
+          },
+          {
+            "title": "Complete skills",
+            "text": "Serve, return, drop shot, third shot, volley and placement"
+          },
+          {
+            "title": "Details matter",
+            "text": "Footwork, consistency, shot quality, court movement, tactics, shot selection and in-match adjustments"
+          },
+          {
+            "title": "Match focused",
+            "text": "From fundamentals to match play, raising your whole game"
+          },
+          {
+            "title": "Table tennis to pickleball",
+            "text": "Especially good at helping table tennis players make the switch"
+          }
+        ],
+        "quote": "Plenty of match experience means I understand the game, and how to help you improve on court."
+      }
+    ],
+    "motto": "Professional · Focused · A better you",
+    "joinTitle": "Join us today!",
+    "joinText": "Better coaching, a better you, at Timing Sports.",
+    "joinCta": "Contact us to book a lesson"
+  },
+  "pricing": {
+    "kicker": "Court rental",
+    "title": "Court pricing",
+    "headers": {
+      "days": "Days",
+      "time": "Time",
+      "price": "Price"
+    },
+    "perHour": "/ hour",
+    "tagline": "Play pickleball together!",
+    "bookCta": "Book a Court",
+    "coachingNote": "Looking for lessons?",
+    "coachingCta": "See coaching"
+  },
+  "about": {
+    "kicker": "About & contact",
+    "title": "Come play with us",
+    "intro": "Timing Sports is an all-in-one sports venue bringing together pickleball, badminton and golf simulation, with a comfortable, professional space for players of every age and level.",
+    "contactTitle": "Get in touch",
+    "address": "Address",
+    "email": "Email",
+    "phone": "Phone",
+    "instagram": "Instagram",
+    "map": "Open in Google Maps",
+    "copy": "Copy",
+    "copied": "Copied",
+    "scanTitle": "Message us",
+    "whatsapp": "WhatsApp",
+    "whatsappNote": "Scan with WhatsApp to add us as a contact",
+    "wechat": "WeChat",
+    "wechatNote": "Scan with WeChat to add us as a friend"
+  },
+  "contact": {
+    "address": "8-2668 Simpson Rd",
+    "email": "timingsports2668@gmail.com",
+    "phone": "778-788-1155",
+    "instagram": "timingsportsclub"
+  }
+}

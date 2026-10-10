@@ -215,6 +215,9 @@ export const getMyBookings = async (_params, auth) => {
     credits: b.credits,
     paidWith: b.paidWith,
     amountCents: b.amountCents,
+    balanceAfter: b.balanceAfter ?? null,
+    name: b.name,
+    paidAt: b.paidAt ?? b.createdAt,
     createdAt: b.createdAt,
     doorCode: doorCodeView(b),
     receipt: buildReceipt(b),
@@ -260,7 +263,7 @@ export const bookCourt = async (body, auth) => {
   await requireModules('booking', 'calendar', 'credit')
   validatePlayer(auth)
   const request = validateBookingRequest(body, await loadRules())
-  const credits = bookingCredits(rules(), request.minutes)
+  const credits = bookingCredits(rules(), request.minutes, request.date, request.start)
 
   const db = getDB()
   const player = await db.collection(PLAYERS).findOne({ _id: toObjectId(auth.playerId) })
@@ -310,7 +313,7 @@ export const bookCourtAsGuest = async (body, auth) => {
   const r = await loadRules()
   const request = validateBookingRequest(body, r)
   validateGuest(body)
-  const amountCents = bookingPriceCents(r, request.minutes)
+  const amountCents = bookingPriceCents(r, request.minutes, request.date, request.start)
   const guest = {
     firstName: toTitleCase(body.firstName),
     lastName: toTitleCase(body.lastName),

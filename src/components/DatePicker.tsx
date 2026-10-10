@@ -1,4 +1,5 @@
 import { createSignal, onMount, onCleanup, Show, For, type JSX } from 'solid-js'
+import { langActions } from '../stores/langStore'
 
 interface DatePickerProps {
   label?: string
@@ -10,22 +11,23 @@ interface DatePickerProps {
   maxYear?: number
 }
 
-const months = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-]
+// Month and day names follow the shown language (src/i18n); a club without
+// a second language always gets English.
+const monthName = (month: number) =>
+  new Date(2000, month, 1).toLocaleDateString(langActions.locale(), {
+    month: 'long',
+  })
 
-const shortMonths = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-]
+const weekdays = () => langActions.list('datePicker.weekdays')
 
-const weekdays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
-
-const formatDate = (date: Date | null): string => {
-  if (!date) return ''
-  return `${shortMonths[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`
-}
+const formatDate = (date: Date | null): string =>
+  date
+    ? date.toLocaleDateString(langActions.locale(), {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : ''
 
 const getDaysInMonth = (year: number, month: number): number =>
   new Date(year, month + 1, 0).getDate()
@@ -211,17 +213,25 @@ const DatePicker = (props: DatePickerProps) => {
   }
 
   const handleDayClick = (day: number) => {
-    const newDate = new Date(viewDate().getFullYear(), viewDate().getMonth(), day)
+    const newDate = new Date(
+      viewDate().getFullYear(),
+      viewDate().getMonth(),
+      day,
+    )
     props.onChange(newDate)
     setShowCalendar(false)
   }
 
   const handlePrevMonth = () => {
-    setViewDate(new Date(viewDate().getFullYear(), viewDate().getMonth() - 1, 1))
+    setViewDate(
+      new Date(viewDate().getFullYear(), viewDate().getMonth() - 1, 1),
+    )
   }
 
   const handleNextMonth = () => {
-    setViewDate(new Date(viewDate().getFullYear(), viewDate().getMonth() + 1, 1))
+    setViewDate(
+      new Date(viewDate().getFullYear(), viewDate().getMonth() + 1, 1),
+    )
   }
 
   const handleYearClick = () => {
@@ -273,11 +283,11 @@ const DatePicker = (props: DatePickerProps) => {
   }
 
   const handleNavMouseOver = (e: MouseEvent) => {
-    (e.currentTarget as HTMLElement).style.backgroundColor = '#f5f5f5'
+    ;(e.currentTarget as HTMLElement).style.backgroundColor = '#f5f5f5'
   }
 
   const handleNavMouseOut = (e: MouseEvent) => {
-    (e.currentTarget as HTMLElement).style.backgroundColor = '#fff'
+    ;(e.currentTarget as HTMLElement).style.backgroundColor = '#fff'
   }
 
   return (
@@ -289,7 +299,7 @@ const DatePicker = (props: DatePickerProps) => {
         style={props.disabled ? disabledDateBoxStyle : dateBoxStyle}
         onClick={handleDateBoxClick}
       >
-        {formatDate(props.value) || 'Select date'}
+        {formatDate(props.value) || langActions.t('common.selectDate')}
       </div>
       <Show when={showCalendar() && !props.disabled}>
         <div style={calendarStyle}>
@@ -304,7 +314,9 @@ const DatePicker = (props: DatePickerProps) => {
                     <div
                       style={{
                         ...yearOptionStyle,
-                        ...(year === viewDate().getFullYear() ? selectedYearStyle : {}),
+                        ...(year === viewDate().getFullYear()
+                          ? selectedYearStyle
+                          : {}),
                       }}
                       onClick={() => handleYearSelect(year)}
                     >
@@ -315,19 +327,16 @@ const DatePicker = (props: DatePickerProps) => {
               </div>
             </Show>
           </div>
-          <div style={monthHeaderStyle}>{months[viewDate().getMonth()]}</div>
+          <div style={monthHeaderStyle}>{monthName(viewDate().getMonth())}</div>
           <div style={weekdaysStyle}>
-            <For each={weekdays}>
+            <For each={weekdays()}>
               {(day) => <div style={weekdayStyle}>{day}</div>}
             </For>
           </div>
           <div style={daysGridStyle}>
             <For each={getCalendarDays()}>
               {(item) => (
-                <Show
-                  when={!item.isEmpty}
-                  fallback={<div style={dayStyle} />}
-                >
+                <Show when={!item.isEmpty} fallback={<div style={dayStyle} />}>
                   <div
                     style={{
                       ...dayStyle,

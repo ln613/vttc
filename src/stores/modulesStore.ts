@@ -1,6 +1,7 @@
 import { createStore } from 'solid-js/store'
 import clubConfig from 'club-config'
 import { apiGet, apiPost } from '../utils/api'
+import { hasSite } from '../site/siteContent'
 import {
   normalizeModules,
   isModuleOn,
@@ -92,8 +93,10 @@ const load = () => (loading ??= fetchModules())
 
 const on = (key: ModuleKey): boolean => isModuleOn(modulesState.modules, key)
 
-// Where "/" goes: the event list, else the booking calendar, else Account.
+// Where "/" goes: the club's website if it has one, else the event list,
+// else the booking calendar, else Account.
 const homePath = (): string => {
+  if (hasSite()) return '/'
   if (on('events')) return '/events'
   if (on('calendar')) return '/booking'
   return '/account'

@@ -5,6 +5,7 @@ import { normalizeSex, toDbSex } from '../../shared/rules/sex'
 import { playerState, playerActions } from './playerStore'
 import { customConfirm } from './confirmDialogStore'
 import { modulesActions } from './modulesStore'
+import { langActions } from './langStore'
 import type { Player } from '../../shared/types/Player'
 
 interface AccountProfileData {
@@ -144,7 +145,7 @@ export const accountPageActions = {
     if (name && rating !== '' && modulesActions.on('rating')) {
       return `${name} (${rating})`
     }
-    return name || 'Account'
+    return name || langActions.t('account.title')
   },
 
   enterEditMode: () => {
@@ -160,7 +161,12 @@ export const accountPageActions = {
       })
       return
     }
-    if (!(await customConfirm('Discard unsaved changes?', { confirmColor: '#e74c3c' }))) return
+    if (
+      !(await customConfirm(langActions.t('account.discardChanges'), {
+        confirmColor: '#e74c3c',
+      }))
+    )
+      return
     setAccountPageState({
       formData: { ...accountPageState.initialFormData },
       editing: false,
@@ -196,7 +202,10 @@ export const accountPageActions = {
       }>('updateProfile', buildSavePayload(formData))
 
       let payload = buildSavePayload(formData)
-      if (firstResult.needsConfirm && (firstResult.affectedEvents || []).length > 0) {
+      if (
+        firstResult.needsConfirm &&
+        (firstResult.affectedEvents || []).length > 0
+      ) {
         const confirmed = await askConfirmAffected(firstResult.affectedEvents!)
         if (!confirmed) {
           // Admin chose to keep player in those events — abort the
@@ -353,12 +362,11 @@ const isValidPassword = (password: string): boolean =>
 
 const getPasswordErrors = (password: string): string[] => {
   const errors: string[] = []
-  if (password.length < 8) errors.push('Password must be at least 8 characters')
-  if (!/[0-9]/.test(password)) errors.push('Password must contain at least 1 number')
-  if (!/[A-Z]/.test(password))
-    errors.push('Password must contain at least 1 uppercase letter')
-  if (!/[a-z]/.test(password))
-    errors.push('Password must contain at least 1 lowercase letter')
+  const t = langActions.t
+  if (password.length < 8) errors.push(t('account.pwMin8'))
+  if (!/[0-9]/.test(password)) errors.push(t('account.pwNumber'))
+  if (!/[A-Z]/.test(password)) errors.push(t('account.pwUpper'))
+  if (!/[a-z]/.test(password)) errors.push(t('account.pwLower'))
   return errors
 }
 
@@ -367,12 +375,12 @@ const validateChangePasswordInput = (
 ): string | null => {
   const errors: string[] = []
   if (!data.newPassword) {
-    errors.push('New password is required')
+    errors.push(langActions.t('account.pwRequired'))
   } else if (!isValidPassword(data.newPassword)) {
     errors.push(...getPasswordErrors(data.newPassword))
   }
   if (data.newPassword !== data.confirmPassword)
-    errors.push('Passwords do not match')
+    errors.push(langActions.t('account.pwMismatch'))
   return errors.length > 0 ? errors.join('\n') : null
 }
 
@@ -437,15 +445,15 @@ const validateProfile = (data: AccountProfileData): string | null => {
   const errors: string[] = []
 
   if (data.email && !isValidEmail(data.email)) {
-    errors.push('Invalid email address')
+    errors.push(langActions.t('account.invalidEmail'))
   }
 
   if (data.phone && !isValidNorthAmericanPhone(data.phone)) {
-    errors.push('Invalid Canadian/US phone number')
+    errors.push(langActions.t('account.invalidPhone'))
   }
 
   if (data.rating !== '' && !isValidRating(data.rating)) {
-    errors.push('Rating must be a non-negative integer')
+    errors.push(langActions.t('account.invalidRating'))
   }
 
   return errors.length > 0 ? errors.join('\n') : null

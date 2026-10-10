@@ -6,6 +6,7 @@ export interface BookingConfig {
   slotMinutes?: number
   minMinutes?: number
   creditsPerSlot?: number
+  rates?: Array<{ days: string[]; from: string; to: string; dollarsPerHour: number }>
   creditsPerDollar?: number
   minTopUpDollars?: number
   guestHoldMinutes?: number
@@ -19,6 +20,7 @@ export interface BookingRules {
   slotMinutes: number
   minMinutes: number
   creditsPerSlot: number
+  rates: BookingRate[]
   creditsPerDollar: number
   minTopUpDollars: number
   guestHoldMinutes: number
@@ -37,8 +39,20 @@ export declare const daySlots: (rules: BookingRules) => number[]
 export declare const lengthOptions: (rules: BookingRules, start: number, nextBusyStart?: number) => number[]
 export declare const slotsCovered: (rules: BookingRules, start: number, minutes: number) => number[]
 export declare const isValidBookingTime: (rules: BookingRules, start: number, minutes: number) => boolean
-export declare const bookingCredits: (rules: BookingRules, minutes: number) => number
-export declare const bookingPriceCents: (rules: BookingRules, minutes: number) => number
+export type WeekDay = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'
+export interface BookingRate {
+  days: WeekDay[]
+  fromMinutes: number
+  toMinutes: number
+  dollarsPerHour: number
+}
+export declare const WEEK_DAYS: WeekDay[]
+export declare const weekdayOf: (date: string) => WeekDay
+export declare const rateAt: (rules: BookingRules, date: string, minute: number) => BookingRate | undefined
+export declare const slotPriceCents: (rules: BookingRules, date: string | null | undefined, start: number) => number
+export declare const bookingCredits: (rules: BookingRules, minutes: number, date?: string, start?: number) => number
+export declare const bookingPriceCents: (rules: BookingRules, minutes: number, date?: string, start?: number) => number
+export declare const hourlyRateAt: (rules: BookingRules, date: string, start: number) => number
 export declare const topUpCredits: (rules: BookingRules, dollars: number) => number
 export declare const isValidTopUp: (rules: BookingRules, dollars: number) => boolean
 export declare const formatClock: (minutes: number) => string

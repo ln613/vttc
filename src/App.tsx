@@ -1,4 +1,4 @@
-import { HashRouter, Route } from '@solidjs/router'
+import { HashRouter, Route, Navigate } from '@solidjs/router'
 import { Show, onMount, type Component, type JSX } from 'solid-js'
 import './App.css'
 import TournamentEdit from './pages/TournamentEdit'
@@ -18,6 +18,11 @@ import RevenueCalculator from './pages/RevenueCalculator'
 import History from './pages/History'
 import Booking from './pages/Booking'
 import Modules from './pages/Modules'
+import SiteHome from './pages/site/SiteHome'
+import SiteCoaches from './pages/site/SiteCoaches'
+import SitePricing from './pages/site/SitePricing'
+import SiteAbout from './pages/site/SiteAbout'
+import { hasSite } from './site/siteContent'
 import ConfirmDialog from './components/ConfirmDialog'
 import { ModuleGate, Home } from './components/ModuleGate'
 import { modulesActions } from './stores/modulesStore'
@@ -56,13 +61,31 @@ const gated =
     </ModuleGate>
   )
 
+// The website's pages exist only for a club that has one.
+const siteOnly =
+  (Page: Component): Component =>
+  () => (
+    <Show when={hasSite()} fallback={<Navigate href="/" />}>
+      <Page />
+    </Show>
+  )
+
 const TournamentEditPage = () => <TournamentEdit isEdit />
 const EventEditPage = () => <EventEdit isEdit />
 
+// A club with its own website opens on it; otherwise the event list, or
+// whatever its modules make home.
 const HomePage = () => (
-  <Home>
-    <EventList />
-  </Home>
+  <Show
+    when={hasSite()}
+    fallback={
+      <Home>
+        <EventList />
+      </Home>
+    }
+  >
+    <SiteHome />
+  </Show>
 )
 
 const App = () => (
@@ -88,6 +111,9 @@ const App = () => (
     <Route path="/revenue-calculator" component={gated('events', RevenueCalculator)} />
     <Route path="/history/:playerId" component={gated('players', History)} />
     <Route path="/booking" component={gated('calendar', Booking)} />
+    <Route path="/coaches" component={siteOnly(SiteCoaches)} />
+    <Route path="/pricing" component={siteOnly(SitePricing)} />
+    <Route path="/about" component={siteOnly(SiteAbout)} />
   </HashRouter>
 )
 

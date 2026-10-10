@@ -4,11 +4,13 @@
   "appName": "Timing Sports",
   "timezone": "America/Vancouver",
   "branding": {
-    "bannerUrl": "https://res.cloudinary.com/vttc/image/upload/v1790976391/752213d7-6b00-4922-ad7a-2d277a030252_v6gdnd.jpg",
+    "bannerUrl": "https://res.cloudinary.com/vttc/image/upload/v1791580349/banner1_tfy0vc.jpg",
+    "bannerUrlMobile": "https://res.cloudinary.com/vttc/image/upload/v1791580349/banner2_esvm2i.jpg",
     "bannerAlt": "Timing Sports Banner",
     "contactName": "Timing Sports",
     "faviconUrl": "/images/logo.png",
-    "pageTitle": "Timing Sports"
+    "pageTitle": "Timing Sports",
+    "topBarColor": "#3b1d82"
   },
   "tables": {
     "all": [
@@ -42,7 +44,7 @@
   "booking": {
     "enabled": true,
     "courtLabel": "Pickleball Court",
-    "openTime": "08:00",
+    "openTime": "09:00",
     "closeTime": "24:00",
     "slotMinutes": 30,
     "minMinutes": 60,
@@ -51,6 +53,57 @@
     "minTopUpDollars": 10,
     "guestHoldMinutes": 15,
     "doorCodeLeadMinutes": 15,
-    "doorCodeTrailMinutes": 15
+    "doorCodeTrailMinutes": 15,
+    "rates": [
+      {
+        "days": [
+          "mon",
+          "tue",
+          "wed",
+          "thu"
+        ],
+        "from": "09:00",
+        "to": "18:00",
+        "dollarsPerHour": 30
+      },
+      {
+        "days": [
+          "mon",
+          "tue",
+          "wed",
+          "thu"
+        ],
+        "from": "18:00",
+        "to": "24:00",
+        "dollarsPerHour": 40
+      },
+      {
+        "days": [
+          "fri",
+          "sat",
+          "sun"
+        ],
+        "from": "09:00",
+        "to": "12:00",
+        "dollarsPerHour": 40
+      },
+      {
+        "days": [
+          "fri",
+          "sat",
+          "sun"
+        ],
+        "from": "12:00",
+        "to": "24:00",
+        "dollarsPerHour": 45
+      }
+    ]
+  },
+  "site": {
+    "enabled": true,
+    "languages": [
+      "en",
+      "zh"
+    ]
   }
 }

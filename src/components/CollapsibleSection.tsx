@@ -1,9 +1,12 @@
 import { Show, type JSX } from 'solid-js'
+import { themed } from '../site/themed'
+import '../pages/booking.css'
 
 // A titled section that opens and closes from its header. `summary` sits
 // beside the title so a closed section can still say something useful (a
 // balance, a count); `actions` sit at the right edge, outside the toggle, so
-// pressing one never opens or closes the section.
+// pressing one never opens or closes the section. On a club with its own
+// website each section is a card in the site's look (booking.css).
 const CollapsibleSection = (props: {
   title: string
   open: boolean
@@ -12,7 +15,7 @@ const CollapsibleSection = (props: {
   actions?: JSX.Element
   children: JSX.Element
 }) => (
-  <section style={sectionStyle}>
+  <section {...themed(sectionStyle, 'cs-card')}>
     <div style={headerStyle}>
       <button
         type="button"
@@ -23,7 +26,7 @@ const CollapsibleSection = (props: {
         <span style={chevronStyle(props.open)}>
           <ChevronIcon />
         </span>
-        <span style={titleStyle}>{props.title}</span>
+        <span {...themed(titleStyle, 'cs-title')}>{props.title}</span>
         <Show when={props.summary}>
           <span style={summaryStyle}>{props.summary}</span>
         </Show>

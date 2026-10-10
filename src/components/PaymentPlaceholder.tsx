@@ -1,11 +1,15 @@
-import { Show, type JSX } from 'solid-js'
-import Button from './Button'
+import { Show } from 'solid-js'
 import { formatDollars } from '../../shared/rules/booking'
+import { langActions } from '../stores/langStore'
+import '../pages/booking.css'
+
+const t = langActions.t
 
 // Where the card payment will go once Stripe is connected. Until then it
 // says so plainly, and — only where the site allows the placeholder
 // (PAYMENTS_MODE=placeholder, see netlify/functions/utils/payments.js) —
-// offers to complete the payment without a card, for testing.
+// offers to complete the payment without a card, for testing. Styled by
+// booking.css, so it takes the look of whichever page opens it.
 const PaymentPlaceholder = (props: {
   amountCents: number
   available: boolean
@@ -13,74 +17,46 @@ const PaymentPlaceholder = (props: {
   onPay: () => void
   onBack: () => void
 }) => (
-  <div style={boxStyle}>
-    <div style={amountRowStyle}>
-      <span>Amount to pay</span>
-      <strong style={amountStyle}>{formatDollars(props.amountCents)}</strong>
+  <div style={{ display: 'flex', 'flex-direction': 'column', gap: '12px' }}>
+    <div class="bk-pay-amount">
+      <span>{t('payment.amountToPay')}</span>
+      <span class="bk-price">{formatDollars(props.amountCents)}</span>
     </div>
-    <div style={cardAreaStyle}>
-      <strong>Card payment (Stripe)</strong>
-      <span>Card payments are coming soon.</span>
+    <div class="bk-pay-card">
+      <strong>{t('payment.cardTitle')}</strong>
+      <span>{t('payment.comingSoon')}</span>
     </div>
     <Show
       when={props.available}
-      fallback={<div style={unavailableStyle}>Online payment is not available yet. Please pay at the club.</div>}
+      fallback={
+        <div class="bk-pay-unavailable">{t('payment.unavailable')}</div>
+      }
     >
-      <div style={testNoteStyle}>Test mode: no card is charged.</div>
+      <p class="bk-note" style={{ 'text-align': 'center' }}>
+        {t('payment.testMode')}
+      </p>
     </Show>
-    <div style={actionsStyle}>
-      <Button color="#888" onClick={props.onBack} disabled={props.busy}>
-        Back
-      </Button>
+    <div class="bk-actions">
+      <button
+        type="button"
+        class="bk-btn bk-btn-secondary bk-btn-fill"
+        onClick={() => props.onBack()}
+        disabled={props.busy}
+      >
+        {t('common.back')}
+      </button>
       <Show when={props.available}>
-        <Button color="#27ae60" onClick={props.onPay} disabled={props.busy}>
-          {props.busy ? 'Paying...' : 'Simulate payment'}
-        </Button>
+        <button
+          type="button"
+          class="bk-btn bk-btn-primary bk-btn-fill"
+          onClick={() => props.onPay()}
+          disabled={props.busy}
+        >
+          {props.busy ? t('payment.paying') : t('payment.simulate')}
+        </button>
       </Show>
     </div>
   </div>
 )
-
-const boxStyle: JSX.CSSProperties = { display: 'flex', 'flex-direction': 'column', gap: '12px' }
-
-const amountRowStyle: JSX.CSSProperties = {
-  display: 'flex',
-  'justify-content': 'space-between',
-  'align-items': 'baseline',
-  'font-size': '15px',
-  color: '#333',
-}
-
-const amountStyle: JSX.CSSProperties = { 'font-size': '22px' }
-
-const cardAreaStyle: JSX.CSSProperties = {
-  display: 'flex',
-  'flex-direction': 'column',
-  gap: '4px',
-  padding: '16px',
-  border: '2px dashed #c9d3dd',
-  'border-radius': '10px',
-  color: '#555',
-  'font-size': '14px',
-  'text-align': 'center',
-}
-
-const testNoteStyle: JSX.CSSProperties = { 'font-size': '13px', color: '#777', 'text-align': 'center' }
-
-const unavailableStyle: JSX.CSSProperties = {
-  'font-size': '14px',
-  color: '#e67e22',
-  'text-align': 'center',
-  padding: '8px 12px',
-  'background-color': '#fef9e7',
-  'border-radius': '6px',
-}
-
-const actionsStyle: JSX.CSSProperties = {
-  display: 'flex',
-  'justify-content': 'center',
-  gap: '12px',
-  'margin-top': '4px',
-}
 
 export default PaymentPlaceholder
