@@ -61,6 +61,15 @@ import {
   confirmPayment,
 } from './bookingHandlers.js'
 import {
+  getGifts,
+  saveGift,
+  deleteGift,
+  getRewardMembers,
+  redeemGift,
+  getMyRedemptions,
+  getRedemptions,
+} from './rewardsHandlers.js'
+import {
   getLiveScore,
   rebuildMatchQueue,
   postponeMatch,
@@ -164,6 +173,11 @@ export const apiHandlers = {
     bookingDay: (params, auth) => getBookingDay(params, auth),
     myBookings: (params, auth) => getMyBookings(params, auth),
     myCredits: (params, auth) => getMyCredits(params, auth),
+    // Reward points and gifts (points model) — see specs/rules/wallet.md.
+    gifts: () => getGifts(),
+    rewardMembers: () => getRewardMembers(),
+    myRedemptions: (params, auth) => getMyRedemptions(params, auth),
+    redemptions: () => getRedemptions(),
     revenue: () => getRevenue(),
     revenueTemplates: () => getRevenueTemplates(),
   },
@@ -256,6 +270,9 @@ export const apiHandlers = {
     bookCourtAsGuest: (body, auth) => bookCourtAsGuest(body, auth),
     topUpCredits: (body, auth) => topUpCredits(body, auth),
     confirmPayment: (body, auth) => confirmPayment(body, auth),
+    saveGift: (body) => saveGift(body),
+    deleteGift: (body) => deleteGift(body),
+    redeemGift: (body, auth) => redeemGift(body, auth),
     sendVerificationCode: (body) => sendVerificationCode(body),
     verifyCode: (body) => verifyCode(body),
     // Both check the caller is the player named in the body (or, for a

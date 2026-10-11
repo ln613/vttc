@@ -211,7 +211,13 @@ export const formatLength = (minutes) => {
   return `${hours} hour${hours === 1 ? '' : 's'}`
 }
 
-export const formatDollars = (cents) =>
-  `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`
+// "$30", "$22.50", "$1,000".
+export const formatDollars = (cents) => {
+  const digits = cents % 100 === 0 ? 0 : 2
+  return `$${(cents / 100).toLocaleString('en-US', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  })}`
+}
 
 export const formatCredits = (credits) => credits.toLocaleString('en-US')

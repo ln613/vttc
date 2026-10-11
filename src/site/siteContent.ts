@@ -102,6 +102,14 @@ const contentFiles = import.meta.glob<SiteContent>('club-site/*.json', {
   import: 'default',
 })
 
+// The images live on Cloudinary, listed in images.json ("hero-1" → its
+// address) by scripts/upload-site-images.mjs. Any still in the images
+// folder are bundled as before, and the list wins for a name in both.
+const uploadedImages = import.meta.glob<Record<string, string>>(
+  'club-site/images.json',
+  { eager: true, import: 'default' },
+)
+
 const imageFiles = import.meta.glob<string>('club-site/images/*', {
   eager: true,
   query: '?url',
@@ -118,9 +126,12 @@ const contentByLanguage = Object.fromEntries(
   ]),
 ) as Partial<Record<SiteLanguage, SiteContent>>
 
-const imagesByName = Object.fromEntries(
-  Object.entries(imageFiles).map(([path, url]) => [baseName(path), url]),
-)
+const imagesByName: Record<string, string> = {
+  ...Object.fromEntries(
+    Object.entries(imageFiles).map(([path, url]) => [baseName(path), url]),
+  ),
+  ...Object.values(uploadedImages)[0],
+}
 
 /** The club has a website, and it is switched on in the club config. */
 export const hasSite = (): boolean =>
@@ -135,7 +146,7 @@ export const siteLanguages = (): SiteLanguage[] => {
 export const siteContentFor = (lang: SiteLanguage): SiteContent =>
   (contentByLanguage[lang] ?? contentByLanguage.en) as SiteContent
 
-/** "hero-1" → the bundled image's URL. */
+/** "hero-1" → the image's address. */
 export const siteImage = (name: string): string => imagesByName[name] ?? ''
 
 /** The hero background photos, hero-1, hero-2… in order. */

@@ -5,9 +5,9 @@ import type { JSX } from 'solid-js'
 // and for screen readers.
 
 const ICON_SIZE = 40
-// The app's own blue, for the icons that are ours (Google's G keeps its own
-// colours).
-const ICON_BLUE = '#2185d0'
+// The app's own blue for the icons that are ours — the site's accent where
+// the club has a website (Google's G keeps its own colours).
+const ICON_FILL = { fill: 'var(--bk-accent, #2185d0)' }
 
 // Google's own "G", in its four colours (Google branding guidelines).
 export const GoogleLogo = () => (
@@ -34,7 +34,7 @@ export const GoogleLogo = () => (
 export const EmailIcon = () => (
   <svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 24 24" aria-hidden="true">
     <path
-      fill={ICON_BLUE}
+      style={ICON_FILL}
       d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"
     />
   </svg>
@@ -43,7 +43,7 @@ export const EmailIcon = () => (
 export const PhoneIcon = () => (
   <svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 24 24" aria-hidden="true">
     <path
-      fill={ICON_BLUE}
+      style={ICON_FILL}
       d="M17 1.01 7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"
     />
   </svg>

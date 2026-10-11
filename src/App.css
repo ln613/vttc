@@ -126,6 +126,87 @@
   display: none;
 }
 
+/* The page links sit in the top bar's row as if they were its children. A
+ * club with its own website has too many for a narrow screen, so there they
+ * fold behind the hamburger (Header.tsx, MenuButton / MenuPanel). */
+.vttc-nav-links {
+  display: contents;
+}
+.vttc-topbar {
+  position: relative;
+}
+.vttc-menu-btn {
+  display: none;
+  width: 44px;
+  height: 44px;
+  box-sizing: border-box;
+  padding: 0;
+  flex: none;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.vttc-menu-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.vttc-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 890;
+  background: rgba(15, 8, 34, 0.35);
+}
+.vttc-menu-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 0 10px;
+  box-shadow: 0 14px 30px rgba(15, 8, 34, 0.35);
+}
+.vttc-menu-link {
+  display: block;
+  width: 100%;
+  padding: 14px 24px;
+  border: 0;
+  border-left: 4px solid transparent;
+  background: transparent;
+  color: #ffffff;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.vttc-menu-link + .vttc-menu-link {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+.vttc-menu-link.is-on {
+  border-left-color: #f7dd25;
+  background: rgba(255, 255, 255, 0.08);
+}
+@media (max-width: 900px) {
+  .vttc-nav-links.has-menu {
+    display: none;
+  }
+  .vttc-menu-btn {
+    display: grid;
+  }
+}
+@media (min-width: 901px) {
+  .vttc-menu-panel,
+  .vttc-menu-backdrop {
+    display: none;
+  }
+}
+
 /* Icon tap-target: any element that opts in gets a 44x44px minimum hit
  * area and suppressed double-tap zoom — meets Apple HIG and stops iOS
  * from re-classifying small taps as scroll gestures. */

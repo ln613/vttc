@@ -39,6 +39,10 @@ export const ACCESS = {
     bookingDay: PUBLIC, // who booked is shown only to them and to admins
     myBookings: USER,
     myCredits: USER,
+    gifts: PUBLIC, // the Rewards page, for anyone to look at
+    rewardMembers: ADMIN, // names, club ids and points, for redeeming
+    myRedemptions: USER,
+    redemptions: ADMIN, // every member's
     umpires: ADMIN, // the roster, with contact details
     umpireTableCounts: ADMIN, // for the assign-a-table dialog
     matchUmpireChoices: USER, // the tablet asks who is running this match
@@ -58,6 +62,9 @@ export const ACCESS = {
     bookCourtAsGuest: PUBLIC, // held until paid
     topUpCredits: USER,
     confirmPayment: PUBLIC, // a guest pays too; a top-up is checked against the caller
+    saveGift: ADMIN,
+    deleteGift: ADMIN,
+    redeemGift: ADMIN, // takes a member's points
     sendVerificationCode: PUBLIC,
     verifyCode: PUBLIC,
 

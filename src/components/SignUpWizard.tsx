@@ -1,7 +1,7 @@
 import { Show, For, Index, type Component, type JSX } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import Input from './Input'
-import Button from './Button'
+import ThemeButton from './ThemeButton'
 import PasswordRules from './PasswordRules'
 import DateOfBirthSelect from './DateOfBirthSelect'
 import GoogleSignInIcon, { GoogleSignInStatus } from './GoogleSignInIcon'
@@ -14,9 +14,13 @@ import {
 } from '../stores/signUpStore'
 import { formatPhone } from '../../shared/rules/contact'
 import { modulesActions } from '../stores/modulesStore'
+import { hasSite } from '../site/siteContent'
+import { themed } from '../site/themed'
 
 // The self sign-up wizard (specs/shared/header.md). One screen per step, all
-// state and every decision in signUpStore; this file only draws.
+// state and every decision in signUpStore; this file only draws. A club with
+// its own website draws it in the site's look (booking.css, inside the
+// site's dialog — see DialogFrame).
 
 // ==================== shared pieces ====================
 
@@ -38,9 +42,14 @@ const StepError = () => (
 
 const BackButton = () => (
   <Show when={signUpActions.canGoBack()}>
-    <Button color="#888" onClick={signUpActions.back} disabled={signUpState.loading}>
+    <ThemeButton
+      variant="secondary"
+      plainColor="#888"
+      onClick={signUpActions.back}
+      disabled={signUpState.loading}
+    >
       Back
-    </Button>
+    </ThemeButton>
   </Show>
 )
 
@@ -63,13 +72,13 @@ const StepForm = (props: {
       <StepError />
       <div style={actionsStyle}>
         <BackButton />
-        <Button
+        <ThemeButton
           type="submit"
-          color="#27ae60"
+          variant="primary"
           disabled={signUpState.loading || props.submitDisabled}
         >
           {signUpState.loading ? 'Please wait...' : props.submitLabel}
-        </Button>
+        </ThemeButton>
       </div>
     </form>
   )
@@ -160,7 +169,12 @@ const ResendLink = () => {
   const waiting = () => signUpState.resendCountdown > 0 || signUpState.loading
   return (
     <span
-      style={{ ...linkStyle, opacity: waiting() ? 0.5 : 1, cursor: waiting() ? 'default' : 'pointer' }}
+      class={hasSite() ? 'bk-link' : undefined}
+      style={{
+        ...(hasSite() ? {} : linkStyle),
+        opacity: waiting() ? 0.5 : 1,
+        cursor: waiting() ? 'default' : 'pointer',
+      }}
       onClick={signUpActions.resendCode}
     >
       {signUpState.resendCountdown > 0
@@ -239,7 +253,12 @@ const SimilarPlayerRow = (props: {
   const selected = () => signUpState.selectedPlayerId === props.player._id
   const select = () => signUpActions.selectSimilarPlayer(props.player._id)
   return (
-    <label style={matchRowStyle(selected())}>
+    <label
+      {...themed(
+        matchRowStyle(selected()),
+        selected() ? 'su-match is-on' : 'su-match',
+      )}
+    >
       <input type="radio" name="similarPlayer" checked={selected()} onChange={select} style={radioStyle} />
       <span style={matchNameStyle}>
         {props.player.firstName} {props.player.lastName}
@@ -270,7 +289,7 @@ const MatchStep = () => (
       </For>
     </div>
     <div style={secondaryLinkRowStyle}>
-      <span style={linkStyle} onClick={signUpActions.chooseNewPlayer}>
+      <span {...themed(linkStyle, 'bk-link')} onClick={signUpActions.chooseNewPlayer}>
         None of these is me — I'm new
       </span>
     </div>
@@ -286,14 +305,14 @@ const SexStep = () => (
     <div style={choicesStyle}>
       <button
         type="button"
-        style={choiceStyle(signUpState.sex === 'male')}
+        {...themed(choiceStyle(signUpState.sex === 'male'), choiceClass(signUpState.sex === 'male'))}
         onClick={() => signUpActions.chooseSex('male')}
       >
         Male
       </button>
       <button
         type="button"
-        style={choiceStyle(signUpState.sex === 'female')}
+        {...themed(choiceStyle(signUpState.sex === 'female'), choiceClass(signUpState.sex === 'female'))}
         onClick={() => signUpActions.chooseSex('female')}
       >
         Female
@@ -321,7 +340,7 @@ const DobStep = () => (
       onChange={signUpActions.setDobPart}
     />
     <div style={secondaryLinkRowStyle}>
-      <span style={linkStyle} onClick={signUpActions.skipDob}>
+      <span {...themed(linkStyle, 'bk-link')} onClick={signUpActions.skipDob}>
         Skip for now
       </span>
     </div>
@@ -376,7 +395,7 @@ const SignInLink = () => (
   <Show when={BEFORE_VERIFICATION.includes(signUpState.step)}>
     <div style={signInRowStyle}>
       Already have an account?{' '}
-      <span style={linkStyle} onClick={signUpActions.goToSignIn}>
+      <span {...themed(linkStyle, 'bk-link')} onClick={signUpActions.goToSignIn}>
         Sign in
       </span>
     </div>
@@ -442,6 +461,16 @@ const progressDotsStyle: JSX.CSSProperties = {
 
 // Circles, per the house rule: equal width and height, no padding, never
 // shrunk by the flex row.
+// The site's own colours where the club has a website (done, current, to
+// come); the app's green, blue and grey otherwise.
+const dotColor = (n: number, current: number) => {
+  if (hasSite()) {
+    if (n < current) return 'var(--bk-free-line, #cdbcfb)'
+    return n === current ? 'var(--bk-accent, #3b1d82)' : 'var(--bk-line, #e2d8fa)'
+  }
+  return n < current ? '#27ae60' : n === current ? '#2185d0' : '#ddd'
+}
+
 const progressDotStyle = (n: number, current: number): JSX.CSSProperties => ({
   width: '10px',
   height: '10px',
@@ -449,7 +478,7 @@ const progressDotStyle = (n: number, current: number): JSX.CSSProperties => ({
   padding: 0,
   flex: 'none',
   'border-radius': '50%',
-  'background-color': n < current ? '#27ae60' : n === current ? '#2185d0' : '#ddd',
+  'background-color': dotColor(n, current),
   transform: n === current ? 'scale(1.3)' : 'none',
   transition: 'background-color 0.2s ease, transform 0.2s ease',
 })
@@ -478,6 +507,10 @@ const choiceStyle = (selected: boolean, disabled = false): JSX.CSSProperties => 
   cursor: disabled ? 'not-allowed' : 'pointer',
   'box-sizing': 'border-box',
 })
+
+// Male / Female: the site's selectable tiles (booking.css).
+const choiceClass = (selected: boolean) =>
+  selected ? 'bk-option su-choice is-on' : 'bk-option su-choice'
 
 const linkStyle: JSX.CSSProperties = {
   color: '#2185d0',

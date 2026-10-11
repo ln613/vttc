@@ -2,11 +2,12 @@ import {
   Show,
   Switch,
   Match,
+  For,
   createSignal,
   onMount,
   type JSX,
 } from 'solid-js'
-import { useNavigate } from '@solidjs/router'
+import { useNavigate, useLocation } from '@solidjs/router'
 import { authState, authActions } from '../stores/authStore'
 import { signUpState, signUpActions } from '../stores/signUpStore'
 import {
@@ -14,7 +15,6 @@ import {
   liveScoreActions,
 } from '../stores/liveScoreStore'
 import Input from './Input'
-import Button from './Button'
 import SignUpWizard from './SignUpWizard'
 import GoogleSignInIcon, { GoogleSignInStatus } from './GoogleSignInIcon'
 import { iconRowStyle } from './SignInIcons'
@@ -25,6 +25,11 @@ import clubConfig from 'club-config'
 import { modulesActions } from '../stores/modulesStore'
 import { langState, langActions } from '../stores/langStore'
 import { hasSite } from '../site/siteContent'
+import { pointsModel } from '../i18n/wallet'
+import DialogFrame from './DialogFrame'
+import SiteBanner from './SiteBanner'
+import ThemeButton from './ThemeButton'
+import { themed } from '../site/themed'
 
 export const Header = () => (
   <header>
@@ -42,7 +47,15 @@ const MOBILE_BANNER_MAX_WIDTH = 768
 // banner just to squash it. Without a mobile crop the <source> points at
 // the same file as the <img>, which is one request either way — no reason
 // to make the element conditional.
+// A club with its own website gets its site's banner (SiteBanner): a
+// photo with the logo and name over it, which can't be squashed.
 const Banner = () => (
+  <Show when={!hasSite()} fallback={<SiteBanner />}>
+    <PictureBanner />
+  </Show>
+)
+
+const PictureBanner = () => (
   <picture>
     <source
       media={`(max-width: ${MOBILE_BANNER_MAX_WIDTH}px)`}
@@ -66,20 +79,17 @@ const PendingPasswordModal = () => {
   }
   return (
     <Show when={authState.showPendingModal}>
-      <div style={overlayStyle}>
-        <div style={dialogStyle}>
-          <h3 style={dialogTitleStyle}>Change your password</h3>
-          <div style={infoMsgStyle}>
-            This account was created on your behalf. Please change your
-            password on the Account page.
-          </div>
-          <div style={buttonContainerStyle}>
-            <Button color="#27ae60" onClick={handleConfirm}>
-              Confirm
-            </Button>
-          </div>
+      <DialogFrame title="Change your password">
+        <div style={infoMsgStyle}>
+          This account was created on your behalf. Please change your
+          password on the Account page.
         </div>
-      </div>
+        <div style={buttonContainerStyle}>
+          <ThemeButton variant="primary" onClick={handleConfirm}>
+            Confirm
+          </ThemeButton>
+        </div>
+      </DialogFrame>
     </Show>
   )
 }
@@ -88,6 +98,7 @@ const TopBar = () => {
   const navigate = useNavigate()
   const [showTablePicker, setShowTablePicker] = createSignal(false)
   const [showUmpirePassword, setShowUmpirePassword] = createSignal(false)
+  const [menuOpen, setMenuOpen] = createSignal(false)
 
   // The button only exists while there is something to umpire, and the
   // header is on every page — so the table state has to be loaded here
@@ -138,24 +149,10 @@ const TopBar = () => {
       : 'in_progress'
   }
 
-  const handleEventsClick = () => {
-    navigate('/events')
+  const goTo = (path: string) => () => {
+    setMenuOpen(false)
+    navigate(path)
   }
-
-  const handlePlayersClick = () => {
-    navigate('/players')
-  }
-
-  const handleScheduleClick = () => {
-    navigate('/schedule')
-  }
-
-  const handleBookingClick = () => {
-    navigate('/booking')
-  }
-
-  // The club's own website pages (specs/pages/Club Site.md).
-  const goTo = (path: string) => () => navigate(path)
 
   const handleAccountClick = () => {
     if (authActions.isSignedIn()) {
@@ -173,6 +170,11 @@ const TopBar = () => {
     <div class="vttc-topbar" style={topBarStyle}>
       <div style={topBarContentStyle}>
         <div class="vttc-nav-left" style={navLeftStyle}>
+          {/* A club with its own website has more links than a phone can
+              show, so there they fold into a menu (see App.css). */}
+          <Show when={hasSite()}>
+            <MenuButton open={menuOpen()} onToggle={() => setMenuOpen(!menuOpen())} />
+          </Show>
           {/* Each link follows its module (specs/rules/modules.md). The
               tablet's button is Game Play; everyone else's is Live Score. */}
           <Show
@@ -218,44 +220,15 @@ const TopBar = () => {
               onClose={() => setShowTablePicker(false)}
             />
           </Show>
-          <Show when={hasSite()}>
-            <button class="vttc-nav-link" style={navLinkStyle} onClick={goTo('/')}>
-              {langActions.t('nav.home')}
-            </button>
-          </Show>
-          <Show when={modulesActions.on('events')}>
-            <button class="vttc-nav-link" style={navLinkStyle} onClick={handleEventsClick}>
-              {langActions.t('nav.events')}
-            </button>
-          </Show>
-          <Show when={modulesActions.on('schedule')}>
-            <button class="vttc-nav-link" style={navLinkStyle} onClick={handleScheduleClick}>
-              {langActions.t('nav.schedule')}
-            </button>
-          </Show>
-          <Show when={modulesActions.on('players')}>
-            <button class="vttc-nav-link" style={navLinkStyle} onClick={handlePlayersClick}>
-              {langActions.t('nav.players')}
-            </button>
-          </Show>
-          <Show when={hasSite()}>
-            <button class="vttc-nav-link" style={navLinkStyle} onClick={goTo('/coaches')}>
-              {langActions.t('nav.coaches')}
-            </button>
-            <button class="vttc-nav-link" style={navLinkStyle} onClick={goTo('/pricing')}>
-              {langActions.t('nav.pricing')}
-            </button>
-          </Show>
-          <Show when={modulesActions.on('calendar') && !authState.isTablet}>
-            <button class="vttc-nav-link" style={navLinkStyle} onClick={handleBookingClick}>
-              {langActions.t('nav.booking')}
-            </button>
-          </Show>
-          <Show when={hasSite()}>
-            <button class="vttc-nav-link" style={navLinkStyle} onClick={goTo('/about')}>
-              {langActions.t('nav.about')}
-            </button>
-          </Show>
+          <div class={hasSite() ? 'vttc-nav-links has-menu' : 'vttc-nav-links'}>
+            <For each={navItems()}>
+              {(item) => (
+                <button class="vttc-nav-link" style={navLinkStyle} onClick={goTo(item.path)}>
+                  {langActions.t(item.label)}
+                </button>
+              )}
+            </For>
+          </div>
         </div>
         <div style={navRightStyle}>
           <Show when={langActions.canToggle()}>
@@ -271,7 +244,89 @@ const TopBar = () => {
           </button>
         </div>
       </div>
+      <Show when={menuOpen()}>
+        <MenuPanel onPick={goTo} onClose={() => setMenuOpen(false)} />
+      </Show>
     </div>
+  )
+}
+
+// The page links, in order. Each follows its module (specs/rules/modules.md);
+// the website's own pages only exist for a club that has one.
+const navItems = () =>
+  [
+    { label: 'nav.home', path: '/', show: hasSite() },
+    { label: 'nav.events', path: '/events', show: modulesActions.on('events') },
+    { label: 'nav.schedule', path: '/schedule', show: modulesActions.on('schedule') },
+    { label: 'nav.players', path: '/players', show: modulesActions.on('players') },
+    { label: 'nav.coaches', path: '/coaches', show: hasSite() },
+    { label: 'nav.pricing', path: '/pricing', show: hasSite() },
+    {
+      label: 'nav.booking',
+      path: '/booking',
+      show: modulesActions.on('calendar') && !authState.isTablet,
+    },
+    {
+      label: 'nav.rewards',
+      path: '/rewards',
+      show: pointsModel && modulesActions.on('credit') && !authState.isTablet,
+    },
+    { label: 'nav.about', path: '/about', show: hasSite() },
+  ].filter((item) => item.show)
+
+// The hamburger: three bars, a cross while the menu is open.
+const MenuButton = (props: { open: boolean; onToggle: () => void }) => (
+  <button
+    type="button"
+    class="vttc-menu-btn"
+    aria-label={langActions.t('nav.menu')}
+    aria-expanded={props.open}
+    onClick={() => props.onToggle()}
+  >
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+      <Show
+        when={props.open}
+        fallback={
+          <>
+            <line x1="4" y1="7" x2="20" y2="7" />
+            <line x1="4" y1="12" x2="20" y2="12" />
+            <line x1="4" y1="17" x2="20" y2="17" />
+          </>
+        }
+      >
+        <line x1="6" y1="6" x2="18" y2="18" />
+        <line x1="18" y1="6" x2="6" y2="18" />
+      </Show>
+    </svg>
+  </button>
+)
+
+// The links stacked under the top bar, the current page marked. Tapping
+// outside closes it.
+const MenuPanel = (props: {
+  onPick: (path: string) => () => void
+  onClose: () => void
+}) => {
+  const location = useLocation()
+  const isCurrent = (path: string) => location.pathname === path
+  return (
+    <>
+      <div class="vttc-menu-backdrop" onClick={() => props.onClose()} />
+      <nav class="vttc-menu-panel" style={{ 'background-color': topBarStyle['background-color'] }}>
+        <For each={navItems()}>
+          {(item) => (
+            <button
+              type="button"
+              class={isCurrent(item.path) ? 'vttc-menu-link is-on' : 'vttc-menu-link'}
+              aria-current={isCurrent(item.path) ? 'page' : undefined}
+              onClick={props.onPick(item.path)}
+            >
+              {langActions.t(item.label)}
+            </button>
+          )}
+        </For>
+      </nav>
+    </>
   )
 }
 
@@ -326,32 +381,33 @@ const UmpirePasswordDialog = (props: {
   }
 
   return (
-    <div style={overlayStyle} onClick={props.onClose}>
-      <div style={umpireDialogStyle} onClick={(e) => e.stopPropagation()}>
-        <h2 style={dialogTitleStyle}>Umpire a Match</h2>
-        <div style={umpireHintStyle}>
-          Enter the match day password to score a match on any table.
-        </div>
-        <Input
-          label="Match Day Password"
-          name="matchDayPassword"
-          type="password"
-          value={password()}
-          onChange={setPassword}
-        />
-        <Show when={error()}>
-          <div style={umpireErrorStyle}>{error()}</div>
-        </Show>
-        <div style={umpireButtonRowStyle}>
-          <Button color="#e74c3c" onClick={props.onClose}>
-            Cancel
-          </Button>
-          <Button color="#27ae60" onClick={() => void submit()} disabled={busy()}>
-            {busy() ? 'Checking...' : 'Continue'}
-          </Button>
-        </div>
+    <DialogFrame title="Umpire a Match" onClose={props.onClose}>
+      <div style={umpireHintStyle}>
+        Enter the match day password to score a match on any table.
       </div>
-    </div>
+      <Input
+        label="Match Day Password"
+        name="matchDayPassword"
+        type="password"
+        value={password()}
+        onChange={setPassword}
+      />
+      <Show when={error()}>
+        <div style={umpireErrorStyle}>{error()}</div>
+      </Show>
+      <div style={umpireButtonRowStyle}>
+        <ThemeButton variant="secondary" plainColor="#e74c3c" onClick={props.onClose}>
+          Cancel
+        </ThemeButton>
+        <ThemeButton
+          variant="primary"
+          onClick={() => void submit()}
+          disabled={busy()}
+        >
+          {busy() ? 'Checking...' : 'Continue'}
+        </ThemeButton>
+      </div>
+    </DialogFrame>
   )
 }
 
@@ -411,32 +467,30 @@ const SettingsIcon = () => (
 
 // Auth Dialog (switches between sign in and sign up)
 
-const AuthDialog = () => {
-  const handleOverlayClick = () => {
-    authActions.hideDialog()
-    signUpActions.reset()
-  }
+// In the club website's look for a club that has one (DialogFrame).
+const AuthDialog = () => (
+  <Show when={authState.dialogView !== null}>
+    <DialogFrame title={authDialogTitle()} onClose={closeAuthDialog}>
+      <Switch>
+        <Match when={authState.dialogView === 'signIn'}>
+          <SignInDialogContent />
+        </Match>
+        <Match when={authState.dialogView === 'signUp'}>
+          <SignUpWizardSection />
+        </Match>
+      </Switch>
+    </DialogFrame>
+  </Show>
+)
 
-  const handleDialogClick = (e: MouseEvent) => {
-    e.stopPropagation()
-  }
+const closeAuthDialog = () => {
+  authActions.hideDialog()
+  signUpActions.reset()
+}
 
-  return (
-    <Show when={authState.dialogView !== null}>
-      <div style={overlayStyle} onClick={handleOverlayClick}>
-        <div style={dialogStyle} onClick={handleDialogClick}>
-          <Switch>
-            <Match when={authState.dialogView === 'signIn'}>
-              <SignInDialogContent />
-            </Match>
-            <Match when={authState.dialogView === 'signUp'}>
-              <SignUpDialogContent />
-            </Match>
-          </Switch>
-        </div>
-      </div>
-    </Show>
-  )
+const authDialogTitle = () => {
+  if (authState.dialogView === 'signIn') return 'Sign in'
+  return signUpState.adminRegisterMode ? 'Register Player' : 'Sign up'
 }
 
 // Sign In Dialog Content
@@ -455,7 +509,6 @@ const SignInDialogContent = () => {
 
   return (
     <>
-      <h1 style={dialogTitleStyle}>Sign in</h1>
       <Input
         label="Email / Phone"
         name="emailOrPhone"
@@ -473,13 +526,15 @@ const SignInDialogContent = () => {
         <div style={errorStyle}>{authState.error}</div>
       </Show>
       <div style={buttonContainerStyle}>
-        <Button
+        <ThemeButton
+          variant="primary"
+          plainColor="#2185d0"
+          fill={hasSite()}
           onClick={handleSignIn}
-          color="#2185d0"
           disabled={authState.loading}
         >
           {authState.loading ? 'Signing in...' : 'Sign in'}
-        </Button>
+        </ThemeButton>
       </div>
       <div style={googleSignInRowStyle}>
         <div style={iconRowStyle}>
@@ -488,7 +543,7 @@ const SignInDialogContent = () => {
         <GoogleSignInStatus />
       </div>
       <div style={linkContainerStyle}>
-        <span style={linkStyle} onClick={handleGoToSignUp}>
+        <span {...themed(linkStyle, 'bk-link')} onClick={handleGoToSignUp}>
           Sign up
         </span>
       </div>
@@ -498,11 +553,8 @@ const SignInDialogContent = () => {
 
 // Sign Up Dialog Content
 
-const SignUpDialogContent = () => (
+const SignUpWizardSection = () => (
   <>
-    <h1 style={dialogTitleStyle}>
-      {signUpState.adminRegisterMode ? 'Register Player' : 'Sign up'}
-    </h1>
     <Switch>
       <Match when={signUpState.adminRegisterMode}>
         <AdminRegisterSection />
@@ -526,9 +578,9 @@ const AdminRegisterSection = () => (
           Sign up email sent to {signUpState.email}.
         </div>
         <div style={buttonContainerStyle}>
-          <Button onClick={authActions.hideDialog} color="#27ae60">
+          <ThemeButton variant="primary" onClick={authActions.hideDialog}>
             OK
-          </Button>
+          </ThemeButton>
         </div>
       </>
     }
@@ -542,20 +594,21 @@ const AdminRegisterSection = () => (
       <div style={errorStyle}>{signUpState.error}</div>
     </Show>
     <div style={buttonContainerStyle}>
-      <Button
+      <ThemeButton
+        variant="secondary"
+        plainColor="#e74c3c"
         onClick={authActions.hideDialog}
-        color="#e74c3c"
         disabled={signUpState.loading}
       >
         Cancel
-      </Button>
-      <Button
+      </ThemeButton>
+      <ThemeButton
+        variant="primary"
         onClick={signUpActions.runAdminRegister}
-        color="#27ae60"
         disabled={signUpState.loading}
       >
         {signUpState.loading ? 'Sending...' : 'Sign up'}
-      </Button>
+      </ThemeButton>
     </div>
   </Show>
 )
@@ -572,9 +625,12 @@ const NewPlayerSuccessSection = () => (
       </Show>
     </div>
     <div style={buttonContainerStyle}>
-      <Button onClick={signUpActions.dismissNewPlayerSuccess} color="#27ae60">
+      <ThemeButton
+        variant="primary"
+        onClick={signUpActions.dismissNewPlayerSuccess}
+      >
         OK
-      </Button>
+      </ThemeButton>
     </div>
   </>
 )
@@ -638,16 +694,6 @@ const umpireButtonStyle: JSX.CSSProperties = {
   'white-space': 'nowrap',
 }
 
-const umpireDialogStyle: JSX.CSSProperties = {
-  'background-color': '#fff',
-  'border-radius': '12px',
-  padding: '24px',
-  width: '100%',
-  'max-width': '360px',
-  display: 'flex',
-  'flex-direction': 'column',
-  gap: '8px',
-}
 
 const umpireHintStyle: JSX.CSSProperties = {
   'font-size': '13px',
@@ -728,37 +774,7 @@ const accountButtonStyle: JSX.CSSProperties = {
   transition: 'background-color 0.2s ease',
 }
 
-const overlayStyle: JSX.CSSProperties = {
-  position: 'fixed',
-  top: '0',
-  left: '0',
-  right: '0',
-  bottom: '0',
-  'background-color': 'rgba(0, 0, 0, 0.5)',
-  display: 'flex',
-  'align-items': 'center',
-  'justify-content': 'center',
-  'z-index': '1000',
-}
 
-const dialogStyle: JSX.CSSProperties = {
-  'background-color': '#fff',
-  'border-radius': '12px',
-  padding: '32px',
-  'min-width': '360px',
-  'max-width': '420px',
-  'max-height': '85vh',
-  'overflow-y': 'auto',
-  'box-shadow': '0 8px 32px rgba(0, 0, 0, 0.2)',
-}
-
-const dialogTitleStyle: JSX.CSSProperties = {
-  'font-size': '24px',
-  'font-weight': 700,
-  color: '#333',
-  'margin-bottom': '20px',
-  'text-align': 'center',
-}
 
 const errorStyle: JSX.CSSProperties = {
   color: '#e74c3c',

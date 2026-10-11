@@ -24,7 +24,8 @@ import { creditsState, creditsActions } from '../stores/creditsStore'
 import { authState, authActions } from '../stores/authStore'
 import { langActions } from '../stores/langStore'
 import { hasSite, loadSiteFonts } from '../site/siteContent'
-import { formatDollars, formatCredits } from '../../shared/rules/booking'
+import { formatDollars } from '../../shared/rules/booking'
+import { formatBalance, walletT } from '../i18n/wallet'
 import './booking.css'
 
 // Court booking: pick a day, pick a free half hour, choose how long, then
@@ -110,8 +111,8 @@ const BalanceLine = () => (
   >
     <div class="bk-balance">
       <span>
-        {t('booking.yourCredits')}{' '}
-        <strong>{formatCredits(creditsState.balance ?? 0)}</strong>
+        {walletT('yourBalance')}{' '}
+        <strong>{formatBalance(creditsState.balance ?? 0)}</strong>
       </span>
       <button
         type="button"
@@ -410,18 +411,16 @@ const PlayerPayment = () => (
     <div class="bk-price-row">
       <span>{t('booking.cost')}</span>
       <span class="bk-price">
-        {t('booking.creditsAmount', {
-          credits: formatCredits(bookingActions.costCredits()),
-        })}
+        {formatBalance(bookingActions.costCredits())}
       </span>
     </div>
     <p class="bk-note">
-      {t('booking.balance', {
-        credits: formatCredits(creditsState.balance ?? 0),
+      {walletT('balanceLine', {
+        amount: formatBalance(creditsState.balance ?? 0),
       })}
     </p>
     <Show when={!bookingActions.hasEnoughCredits()}>
-      <p class="bk-warn">{t('booking.notEnough')}</p>
+      <p class="bk-warn">{walletT('notEnough')}</p>
     </Show>
     <Actions>
       <button
@@ -473,7 +472,7 @@ const GuestPayment = () => (
         >
           {t('booking.signIn')}
         </button>{' '}
-        {t('booking.toBookWithCredits')}
+        {walletT('toBook')}
       </p>
     </Show>
     <Actions>
@@ -634,9 +633,9 @@ const DoneStep = () => (
       when={creditsActions.paysWithCredits() && bookingState.bookedCredits > 0}
     >
       <p class="bk-note">
-        {t('booking.creditsUsed', {
-          used: formatCredits(bookingState.bookedCredits),
-          balance: formatCredits(creditsState.balance ?? 0),
+        {walletT('used', {
+          used: formatBalance(bookingState.bookedCredits),
+          balance: formatBalance(creditsState.balance ?? 0),
         })}
       </p>
     </Show>

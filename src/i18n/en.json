@@ -7,7 +7,9 @@
     "booking": "Booking",
     "events": "Events",
     "schedule": "Schedule",
-    "players": "Players"
+    "players": "Players",
+    "rewards": "Rewards",
+    "menu": "Menu"
   },
   "language": {
     "switchTo": "中文",
@@ -34,7 +36,8 @@
     "continue": "Continue",
     "pleaseWait": "Please wait...",
     "selectDate": "Select date",
-    "midnight": "{time} (midnight)"
+    "midnight": "{time} (midnight)",
+    "ok": "OK"
   },
   "booking": {
     "kicker": "Court booking",
@@ -103,7 +106,11 @@
     "youGet": "You get",
     "added": "{credits} credits added",
     "balanceIs": "Your balance is {balance} credits.",
-    "minimum": "Top up at least ${min}, in whole dollars"
+    "minimum": "Top up at least ${min}, in whole dollars",
+    "chooseAmount": "Choose an amount. Your balance goes up by the same amount, and pays for bookings.",
+    "bonus": "+{points} points",
+    "noBonus": "No bonus points",
+    "pointsAdded": "+{points} reward points — you now have {total}."
   },
   "account": {
     "title": "Account",
@@ -142,7 +149,11 @@
     "pwUpper": "Password must contain at least 1 uppercase letter",
     "pwLower": "Password must contain at least 1 lowercase letter",
     "pwRequired": "New password is required",
-    "pwMismatch": "Passwords do not match"
+    "pwMismatch": "Passwords do not match",
+    "points": "Reward points",
+    "clubId": "Club ID",
+    "rewards": "Rewards",
+    "redemptionHistory": "Redemption history"
   },
   "password": {
     "min8": "At least 8 characters",
@@ -194,7 +205,16 @@
     "updateRating": "Update Rating",
     "updating": "Updating...",
     "modules": "Modules",
-    "ratingResult": "Rated {matches} new match(es); updated {players} player rating(s)."
+    "ratingResult": "Rated {matches} new match(es); updated {players} player rating(s).",
+    "rewards": "Rewards",
+    "topUpOptions": "Top-up amounts",
+    "topUpHint": "What members can top up, and the reward points each gives.",
+    "topUpDollars": "Amount ($)",
+    "topUpPoints": "Reward points",
+    "addTopUp": "Add amount",
+    "removeTopUp": "Remove",
+    "gifts": "Gifts",
+    "redemptions": "Redemption History"
   },
   "datePicker": {
     "weekdays": [
@@ -206,5 +226,90 @@
       "Fr",
       "Sa"
     ]
+  },
+  "wallet": {
+    "credits": {
+      "amount": "{credits} credits",
+      "title": "Credits",
+      "yourBalance": "Your credits",
+      "balanceLine": "Your balance: {amount}",
+      "notEnough": "Not enough credits. Top up to book this time.",
+      "toBook": "to book with credits.",
+      "used": "{used} used. Your balance is {balance}.",
+      "topUpTitle": "Top up credits",
+      "added": "{amount} added",
+      "paid": "{amount}"
+    },
+    "points": {
+      "title": "Balance",
+      "yourBalance": "Your balance",
+      "balanceLine": "Your balance: {amount}",
+      "notEnough": "Not enough balance. Top up to book this time.",
+      "toBook": "to book with your balance.",
+      "used": "{used} paid from your balance. Your balance is {balance}.",
+      "topUpTitle": "Top up",
+      "added": "{amount} added to your balance",
+      "paid": "{amount} from balance"
+    }
+  },
+  "rewards": {
+    "kicker": "Rewards",
+    "title": "Rewards",
+    "intro": "Top up and earn reward points, then trade them for gifts at the club. Points can only be redeemed for gifts.",
+    "atClub": "Redeem your points at the front desk — just ask our staff.",
+    "yourPoints": "Your points",
+    "points": "{points} points",
+    "clubId": "Club ID",
+    "signInForPoints": "Sign in to see your points.",
+    "history": "Redemption history",
+    "none": "No gifts yet.",
+    "redeem": "Redeem",
+    "loadFailed": "Could not load the rewards",
+    "redeemTitle": "Redeem {gift}",
+    "quantity": "Number of items",
+    "fewer": "One fewer",
+    "more": "One more",
+    "member": "Member",
+    "chooseMember": "-- Choose a member --",
+    "memberPoints": "{name} has {points} points",
+    "needed": "Points needed",
+    "notEnough": "Not enough points",
+    "confirm": "Redeem",
+    "redeeming": "Redeeming...",
+    "redeemed": "Redeemed {quantity} × {gift} for {name}. They now have {points} points.",
+    "manageGifts": "Manage gifts",
+    "pointsEach": "{points} points each"
+  },
+  "redemptions": {
+    "kicker": "Rewards",
+    "title": "Redemption History",
+    "allTitle": "All Redemptions",
+    "none": "No redemptions yet.",
+    "search": "Search by name, club ID or gift",
+    "item": "{quantity} × {gift}",
+    "points": "−{points} points",
+    "pointsLeft": "{points} points left",
+    "by": "Redeemed by {name}",
+    "loadFailed": "Could not load the redemptions"
+  },
+  "gifts": {
+    "kicker": "Club admin",
+    "title": "Gifts",
+    "add": "Add gift",
+    "edit": "Edit",
+    "delete": "Delete",
+    "editTitle": "Edit gift",
+    "addTitle": "New gift",
+    "name": "Name",
+    "description": "Description",
+    "image": "Image",
+    "chooseImage": "Choose image",
+    "changeImage": "Change image",
+    "removeImage": "Remove image",
+    "points": "Points needed",
+    "confirmDelete": "Delete \"{name}\"? Past redemptions of it are kept.",
+    "none": "No gifts yet. Add the first one.",
+    "imageFailed": "Could not read that image",
+    "loadFailed": "Could not load the gifts"
   }
 }

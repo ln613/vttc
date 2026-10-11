@@ -15,6 +15,7 @@ Vertical
     - saving indicator (spinning circle, while saving)
 - Event Setting Section (Tournament module)
 - Court Booking Section (Booking module)
+- Rewards Section (points model and Credit module — rules/wallet.md)
 - Revenue Section (Tournament module)
 - Modules Section (super admin only): link to the Modules page
 
@@ -43,6 +44,13 @@ Vertical
 - defaults from the club config's `booking.openTime` / `booking.closeTime` (8:00 AM to midnight for Timing Sports)
 - a later opening that leaves closing too soon moves closing with it
 - validated on save: half-hour times, closing at least the minimum booking length after opening. See `specs/rules/booking.md`
+
+## Rewards Section
+
+- "Top-up amounts — What members can top up, and the reward points each gives."
+- a row per amount: "Amount ($)" and "Reward points" (edited with the page's Edit/Save; "×" removes a row, "+ Add amount" adds one)
+- validated on save (rules/wallet.md, "Top up")
+- links: "Gifts" (Gifts page), "Redemption History" (every member's)
 
 ## Umpire Section
 

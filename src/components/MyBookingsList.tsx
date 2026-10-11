@@ -9,7 +9,8 @@ import {
 } from '../stores/myBookingsStore'
 import { langActions } from '../stores/langStore'
 import { themed } from '../site/themed'
-import { formatCredits, formatDollars } from '../../shared/rules/booking'
+import { formatDollars } from '../../shared/rules/booking'
+import { formatBalance, walletT } from '../i18n/wallet'
 
 // The signed-in player's court bookings, in the Account page's My Bookings
 // section: upcoming, then past, each with its door code and receipt. The
@@ -81,7 +82,7 @@ const timeRange = (b: MyBooking) =>
 const paidText = (b: MyBooking) =>
   b.paidWith === 'card'
     ? t('myBookings.paidCard', { amount: formatDollars(b.amountCents ?? 0) })
-    : t('myBookings.paidCredits', { credits: formatCredits(b.credits ?? 0) })
+    : walletT('paid', { amount: formatBalance(b.credits ?? 0) })
 
 const BookingCard = (props: { booking: MyBooking }) => (
   <div {...themed(cardStyle, 'mb-card')}>
@@ -164,9 +165,7 @@ const receiptLines = (b: MyBooking) => [
     ? [
         [
           t('myBookings.balanceAfter'),
-          t('myBookings.paidCredits', {
-            credits: formatCredits(b.balanceAfter),
-          }),
+          formatBalance(b.balanceAfter),
         ],
       ]
     : []),

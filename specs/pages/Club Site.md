@@ -7,7 +7,7 @@ A club's own public website, shown inside the app: Home, Coaches, Pricing, About
 "branding": { "topBarColor": "#3b1d82" }
 ```
 
-Content lives in `clubs/<slug>/site/`: one resource file per language (`en.json`, `zh.json`) and the images (`images/`). Only the building club's files are bundled. A club without a site keeps the app exactly as before. Timing Sports is the first.
+Content lives in `clubs/<slug>/site/`: one resource file per language (`en.json`, `zh.json`) and `images.json`, which maps each image's name ("hero-1", "coach-nathan", "qr-wechat"…) to its address on Cloudinary (folder "Timing Sports"), served as `f_auto,q_auto` so each browser gets the smallest format it takes. To add or replace images, run `node scripts/with-club.mjs --club <slug> node scripts/upload-site-images.mjs <folder of images> --folder "<Cloudinary folder>"` (needs `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`); it uploads them and updates `images.json`. Images left in an `images/` folder are still bundled. Only the building club's files are included. A club without a site keeps the app exactly as before. Timing Sports is the first.
 
 ## Languages
 

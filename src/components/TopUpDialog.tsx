@@ -1,24 +1,36 @@
-import { Show, Switch, Match } from 'solid-js'
+import { Show, Switch, Match, For } from 'solid-js'
 import Input from './Input'
 import PaymentPlaceholder from './PaymentPlaceholder'
 import { creditsState, creditsActions } from '../stores/creditsStore'
-import { formatCredits } from '../../shared/rules/booking'
+import { formatCredits, formatDollars } from '../../shared/rules/booking'
+import type { TopUpOption } from '../../shared/rules/wallet'
 import { langActions } from '../stores/langStore'
+import {
+  formatBalance,
+  formatPoints,
+  pointsModel,
+  walletT,
+} from '../i18n/wallet'
 import '../pages/booking.css'
 
 const t = langActions.t
 
-// Top up court-booking credits: an amount in dollars, then payment. Opens
-// above the booking dialog, and takes the look of the page it is on.
+// Top up the court-booking balance: an amount, then payment. A credits club
+// takes any whole-dollar amount; a points club offers set amounts, each with
+// its reward points (specs/rules/wallet.md). Opens above the booking dialog,
+// and takes the look of the page it is on.
 const TopUpDialog = () => (
   <Show when={creditsState.topUpOpen}>
     <div class="bk-overlay is-top" onClick={creditsActions.closeTopUp}>
       <div class="bk-dialog" onClick={(e) => e.stopPropagation()}>
         <div class="bk-dialog-head">
-          <h2 class="bk-dialog-title">{t('topUp.title')}</h2>
+          <h2 class="bk-dialog-title">{walletT('topUpTitle')}</h2>
         </div>
         <div class="bk-dialog-body">
           <Switch>
+            <Match when={creditsState.topUpStep === 'amount' && pointsModel}>
+              <OptionsStep />
+            </Match>
             <Match when={creditsState.topUpStep === 'amount'}>
               <AmountStep />
             </Match>
@@ -94,14 +106,74 @@ const AmountStep = () => {
   )
 }
 
+// A points club: one of its amounts, each showing the points it gives.
+const OptionsStep = () => (
+  <>
+    <p class="bk-note">{t('topUp.chooseAmount')}</p>
+    <div class="bk-options">
+      <For each={creditsState.topUpOptions}>
+        {(option) => <OptionButton option={option} />}
+      </For>
+    </div>
+    <div class="bk-actions">
+      <button
+        type="button"
+        class="bk-btn bk-btn-secondary bk-btn-fill"
+        onClick={creditsActions.closeTopUp}
+        disabled={creditsState.busy}
+      >
+        {t('common.cancel')}
+      </button>
+      <button
+        type="button"
+        class="bk-btn bk-btn-primary bk-btn-fill"
+        onClick={creditsActions.startTopUp}
+        disabled={creditsState.busy}
+      >
+        {creditsState.busy ? t('common.pleaseWait') : t('common.continue')}
+      </button>
+    </div>
+  </>
+)
+
+const OptionButton = (props: { option: TopUpOption }) => (
+  <button
+    type="button"
+    class={
+      creditsActions.isChosenOption(props.option)
+        ? 'bk-option is-on'
+        : 'bk-option'
+    }
+    aria-pressed={creditsActions.isChosenOption(props.option)}
+    onClick={() => creditsActions.chooseOption(props.option)}
+  >
+    <span class="bk-option-amount">
+      {formatDollars(props.option.dollars * 100)}
+    </span>
+    <span class="bk-option-bonus">
+      {props.option.points > 0
+        ? t('topUp.bonus', { points: formatPoints(props.option.points) })
+        : t('topUp.noBonus')}
+    </span>
+  </button>
+)
+
 const DoneStep = () => (
   <>
     <p class="bk-done">
-      {t('topUp.added', { credits: formatCredits(creditsState.creditsBought) })}
+      {walletT('added', { amount: formatBalance(creditsState.creditsBought) })}
     </p>
+    <Show when={creditsState.pointsEarned > 0}>
+      <p class="bk-note" style={{ 'text-align': 'center' }}>
+        {t('topUp.pointsAdded', {
+          points: formatPoints(creditsState.pointsEarned),
+          total: formatPoints(creditsState.points ?? 0),
+        })}
+      </p>
+    </Show>
     <p class="bk-note" style={{ 'text-align': 'center' }}>
-      {t('topUp.balanceIs', {
-        balance: formatCredits(creditsState.balance ?? 0),
+      {walletT('balanceLine', {
+        amount: formatBalance(creditsState.balance ?? 0),
       })}
     </p>
     <div class="bk-actions is-center">

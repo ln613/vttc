@@ -24,7 +24,7 @@ the player's confirmed bookings, newest first: [{ _id, date, court, start, minut
 
 ## My credits (GET myCredits, signed in)
 
-{ credits, paymentsAvailable }
+{ credits, points, paymentsAvailable } — `points`: reward points (points model, rules/wallet.md), 0 otherwise
 
 ## Book with credits (POST bookCourt, signed in)
 
@@ -61,11 +61,11 @@ the player's confirmed bookings, newest first: [{ _id, date, court, start, minut
 
 ### input
 
-- dollars* (whole, at least the minimum)
+- dollars* — credits model: whole, at least the minimum; points model: one of the amounts on offer (rules/wallet.md)
 
 ### Output
 
-{ paymentId, amountCents, credits, paymentsAvailable } — a pending payment
+{ paymentId, amountCents, credits, points, paymentsAvailable } — a pending payment; `points` the reward points it will give (0 on the credits model)
 
 ## Confirm payment (POST confirmPayment, public)
 
@@ -82,4 +82,38 @@ The Stripe placeholder: only with PAYMENTS_MODE=placeholder. Once Stripe is conn
 
 ### Output
 
-guest booking (then the door code and the receipt email): { kind, ok, booking: { date, court, start, minutes }, doorCode | null, receiptSentTo | null }; top-up: { kind, ok, balance }
+guest booking (then the door code and the receipt email): { kind, ok, booking: { date, court, start, minutes }, doorCode | null, receiptSentTo | null }; top-up: { kind, ok, balance, points? } — `points`, the member's reward points after, when the top-up gave some
+
+# Reward APIs
+
+Points model only (rules/wallet.md), with the Credit module; otherwise "Rewards are not available at this club".
+
+## Gifts (GET gifts, public)
+
+[{ _id, name, description, image, points }], fewest points first
+
+## Save gift (POST saveGift, admin)
+
+- input: _id (to update), name*, description, image (data URL or https URL), points*
+- output: the gift
+
+## Delete gift (POST deleteGift, admin)
+
+- input: _id* — hides the gift; output { success }
+
+## Members (GET rewardMembers, admin)
+
+[{ _id, name, clubId, points }] — members with an account (or with points), by name
+
+## Redeem (POST redeemGift, admin)
+
+- input: giftId*, playerId*, quantity* (1–99)
+- output: { redemption, points } — the member's points after
+
+## My redemptions (GET myRedemptions, signed in)
+
+{ points, redemptions: [{ _id, playerId, playerName, clubId, giftName, giftPoints, quantity, points, pointsAfter, redeemedBy, createdAt }] }, newest first
+
+## Redemptions (GET redemptions, admin)
+
+every member's redemptions (same fields), newest first, the latest 500

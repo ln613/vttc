@@ -1,13 +1,85 @@
-import { Show } from 'solid-js'
+import { Show, onMount } from 'solid-js'
 import type { JSX } from 'solid-js'
 import Button from './Button'
+import ThemeButton from './ThemeButton'
 import {
   confirmDialogState,
   confirmDialogActions,
 } from '../stores/confirmDialogStore'
+import { langActions } from '../stores/langStore'
+import { hasSite, loadSiteFonts } from '../site/siteContent'
+import '../pages/booking.css'
 
+// The app's confirm/alert box (customConfirm). A club with its own website
+// gets it in the site's look and language, over whatever page it opens on;
+// every other club the plain box.
 const ConfirmDialog = () => (
   <Show when={confirmDialogState.open}>
+    <Show when={hasSite()} fallback={<PlainConfirm />}>
+      <SiteConfirm />
+    </Show>
+  </Show>
+)
+
+// In modal mode the umpire must tap an explicit button — overlay clicks are
+// swallowed.
+const dismissOnOverlay = (e: MouseEvent) => {
+  e.stopPropagation()
+  e.preventDefault()
+  if (confirmDialogState.modal) return
+  confirmDialogActions.cancel()
+}
+
+// A red confirm (delete, reset) is the site's danger button; anything else
+// its primary one.
+const isDanger = () => /^#e74c3c$/i.test(confirmDialogState.confirmColor)
+
+// The store's default labels are English; the site shows its own.
+const confirmLabel = () =>
+  confirmDialogState.confirmLabel === 'OK'
+    ? langActions.t('common.ok')
+    : confirmDialogState.confirmLabel
+
+const cancelLabel = () =>
+  !confirmDialogState.cancelLabel || confirmDialogState.cancelLabel === 'Cancel'
+    ? langActions.t('common.cancel')
+    : confirmDialogState.cancelLabel
+
+const SiteConfirm = () => {
+  onMount(loadSiteFonts)
+  return (
+    <div class="bk-site bk-overlay is-confirm" onClick={dismissOnOverlay}>
+      <div
+        class="bk-dialog bk-dialog-padded"
+        role="alertdialog"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p class="bk-confirm-message">{confirmDialogState.message}</p>
+        <div class="bk-actions">
+          <Show when={confirmDialogState.mode === 'confirm'}>
+            <ThemeButton
+              variant="secondary"
+              fill
+              onClick={() => confirmDialogActions.cancel()}
+            >
+              {cancelLabel()}
+            </ThemeButton>
+          </Show>
+          <ThemeButton
+            variant={isDanger() ? 'danger' : 'primary'}
+            fill
+            onClick={() => confirmDialogActions.confirm()}
+          >
+            {confirmLabel()}
+          </ThemeButton>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const PlainConfirm = () => (
+  <>
     <div
       style={overlayStyle}
       onClick={(e) => {
@@ -47,7 +119,7 @@ const ConfirmDialog = () => (
         </div>
       </div>
     </div>
-  </Show>
+  </>
 )
 
 const overlayStyle: JSX.CSSProperties = {

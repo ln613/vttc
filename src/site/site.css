@@ -198,6 +198,83 @@
   font-size: clamp(34px, 6vw, 64px);
 }
 
+/* ---------- the banner (top of every page) ---------- */
+
+.ts-banner {
+  position: relative;
+  background-color: var(--ts-night);
+  background-size: cover;
+  /* The strip of the photo with the court floor and the net. */
+  background-position: center 54%;
+  color: var(--ts-white);
+  overflow: hidden;
+}
+.ts-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  /* Dark behind the name so it reads; the court opens up to the right. */
+  background: linear-gradient(
+    90deg,
+    rgba(22, 13, 46, 0.92) 0%,
+    rgba(30, 15, 64, 0.72) 38%,
+    rgba(36, 18, 77, 0.22) 72%,
+    rgba(36, 18, 77, 0.1) 100%
+  );
+}
+.ts-banner-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 2vw, 20px);
+  min-height: clamp(84px, 12vw, 132px);
+  padding-block: 12px;
+}
+.ts-banner-logo {
+  width: clamp(54px, 7.5vw, 88px);
+  height: clamp(54px, 7.5vw, 88px);
+  box-sizing: border-box;
+  padding: 0;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9), 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+.ts-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.ts-banner .ts-banner-name {
+  font-size: clamp(26px, 4.6vw, 52px);
+  line-height: 0.95;
+}
+.ts-banner-services {
+  font-weight: 700;
+  font-size: clamp(10.5px, 1.25vw, 13px);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #d9cffb;
+}
+.ts-banner-tagline {
+  margin-left: auto;
+  font-size: clamp(22px, 3vw, 36px);
+  transform: rotate(-3deg);
+  white-space: nowrap;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+}
+@media (max-width: 640px) {
+  .ts-banner-tagline {
+    display: none;
+  }
+  .ts-banner-services {
+    letter-spacing: 0.06em;
+    font-size: 10px;
+  }
+}
+
 /* ---------- home: hero ---------- */
 
 .ts-hero {

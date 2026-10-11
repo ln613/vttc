@@ -22,6 +22,10 @@ import SiteHome from './pages/site/SiteHome'
 import SiteCoaches from './pages/site/SiteCoaches'
 import SitePricing from './pages/site/SitePricing'
 import SiteAbout from './pages/site/SiteAbout'
+import Rewards from './pages/Rewards'
+import Redemptions from './pages/Redemptions'
+import Gifts from './pages/Gifts'
+import { pointsModel } from './i18n/wallet'
 import { hasSite } from './site/siteContent'
 import ConfirmDialog from './components/ConfirmDialog'
 import { ModuleGate, Home } from './components/ModuleGate'
@@ -70,6 +74,16 @@ const siteOnly =
     </Show>
   )
 
+// Rewards and gifts exist only for a club on the points model
+// (specs/rules/wallet.md), and with the Credit module.
+const pointsOnly =
+  (Page: Component): Component =>
+  () => (
+    <Show when={pointsModel} fallback={<Navigate href="/" />}>
+      <Page />
+    </Show>
+  )
+
 const TournamentEditPage = () => <TournamentEdit isEdit />
 const EventEditPage = () => <EventEdit isEdit />
 
@@ -114,6 +128,9 @@ const App = () => (
     <Route path="/coaches" component={siteOnly(SiteCoaches)} />
     <Route path="/pricing" component={siteOnly(SitePricing)} />
     <Route path="/about" component={siteOnly(SiteAbout)} />
+    <Route path="/rewards" component={gated('credit', pointsOnly(Rewards))} />
+    <Route path="/redemptions" component={gated('credit', pointsOnly(Redemptions))} />
+    <Route path="/gifts" component={gated('credit', pointsOnly(Gifts))} />
   </HashRouter>
 )
 

@@ -7,7 +7,9 @@
     "booking": "订场",
     "events": "赛事",
     "schedule": "赛程",
-    "players": "球员"
+    "players": "球员",
+    "rewards": "积分礼品",
+    "menu": "菜单"
   },
   "language": {
     "switchTo": "EN",
@@ -34,7 +36,8 @@
     "continue": "继续",
     "pleaseWait": "请稍候…",
     "selectDate": "选择日期",
-    "midnight": "{time}（午夜）"
+    "midnight": "{time}（午夜）",
+    "ok": "确定"
   },
   "booking": {
     "kicker": "场地预订",
@@ -103,7 +106,11 @@
     "youGet": "可获得",
     "added": "已充值 {credits} 积分",
     "balanceIs": "当前余额 {balance} 积分。",
-    "minimum": "最低充值 {min} 加元，金额须为整数"
+    "minimum": "最低充值 {min} 加元，金额须为整数",
+    "chooseAmount": "请选择充值金额。余额按充值金额等额增加，可用于预订场地。",
+    "bonus": "赠送 {points} 积分",
+    "noBonus": "无赠送积分",
+    "pointsAdded": "获赠 {points} 积分，当前共 {total} 积分。"
   },
   "account": {
     "title": "账户",
@@ -142,7 +149,11 @@
     "pwUpper": "密码须包含至少 1 个大写字母",
     "pwLower": "密码须包含至少 1 个小写字母",
     "pwRequired": "请输入新密码",
-    "pwMismatch": "两次输入的密码不一致"
+    "pwMismatch": "两次输入的密码不一致",
+    "points": "积分",
+    "clubId": "会员号",
+    "rewards": "积分兑换",
+    "redemptionHistory": "兑换记录"
   },
   "password": {
     "min8": "至少 8 个字符",
@@ -194,7 +205,16 @@
     "updateRating": "更新等级分",
     "updating": "更新中…",
     "modules": "功能模块",
-    "ratingResult": "已计算 {matches} 场新比赛，更新了 {players} 名球员的等级分。"
+    "ratingResult": "已计算 {matches} 场新比赛，更新了 {players} 名球员的等级分。",
+    "rewards": "积分礼品",
+    "topUpOptions": "充值金额",
+    "topUpHint": "会员可选的充值金额，以及每档赠送的积分。",
+    "topUpDollars": "金额（加元）",
+    "topUpPoints": "赠送积分",
+    "addTopUp": "添加金额",
+    "removeTopUp": "删除",
+    "gifts": "礼品管理",
+    "redemptions": "兑换记录"
   },
   "datePicker": {
     "weekdays": [
@@ -206,5 +226,90 @@
       "五",
       "六"
     ]
+  },
+  "wallet": {
+    "credits": {
+      "amount": "{credits} 积分",
+      "title": "积分",
+      "yourBalance": "我的积分",
+      "balanceLine": "积分余额：{amount}",
+      "notEnough": "积分不足，请先充值。",
+      "toBook": "即可用积分预订。",
+      "used": "已使用 {used}，余额 {balance}。",
+      "topUpTitle": "充值积分",
+      "added": "已充值 {amount}",
+      "paid": "{amount}"
+    },
+    "points": {
+      "title": "账户余额",
+      "yourBalance": "我的余额",
+      "balanceLine": "账户余额：{amount}",
+      "notEnough": "余额不足，请先充值。",
+      "toBook": "即可用余额预订。",
+      "used": "已从余额支付 {used}，当前余额 {balance}。",
+      "topUpTitle": "充值",
+      "added": "余额已增加 {amount}",
+      "paid": "余额支付 {amount}"
+    }
+  },
+  "rewards": {
+    "kicker": "积分礼品",
+    "title": "积分兑换",
+    "intro": "充值即可获赠积分，积分可在球馆兑换礼品。积分仅限兑换礼品。",
+    "atClub": "请到前台找工作人员兑换礼品。",
+    "yourPoints": "我的积分",
+    "points": "{points} 积分",
+    "clubId": "会员号",
+    "signInForPoints": "登录后可查看你的积分。",
+    "history": "兑换记录",
+    "none": "暂无礼品。",
+    "redeem": "兑换",
+    "loadFailed": "无法加载礼品",
+    "redeemTitle": "兑换 {gift}",
+    "quantity": "数量",
+    "fewer": "减少一件",
+    "more": "增加一件",
+    "member": "会员",
+    "chooseMember": "-- 选择会员 --",
+    "memberPoints": "{name} 有 {points} 积分",
+    "needed": "所需积分",
+    "notEnough": "积分不足",
+    "confirm": "确认兑换",
+    "redeeming": "兑换中…",
+    "redeemed": "已为 {name} 兑换 {quantity} × {gift}，剩余 {points} 积分。",
+    "manageGifts": "管理礼品",
+    "pointsEach": "每件 {points} 积分"
+  },
+  "redemptions": {
+    "kicker": "积分礼品",
+    "title": "兑换记录",
+    "allTitle": "全部兑换记录",
+    "none": "暂无兑换记录。",
+    "search": "按姓名、会员号或礼品搜索",
+    "item": "{quantity} × {gift}",
+    "points": "−{points} 积分",
+    "pointsLeft": "剩余 {points} 积分",
+    "by": "经办人：{name}",
+    "loadFailed": "无法加载兑换记录"
+  },
+  "gifts": {
+    "kicker": "球馆管理",
+    "title": "礼品管理",
+    "add": "添加礼品",
+    "edit": "编辑",
+    "delete": "删除",
+    "editTitle": "编辑礼品",
+    "addTitle": "新礼品",
+    "name": "名称",
+    "description": "描述",
+    "image": "图片",
+    "chooseImage": "选择图片",
+    "changeImage": "更换图片",
+    "removeImage": "移除图片",
+    "points": "所需积分",
+    "confirmDelete": "删除“{name}”？已有的兑换记录会保留。",
+    "none": "暂无礼品，请添加第一件。",
+    "imageFailed": "无法读取该图片",
+    "loadFailed": "无法加载礼品"
   }
 }

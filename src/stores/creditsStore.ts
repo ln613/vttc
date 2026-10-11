@@ -9,15 +9,27 @@ import {
   isValidTopUp,
   topUpCredits,
 } from '../../shared/rules/booking'
+import {
+  DEFAULT_TOP_UP_OPTIONS,
+  findTopUpOption,
+  sortTopUpOptions,
+  type TopUpOption,
+} from '../../shared/rules/wallet'
+import { pointsModel } from '../i18n/wallet'
 
-// A player's court-booking credits, and topping them up. Shared by the
-// Account page (balance, Top up) and the Booking page (pay with credits, or
-// top up when there are not enough). See specs/rules/booking.md.
+// A player's court-booking balance, and topping it up. Shared by the
+// Account page (balance, Top up) and the Booking page (pay from the
+// balance, or top up when there is not enough). See specs/rules/booking.md
+// and, for the two ways a club can run it, specs/rules/wallet.md.
 
 export type TopUpStep = 'amount' | 'pay' | 'done'
 
 interface CreditsState {
   balance: number | null
+  // Reward points (points model): only ever redeemed for gifts.
+  points: number | null
+  // The amounts a points club offers, from its settings.
+  topUpOptions: TopUpOption[]
   paymentsAvailable: boolean
   loading: boolean
   error: string | null
@@ -28,12 +40,15 @@ interface CreditsState {
   paymentId: string
   amountCents: number
   creditsBought: number
+  pointsEarned: number
   busy: boolean
   topUpError: string | null
 }
 
 const getInitialState = (): CreditsState => ({
   balance: null,
+  points: null,
+  topUpOptions: DEFAULT_TOP_UP_OPTIONS,
   paymentsAvailable: false,
   loading: false,
   error: null,
@@ -43,6 +58,7 @@ const getInitialState = (): CreditsState => ({
   paymentId: '',
   amountCents: 0,
   creditsBought: 0,
+  pointsEarned: 0,
   busy: false,
   topUpError: null,
 })
@@ -80,17 +96,29 @@ const dollarsValue = (): number => Number(creditsState.dollars)
 const topUpPreviewCredits = (): number =>
   isValidTopUp(rules, dollarsValue()) ? topUpCredits(rules, dollarsValue()) : 0
 
+// A points club tops up by one of its offered amounts.
+const isValidAmount = (): boolean =>
+  pointsModel
+    ? !!findTopUpOption(creditsState.topUpOptions, dollarsValue())
+    : isValidTopUp(rules, dollarsValue())
+
+const isChosenOption = (option: TopUpOption): boolean =>
+  dollarsValue() === option.dollars
+
 // ==================== balance ====================
 
 const fetchBalance = async () => {
   if (!paysWithCredits()) return
   setCreditsState({ loading: true, error: null })
   try {
-    const data = await apiGet<{ credits: number; paymentsAvailable: boolean }>(
-      'myCredits',
-    )
+    const data = await apiGet<{
+      credits: number
+      points: number
+      paymentsAvailable: boolean
+    }>('myCredits')
     setCreditsState({
       balance: data.credits,
+      points: data.points ?? 0,
       paymentsAvailable: data.paymentsAvailable,
       loading: false,
     })
@@ -110,12 +138,36 @@ const openTopUp = () => {
   setCreditsState({
     topUpOpen: true,
     topUpStep: 'amount',
-    dollars: String(rules.minTopUpDollars),
+    dollars: String(
+      pointsModel
+        ? (creditsState.topUpOptions[0]?.dollars ?? '')
+        : rules.minTopUpDollars,
+    ),
     paymentId: '',
     topUpError: null,
     busy: false,
   })
+  if (pointsModel) void fetchTopUpOptions()
 }
+
+// The amounts on offer live in the club's settings, which an admin can
+// change, so they are read each time the dialog opens.
+const fetchTopUpOptions = async () => {
+  try {
+    const settings = await apiGet<{ topUpOptions?: TopUpOption[] }>('settings')
+    const options = sortTopUpOptions(settings.topUpOptions ?? [])
+    if (!options.length) return
+    setCreditsState({ topUpOptions: options })
+    if (!findTopUpOption(options, dollarsValue())) {
+      setCreditsState({ dollars: String(options[0].dollars) })
+    }
+  } catch {
+    // Keep the defaults; the server checks the amount anyway.
+  }
+}
+
+const chooseOption = (option: TopUpOption) =>
+  setCreditsState({ dollars: String(option.dollars), topUpError: null })
 
 const closeTopUp = () => setCreditsState({ topUpOpen: false, topUpError: null })
 
@@ -126,11 +178,12 @@ interface TopUpResponse {
   paymentId: string
   amountCents: number
   credits: number
+  points?: number
   paymentsAvailable: boolean
 }
 
 const startTopUp = async () => {
-  if (!isValidTopUp(rules, dollarsValue())) {
+  if (!isValidAmount()) {
     return setCreditsState(
       'topUpError',
       langActions.t('topUp.minimum', { min: rules.minTopUpDollars }),
@@ -147,6 +200,7 @@ const startTopUp = async () => {
       paymentId: result.paymentId,
       amountCents: result.amountCents,
       creditsBought: result.credits,
+      pointsEarned: result.points ?? 0,
       paymentsAvailable: result.paymentsAvailable,
     })
   } catch (err) {
@@ -160,10 +214,16 @@ const startTopUp = async () => {
 const payTopUp = async () => {
   setCreditsState({ busy: true, topUpError: null })
   try {
-    const result = await apiPost<{ balance: number }>('confirmPayment', {
-      paymentId: creditsState.paymentId,
+    const result = await apiPost<{ balance: number; points?: number }>(
+      'confirmPayment',
+      { paymentId: creditsState.paymentId },
+    )
+    setCreditsState({
+      busy: false,
+      topUpStep: 'done',
+      balance: result.balance,
+      ...(result.points != null ? { points: result.points } : {}),
     })
-    setCreditsState({ busy: false, topUpStep: 'done', balance: result.balance })
   } catch (err) {
     setCreditsState({
       busy: false,
@@ -180,6 +240,8 @@ export const creditsActions = {
   hasMyBookings,
   isPlayer,
   topUpPreviewCredits,
+  isChosenOption,
+  chooseOption,
   fetchBalance,
   setBalance,
   openTopUp,

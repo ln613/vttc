@@ -7,7 +7,9 @@ import {
   formatLength,
   formatDollars,
   formatCredits,
+  bookingRules,
 } from '../../../shared/rules/booking.js'
+import { balanceCents, isPointsModel } from '../../../shared/rules/wallet.js'
 
 const throwError = (message) => {
   throw new Error(message)
@@ -40,12 +42,24 @@ const clubDateTime = (instant) =>
     minute: '2-digit',
   }).format(instant)
 
+// A balance amount as the club's model shows it: "3,000 credits", or (points
+// model, where the balance is dollars) "$30.00" — specs/rules/wallet.md.
+const balanceAmount = (credits) =>
+  isPointsModel(club)
+    ? formatDollars(balanceCents(credits, bookingRules(club.booking).creditsPerDollar))
+    : `${formatCredits(credits)} credits`
+
 const paymentLines = (booking) =>
   booking.paidWith === 'credits'
     ? [
-        { label: 'Paid', value: `${formatCredits(booking.credits)} credits` },
+        {
+          label: 'Paid',
+          value: isPointsModel(club)
+            ? `${balanceAmount(booking.credits)} from balance`
+            : balanceAmount(booking.credits),
+        },
         ...(booking.balanceAfter != null
-          ? [{ label: 'Balance after', value: `${formatCredits(booking.balanceAfter)} credits` }]
+          ? [{ label: 'Balance after', value: balanceAmount(booking.balanceAfter) }]
           : []),
       ]
     : [{ label: 'Paid', value: `${formatDollars(booking.amountCents)} by card` }]

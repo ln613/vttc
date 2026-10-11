@@ -43,6 +43,14 @@ declare module 'club-config' {
     saveUmpireInfo?: boolean
     maxUmpiresPerTable?: number
     /**
+     * How players hold money with the club — see specs/rules/wallet.md.
+     * "credits" (absent = this): top up, get credits, pay for bookings in
+     * credits. "points": top up into a dollar balance that pays for
+     * bookings, plus reward points (some top-up amounts) that are only
+     * redeemed for gifts.
+     */
+    creditModel?: 'credits' | 'points'
+    /**
      * Court booking — see specs/rules/booking.md. Absent or not enabled =
      * no Booking page, no credits. Every number is optional and falls
      * back to DEFAULT_BOOKING in shared/rules/booking.js.

@@ -3,6 +3,7 @@
 ## Layout
 
 - banner https://res.cloudinary.com/vttc/image/upload/v1767957616/banner.jpg
+  - a club with its own website (specs/pages/Club Site.md) instead gets a banner built like its home hero: a photo of the court ("hero-2", cropped to the court floor and the net) as the background under a purple gradient that is dark behind the text and opens up over the court, with the round logo, the name ("TIMING SPORTS", italic display type), the services line and the script tagline ("Play · Connect · Enjoy", hidden on phones) laid over it as text in the current language — so it never stretches at any width
 - Top bar (blue bg, white text). Every link and button follows its module (rules/modules.md); one that is off is not shown
   - Live score icon (for tablet, show Tablet)
   - "Umpire" button (green bg), next to the live score icon
@@ -17,6 +18,8 @@
   - Schedule: go to the schedule page
   - Players: go to the Players page
   - "Booking": go to the Booking page — Calendar module, not for the tablet
+  - "Rewards": go to the Rewards page — points model (rules/wallet.md) and Credit module, not for the tablet
+  - a club with its own website, on a screen 900px wide or less (phones, tablets): the page links fold into a menu — a hamburger icon (44×44) at the left of the top bar, which turns into a cross while open. The menu drops down under the top bar, one link per row in the top bar's colour, the current page marked with a yellow bar; picking a link (or tapping outside) closes it. The live score badge, language toggle, settings and account icons stay in the bar. Other clubs keep their links in the bar at every width
   - a club with its own website (specs/pages/Club Site.md): "Home", "Coaches", "Pricing", "About", in the club's top bar colour, and a language toggle (align right) when the site has more than one language
   - on a phone (480px and narrower) the bar tightens its spacing so the links fit beside the icons; on a screen too narrow even for that, the links scroll sideways within the bar, never the page
   - Setting Icon (align right, admin only)
@@ -42,6 +45,8 @@
 - on failure, keep the dialog open and show the error
 
 ## Sign in dialog
+
+A club with its own website (specs/pages/Club Site.md) shows the sign in, sign up, "Change your password" and "Umpire a Match" dialogs — and every confirm box in the app (e.g. "Delete …?", "Discard unsaved changes?"; red confirms become the site's red button, the rest its yellow one; "OK"/"Cancel" in the site's language) — in its site's look, on any page: the title in the purple heading band, the site's pill buttons ("Sign in" full width), links, progress dots and choice tiles in its colours. Other clubs keep the plain white dialog.
 
 - header "Sign in", (h1)
 - email/phone input box

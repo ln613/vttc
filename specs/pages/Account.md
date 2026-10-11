@@ -50,6 +50,9 @@ Credit module (rules/modules.md), on the signed-in player's own account (not whe
 
 - header: "Credits", and the balance "{credits} credits" at the right, so it shows while closed
 - open: balance "{credits}" (large) "credits", "Top up" button (green): opens the Top up dialog (see rules/booking.md)
+- points model (rules/wallet.md): titled "Balance", the balance in dollars ("$100"), and under "Top up":
+  - "Reward points: {points}" and "Club ID: {club id}"
+  - links "Rewards" (Rewards page) and "Redemption history" (Redemption History page)
 
 ## My Bookings Section
 

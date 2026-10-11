@@ -41,6 +41,7 @@
     "low": [],
     "high": []
   },
+  "creditModel": "points",
   "booking": {
     "enabled": true,
     "courtLabel": "Pickleball Court",

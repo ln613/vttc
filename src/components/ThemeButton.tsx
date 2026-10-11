@@ -17,7 +17,10 @@ const PLAIN_COLORS: Record<Variant, string> = {
 
 const ThemeButton = (props: {
   variant: Variant
-  onClick: () => void
+  // A form's submit button needs no onClick: Enter and the click both
+  // submit the form.
+  onClick?: () => void
+  type?: 'button' | 'submit'
   disabled?: boolean
   fill?: boolean
   small?: boolean
@@ -27,9 +30,9 @@ const ThemeButton = (props: {
 }) =>
   hasSite() ? (
     <button
-      type="button"
+      type={props.type ?? 'button'}
       class={`bk-btn bk-btn-${props.variant}${props.fill ? ' bk-btn-fill' : ''}${props.small ? ' bk-btn-small' : ''}`}
-      onClick={() => props.onClick()}
+      onClick={() => props.onClick?.()}
       disabled={props.disabled}
     >
       {props.children}
@@ -37,7 +40,8 @@ const ThemeButton = (props: {
   ) : (
     <Button
       color={props.plainColor ?? PLAIN_COLORS[props.variant]}
-      onClick={() => props.onClick()}
+      type={props.type}
+      onClick={() => props.onClick?.()}
       disabled={props.disabled}
       fill={props.fill}
       size={props.small ? 'small' : undefined}

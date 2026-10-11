@@ -1,4 +1,4 @@
-import { Show, onMount, type JSX } from 'solid-js'
+import { Show, For, onMount, type JSX } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { Header } from '../components/Header'
 import { authState } from '../stores/authStore'
@@ -15,6 +15,8 @@ import {
 import ThemeButton from '../components/ThemeButton'
 import { langActions } from '../stores/langStore'
 import { hasSite, loadSiteFonts } from '../site/siteContent'
+import { pointsModel } from '../i18n/wallet'
+import type { TopUpOption } from '../../shared/rules/wallet'
 import { themed } from '../site/themed'
 import './booking.css'
 
@@ -57,6 +59,10 @@ const Settings = () => {
           </Show>
           <Show when={modulesActions.on('booking')}>
             <BookingSection />
+          </Show>
+          {/* Points model only (specs/rules/wallet.md). */}
+          <Show when={pointsModel && modulesActions.on('credit')}>
+            <RewardsSection />
           </Show>
           {/* Only where the club records who umpired — otherwise there is
               no roster to keep. */}
@@ -338,6 +344,130 @@ const BookingSection = () => (
     </div>
   </div>
 )
+
+// Points model: the top-up amounts on offer with their reward points
+// (edited with the rest of the page), and the rewards pages.
+const RewardsSection = () => {
+  const navigate = useNavigate()
+  return (
+    <div {...themed(sectionStyle, 'bk-card')}>
+      <h4 {...themed(sectionHeaderStyle, 'bk-section-title')}>
+        {t('settings.rewards')}
+      </h4>
+      <TopUpOptionsEditor />
+      <div style={{ 'margin-top': '16px' }}>
+        <div {...themed(linkColumnStyle, 'bk-links')}>
+          <button
+            type="button"
+            {...themed(linkButtonStyle, 'bk-link')}
+            onClick={() => navigate('/gifts')}
+          >
+            {t('settings.gifts')}
+          </button>
+          <button
+            type="button"
+            {...themed(linkButtonStyle, 'bk-link')}
+            onClick={() => navigate('/redemptions')}
+          >
+            {t('settings.redemptions')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const topUpOptions = (): TopUpOption[] => settingsValue('topUpOptions') ?? []
+
+const setTopUpOption = (
+  index: number,
+  field: keyof TopUpOption,
+  value: string,
+) =>
+  settingsActions.setDraft(
+    'topUpOptions',
+    topUpOptions().map((o, i) =>
+      i === index ? { ...o, [field]: Number(value.replace(/[^\d]/g, '')) } : o,
+    ),
+  )
+
+const removeTopUpOption = (index: number) =>
+  settingsActions.setDraft(
+    'topUpOptions',
+    topUpOptions().filter((_, i) => i !== index),
+  )
+
+const addTopUpOption = () =>
+  settingsActions.setDraft('topUpOptions', [
+    ...topUpOptions(),
+    { dollars: 0, points: 0 },
+  ])
+
+const TopUpOptionsEditor = () => (
+  <div style={topUpEditorStyle}>
+    <span style={checkboxLabelStyle}>
+      <strong>{t('settings.topUpOptions')}</strong> — {t('settings.topUpHint')}
+    </span>
+    <div class="rw-topup-row rw-topup-head">
+      <span>{t('settings.topUpDollars')}</span>
+      <span>{t('settings.topUpPoints')}</span>
+      <span style={{ width: '32px' }} />
+    </div>
+    <For each={topUpOptions()}>
+      {(option, i) => (
+        <div class="rw-topup-row">
+          <input
+            inputMode="numeric"
+            aria-label={t('settings.topUpDollars')}
+            value={String(option.dollars)}
+            disabled={!settingsState.editing}
+            onChange={(e) =>
+              setTopUpOption(i(), 'dollars', e.currentTarget.value)
+            }
+          />
+          <input
+            inputMode="numeric"
+            aria-label={t('settings.topUpPoints')}
+            value={String(option.points)}
+            disabled={!settingsState.editing}
+            onChange={(e) =>
+              setTopUpOption(i(), 'points', e.currentTarget.value)
+            }
+          />
+          <Show when={settingsState.editing} fallback={<span style={{ width: '32px' }} />}>
+            <button
+              type="button"
+              class="rw-remove"
+              aria-label={t('settings.removeTopUp')}
+              title={t('settings.removeTopUp')}
+              onClick={() => removeTopUpOption(i())}
+            >
+              ×
+            </button>
+          </Show>
+        </div>
+      )}
+    </For>
+    <Show when={settingsState.editing}>
+      <div>
+        <button
+          type="button"
+          {...themed(linkButtonStyle, 'bk-link')}
+          onClick={addTopUpOption}
+        >
+          + {t('settings.addTopUp')}
+        </button>
+      </div>
+    </Show>
+  </div>
+)
+
+const topUpEditorStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '8px',
+  'max-width': '420px',
+}
 
 const hoursRowStyle: JSX.CSSProperties = {
   display: 'grid',

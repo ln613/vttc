@@ -3,6 +3,10 @@ import clubConfig from 'club-config'
 import { apiGet, apiPost } from '../utils/api'
 import { langActions } from './langStore'
 import { DEFAULT_BOOKING } from '../../shared/rules/booking'
+import {
+  DEFAULT_TOP_UP_OPTIONS,
+  type TopUpOption,
+} from '../../shared/rules/wallet'
 
 export interface AppSettings {
   ignoreUnpaidInGeneration: boolean
@@ -17,6 +21,9 @@ export interface AppSettings {
   // specs/rules/booking.md.
   bookingOpenTime: string
   bookingCloseTime: string
+  // The top-up amounts a points club offers, with their reward points. See
+  // specs/rules/wallet.md.
+  topUpOptions: TopUpOption[]
   // Not settings but facts about the site, from the server's environment,
   // never saved: whether it can text a verification code, and the Google
   // client id "Sign in with Google" needs (null when not set up).
@@ -32,6 +39,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   maxUmpiresPerTable: 1,
   bookingOpenTime: clubConfig.booking?.openTime || DEFAULT_BOOKING.openTime,
   bookingCloseTime: clubConfig.booking?.closeTime || DEFAULT_BOOKING.closeTime,
+  topUpOptions: DEFAULT_TOP_UP_OPTIONS,
   smsEnabled: false,
   googleClientId: null,
 }

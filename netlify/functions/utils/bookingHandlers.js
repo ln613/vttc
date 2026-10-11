@@ -16,7 +16,8 @@ import { club, clubDate, clubMinutesOfDay, clubTimeToDate } from './club.js'
 import { issueDoorCode, doorAccessAvailable } from './doorAccess.js'
 import { buildReceipt, doorCodeView } from './bookingReceipt.js'
 import { sendBookingReceiptEmail } from './email.js'
-import { getBookingHours } from './settingsHandlers.js'
+import { getBookingHours, getTopUpOptions } from './settingsHandlers.js'
+import { addRewardPoints } from './rewardsHandlers.js'
 import { requireModules } from './modulesHandlers.js'
 import {
   bookingRules,
@@ -28,6 +29,7 @@ import {
   isValidTopUp,
 } from '../../../shared/rules/booking.js'
 import { isValidEmail, normalizePhone } from '../../../shared/rules/contact.js'
+import { findTopUpOption, isPointsModel } from '../../../shared/rules/wallet.js'
 import { toTitleCase } from '../../../shared/rules/nameMatch.js'
 import {
   createPayment,
@@ -145,8 +147,22 @@ const validateGuest = (body) => {
   if (errors.length) throwError(errors.join('\n'))
 }
 
+// What the balance is called in a message: credits, or (points model, where
+// it is dollars) the balance — specs/rules/wallet.md.
+const pointsClub = () => isPointsModel(club)
+const NOT_ENOUGH = () =>
+  pointsClub()
+    ? 'Not enough balance. Please top up first.'
+    : 'Not enough credits. Please top up first.'
+
 const validatePlayer = (auth) => {
-  if (!auth?.playerId) throwError('Sign in with a player account to book with credits')
+  if (!auth?.playerId) {
+    throwError(
+      pointsClub()
+        ? 'Sign in with a player account to book with your balance'
+        : 'Sign in with a player account to book with credits',
+    )
+  }
 }
 
 // ==================== reading ====================
@@ -224,15 +240,22 @@ export const getMyBookings = async (_params, auth) => {
   }))
 }
 
-/** The signed-in player's credit balance, and what credits cost. */
+/**
+ * The signed-in player's balance (credits), their reward points (points
+ * model), and whether a top-up can be paid for here.
+ */
 export const getMyCredits = async (_params, auth) => {
   await requireModules('credit')
   validatePlayer(auth)
   const player = await getDB()
     .collection(PLAYERS)
-    .findOne({ _id: toObjectId(auth.playerId) }, { projection: { credits: 1 } })
+    .findOne({ _id: toObjectId(auth.playerId) }, { projection: { credits: 1, points: 1 } })
   if (!player) throwError('Player not found')
-  return { credits: player.credits || 0, paymentsAvailable: paymentsAvailable() }
+  return {
+    credits: player.credits || 0,
+    points: player.points || 0,
+    paymentsAvailable: paymentsAvailable(),
+  }
 }
 
 // ==================== booking with credits ====================
@@ -268,7 +291,7 @@ export const bookCourt = async (body, auth) => {
   const db = getDB()
   const player = await db.collection(PLAYERS).findOne({ _id: toObjectId(auth.playerId) })
   if (!player) throwError('Player not found')
-  if ((player.credits || 0) < credits) throwError('Not enough credits. Please top up first.')
+  if ((player.credits || 0) < credits) throwError(NOT_ENOUGH())
 
   const { insertedId: bookingId } = await db.collection(BOOKINGS).insertOne({
     ...request,
@@ -291,7 +314,7 @@ export const bookCourt = async (body, auth) => {
   if (balance === null) {
     await releaseSlots(bookingId)
     await db.collection(BOOKINGS).deleteOne({ _id: bookingId })
-    throwError('Not enough credits. Please top up first.')
+    throwError(NOT_ENOUGH())
   }
 
   await db
@@ -357,25 +380,43 @@ export const bookCourtAsGuest = async (body, auth) => {
 
 // ==================== topping up ====================
 
-/** Start a top-up for the signed-in player. Credits arrive once it is paid. */
+/**
+ * Start a top-up for the signed-in player. The balance (and, for a points
+ * club, the reward points) arrive once it is paid.
+ */
 export const topUpCredits = async (body, auth) => {
   await requireModules('credit')
   validatePlayer(auth)
   const r = rules()
   const dollars = Number(body?.dollars)
-  if (!isValidTopUp(r, dollars)) throwError(`Top up at least $${r.minTopUpDollars}, in whole dollars`)
+  const points = await topUpRewardPoints(r, dollars)
   const payment = await createPayment({
     kind: 'topUp',
     amountCents: dollars * 100,
     credits: creditsForDollars(r, dollars),
+    points,
     playerId: toObjectId(auth.playerId),
   })
   return {
     paymentId: payment._id.toString(),
     amountCents: payment.amountCents,
     credits: payment.credits,
+    points: payment.points,
     paymentsAvailable: paymentsAvailable(),
   }
+}
+
+// A credits club takes any whole-dollar amount from its minimum up; a points
+// club only the amounts it offers, each with its reward points (fixed into
+// the payment now, so a later change to the offer can't alter it).
+const topUpRewardPoints = async (r, dollars) => {
+  if (!pointsClub()) {
+    if (!isValidTopUp(r, dollars)) throwError(`Top up at least $${r.minTopUpDollars}, in whole dollars`)
+    return 0
+  }
+  const option = findTopUpOption(await getTopUpOptions(), dollars)
+  if (!option) throwError('Choose one of the top-up amounts')
+  return option.points
 }
 
 // ==================== once a booking is confirmed ====================
@@ -521,7 +562,10 @@ const applyTopUpPayment = async (payment) => {
     )
   const after = result?.value !== undefined ? result.value : result
   await recordLedger({ playerId: payment.playerId, kind: 'topup', credits: payment.credits, balanceAfter: after.credits, paymentId: payment._id })
-  return { ok: true, balance: after.credits }
+  const points = payment.points
+    ? await addRewardPoints(payment.playerId, payment.points, { kind: 'topUpReward', paymentId: payment._id })
+    : null
+  return { ok: true, balance: after.credits, ...(points !== null ? { points } : {}) }
 }
 
 const APPLY = { guestBooking: applyGuestBookingPayment, topUp: applyTopUpPayment }

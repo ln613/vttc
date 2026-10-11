@@ -3,6 +3,12 @@ import { club } from './club.js'
 import { isSmsConfigured } from './sms.js'
 import { getGoogleClientId } from './googleAuth.js'
 import { DEFAULT_BOOKING, bookingHoursError } from '../../../shared/rules/booking.js'
+import {
+  DEFAULT_TOP_UP_OPTIONS,
+  isPointsModel,
+  sortTopUpOptions,
+  topUpOptionsError,
+} from '../../../shared/rules/wallet.js'
 
 const COLLECTION = 'settings'
 const DOC_ID = 'global'
@@ -31,6 +37,9 @@ const defaultSettings = () => ({
   // specs/rules/booking.md. The club config's are the default.
   bookingOpenTime: club.booking?.openTime || DEFAULT_BOOKING.openTime,
   bookingCloseTime: club.booking?.closeTime || DEFAULT_BOOKING.closeTime,
+  // The top-up amounts a points club offers, with their reward points —
+  // see specs/rules/wallet.md. Unused by a credits club.
+  topUpOptions: DEFAULT_TOP_UP_OPTIONS,
 })
 
 const throwError = (msg) => {
@@ -53,6 +62,10 @@ export const getSettings = async () => ({
   smsEnabled: isSmsConfigured(),
   googleClientId: getGoogleClientId(),
 })
+
+// The top-up amounts on offer (points model), smallest first.
+export const getTopUpOptions = async () =>
+  sortTopUpOptions((await readSettingsDoc()).topUpOptions)
 
 // The court's opening hours as the booking rules want them.
 export const getBookingHours = async () => {
@@ -78,6 +91,11 @@ export const saveSettings = async (body) => {
     if (k in body) settings[k] = body[k]
   }
   validateBookingHours({ ...defaults, ...settings })
+  if (isPointsModel(club) && 'topUpOptions' in settings) {
+    const error = topUpOptionsError(settings.topUpOptions)
+    if (error) throwError(error)
+    settings.topUpOptions = sortTopUpOptions(settings.topUpOptions)
+  }
   const db = getDB()
   await db.collection(COLLECTION).updateOne(
     { docId: DOC_ID },

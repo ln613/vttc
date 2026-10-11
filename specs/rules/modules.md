@@ -31,7 +31,7 @@ A club turns on only the parts of the app it uses. A super admin sets them on th
 - Live Score: the live score button and page
 - Schedule: the Schedule link and page (leaving Game Play goes home instead)
 - Calendar: the Booking link and page
-- Credit: balances, top-ups and paying for a booking with credits — the Account page's Credits section and the Booking page's balance line. With Credit off, a signed-in player books like a guest (pays by card), with their own name, email and phone filled in; the booking is still theirs (on the calendar and in My Booking)
+- Credit: balances, top-ups and paying for a booking with credits — the Account page's Credits section and the Booking page's balance line. On the points model (rules/wallet.md) also the reward points and gifts: the Rewards, Redemption History and Gifts pages, and the Settings page's Rewards section. With Credit off, a signed-in player books like a guest (pays by card), with their own name, email and phone filled in; the booking is still theirs (on the calendar and in My Booking)
 - My Booking: the Account page's My Bookings section, and the booking confirmation's link to it
 - Settings page: Event Setting, Umpires, Revenue and Update follow Tournament (Umpires: Game Play); Court Booking follows Booking
 

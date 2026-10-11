@@ -47,7 +47,7 @@ Prices follow the day of the week and the time of day, from `booking.rates` in t
 
 - each half hour is charged at the rate covering it, so a booking across 6 PM (or noon) pays each rate for its own part: Mon 5–7 PM is $30 + $40 = $70
 - a half hour no rate covers is charged the flat `creditsPerSlot` (the price for a club without rates)
-- registered player: the price in credits, at the top-up rate ($1 = 100 credits): Mon 9–10 AM is 3,000 credits
+- registered player: the price from their balance — in credits at the top-up rate ($1 = 100 credits: Mon 9–10 AM is 3,000 credits), or for a club on the points model, in dollars ($30). See rules/wallet.md
 - guest: the same price in dollars
 - the Booking page shows each free half hour's hourly rate; the Pricing page (specs/pages/Club Site.md) is built from the same rates, so the two always agree
 - Timing Sports opens at 9:00 AM, where its rates begin
@@ -55,7 +55,7 @@ Prices follow the day of the week and the time of day, from `booking.rates` in t
 ## Booking as a registered player
 
 - signed in with a player account (the admin and tablet logins can only book as a guest)
-- credits are taken atomically: the balance must cover the cost at the moment of booking, otherwise "Not enough credits. Please top up first." and nothing is booked
+- the balance is taken atomically: it must cover the cost at the moment of booking, otherwise "Not enough credits. Please top up first." ("Not enough balance. Please top up first." on the points model) and nothing is booked
 - every change to a balance is written to a ledger (creditTransactions) with the balance after it
 
 ## Booking as a guest
@@ -66,7 +66,8 @@ Prices follow the day of the week and the time of day, from `booking.rates` in t
 
 ## Top up
 
-- $1 = 100 credits, whole dollars, at least $10
+- credits model: $1 = 100 credits, whole dollars, at least $10
+- points model: one of the amounts on offer, which adds the same dollars to the balance plus its reward points (rules/wallet.md)
 - paid by card
 
 ## Payment (Stripe placeholder)
@@ -103,7 +104,7 @@ Emailed to the booker (the player's email, or the guest's) once the booking is c
 
 - "{club} — Court Booking", "Receipt"
 - Booking (ref: the last 8 characters of the booking id), Name, Date, Time, Length, Court
-- Paid: "{credits} credits" and "Balance after", or "${amount} by card"
+- Paid: "{credits} credits" and "Balance after" (points model: "${amount} from balance" and the balance after in dollars), or "${amount} by card"
 - Booked on (club time)
 - the door code and "Works {from} – {to}", or "Your door code is not ready yet. Please contact the club before your booking."
 

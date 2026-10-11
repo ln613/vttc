@@ -22,6 +22,13 @@ import {
   accountSectionsActions,
 } from '../stores/accountSectionsStore'
 import { formatCredits } from '../../shared/rules/booking'
+import { clubIdOf } from '../../shared/rules/wallet'
+import {
+  formatBalance,
+  formatPoints,
+  pointsModel,
+  walletT,
+} from '../i18n/wallet'
 import { langActions } from '../stores/langStore'
 import { hasSite, loadSiteFonts } from '../site/siteContent'
 import { themed } from '../site/themed'
@@ -539,16 +546,32 @@ const showMyBookings = () =>
 
 // The balance shows in the header, so it can be read with the section closed.
 const creditsSummary = () =>
-  creditsState.balance !== null
-    ? t('account.creditsSummary', {
-        credits: formatCredits(creditsState.balance),
-      })
-    : ''
+  creditsState.balance !== null ? formatBalance(creditsState.balance) : ''
+
+// Credits: "3,000 credits". Points model: the dollar balance (its reward
+// points are shown under it) — specs/rules/wallet.md.
+const BalanceAmount = () => (
+  <Show
+    when={pointsModel}
+    fallback={
+      <>
+        <strong style={hasSite() ? undefined : creditsAmountStyle}>
+          {formatCredits(creditsState.balance ?? 0)}
+        </strong>
+        <span style={creditsMutedStyle}>{t('account.creditsUnit')}</span>
+      </>
+    }
+  >
+    <strong style={hasSite() ? undefined : creditsAmountStyle}>
+      {formatBalance(creditsState.balance ?? 0)}
+    </strong>
+  </Show>
+)
 
 const CreditsSection = () => (
   <Show when={showCredits()}>
     <CollapsibleSection
-      title={t('account.credits')}
+      title={walletT('title')}
       open={accountSectionsState.credits}
       onToggle={() => accountSectionsActions.toggle('credits')}
       summary={creditsSummary()}
@@ -562,18 +585,66 @@ const CreditsSection = () => (
             </span>
           }
         >
-          <strong style={hasSite() ? undefined : creditsAmountStyle}>
-            {formatCredits(creditsState.balance ?? 0)}
-          </strong>
-          <span style={creditsMutedStyle}>{t('account.creditsUnit')}</span>
+          <BalanceAmount />
         </Show>
       </div>
       <ThemeButton variant="primary" onClick={creditsActions.openTopUp}>
         {t('account.topUp')}
       </ThemeButton>
+      <Show when={pointsModel}>
+        <RewardPoints />
+      </Show>
     </CollapsibleSection>
   </Show>
 )
+
+// Points model: the member's reward points, the club id the desk asks for
+// when they redeem, and where to see the gifts and what they've redeemed.
+const RewardPoints = () => {
+  const navigate = useNavigate()
+  return (
+    <div style={rewardPointsStyle}>
+      <div class="rw-points">
+        <span>
+          {t('account.points')}:{' '}
+          <strong>{formatPoints(creditsState.points ?? 0)}</strong>
+        </span>
+        <span class="rw-meta">
+          {t('account.clubId')}: {clubIdOf(authState.user?._id)}
+        </span>
+      </div>
+      <div {...themed(rewardLinksStyle, 'bk-links')}>
+        <button
+          type="button"
+          class="bk-link"
+          onClick={() => navigate('/rewards')}
+        >
+          {t('account.rewards')}
+        </button>
+        <button
+          type="button"
+          class="bk-link"
+          onClick={() => navigate('/redemptions')}
+        >
+          {t('account.redemptionHistory')}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const rewardPointsStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '10px',
+  'margin-top': '18px',
+}
+
+const rewardLinksStyle: JSX.CSSProperties = {
+  display: 'flex',
+  gap: '16px',
+  'flex-wrap': 'wrap',
+}
 
 const MyBookingsSection = () => (
   <Show when={showMyBookings()}>

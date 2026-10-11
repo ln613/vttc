@@ -57,6 +57,8 @@ Vertical
 - signing in or out while on the page reloads the balance
 - validate the guest form: first name, last name, email, phone (Canadian/US)
 
+Points model (rules/wallet.md): "Your balance: ${balance}", the cost in dollars from the balance, "Not enough balance. Top up to book this time.", "Sign in to book with your balance.", and once booked "${amount} paid from your balance. Your balance is ${balance}."
+
 ## Top up dialog
 
 Shared with the Account page.
@@ -67,3 +69,4 @@ Shared with the Account page.
 - "Cancel", "Continue": under $10 → "Top up at least $10, in whole dollars"
 - payment placeholder
 - done: "{credits} credits added. Your balance is {balance} credits." "Done"
+- points model (rules/wallet.md): "Top up"; "Choose an amount. Your balance goes up by the same amount, and pays for bookings."; the amounts on offer as tiles, each "${amount}" and "+{points} points" (or "No bonus points"), the first chosen; done: "${amount} added to your balance", "+{points} reward points — you now have {total}.", "Your balance: ${balance}"
