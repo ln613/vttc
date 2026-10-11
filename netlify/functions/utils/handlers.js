@@ -60,6 +60,7 @@ import {
   topUpCredits,
   confirmPayment,
 } from './bookingHandlers.js'
+import { getMyWaiver, acceptWaiver } from './waiverHandlers.js'
 import {
   getGifts,
   saveGift,
@@ -174,6 +175,8 @@ export const apiHandlers = {
     myBookings: (params, auth) => getMyBookings(params, auth),
     myCredits: (params, auth) => getMyCredits(params, auth),
     // Reward points and gifts (points model) — see specs/rules/wallet.md.
+    // The club's liability waiver — see specs/rules/waiver.md.
+    myWaiver: (params, auth) => getMyWaiver(params, auth),
     gifts: () => getGifts(),
     rewardMembers: () => getRewardMembers(),
     myRedemptions: (params, auth) => getMyRedemptions(params, auth),
@@ -270,6 +273,7 @@ export const apiHandlers = {
     bookCourtAsGuest: (body, auth) => bookCourtAsGuest(body, auth),
     topUpCredits: (body, auth) => topUpCredits(body, auth),
     confirmPayment: (body, auth) => confirmPayment(body, auth),
+    acceptWaiver: (body, auth) => acceptWaiver(body, auth),
     saveGift: (body) => saveGift(body),
     deleteGift: (body) => deleteGift(body),
     redeemGift: (body, auth) => redeemGift(body, auth),

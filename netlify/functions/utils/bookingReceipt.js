@@ -64,6 +64,18 @@ const paymentLines = (booking) =>
       ]
     : [{ label: 'Paid', value: `${formatDollars(booking.amountCents)} by card` }]
 
+// The liability waiver the booker accepted (specs/rules/waiver.md), when the
+// club requires one: which version, and when.
+const waiverLines = (booking) =>
+  booking.waiver
+    ? [
+        {
+          label: 'Liability waiver',
+          value: `Accepted ${clubDateTime(booking.waiver.acceptedAt)} (version ${booking.waiver.version})`,
+        },
+      ]
+    : []
+
 // "Works 7:15 PM – 9:15 PM", or nothing when the booking has no code yet.
 export const doorCodeView = (booking) =>
   booking.doorCode?.code
@@ -92,6 +104,7 @@ export const buildReceipt = (booking) => {
       { label: 'Court', value: courtName(booking.court) },
       ...paymentLines(booking),
       { label: 'Booked on', value: clubDateTime(booking.paidAt || booking.createdAt) },
+      ...waiverLines(booking),
     ],
     doorCode: doorCodeView(booking),
   }

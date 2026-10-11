@@ -28,6 +28,7 @@ import Gifts from './pages/Gifts'
 import { pointsModel } from './i18n/wallet'
 import { hasSite } from './site/siteContent'
 import ConfirmDialog from './components/ConfirmDialog'
+import WaiverGate from './components/WaiverGate'
 import { ModuleGate, Home } from './components/ModuleGate'
 import { modulesActions } from './stores/modulesStore'
 import type { ModuleKey } from '../shared/rules/modules'
@@ -47,6 +48,7 @@ const RootLayout = (props: { children?: JSX.Element }) => {
 const Layout = (props: { children?: JSX.Element }) => (
   <>
     {props.children}
+    <WaiverGate />
     <ConfirmDialog />
     <Show when={notificationsEnabled}>
       <UserNotifications />

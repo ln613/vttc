@@ -15,6 +15,8 @@ import {
 } from '../../shared/rules/booking'
 import { langActions } from './langStore'
 import { isValidEmail, isValidPhone } from '../../shared/rules/contact'
+import { requiredWaiver } from '../../shared/rules/waiver'
+import { waiverState } from './waiverStore'
 
 // The Booking page: a week of days to pick from, the chosen day's court
 // times, and the dialog that books one. See specs/pages/Booking.md.
@@ -53,7 +55,9 @@ interface BookingCompleted {
   receiptSentTo: string | null
 }
 
-export type DialogStep = 'details' | 'guest' | 'pay' | 'done'
+// 'waiver': a guest accepts the club's liability waiver before paying
+// (specs/rules/waiver.md).
+export type DialogStep = 'details' | 'guest' | 'waiver' | 'pay' | 'done'
 
 export type SlotStatus = 'loading' | 'past' | 'taken' | 'free' | 'tooLate'
 
@@ -72,6 +76,9 @@ interface BookingState {
   lastName: string
   email: string
   phone: string
+  // The guest ticked the waiver's box, and accepted it for this booking.
+  waiverAgreed: boolean
+  waiverAccepted: boolean
   paymentId: string
   amountCents: number
   heldUntil: string
@@ -98,6 +105,8 @@ const getInitialState = (): BookingState => ({
   lastName: '',
   email: '',
   phone: '',
+  waiverAgreed: false,
+  waiverAccepted: false,
   paymentId: '',
   amountCents: 0,
   heldUntil: '',
@@ -298,6 +307,9 @@ const selectSlot = (court: number, start: number) => {
     minutes: rules().minMinutes,
     dialogError: null,
     busy: false,
+    // Each booking is accepted for on its own.
+    waiverAgreed: false,
+    waiverAccepted: false,
   })
 }
 
@@ -385,9 +397,38 @@ interface GuestHold {
   paymentsAvailable: boolean
 }
 
+// The club's waiver, when it requires one. A signed-in member has accepted
+// it already (WaiverGate), so only a guest is asked here.
+const clubWaiver = requiredWaiver(clubConfig)
+
+const guestMustAcceptWaiver = (): boolean =>
+  !!clubWaiver &&
+  !bookingState.waiverAccepted &&
+  !(authActions.hasPlayerRecord() && !waiverState.mustAccept)
+
+// The details are checked first; then, where the club requires it, the
+// waiver; only then is the time held for payment.
 const submitGuest = async () => {
   const invalid = validateGuest()
   if (invalid) return setBookingState('dialogError', invalid)
+  if (guestMustAcceptWaiver()) {
+    return setBookingState({ step: 'waiver', dialogError: null })
+  }
+  await holdForGuest()
+}
+
+const setWaiverAgreed = (agreed: boolean) =>
+  setBookingState({ waiverAgreed: agreed, dialogError: null })
+
+const acceptWaiverAndContinue = async () => {
+  if (!bookingState.waiverAgreed) return
+  setBookingState({ waiverAccepted: true })
+  await holdForGuest()
+}
+
+const backToGuest = () => setBookingState({ step: 'guest', dialogError: null })
+
+const holdForGuest = async () => {
   setBookingState({ busy: true, dialogError: null })
   try {
     const hold = await apiPost<GuestHold>('bookCourtAsGuest', {
@@ -396,6 +437,9 @@ const submitGuest = async () => {
       lastName: bookingState.lastName,
       email: bookingState.email,
       phone: bookingState.phone,
+      ...(clubWaiver && bookingState.waiverAccepted
+        ? { waiverVersion: clubWaiver.version }
+        : {}),
     })
     setBookingState({
       busy: false,
@@ -449,6 +493,9 @@ export const bookingActions = {
   bookWithCredits,
   signInForCredits,
   startGuest,
+  setWaiverAgreed,
+  acceptWaiverAndContinue,
+  backToGuest,
   setGuestField,
   submitGuest,
   payAsGuest,

@@ -27,6 +27,8 @@ import { hasSite, loadSiteFonts } from '../site/siteContent'
 import { formatDollars } from '../../shared/rules/booking'
 import { formatBalance, walletT } from '../i18n/wallet'
 import './booking.css'
+import WaiverContent from '../components/WaiverContent'
+import { waiverActions } from '../stores/waiverStore'
 
 // Court booking: pick a day, pick a free half hour, choose how long, then
 // book with credits (a signed-in player) or as a guest who pays by card.
@@ -360,6 +362,9 @@ const BookingDialog = () => (
             <Match when={bookingState.step === 'guest'}>
               <GuestStep />
             </Match>
+            <Match when={bookingState.step === 'waiver'}>
+              <GuestWaiverStep />
+            </Match>
             <Match when={bookingState.step === 'pay'}>
               <PayStep />
             </Match>
@@ -494,6 +499,43 @@ const GuestPayment = () => (
       </button>
     </Actions>
   </>
+)
+
+// The club's liability waiver, which a guest accepts before paying
+// (specs/rules/waiver.md).
+const GuestWaiverStep = () => (
+  <Show when={waiverActions.text()}>
+    {(text) => (
+      <>
+        <h3 class="bk-section-title" style={{ margin: 0 }}>
+          {text().title}
+        </h3>
+        <WaiverContent
+          text={text()}
+          agreed={bookingState.waiverAgreed}
+          onAgree={bookingActions.setWaiverAgreed}
+        />
+        <Actions>
+          <button
+            type="button"
+            class="bk-btn bk-btn-secondary bk-btn-fill"
+            onClick={bookingActions.backToGuest}
+            disabled={bookingState.busy}
+          >
+            {t('common.back')}
+          </button>
+          <button
+            type="button"
+            class="bk-btn bk-btn-primary bk-btn-fill"
+            onClick={() => void bookingActions.acceptWaiverAndContinue()}
+            disabled={!bookingState.waiverAgreed || bookingState.busy}
+          >
+            {bookingState.busy ? t('common.pleaseWait') : t('waiver.accept')}
+          </button>
+        </Actions>
+      </>
+    )}
+  </Show>
 )
 
 const GuestStep = () => (

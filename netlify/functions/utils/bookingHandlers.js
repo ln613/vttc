@@ -18,6 +18,7 @@ import { buildReceipt, doorCodeView } from './bookingReceipt.js'
 import { sendBookingReceiptEmail } from './email.js'
 import { getBookingHours, getTopUpOptions } from './settingsHandlers.js'
 import { addRewardPoints } from './rewardsHandlers.js'
+import { requireWaiverAccepted, guestWaiverAcceptance } from './waiverHandlers.js'
 import { requireModules } from './modulesHandlers.js'
 import {
   bookingRules,
@@ -235,6 +236,7 @@ export const getMyBookings = async (_params, auth) => {
     name: b.name,
     paidAt: b.paidAt ?? b.createdAt,
     createdAt: b.createdAt,
+    waiver: b.waiver ?? null,
     doorCode: doorCodeView(b),
     receipt: buildReceipt(b),
   }))
@@ -285,6 +287,7 @@ const spendCredits = async (playerId, credits) => {
 export const bookCourt = async (body, auth) => {
   await requireModules('booking', 'calendar', 'credit')
   validatePlayer(auth)
+  const waiver = await requireWaiverAccepted(auth.playerId)
   const request = validateBookingRequest(body, await loadRules())
   const credits = bookingCredits(rules(), request.minutes, request.date, request.start)
 
@@ -300,6 +303,7 @@ export const bookCourt = async (body, auth) => {
     credits,
     status: 'claiming',
     paidWith: 'credits',
+    ...(waiver ? { waiver } : {}),
     createdAt: new Date(),
   })
 
@@ -336,6 +340,7 @@ export const bookCourtAsGuest = async (body, auth) => {
   const r = await loadRules()
   const request = validateBookingRequest(body, r)
   validateGuest(body)
+  const waiver = await guestWaiverAcceptance(body, auth)
   const amountCents = bookingPriceCents(r, request.minutes, request.date, request.start)
   const guest = {
     firstName: toTitleCase(body.firstName),
@@ -357,6 +362,7 @@ export const bookCourtAsGuest = async (body, auth) => {
     status: 'pending_payment',
     paidWith: 'card',
     heldUntil,
+    ...(waiver ? { waiver } : {}),
     createdAt: new Date(),
   })
 
@@ -387,6 +393,7 @@ export const bookCourtAsGuest = async (body, auth) => {
 export const topUpCredits = async (body, auth) => {
   await requireModules('credit')
   validatePlayer(auth)
+  await requireWaiverAccepted(auth.playerId)
   const r = rules()
   const dollars = Number(body?.dollars)
   const points = await topUpRewardPoints(r, dollars)

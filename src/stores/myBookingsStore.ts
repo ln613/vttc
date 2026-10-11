@@ -20,6 +20,8 @@ export interface MyBooking {
   minutes: number
   credits?: number
   paidWith: 'credits' | 'card'
+  // The liability waiver the booker accepted (specs/rules/waiver.md).
+  waiver?: { version: string; acceptedAt: string } | null
   amountCents?: number
   balanceAfter: number | null
   name: string

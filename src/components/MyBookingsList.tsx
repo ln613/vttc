@@ -170,6 +170,17 @@ const receiptLines = (b: MyBooking) => [
       ]
     : []),
   [t('myBookings.bookedOn'), langActions.instant(b.paidAt)],
+  ...(b.waiver
+    ? [
+        [
+          t('myBookings.waiver'),
+          t('myBookings.waiverAccepted', {
+            date: langActions.instant(b.waiver.acceptedAt),
+            version: b.waiver.version,
+          }),
+        ],
+      ]
+    : []),
 ]
 
 const Receipt = (props: { booking: MyBooking }) => (

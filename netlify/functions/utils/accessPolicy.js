@@ -39,6 +39,7 @@ export const ACCESS = {
     bookingDay: PUBLIC, // who booked is shown only to them and to admins
     myBookings: USER,
     myCredits: USER,
+    myWaiver: USER, // whether the caller still has to accept it
     gifts: PUBLIC, // the Rewards page, for anyone to look at
     rewardMembers: ADMIN, // names, club ids and points, for redeeming
     myRedemptions: USER,
@@ -62,6 +63,7 @@ export const ACCESS = {
     bookCourtAsGuest: PUBLIC, // held until paid
     topUpCredits: USER,
     confirmPayment: PUBLIC, // a guest pays too; a top-up is checked against the caller
+    acceptWaiver: USER, // the caller accepts it for themselves
     saveGift: ADMIN,
     deleteGift: ADMIN,
     redeemGift: ADMIN, // takes a member's points

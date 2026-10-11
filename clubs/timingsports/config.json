@@ -42,6 +42,7 @@
     "high": []
   },
   "creditModel": "points",
+  "liabilityWaiver": { "required": true, "version": "2026-10-11" },
   "booking": {
     "enabled": true,
     "courtLabel": "Pickleball Court",

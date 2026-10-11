@@ -184,7 +184,9 @@
     "bookedOn": "预订时间",
     "paidCredits": "{credits} 积分",
     "paidCard": "{amount}（银行卡）",
-    "loadFailed": "无法加载你的预订"
+    "loadFailed": "无法加载你的预订",
+    "waiver": "免责声明",
+    "waiverAccepted": "已于 {date} 接受（版本 {version}）"
   },
   "settings": {
     "kicker": "球馆管理",
@@ -311,5 +313,10 @@
     "none": "暂无礼品，请添加第一件。",
     "imageFailed": "无法读取该图片",
     "loadFailed": "无法加载礼品"
+  },
+  "waiver": {
+    "accept": "接受并继续",
+    "decline": "我不同意，退出登录",
+    "failed": "保存失败，请重试。"
   }
 }

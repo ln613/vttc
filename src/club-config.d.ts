@@ -51,6 +51,12 @@ declare module 'club-config' {
      */
     creditModel?: 'credits' | 'points'
     /**
+     * A liability waiver every member must accept before using their
+     * account — see specs/rules/waiver.md. The text is in
+     * clubs/<slug>/waiver.json; changing `version` asks everyone again.
+     */
+    liabilityWaiver?: { required?: boolean; version: string }
+    /**
      * Court booking — see specs/rules/booking.md. Absent or not enabled =
      * no Booking page, no credits. Every number is optional and falls
      * back to DEFAULT_BOOKING in shared/rules/booking.js.

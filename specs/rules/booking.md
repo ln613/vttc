@@ -106,6 +106,7 @@ Emailed to the booker (the player's email, or the guest's) once the booking is c
 - Booking (ref: the last 8 characters of the booking id), Name, Date, Time, Length, Court
 - Paid: "{credits} credits" and "Balance after" (points model: "${amount} from balance" and the balance after in dollars), or "${amount} by card"
 - Booked on (club time)
+- Liability waiver: "Accepted {date, time} (version {version})", when the club requires one (rules/waiver.md)
 - the door code and "Works {from} – {to}", or "Your door code is not ready yet. Please contact the club before your booking."
 
 A failure to send never undoes the booking; it is recorded on the booking (`receiptError`). Sent from the club's Gmail (`GMAIL_1`).

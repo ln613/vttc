@@ -1,0 +1,88 @@
+{
+  "en": {
+    "title": "Liability Waiver",
+    "intro": "Please read this carefully. It is a release of liability and waiver of certain legal rights. By accepting it you agree to its terms for every visit to Timing Sports, including court bookings, coaching, classes, events and use of the lounge.",
+    "sections": [
+      {
+        "heading": "1. Assumption of risk",
+        "body": "Pickleball, badminton, golf simulation and other sports carry an inherent risk of injury. These include slips, trips and falls; collisions with other players, walls, posts or nets; being struck by balls, paddles, racquets, shuttles or golf balls; sprains, strains, fractures, eye and head injuries; heat exhaustion, heart attack and, in rare cases, death. I understand these risks, some of which cannot be removed without changing the nature of the activity, and I freely accept them."
+      },
+      {
+        "heading": "2. Health and fitness",
+        "body": "I confirm that I am in good health and physically able to take part, and that I have no medical condition that makes taking part unsafe for me. I will consult a doctor if I am unsure. I will stop playing and tell staff if I feel unwell or hurt."
+      },
+      {
+        "heading": "3. Release of liability",
+        "body": "To the fullest extent permitted by law, I release Timing Sports, its owners, directors, employees, coaches, contractors and volunteers (the \"Releasees\") from all claims, demands, losses and damages for any injury, illness, death or loss I suffer while taking part in any activity at or arranged by Timing Sports, including those caused by the negligence of the Releasees or by the condition of the premises or equipment."
+      },
+      {
+        "heading": "4. Indemnity",
+        "body": "I agree to indemnify and hold harmless the Releasees from any claim, cost or expense (including legal fees) arising from my participation or my conduct, including any damage I cause to the facility, its equipment or other people."
+      },
+      {
+        "heading": "5. Personal property",
+        "body": "Timing Sports is not responsible for personal belongings, equipment, valuables or vehicles that are lost, stolen or damaged on or around the premises, including in the lounge, change areas and parking. I bring and leave property at my own risk."
+      },
+      {
+        "heading": "6. Facility rules and conduct",
+        "body": "I will follow the posted rules and staff instructions, wear clean non-marking indoor court shoes and suitable clothing, use equipment only for its intended purpose, and treat other players and staff with respect. Timing Sports may refuse entry or ask anyone to leave for unsafe or disrespectful behaviour, without refund. I am responsible for the cost of any damage I cause."
+      },
+      {
+        "heading": "7. Medical treatment",
+        "body": "If I am injured or become ill, I consent to staff giving first aid and calling emergency medical services. I am responsible for any cost of medical treatment and transport."
+      },
+      {
+        "heading": "8. Minors",
+        "body": "Anyone under 19 must have this waiver accepted by a parent or legal guardian, who accepts it on the minor's behalf and on their own behalf, and agrees to supervise or arrange supervision of the minor."
+      },
+      {
+        "heading": "9. General",
+        "body": "This waiver is governed by the laws of the Province of British Columbia. If any part of it is found invalid, the rest remains in full effect. It applies to every visit until a new version is presented to me to accept."
+      }
+    ],
+    "agree": "I have read and understand this waiver. I know I am giving up certain legal rights, and I accept it voluntarily."
+  },
+  "zh": {
+    "title": "免责声明",
+    "intro": "请仔细阅读。本文件为责任免除及部分法律权利的放弃声明。接受本声明，即表示你同意其条款适用于你每一次到访 Timing Sports，包括场地预订、教练课程、团体课、活动以及休息区的使用。",
+    "sections": [
+      {
+        "heading": "一、风险自担",
+        "body": "匹克球、羽毛球、高尔夫模拟及其他运动均存在固有的受伤风险，包括滑倒、绊倒、摔倒；与其他球员、墙壁、立柱或球网碰撞；被球、球拍、羽毛球或高尔夫球击中；扭伤、拉伤、骨折、眼部及头部受伤；中暑、心脏病发作，在极少数情况下甚至死亡。我了解上述风险（其中部分风险若要消除，将改变运动本身的性质），并自愿承担。"
+      },
+      {
+        "heading": "二、健康状况",
+        "body": "我确认本人身体健康，能够参加运动，且没有使我参加运动变得不安全的疾病或身体状况。如有疑问，我会先咨询医生。如感到不适或受伤，我会立即停止运动并告知工作人员。"
+      },
+      {
+        "heading": "三、免除责任",
+        "body": "在法律允许的最大范围内，对于我在 Timing Sports 或由其组织的任何活动中所遭受的任何伤害、疾病、死亡或损失，我免除 Timing Sports 及其所有者、董事、员工、教练、承包商和志愿者（“被免责方”）的一切索赔、要求、损失及损害赔偿责任，包括因被免责方的疏忽或场地、设备状况所导致的情况。"
+      },
+      {
+        "heading": "四、赔偿保证",
+        "body": "对于因我参加活动或我的行为（包括我对场馆、设备或他人造成的任何损害）而引起的任何索赔、费用或开支（包括律师费），我同意赔偿被免责方并使其免受损害。"
+      },
+      {
+        "heading": "五、个人财物",
+        "body": "对于在场馆内或周边（包括休息区、更衣区和停车场）遗失、被盗或损坏的个人物品、装备、贵重物品或车辆，Timing Sports 概不负责。携带及存放物品的风险由我本人承担。"
+      },
+      {
+        "heading": "六、场馆规则与行为",
+        "body": "我会遵守张贴的规则和工作人员的指示，穿着干净的室内防滑无痕球鞋和合适的服装，按用途使用设备，并尊重其他球员和工作人员。对于不安全或不尊重他人的行为，Timing Sports 有权拒绝入场或要求其离开，且不予退款。因我造成的任何损坏，费用由我承担。"
+      },
+      {
+        "heading": "七、医疗救治",
+        "body": "如我受伤或生病，我同意工作人员为我进行急救并呼叫紧急医疗服务。医疗救治及转运的费用由我本人承担。"
+      },
+      {
+        "heading": "八、未成年人",
+        "body": "未满 19 岁者，须由其父母或法定监护人代为接受本声明。父母或监护人代表未成年人及其本人接受本声明，并同意负责监护或安排监护。"
+      },
+      {
+        "heading": "九、其他",
+        "body": "本声明受不列颠哥伦比亚省法律管辖。如本声明任何部分被认定无效，其余部分仍然完全有效。本声明适用于我的每一次到访，直至向我出示新版本并由我重新接受为止。"
+      }
+    ],
+    "agree": "我已阅读并理解本免责声明，知道自己放弃了部分法律权利，并自愿接受。"
+  }
+}
