@@ -96,6 +96,8 @@ Team of 4 only. Same team match as a French League tournament (match.md, "French
 - the doubles don't start until all of the first 6 singles are finished, and the 2 doubles start at the same time; the last 6 singles follow once the doubles are done
 - a match whose player is still playing on the other table waits on its table (the tablet shows who it is waiting for) and starts when they are free
 
+Points: every sub match is scored in points, whatever its games were: the winner gets 2 and the loser 1, so a result always reads 2 : 1. A side that doesn't show or defaults (the Forfeit button) gets 0: 2 : 0. A team match's score is the sum of its sub matches' points (e.g. 22 : 20), and the side with more points takes the round (equal points: a draw, nobody takes it). The points go towards the standing: a French League ranks on total points (Pts) first, then the usual order below.
+
 The 4 singles pairings not played are A vs X, B vs Y, C vs Z, D vs W.
 
 For now the order of play is generated, not picked: when the matches of a round are generated, each team's selection order is its order of play (first selected is A / X, then B / Y, C / Z, D / W), and the 14 sub matches are created straight away.

@@ -26,9 +26,8 @@ const defaultSettings = () => ({
   // the value is copied onto each event as it is created.
   tabletMirrorEnabled: !!club.tabletMirrorEnabled,
   // Whether the match-day password lets someone without an account score a
-  // match. Absent from the club config means allowed, which is how the app
-  // behaved before this could be turned off.
-  allowPublicUmpire: club.allowPublicUmpire !== false,
+  // match. Off unless the club config turns it on.
+  allowPublicUmpire: !!club.allowPublicUmpire,
   // Human umpires — see specs/rules/umpires.md. Off by default: a club
   // that does not track who umpired should not be asked about it.
   saveUmpireInfo: !!club.saveUmpireInfo,

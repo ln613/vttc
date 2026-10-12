@@ -34,6 +34,7 @@ export type StageTab =
   | 'bracket'
   // League rounds show these instead (specs/pages/Event Detail.md).
   | 'matches'
+  | 'results'
   | 'teams'
   | 'standing'
 
@@ -393,6 +394,8 @@ export const eventDetailActions = {
         matchId,
         confirmed: true,
         result: games,
+        // The side that didn't show / defaulted (French League: 2 : 0).
+        forfeitedSide: side,
       })
       if (eventDetailState.eventId === eventId) {
         await fetchEvent(eventId, true)
@@ -488,7 +491,9 @@ export const eventDetailActions = {
   getVisibleTabs: (): StageTab[] => {
     const event = eventDetailState.data
     if (!event) return []
-    if (event.eventType === 'league') return ['matches', 'teams', 'standing']
+    if (event.eventType === 'league') {
+      return ['matches', 'results', 'teams', 'standing']
+    }
     const stagesArray = event.stages || []
     const tabs: StageTab[] = []
     if (stagesArray.includes('group')) tabs.push('group')

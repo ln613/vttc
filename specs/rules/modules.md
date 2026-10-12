@@ -15,9 +15,9 @@ A club turns on only the parts of the app it uses. A super admin sets them on th
 - Account*
   - Profile*
   - Credit
-  - My Booking (* on Booking)
+  - My Booking (* on Booking, only with Booking)
 
-\* cannot be turned off. "* on X": cannot be turned off while X is on.
+\* cannot be turned off. "* on X": cannot be turned off while X is on. "only with X": in effect only while X is on — Booking off turns My Booking off too (the Account page's My Bookings section goes), keeping its setting for when Booking comes back.
 
 - a second-level module is in effect only while its first-level module is on: Tournament off turns off Events, Players, Game Play, Live Score and Schedule, keeping what each was set to for when Tournament comes back
 - before a super admin saves anything: all on, except Booking, which follows the club config (`booking.enabled`)

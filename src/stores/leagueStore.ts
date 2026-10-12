@@ -14,7 +14,13 @@ import {
   computeLeagueStandings,
   isRoundSelectionComplete,
 } from '../../shared/rules/leagueRules'
-import { getFixtureTables } from '../../shared/rules/leagueSchedule'
+import {
+  getFixtureTables,
+  FRENCH_LEAGUE,
+  isFrenchLeagueLeagueTie,
+  getFrenchLeagueSubPoints,
+  getFrenchLeagueTiePoints,
+} from '../../shared/rules/leagueSchedule'
 import { apiGet, apiPost } from '../utils/api'
 import { formatLocalDate } from '../utils/date'
 import {
@@ -66,6 +72,8 @@ interface LeagueState {
   resettingRound: boolean
   selectDialogParticipantId: string | null
   selectionError: string | null
+  // Results tab: which team matches have their sub-matches open.
+  expandedResultIds: Record<string, boolean>
 }
 
 const getInitialState = (): LeagueState => ({
@@ -80,6 +88,7 @@ const getInitialState = (): LeagueState => ({
   resettingRound: false,
   selectDialogParticipantId: null,
   selectionError: null,
+  expandedResultIds: {},
 })
 
 const [leagueState, setLeagueState] =
@@ -140,6 +149,99 @@ const withBusy = async (
   }
 }
 
+// ==================== Results ====================
+
+// One line of the Results tab: a team match ("Team A 8 : 6 Team D", sub-
+// matches won) or one of its sub-matches ("Léa Richard 3 : 1 Jules
+// Mercier", games won).
+export interface LeagueResultLine {
+  key: string
+  side1: string
+  side2: string
+  score1: number
+  score2: number
+  played: boolean
+  winner: 1 | 2 | null
+}
+
+export interface LeagueResult extends LeagueResultLine {
+  subs: LeagueResultLine[]
+}
+
+const playerNames = (players: Player[] | undefined): string =>
+  (players || []).map((p) => `${p.firstName} ${p.lastName}`.trim()).join(' / ')
+
+const gamesWonBy = (match: Match, side: 1 | 2): number =>
+  (match.games || []).filter((g) =>
+    side === 1 ? g.score1 > g.score2 : g.score2 > g.score1,
+  ).length
+
+const asWinner = (side: number | null | undefined): 1 | 2 | null =>
+  side === 1 || side === 2 ? side : null
+
+// Games won, or for a French League sub-match its points (2 : 1, 2 : 0).
+const subScore = (sub: Match, points: boolean): [number, number] =>
+  points
+    ? getFrenchLeagueSubPoints(sub) ?? [0, 0]
+    : [gamesWonBy(sub, 1), gamesWonBy(sub, 2)]
+
+const toSubResult =
+  (points: boolean) =>
+  (sub: Match, index: number): LeagueResultLine => {
+    const [score1, score2] = subScore(sub, points)
+    return {
+      key: sub._id || String(index),
+      side1: playerNames(sub.side1),
+      side2: playerNames(sub.side2),
+      score1,
+      score2,
+      played: sub.winningSide != null || (sub.games || []).length > 0,
+      winner: asWinner(sub.winningSide),
+    }
+  }
+
+const teamNameOf = (match: Match, side: 'side1' | 'side2'): string => {
+  const participantId = match.participantIds?.[side]
+  return (
+    (participantId && leagueActions.getTeamName(participantId)) ||
+    playerNames(match[side])
+  )
+}
+
+// A team match's score is the sub-matches each side has won — for a French
+// League, the points they are worth; dead rubbers dropped once a tie was
+// decided don't count.
+const toLeagueResult = (match: Match): LeagueResult => {
+  const points = isFrenchLeagueLeagueTie(match)
+  const played = (match.subMatches || []).filter((sub) => !sub.cancelledAt)
+  const subs = played.map(toSubResult(points))
+  const [score1, score2] = points
+    ? getFrenchLeagueTiePoints(played)
+    : [1, 2].map((side) => subs.filter((s) => s.winner === side).length)
+  return {
+    key: match._id,
+    side1: teamNameOf(match, 'side1'),
+    side2: teamNameOf(match, 'side2'),
+    score1,
+    score2,
+    played: subs.some((s) => s.played),
+    winner: asWinner(match.winningSide) ?? decidedBySubs(subs, score1, score2),
+    subs,
+  }
+}
+
+// Once every sub-match has a winner, the side with the higher score won the
+// tie.
+const decidedBySubs = (
+  subs: LeagueResultLine[],
+  won1: number,
+  won2: number,
+): 1 | 2 | null => {
+  if (subs.length === 0 || subs.some((s) => s.winner == null)) return null
+  if (won1 === won2) return null
+  return won1 > won2 ? 1 : 2
+}
+
 export const leagueActions = {
   // Every round carries the league's id, so any round event can open it.
   load: async (event: Event | null) => {
@@ -168,6 +270,18 @@ export const leagueActions = {
 
   setSelectedRound: (roundIndex: number) =>
     setLeagueState({ selectedRoundIndex: roundIndex, selectionError: null }),
+
+  // ==================== Results tab ====================
+
+  /** The selected week's team matches as results: "Team A 8 : 6 Team D". */
+  getRoundResults: (): LeagueResult[] =>
+    (leagueActions.getSelectedRound()?.matches || []).map(toLeagueResult),
+
+  toggleResult: (matchId: string) =>
+    setLeagueState('expandedResultIds', matchId, (open) => !open),
+
+  isResultExpanded: (matchId: string): boolean =>
+    !!leagueState.expandedResultIds[matchId],
 
   openSelectDialog: (participantId: string) =>
     setLeagueState({
@@ -357,7 +471,11 @@ export const leagueActions = {
     computeLeagueStandings(
       leagueActions.getParticipants(),
       leagueActions.getRounds(),
+      { byPoints: leagueActions.scoresPoints() },
     ),
+
+  // French League scores in points: 2 a win, 1 a loss, 0 a forfeit.
+  scoresPoints: (): boolean => leagueState.data?.league?.format === FRENCH_LEAGUE,
 
   reset: () => {
     unsubscribeLeague()

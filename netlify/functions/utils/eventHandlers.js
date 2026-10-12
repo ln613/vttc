@@ -27,6 +27,8 @@ import {
   FRENCH_LEAGUE_TABLES,
   FRENCH_LEAGUE_TEAM_SIZE,
   isFrenchLeagueTournament,
+  isFrenchLeagueLeagueTie,
+  getFrenchLeagueTiePoints,
   teamSubMatchesUnderWay,
 } from '../../../shared/rules/frenchLeague.js'
 import {
@@ -2504,7 +2506,7 @@ const advanceKnockoutRound = (stage, event) => {
 export const finishMatch = async (body) => {
   validateFinishMatchInput(body)
 
-  const { _id, matchId, result, confirmed, umpiredBy } = body
+  const { _id, matchId, result, confirmed, umpiredBy, forfeitedSide } = body
 
   const db = getDB()
   const collection = db.collection(EVENTS_COLLECTION)
@@ -2524,6 +2526,7 @@ export const finishMatch = async (body) => {
     result,
     confirmed,
     event,
+    forfeitedSide,
   )
 
   // Find and update match in group stage
@@ -2544,7 +2547,7 @@ export const finishMatch = async (body) => {
         }
 
         // Update match with result
-        const updatedMatch = updateMatchWithResult(match, result)
+        const updatedMatch = updateMatchWithResult(match, result, forfeitedSide)
         if (confirmed) {
           updatedMatch.confirmed = true
           updatedMatch.confirmedAt = new Date().toISOString()
@@ -2597,7 +2600,7 @@ export const finishMatch = async (body) => {
             throwError('Match is already confirmed')
           }
 
-          const updatedMatch = updateMatchWithResult(knockoutMatch.match, result)
+          const updatedMatch = updateMatchWithResult(knockoutMatch.match, result, forfeitedSide)
           if (confirmed) {
           updatedMatch.confirmed = true
           updatedMatch.confirmedAt = new Date().toISOString()
@@ -2795,6 +2798,7 @@ const applyFinishToTeamSubMatch = (
   result,
   confirmed,
   event,
+  forfeitedSide,
 ) => {
   const groupStageIndex = updatedStages.findIndex((s) => s.type === 'group')
   if (groupStageIndex !== -1) {
@@ -2809,7 +2813,7 @@ const applyFinishToTeamSubMatch = (
         const sub = parent.subMatches[subIdx]
         if (sub.confirmed) throwError('Match is already confirmed')
 
-        const updatedSub = updateMatchWithResult(sub, result)
+        const updatedSub = updateMatchWithResult(sub, result, forfeitedSide)
         if (confirmed) {
           updatedSub.confirmed = true
           updatedSub.confirmedAt = new Date().toISOString()
@@ -2861,7 +2865,7 @@ const applyFinishToTeamSubMatch = (
         const sub = parent.subMatches[subIdx]
         if (sub.confirmed) throwError('Match is already confirmed')
 
-        const updatedSub = updateMatchWithResult(sub, result)
+        const updatedSub = updateMatchWithResult(sub, result, forfeitedSide)
         if (confirmed) {
           updatedSub.confirmed = true
           updatedSub.confirmedAt = new Date().toISOString()
@@ -2914,9 +2918,14 @@ const validateFinishMatchInput = (body) => {
   if (!body._id) throwError('Event ID is required')
   if (!body.matchId) throwError('Match ID is required')
   if (!body.result || !Array.isArray(body.result)) throwError('Match result is required')
+  if (body.forfeitedSide != null && ![1, 2].includes(body.forfeitedSide)) {
+    throwError('forfeitedSide must be 1 or 2')
+  }
 }
 
-const updateMatchWithResult = (match, result) => {
+// forfeitedSide: the side that didn't show or defaulted (the Forfeit
+// button), kept on the match — French League scores it 2 : 0, not 2 : 1.
+const updateMatchWithResult = (match, result, forfeitedSide) => {
   const games = result.map((gameResult, index) => ({
     _id: `${match._id}-game-${index}`,
     config: match.config.gameConfig,
@@ -2935,6 +2944,7 @@ const updateMatchWithResult = (match, result) => {
     gamesWon1,
     gamesWon2,
     winningSide: gamesWon1 >= needed ? 1 : gamesWon2 >= needed ? 2 : undefined,
+    forfeitedSide: forfeitedSide || undefined,
   }
 }
 
@@ -4423,18 +4433,28 @@ const restoreTallyCancelled = (parent) =>
       )
     : parent.subMatches
 
-const decideTeamMatch = (parent, wins1, wins2) => {
+const decideTeamMatch = (parent, score1, score2) => {
   if (playsAllSubMatches(parent)) {
     const decided = parent.subMatches.filter((s) => s.winningSide && s.confirmed)
     if (decided.length < parent.subMatches.length) return undefined
     // An even number of sub-matches can be drawn; neither side takes the
     // round, and the standings still count the matches and games.
-    return wins1 > wins2 ? 1 : wins2 > wins1 ? 2 : undefined
+    return score1 > score2 ? 1 : score2 > score1 ? 2 : undefined
   }
+  const wins1 = score1
+  const wins2 = score2
   const needed = Math.ceil((parent.numberOfMatches || 0) / 2)
   if (needed <= 0) return undefined
   return wins1 >= needed ? 1 : wins2 >= needed ? 2 : undefined
 }
+
+// A team match's score: sub-matches won, or for a French League league tie
+// the points (2 a win, 1 a loss, 0 a forfeit — frenchLeague.js), which also
+// decide who takes the round.
+const teamMatchScore = (parent, wins1, wins2) =>
+  isFrenchLeagueLeagueTie(parent)
+    ? getFrenchLeagueTiePoints(parent.subMatches.filter((s) => s.confirmed))
+    : [wins1, wins2]
 
 const tallyTeamMatch = (parent) => {
   if (!Array.isArray(parent.subMatches) || parent.subMatches.length === 0) {
@@ -4446,7 +4466,8 @@ const tallyTeamMatch = (parent) => {
   const wins2 = parent.subMatches.filter(
     (s) => s.winningSide === 2 && s.confirmed,
   ).length
-  const winningSide = decideTeamMatch(parent, wins1, wins2)
+  const [score1, score2] = teamMatchScore(parent, wins1, wins2)
+  const winningSide = decideTeamMatch(parent, score1, score2)
   const wasFinal = parent.winningSide != null
   const isFinal = winningSide != null
   const finalizedNow = !wasFinal && isFinal
@@ -4462,10 +4483,10 @@ const tallyTeamMatch = (parent) => {
     subMatches,
     matchesWon1: wins1,
     matchesWon2: wins2,
-    // Mirror the tallies into gamesWon1/2 so existing UI bits that read
+    // Mirror the score into gamesWon1/2 so existing UI bits that read
     // those fields show the team match score.
-    gamesWon1: wins1,
-    gamesWon2: wins2,
+    gamesWon1: score1,
+    gamesWon2: score2,
     winningSide,
     confirmed: isFinal ? true : undefined,
     confirmedAt: isFinal ? parent.confirmedAt || now : undefined,

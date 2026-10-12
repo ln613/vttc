@@ -5,6 +5,7 @@
 //
 //   required          always on
 //   requiredWhen: X   on whenever X is on
+//   onlyWhen: X       in effect only while X is on, like a module under X
 //
 // A module is only in effect when every module above it is: turning
 // Tournament off turns off Events, Players, Live Score and the rest, without
@@ -41,7 +42,12 @@ export const MODULES = [
         ],
       },
       { key: 'credit', label: 'Credit' },
-      { key: 'myBooking', label: 'My Booking', requiredWhen: 'booking' },
+      {
+        key: 'myBooking',
+        label: 'My Booking',
+        requiredWhen: 'booking',
+        onlyWhen: 'booking',
+      },
     ],
   },
 ]
@@ -94,16 +100,25 @@ export const normalizeModules = (stored, clubConfig) => {
   return modules
 }
 
-// Whether a module is in effect: its own switch, and every one above it.
+// Whether a module is in effect: its own switch, every one above it, and
+// the module it only works with (onlyWhen).
 export const isModuleOn = (modules, key) => {
   const m = findModule(key)
   if (!m || !modules?.[key]) return false
-  return m.parent ? isModuleOn(modules, m.parent) : true
+  return dependsOn(m).every((k) => isModuleOn(modules, k))
 }
 
-// The nearest module above this one that is switched off, if any.
+// The modules this one needs on: the one above it, and its onlyWhen.
+const dependsOn = (m) => [m.parent, m.onlyWhen].filter(Boolean)
+
+// The nearest module this one depends on that is switched off, if any.
 export const offAncestor = (modules, key) => {
-  const parent = findModule(key)?.parent
-  if (!parent) return null
-  return modules?.[parent] ? offAncestor(modules, parent) : findModule(parent)
+  const m = findModule(key)
+  if (!m) return null
+  for (const k of dependsOn(m)) {
+    if (!modules?.[k]) return findModule(k)
+    const further = offAncestor(modules, k)
+    if (further) return further
+  }
+  return null
 }

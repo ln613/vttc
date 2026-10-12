@@ -273,11 +273,21 @@ The Total column is the total matches played so far.
 
 - on Generate League Schedule click: based on the number of teams, phases, generate schedule for all rounds/weeks according to the rules in the scheduling section in rules/league.md. For each round/week, generate the schedule for team matchs (which team is going to play which team, which team is going to have a buy)
 
+## Results Tab (league)
+- between Matches and Teams
+- the same "Round/Week" dropdown as the Matches tab, sharing its selection: the week picked on one tab is the week shown on the other
+- a week whose matches haven't been generated: "This week's matches haven't been generated yet."
+- otherwise one row per team match of that week: "Team 1  8 : 6  Team 2" — the sub matches each team has won (dead rubbers dropped after a tie was decided don't count); "– : –" before any sub match is played; the winning team in bold
+- a row opens (▶ / ▼) to its sub matches in the same form, in order: "Player 1  3 : 1  Player 2" with games won, doubles as "A / B"; the winner in bold; "– : –" while not yet played
+- French League shows points instead (rules/league.md): each sub match 2 : 1, or 2 : 0 when a side didn't show / defaulted; the team match the sum of its sub matches' points
+- the winning side's number is bold and red, the losing side's blue (a team match is decided by its own result, or once every sub match is played, by who won more). Every ":" lines up down the middle
+
 ## Teams Tab (league)
 - list of all teams (with team name column) with their members
 
 ## Standing Tab (league)
 - list of teams based on the following order (show these columns following the rank and name of the teams)
+- French League: total points (Pts — 2 a sub match won, 1 lost, 0 forfeited) comes first, as the first column, then the order below
 
 1. Number of rounds won (RW)
 2. When RW is tied

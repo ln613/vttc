@@ -23,7 +23,7 @@ import { getGroupName, getGroupLetter } from '../../shared/rules/tournamentRules
 import Select from '../components/Select'
 import ToggleButton from '../components/ToggleButton'
 import SingleSelectTags from '../components/SingleSelectTags'
-import { leagueState, leagueActions, describeTeam, formatRoundLabel } from '../stores/leagueStore'
+import { leagueState, leagueActions, describeTeam, formatRoundLabel, type LeagueResult, type LeagueResultLine } from '../stores/leagueStore'
 import type { LeagueStandingRow } from '../../shared/types/League'
 import { getLeagueLineup } from '../../shared/rules/leagueRules'
 import { teamSubMatchesUnderWay } from '../../shared/rules/frenchLeague'
@@ -804,6 +804,7 @@ const TAB_LABELS: Record<StageTab, string> = {
   knockout: 'Knockout',
   bracket: 'Bracket',
   matches: 'Matches',
+  results: 'Results',
   teams: 'Teams',
   standing: 'Standing',
 }
@@ -845,9 +846,12 @@ const TabButton = (props: TabButtonProps) => {
     return '0'
   }
 
+  // Equal shares that may shrink below their text's natural width, so four
+  // league tabs still fit a phone.
   const tabStyle = (): JSX.CSSProperties => ({
-    flex: '1',
-    padding: '12px 24px',
+    flex: '1 1 0',
+    'min-width': '0',
+    padding: '12px 6px',
     border: 'none',
     'border-right': props.isLast ? 'none' : '1px solid #ddd',
     'border-radius': borderRadius(),
@@ -879,6 +883,9 @@ const StageContent = () => (
     </MatchCase>
     <MatchCase when={eventDetailState.activeStageTab === 'matches'}>
       <LeagueMatchesContent />
+    </MatchCase>
+    <MatchCase when={eventDetailState.activeStageTab === 'results'}>
+      <LeagueResultsContent />
     </MatchCase>
     <MatchCase when={eventDetailState.activeStageTab === 'teams'}>
       <LeagueTeamsContent />
@@ -3530,19 +3537,7 @@ const RoundPicker = () => {
 
   return (
     <div style={roundPickerRowStyle}>
-      <div style={roundPickerStyle}>
-        <Select
-          label="Round/Week"
-          name="leagueRound"
-          value={String(leagueState.selectedRoundIndex)}
-          onChange={(value) => leagueActions.setSelectedRound(Number(value))}
-          options={leagueActions.getRounds().map((round) => ({
-            value: String(round.roundIndex),
-            label: formatRoundLabel(round),
-          }))}
-          noMargin
-        />
-      </div>
+      <RoundSelect />
       <Show when={authState.isAdmin && leagueActions.hasRoundMatches()}>
         <Button
           color="#e74c3c"
@@ -3556,6 +3551,192 @@ const RoundPicker = () => {
     </div>
   )
 }
+
+// The week shown on the Matches and Results tabs: one selection
+// (leagueState.selectedRoundIndex), so switching tabs keeps the week.
+const RoundSelect = () => (
+  <div style={roundPickerStyle}>
+    <Select
+      label="Round/Week"
+      name="leagueRound"
+      value={String(leagueState.selectedRoundIndex)}
+      onChange={(value) => leagueActions.setSelectedRound(Number(value))}
+      options={leagueActions.getRounds().map((round) => ({
+        value: String(round.roundIndex),
+        label: formatRoundLabel(round),
+      }))}
+      noMargin
+    />
+  </div>
+)
+
+// ==================== Results tab (league) ====================
+
+// Each team match of the selected week as "Team A 8 : 6 Team D", opening to
+// its sub-matches in the same form. See specs/pages/Event Detail.md.
+const LeagueResultsContent = () => (
+  <Show when={!leagueState.loading} fallback={<div>Loading...</div>}>
+    <Show
+      when={leagueActions.isScheduleGenerated()}
+      fallback={<div style={leagueNoteStyle}>No schedule yet.</div>}
+    >
+      <div style={roundPickerRowStyle}>
+        <RoundSelect />
+      </div>
+      <Show
+        when={leagueActions.getRoundResults().length > 0}
+        fallback={
+          <div style={leagueNoteStyle}>
+            This week's matches haven't been generated yet.
+          </div>
+        }
+      >
+        <div style={resultsListStyle}>
+          <For each={leagueActions.getRoundResults()}>
+            {(result) => <TeamResult result={result} />}
+          </For>
+        </div>
+      </Show>
+    </Show>
+  </Show>
+)
+
+const TeamResult = (props: { result: LeagueResult }) => (
+  <div style={resultCardStyle}>
+    <button
+      type="button"
+      style={resultToggleStyle}
+      aria-expanded={leagueActions.isResultExpanded(props.result.key)}
+      onClick={() => leagueActions.toggleResult(props.result.key)}
+    >
+      <span style={resultChevronStyle}>
+        {leagueActions.isResultExpanded(props.result.key) ? '▼' : '▶'}
+      </span>
+      <ResultLine line={props.result} team />
+    </button>
+    <Show when={leagueActions.isResultExpanded(props.result.key)}>
+      <div style={resultSubsStyle}>
+        <For each={props.result.subs}>
+          {(sub) => <ResultLine line={sub} />}
+        </For>
+      </div>
+    </Show>
+  </div>
+)
+
+// "Side 1  x : y  Side 2", the winner in bold; not played yet: "– : –".
+const ResultLine = (props: { line: LeagueResultLine; team?: boolean }) => (
+  <div style={resultLineStyle(!!props.team)}>
+    <span style={resultSideStyle('right', props.line.winner === 1)}>
+      {props.line.side1}
+    </span>
+    <span style={resultScoreStyle(!!props.team, props.line.played)}>
+      <Show when={props.line.played} fallback="– : –">
+        <span style={scoreNumberStyle(1, props.line.winner)}>
+          {props.line.score1}
+        </span>
+        {' : '}
+        <span style={scoreNumberStyle(2, props.line.winner)}>
+          {props.line.score2}
+        </span>
+      </Show>
+    </span>
+    <span style={resultSideStyle('left', props.line.winner === 2)}>
+      {props.line.side2}
+    </span>
+  </div>
+)
+
+// Once there is a winner: the winning side's number in bold red, the
+// losing side's in blue.
+const scoreNumberStyle = (
+  side: 1 | 2,
+  winner: 1 | 2 | null,
+): JSX.CSSProperties => {
+  if (winner == null) return {}
+  return side === winner
+    ? { 'font-weight': 800, color: '#e74c3c' }
+    : { color: '#2185d0' }
+}
+
+const resultsListStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '12px',
+}
+
+const resultCardStyle: JSX.CSSProperties = {
+  background: '#fff',
+  border: '1px solid #e5e7eb',
+  'border-radius': '10px',
+  overflow: 'hidden',
+}
+
+// The rows keep the same padding on both sides, and the arrow sits in the
+// left padding, so every ":" lines up down the middle of the card.
+const RESULT_SIDE_PADDING = '28px'
+
+const resultToggleStyle: JSX.CSSProperties = {
+  position: 'relative',
+  display: 'flex',
+  'align-items': 'center',
+  width: '100%',
+  padding: `14px ${RESULT_SIDE_PADDING}`,
+  'box-sizing': 'border-box',
+  border: '0',
+  background: 'transparent',
+  cursor: 'pointer',
+  font: 'inherit',
+  color: 'inherit',
+  'text-align': 'left',
+}
+
+const resultChevronStyle: JSX.CSSProperties = {
+  position: 'absolute',
+  left: '10px',
+  top: '50%',
+  transform: 'translateY(-50%)',
+  color: '#2185d0',
+  'font-size': '12px',
+}
+
+const resultSubsStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  gap: '6px',
+  padding: `10px ${RESULT_SIDE_PADDING} 14px`,
+  'border-top': '1px solid #eef0f3',
+  background: '#fafbfc',
+}
+
+const resultLineStyle = (team: boolean): JSX.CSSProperties => ({
+  display: 'grid',
+  'grid-template-columns': 'minmax(0, 1fr) auto minmax(0, 1fr)',
+  'align-items': 'center',
+  gap: '10px',
+  flex: '1 1 auto',
+  'min-width': '0',
+  'font-size': team ? '16px' : '14px',
+})
+
+const resultSideStyle = (
+  align: 'left' | 'right',
+  isWinner: boolean,
+): JSX.CSSProperties => ({
+  'text-align': align,
+  'font-weight': isWinner ? 700 : 400,
+  'overflow-wrap': 'anywhere',
+})
+
+const resultScoreStyle = (team: boolean, played: boolean): JSX.CSSProperties => ({
+  'min-width': team ? '64px' : '48px',
+  'text-align': 'center',
+  'font-weight': 600,
+  'font-size': team ? '20px' : '15px',
+  'font-variant-numeric': 'tabular-nums',
+  color: played ? '#f1a40f' : '#9aa3af',
+  'white-space': 'nowrap',
+})
 
 // Before a week is generated, each team picks the players it fields.
 // Who plays whom is already fixed by the schedule, so the week reads as its
@@ -3874,7 +4055,12 @@ const LeagueTeamsContent = () => (
 
 type StandingStat = Extract<
   keyof LeagueStandingRow,
-  'roundsWon' | 'matchesWon' | 'matchesLost' | 'gamesWon' | 'gamesLost'
+  | 'points'
+  | 'roundsWon'
+  | 'matchesWon'
+  | 'matchesLost'
+  | 'gamesWon'
+  | 'gamesLost'
 >
 
 const STANDING_COLUMNS: { key: StandingStat; label: string }[] = [
@@ -3885,6 +4071,12 @@ const STANDING_COLUMNS: { key: StandingStat; label: string }[] = [
   { key: 'gamesLost', label: 'GL' },
 ]
 
+// A French League ranks on points, so they lead the columns.
+const standingColumns = () =>
+  leagueActions.scoresPoints()
+    ? [{ key: 'points' as const, label: 'Pts' }, ...STANDING_COLUMNS]
+    : STANDING_COLUMNS
+
 const LeagueStandingContent = () => (
   <div style={tableWrapperStyle}>
     <table style={tableStyle}>
@@ -3892,7 +4084,7 @@ const LeagueStandingContent = () => (
         <tr>
           <th style={thStyle}>#</th>
           <th style={thStyle}>Team</th>
-          <For each={STANDING_COLUMNS}>
+          <For each={standingColumns()}>
             {(column) => <th style={thStyle}>{column.label}</th>}
           </For>
         </tr>
@@ -3905,7 +4097,7 @@ const LeagueStandingContent = () => (
               <td style={tdStyle}>
                 {row.teamName || describeTeam(row.players)}
               </td>
-              <For each={STANDING_COLUMNS}>
+              <For each={standingColumns()}>
                 {(column) => <td style={tdStyle}>{row[column.key]}</td>}
               </For>
             </tr>

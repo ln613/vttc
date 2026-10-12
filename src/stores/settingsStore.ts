@@ -34,7 +34,7 @@ export interface AppSettings {
 const DEFAULT_SETTINGS: AppSettings = {
   ignoreUnpaidInGeneration: true,
   tabletMirrorEnabled: false,
-  allowPublicUmpire: true,
+  allowPublicUmpire: false,
   saveUmpireInfo: false,
   maxUmpiresPerTable: 1,
   bookingOpenTime: clubConfig.booking?.openTime || DEFAULT_BOOKING.openTime,

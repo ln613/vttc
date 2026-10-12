@@ -115,6 +115,9 @@ export interface Match {
   // A league tie played on two tables (French League): both, the first being
   // lockedTableNumber. Each sub-match is locked to its own one of them.
   lockedTableNumbers?: number[]
+  // The side that didn't show / defaulted (the Forfeit button). French League
+  // scores such a sub-match 2 : 0 rather than 2 : 1.
+  forfeitedSide?: 1 | 2
   // Set by an admin's "Play Now" on an RR Singles league round: this pending
   // sub-match is the one the queue offers next. Purely about scheduling —
   // the sub-matches keep their listed order and numbering.

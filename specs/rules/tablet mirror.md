@@ -14,9 +14,8 @@ Both live on the Setting page and are club-wide.
 ### Allow Public Umpire
 
 Whether the match-day password lets someone without an account score a
-match at all. Its default comes from `allowPublicUmpire` in the club config
-(absent = allowed, which is how the app behaved before the setting
-existed). Turning it off hides the Umpire button and refuses the password
+match at all. Off by default; `"allowPublicUmpire": true` in the club
+config turns it on (VTTC has it, keeping its match days as they were). Turning it off hides the Umpire button and refuses the password
 server-side — hiding the button is a courtesy, refusing the password is the
 rule.
 

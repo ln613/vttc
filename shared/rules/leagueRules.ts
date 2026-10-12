@@ -4,6 +4,10 @@
 import type { LeaguePairing, LeagueStandingRow } from '../types/League'
 import type { Match } from '../types/Match'
 import type { Participant } from '../types/Tournament'
+import {
+  getFrenchLeagueSubPoints,
+  isFrenchLeagueLeagueTie,
+} from './frenchLeague.js'
 
 export * from './leagueSchedule.js'
 
@@ -19,6 +23,7 @@ const emptyStandingRow = (participant: Participant): LeagueStandingRow => ({
   matchesLost: 0,
   gamesWon: 0,
   gamesLost: 0,
+  points: 0,
 })
 
 const tallyTeamMatch = (
@@ -26,8 +31,10 @@ const tallyTeamMatch = (
   home: LeagueStandingRow,
   away: LeagueStandingRow,
 ) => {
+  const scoresPoints = isFrenchLeagueLeagueTie(match)
   for (const sub of match.subMatches || []) {
     if (!sub.winningSide) continue
+    if (scoresPoints) addSubPoints(sub, home, away)
     if (sub.winningSide === 1) {
       home.matchesWon++
       away.matchesLost++
@@ -49,13 +56,26 @@ const tallyTeamMatch = (
   }
 }
 
+const addSubPoints = (
+  sub: Match,
+  home: LeagueStandingRow,
+  away: LeagueStandingRow,
+) => {
+  const points = getFrenchLeagueSubPoints(sub)
+  if (!points) return
+  home.points += points[0]
+  away.points += points[1]
+}
+
 /**
  * Rank teams by rounds won, then total matches won, matches lost (fewer is
- * better), games won, and games lost (fewer is better).
+ * better), games won, and games lost (fewer is better). A French League
+ * ranks on points first (league.md).
  */
 export const computeLeagueStandings = (
   participants: Participant[],
   roundMatches: { pairings?: LeaguePairing[]; matches: Match[] }[],
+  options: { byPoints?: boolean } = {},
 ): LeagueStandingRow[] => {
   const rows = new Map<string, LeagueStandingRow>()
   for (const participant of participants) {
@@ -71,8 +91,13 @@ export const computeLeagueStandings = (
     }
   }
 
-  return [...rows.values()].sort(compareStandingRows)
+  return [...rows.values()].sort(
+    options.byPoints ? comparePointsFirst : compareStandingRows,
+  )
 }
+
+const comparePointsFirst = (a: LeagueStandingRow, b: LeagueStandingRow) =>
+  b.points - a.points || compareStandingRows(a, b)
 
 export const compareStandingRows = (
   a: LeagueStandingRow,

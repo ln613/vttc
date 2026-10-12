@@ -83,3 +83,43 @@ export const teamSubMatchesUnderWay = (match) => {
   if (!match.autoScheduled) return true
   return subs.some(subMatchHasPlay)
 }
+
+// ==================== Points (league) ====================
+
+// A French League league scores each sub-match in points, and the points go
+// towards the standings (league.md, "French League"): 2 to the winner, 1 to
+// the loser — so every result reads 2 : 1 — and 0 to a side that didn't
+// show or defaulted (2 : 0).
+export const FRENCH_LEAGUE_WIN_POINTS = 2
+export const FRENCH_LEAGUE_LOSS_POINTS = 1
+export const FRENCH_LEAGUE_FORFEIT_POINTS = 0
+
+/** A French League team match played in a league (every sub-match counts). */
+export const isFrenchLeagueLeagueTie = (match) =>
+  match?.teamMatchType === FRENCH_LEAGUE_MATCH_TYPE && !!match?.playAllMatches
+
+/**
+ * A decided sub-match's points as [side 1, side 2]; null while it has no
+ * winner. `forfeitedSide` marks the side that didn't show or defaulted.
+ */
+export const getFrenchLeagueSubPoints = (sub) => {
+  if (sub?.winningSide !== 1 && sub?.winningSide !== 2) return null
+  const loser = sub.winningSide === 1 ? 2 : 1
+  const loserPoints =
+    sub.forfeitedSide === loser
+      ? FRENCH_LEAGUE_FORFEIT_POINTS
+      : FRENCH_LEAGUE_LOSS_POINTS
+  return sub.winningSide === 1
+    ? [FRENCH_LEAGUE_WIN_POINTS, loserPoints]
+    : [loserPoints, FRENCH_LEAGUE_WIN_POINTS]
+}
+
+/** A team match's points so far, [side 1, side 2], from the given sub-matches. */
+export const getFrenchLeagueTiePoints = (subs) =>
+  (subs || []).reduce(
+    (total, sub) => {
+      const points = getFrenchLeagueSubPoints(sub)
+      return points ? [total[0] + points[0], total[1] + points[1]] : total
+    },
+    [0, 0],
+  )

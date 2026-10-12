@@ -18,6 +18,8 @@ export interface ModuleDefinition {
   label: string
   required?: boolean
   requiredWhen?: ModuleKey
+  // In effect only while this module is on (My Booking needs Booking).
+  onlyWhen?: ModuleKey
   children?: ModuleDefinition[]
 }
 

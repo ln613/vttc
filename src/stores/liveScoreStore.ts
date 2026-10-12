@@ -28,9 +28,8 @@ const getInitialState = (): LiveScoreState => ({
   matchQueue: [],
   activeSessionMatchIds: [],
   scorerHeldMatchIds: [],
-  // Assumed on until the first fetch says otherwise, matching how the app
-  // behaved before the setting existed.
-  allowPublicUmpire: true,
+  // Off until the first fetch says otherwise — the setting's default.
+  allowPublicUmpire: false,
   loading: false,
   error: null,
 })
@@ -60,7 +59,7 @@ const fetchLiveScore = async (runAutoStart = false) => {
       matchQueue: data.matchQueue || [],
       activeSessionMatchIds: data.activeSessionMatchIds || [],
       scorerHeldMatchIds: data.scorerHeldMatchIds || [],
-      allowPublicUmpire: data.allowPublicUmpire !== false,
+      allowPublicUmpire: data.allowPublicUmpire === true,
       loading: false,
       error: null,
     })

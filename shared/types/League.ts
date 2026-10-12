@@ -94,4 +94,5 @@ export interface LeagueStandingRow {
   matchesLost: number // ML
   gamesWon: number // GW
   gamesLost: number // GL
+  points: number // Pts — French League only: 2 a win, 1 a loss, 0 a forfeit
 }
