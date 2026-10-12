@@ -39,6 +39,28 @@ export declare const assignTables: (
   roundsPerPhase: number,
 ) => (number | undefined)[][]
 
+export declare const getTablesPerFixture: (
+  format: LeagueFormat | string | undefined,
+) => number
+
+export declare const getTablePairs: (tables: number[]) => [number, number][]
+
+export declare const getFixtureTables: (
+  pairing: { tableNumber?: number; tableNumbers?: number[] } | undefined,
+) => number[]
+
+export declare const withTablePairs: <
+  T extends { tableNumber?: number; tableNumbers?: number[] },
+>(
+  pairings: T[],
+  tables: number[],
+) => T[]
+
+export declare const getTablePairOf: (
+  tables: number[],
+  tableNumber: number,
+) => [number, number] | undefined
+
 export declare const addWeeks: (date: string, weeks: number) => string
 
 export declare const generateLeagueSchedule: (input: {
@@ -46,6 +68,7 @@ export declare const generateLeagueSchedule: (input: {
   phases: number
   tables: number[]
   startDate: string
+  tablesPerFixture?: number
 }) => LeagueRoundPlan[]
 
 export declare const LEAGUE_FORMATS: LeagueFormat[]

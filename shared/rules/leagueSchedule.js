@@ -7,6 +7,7 @@
 
 import {
   FRENCH_LEAGUE_MATCH_TYPE,
+  FRENCH_LEAGUE_TABLES,
   FRENCH_LEAGUE_TEAM_SIZE,
   getFrenchLeagueLineup,
 } from './frenchLeague.js'
@@ -319,6 +320,58 @@ export const assignTables = (rounds, tables, roundsPerPhase) => {
   return assignments
 }
 
+// ==================== Tables per fixture ====================
+
+/**
+ * How many tables a fixture is played on: two for French League (its tie
+ * runs on two tables at once, match.md), one for every other format.
+ */
+export const getTablesPerFixture = (format) =>
+  format === 'French League' ? FRENCH_LEAGUE_TABLES : 1
+
+/** The club's tables two by two, neighbours in its order: [5, 6], [7, 8]… */
+export const getTablePairs = (tables) => {
+  const pairs = []
+  for (let i = 0; i + 1 < tables.length; i += 2) {
+    pairs.push([tables[i], tables[i + 1]])
+  }
+  return pairs
+}
+
+/** The tables a fixture is played on: its pair, or its one table. */
+export const getFixtureTables = (pairing) => {
+  if (pairing?.tableNumbers?.length) return pairing.tableNumbers
+  return pairing?.tableNumber != null ? [pairing.tableNumber] : []
+}
+
+/**
+ * Give every fixture of a two-table format its pair of tables. A fixture
+ * scheduled before French League took two tables has only one: it gets the
+ * pair holding that table, or the next pair no other fixture has.
+ */
+export const withTablePairs = (pairings, tables) => {
+  const pairs = getTablePairs(tables)
+  const taken = new Set(
+    pairings
+      .filter((p) => p.tableNumbers?.length === 2)
+      .map((p) => p.tableNumbers[0]),
+  )
+  const free = (pair) => !taken.has(pair[0])
+  return pairings.map((pairing) => {
+    if (pairing.tableNumbers?.length === 2) return pairing
+    const pair =
+      pairs.find((p) => free(p) && p.includes(pairing.tableNumber)) ||
+      pairs.find(free)
+    if (!pair) return pairing
+    taken.add(pair[0])
+    return { ...pairing, tableNumber: pair[0], tableNumbers: pair }
+  })
+}
+
+/** The pair a table belongs to, for moving a two-table fixture. */
+export const getTablePairOf = (tables, tableNumber) =>
+  getTablePairs(tables).find((pair) => pair.includes(tableNumber))
+
 // ==================== Dates ====================
 
 /** Dates are local calendar days (YYYY-MM-DD), so no timezone maths. */
@@ -352,6 +405,7 @@ export const generateLeagueSchedule = ({
   phases,
   tables,
   startDate,
+  tablesPerFixture = 1,
 }) => {
   const teamCount = participantIds.length
   if (teamCount < 2) return []
@@ -363,7 +417,17 @@ export const generateLeagueSchedule = ({
   )
 
   const allRounds = repeatPhases(phasePairings, phases)
-  const tableAssignments = assignTables(allRounds, tables, roundsPerPhase)
+  // A two-table fixture rotates over pairs of tables the way a one-table
+  // fixture rotates over tables: each pair stands in for one table, named
+  // by its first.
+  const units =
+    tablesPerFixture > 1 ? getTablePairs(tables) : tables.map((t) => [t])
+  const unitOf = new Map(units.map((unit) => [unit[0], unit]))
+  const tableAssignments = assignTables(
+    allRounds,
+    units.map((unit) => unit[0]),
+    roundsPerPhase,
+  )
 
   return allRounds.map((round, roundIndex) => ({
     roundIndex,
@@ -374,6 +438,9 @@ export const generateLeagueSchedule = ({
       homeParticipantId: participantIds[home - 1],
       awayParticipantId: participantIds[away - 1],
       tableNumber: tableAssignments[roundIndex][i],
+      ...(tablesPerFixture > 1
+        ? { tableNumbers: unitOf.get(tableAssignments[roundIndex][i]) }
+        : {}),
     })),
   }))
 }

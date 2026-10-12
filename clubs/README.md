@@ -35,14 +35,28 @@ A club without a website can still have its own look:
   buttons, page headings and account pages from the app's plain style to
   the club's (`hasSiteLook()` in src/site/siteContent.ts). Only that club's
   build includes it.
-- `branding.banner` in config.json — `{ background, logo, name, services?,
-  tagline? }`: the banner is built from the background image with the logo
-  and name laid over it, so it never stretches.
+- `branding.banner` in config.json — `{ background, backgroundMobile?,
+  logo, name, services?, tagline? }`: the banner is built from the
+  background image with the logo and name laid over it, so it never
+  stretches. `backgroundMobile` is a simpler crop for phones. In theme.css,
+  `--banner-size: auto 100%` shows the whole artwork at the banner's height
+  (pinned right, `--banner-bg` filling the left) instead of cropping it.
 - `branding.topBarColor` — the top bar.
+- `clubs/<slug>/landing.json` — a landing page at "/" instead of the event
+  list: a product-style home with a video, key features and a contact call
+  (specs/pages/Landing.md). `media` holds the addresses (video, poster,
+  pictures) once; `en` / `zh` the words. A club with a website opens on
+  that instead.
 
-NovaPing is the first (navy, cyan and coral; Sora type; squared buttons).
-Its logo and banner background are on Cloudinary in the "NovaPing" folder,
-uploaded with `scripts/upload-site-images.mjs --no-manifest`.
+NovaPing — the brand of this scoring and live-score system, run as its own
+site — is the first (smooth navy, blue, violet and cyan colour bands with
+coral and yellow accents; Exo 2 italic over Inter; pill buttons). Its
+banner shows the product: a scoring tablet and the live score board. Its
+landing page plays the promo video. Its logo, banner images and the video
+are on Cloudinary in the "NovaPing" folder, uploaded with
+`scripts/upload-site-images.mjs --no-manifest` (which takes .mp4 too); the
+landing page's feature pictures are stills cut from the video by
+Cloudinary (`so_<seconds>,c_crop,…` in the address).
 
 The rating system is **not** club-configurable yet; `rating.js` still carries
 VTTC's tables. Deferred until a second club needs different ones.

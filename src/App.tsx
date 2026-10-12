@@ -1,5 +1,5 @@
 import { HashRouter, Route, Navigate } from '@solidjs/router'
-import { Show, onMount, type Component, type JSX } from 'solid-js'
+import { Show, Switch, Match, onMount, type Component, type JSX } from 'solid-js'
 import './App.css'
 import TournamentEdit from './pages/TournamentEdit'
 import EventEdit from './pages/EventEdit'
@@ -22,11 +22,13 @@ import SiteHome from './pages/site/SiteHome'
 import SiteCoaches from './pages/site/SiteCoaches'
 import SitePricing from './pages/site/SitePricing'
 import SiteAbout from './pages/site/SiteAbout'
+import LandingHome from './pages/site/LandingHome'
 import Rewards from './pages/Rewards'
 import Redemptions from './pages/Redemptions'
 import Gifts from './pages/Gifts'
 import { pointsModel } from './i18n/wallet'
 import { hasSite } from './site/siteContent'
+import { hasLanding } from './site/landingContent'
 import ConfirmDialog from './components/ConfirmDialog'
 import WaiverGate from './components/WaiverGate'
 import { ModuleGate, Home } from './components/ModuleGate'
@@ -89,19 +91,22 @@ const pointsOnly =
 const TournamentEditPage = () => <TournamentEdit isEdit />
 const EventEditPage = () => <EventEdit isEdit />
 
-// A club with its own website opens on it; otherwise the event list, or
-// whatever its modules make home.
+// A club with its own website opens on it, one with a landing page on
+// that; otherwise the event list, or whatever its modules make home.
 const HomePage = () => (
-  <Show
-    when={hasSite()}
-    fallback={
+  <Switch>
+    <Match when={hasSite()}>
+      <SiteHome />
+    </Match>
+    <Match when={hasLanding()}>
+      <LandingHome />
+    </Match>
+    <Match when={true}>
       <Home>
         <EventList />
       </Home>
-    }
-  >
-    <SiteHome />
-  </Show>
+    </Match>
+  </Switch>
 )
 
 const App = () => (

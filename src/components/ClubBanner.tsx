@@ -3,8 +3,9 @@ import clubConfig from 'club-config'
 import './club-banner.css'
 
 // The banner of a club without a website (branding.banner in its config):
-// a background image cropped to fill the strip — it can't be squashed at any
-// width — with the logo, name, services and tagline laid over it as text.
+// a background image — never stretched, whatever the width; a club can give
+// a simpler crop for phones — with the logo, name, services and tagline laid
+// over it as text.
 // Its colours and fonts come from the club's theme (club-banner.css reads
 // --banner-* variables; clubs/<slug>/theme.css sets them).
 const ClubBanner = () => {
@@ -12,7 +13,10 @@ const ClubBanner = () => {
   return (
     <div
       class="club-banner"
-      style={{ 'background-image': `url("${banner.background}")` }}
+      style={{
+        '--banner-image': `url("${banner.background}")`,
+        '--banner-image-mobile': `url("${banner.backgroundMobile ?? banner.background}")`,
+      }}
     >
       <div class="club-banner-inner">
         <img class="club-banner-logo" src={banner.logo} alt="" />

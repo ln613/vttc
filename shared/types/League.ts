@@ -62,6 +62,8 @@ export interface LeaguePairing {
   homeParticipantId: string
   awayParticipantId: string
   tableNumber?: number
+  // A two-table fixture (French League): both its tables, tableNumber first.
+  tableNumbers?: number[]
 }
 
 export interface LeagueRoundPlan {

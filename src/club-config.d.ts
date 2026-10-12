@@ -103,6 +103,8 @@ declare module 'club-config' {
        */
       banner?: {
         background: string
+        /** A simpler crop for phones (640px and narrower). */
+        backgroundMobile?: string
         logo: string
         name: string
         tagline?: string

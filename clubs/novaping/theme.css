@@ -1,83 +1,144 @@
-/* NovaPing's own look (see src/site/siteContent.ts, hasSiteLook): midnight
- * navy and night sky, a cyan "nova" accent and coral-orange action buttons,
- * upright geometric type (Sora) over Inter, and squared-off buttons rather
- * than pills. Everything is CSS variables over the shared styles
+/* NovaPing's own look (see src/site/siteContent.ts, hasSiteLook): modern
+ * and sporty — deep navy flowing into electric blue and cyan in smooth
+ * colour bands, coral and yellow accents, Exo 2 in heavy italic over Inter,
+ * pill buttons. Everything is CSS variables over the shared styles
  * (booking.css, club-banner.css), plus a few rules where a style was fixed.
  * `html .bk-site` outranks booking.css's own `.bk-site` defaults. */
 
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Exo+2:ital,wght@0,700;0,800;1,800;1,900&family=Inter:wght@400;500;600;700&display=swap');
 
 html .bk-site {
-  --bk-bg: #eef4fb;
+  --bk-bg: #eef3ff;
   --bk-surface: #ffffff;
-  --bk-ink: #0f1d33;
-  --bk-soft: #50617c;
-  --bk-line: #d7e3f3;
-  --bk-card-line: #d7e3f3;
-  --bk-accent: #0a7f99;
-  --bk-free-bg: #e8f8fb;
-  --bk-free-line: #9fe3ee;
-  --bk-free-ink: #075b6e;
-  --bk-free-hover: #d3f3f8;
-  --bk-mine-bg: #ffe2d6;
-  --bk-mine-line: #ff6a3d;
+  --bk-ink: #0b1440;
+  --bk-soft: #4b587c;
+  --bk-line: #d8e1f8;
+  --bk-card-line: #d8e1f8;
+  --bk-accent: #2563eb;
+  --bk-free-bg: #e8f1ff;
+  --bk-free-line: #a9c6ff;
+  --bk-free-ink: #1d4ed8;
+  --bk-free-hover: #d6e6ff;
+  --bk-mine-bg: #ffe4dc;
+  --bk-mine-line: #ff5a36;
   --bk-mine-ink: #5a1d07;
-  --bk-taken-bg: #0b2a52;
-  --bk-taken-line: #061428;
+  --bk-taken-bg: #0b1440;
+  --bk-taken-line: #070b24;
   --bk-taken-ink: #ffffff;
-  --bk-off-bg: #f1f5fa;
-  --bk-off-ink: #a7b4c6;
-  --bk-primary: #f05a28;
+  --bk-off-bg: #f1f4fb;
+  --bk-off-ink: #a3aec8;
+  --bk-primary: #ff5a36;
   --bk-primary-ink: #ffffff;
-  --bk-secondary: #e3edf9;
-  --bk-secondary-ink: #0b2a52;
-  --bk-radius: 12px;
+  --bk-secondary: #e3eaff;
+  --bk-secondary-ink: #1d2b6b;
+  --bk-radius: 18px;
+  /* The heading bands: the same smooth colour bands as the banner. */
   --bk-head-bg:
-    radial-gradient(circle at 85% 20%, rgba(34, 211, 238, 0.28), transparent 45%),
-    linear-gradient(135deg, #0b2a52, #061428 85%);
+    radial-gradient(120% 140% at 100% 100%, rgba(255, 90, 54, 0.55), transparent 45%),
+    radial-gradient(90% 120% at 85% 0%, rgba(99, 102, 241, 0.75), transparent 55%),
+    radial-gradient(100% 140% at 60% 120%, rgba(6, 182, 212, 0.6), transparent 55%),
+    linear-gradient(120deg, #070b24 0%, #101d63 50%, #1b3aa8 100%);
   --bk-head-ink: #ffffff;
-  --bk-display: 'Sora', 'Inter', 'Noto Sans SC', system-ui, sans-serif;
-  --bk-display-style: normal;
-  --bk-display-weight: 700;
+  --bk-display: 'Exo 2', 'Inter', 'Noto Sans SC', system-ui, sans-serif;
+  --bk-display-style: italic;
+  --bk-display-weight: 900;
   font-family: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
 }
 
-/* Squared-off buttons, upright and unspaced. */
+/* Pill buttons, as on Timing Sports, with a soft glow on the main one. */
 html .bk-site .bk-btn {
-  border-radius: 10px;
-  letter-spacing: 0;
+  border-radius: 999px;
+  letter-spacing: 0.01em;
 }
 html .bk-site .bk-btn-primary {
-  box-shadow: 0 6px 16px rgba(240, 90, 40, 0.28);
+  background: linear-gradient(135deg, #ff5a36, #ff3d7f);
+  box-shadow: 0 8px 22px rgba(255, 74, 90, 0.35);
 }
 html .bk-site .bk-kicker {
-  color: #22d3ee;
-}
-html .bk-site .bk-title,
-html .bk-site .bk-dialog-title {
-  letter-spacing: -0.01em;
+  color: #ffd23f;
 }
 html .bk-site .bk-option.is-on,
 html .bk-site .su-match.is-on {
-  border-color: #0a7f99;
+  border-color: #2563eb;
+}
+
+/* The top bar: the bands, quieter, so the links stay easy to read. */
+.vttc-topbar {
+  background-image: linear-gradient(
+    90deg,
+    #070b24 0%,
+    #101d63 45%,
+    #1d3fb0 80%,
+    #0e7490 100%
+  ) !important;
 }
 
 /* The banner (ClubBanner). */
 .club-banner {
-  --banner-bg: #061428;
+  --banner-bg: #070b24;
+  /* Desktop: the artwork (the scoring tablet and the live board) large —
+   * the size it has filling a 1280px-wide banner — pinned right, so a wider
+   * screen shows more of the bands on the left rather than zooming in and
+   * cutting the tablet and the LIVE badge off. */
+  --banner-size: auto 162%;
   --banner-position: right center;
+  /* Light enough that the colour bands show, dark enough behind the name. */
   --banner-overlay: linear-gradient(
     90deg,
-    rgba(6, 20, 40, 0.92) 0%,
-    rgba(11, 42, 82, 0.62) 42%,
-    rgba(11, 42, 82, 0.05) 75%
+    rgba(7, 11, 36, 0.78) 0%,
+    rgba(7, 11, 36, 0.45) 38%,
+    rgba(7, 11, 36, 0) 65%
   );
-  --banner-display: 'Sora', 'Inter', system-ui, sans-serif;
-  --banner-display-weight: 800;
+  --banner-display: 'Exo 2', 'Inter', system-ui, sans-serif;
+  --banner-display-weight: 900;
+  --banner-display-style: italic;
   --banner-display-case: uppercase;
-  --banner-display-spacing: 0.02em;
-  --banner-soft: #9fd9e6;
-  --banner-tagline-font: 'Sora', 'Inter', system-ui, sans-serif;
-  --banner-tagline-ink: #22d3ee;
-  --banner-logo-ring: 0 0 0 3px rgba(34, 211, 238, 0.7), 0 8px 22px rgba(0, 0, 0, 0.4);
+  --banner-display-spacing: 0;
+  --banner-soft: #bfe9ff;
+  --banner-tagline-font: 'Exo 2', 'Inter', system-ui, sans-serif;
+  --banner-tagline-ink: #ffd23f;
+  --banner-logo-ring: 0 0 0 3px rgba(255, 255, 255, 0.9), 0 10px 24px rgba(2, 6, 23, 0.45);
+}
+
+/* A narrower desktop window has less room beside the name: a little
+ * smaller, so the tablet stays clear of the text. */
+@media (max-width: 1239px) {
+  .club-banner {
+    --banner-size: auto 128%;
+  }
+}
+
+/* Tablets: the whole artwork at the banner's height, clear of the text. */
+@media (max-width: 900px) {
+  .club-banner {
+    --banner-size: auto 100%;
+    --banner-overlay: linear-gradient(
+      90deg,
+      rgba(7, 11, 36, 0.8) 0%,
+      rgba(7, 11, 36, 0.4) 45%,
+      rgba(7, 11, 36, 0) 70%
+    );
+  }
+}
+
+/* On a phone the line wraps under the name, no wider than it, in small
+ * type — so it stays clear of the scoreboard. (`.club-banner` in front:
+ * club-banner.css loads after this file.) */
+@media (max-width: 480px) {
+  .club-banner .club-banner-text {
+    width: min-content;
+  }
+  .club-banner .club-banner-services {
+    font-size: 8.5px;
+    letter-spacing: 0.04em;
+    line-height: 1.3;
+  }
+}
+
+/* The smallest phones: a slightly smaller name, so it ends before the
+ * scoreboard starts. */
+@media (max-width: 400px) {
+  .club-banner .club-banner-name {
+    font-size: 22px;
+  }
 }

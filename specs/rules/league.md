@@ -45,6 +45,8 @@ Teams should rotate on tables every week.
 - No team should play on the same table as last week
 - No team should play on the same table more than 2 times per phase
 
+A French League fixture is played on 2 tables: the club's tables are taken two by two, neighbours in its order ([5, 6], [7, 8], [1, 2], [3, 4]…), and each fixture gets a pair. The rotation rules above apply to the pairs. n teams then need 2 × floor(n/2) tables. The fixture shows both ("5 & 6"); Switch Table moves it to the pair holding the picked table, swapping with the fixture there, before and after the week's matches are generated. A league scheduled before fixtures took two tables gets them when read: each fixture takes the pair holding its table, or the next free pair.
+
 ## Format
 
 1. RR Singles
@@ -71,22 +73,28 @@ C vs Y
 Same format as the team matches in tournaments
 
 3. French League
-Team of 4 only. Same team match as a French League tournament (match.md, "French League"): 14 sub matches, 6 singles, 2 doubles, then 6 singles; every player plays 3 singles and 1 doubles. A league fixture has one table, so they are played one at a time in this order (Home team ABCD, away team XYZW):
+Team of 4 only. Same team match as a French League tournament (match.md, "French League"): 14 sub matches, 6 singles, 2 doubles, then 6 singles; every player plays 3 singles and 1 doubles. Each team match uses its fixture's 2 tables at once, the same way as the tournament (Home team ABCD, away team XYZW; table 1 / table 2 of the pair):
 
-A vs Y
-B vs X
-C vs W
-D vs Z
-B vs W
-A vs Z
-AC vs XZ
-BD vs WY
-C vs X
-D vs Y
-A vs W
-B vs Z
-C vs Y
-D vs X
+| # | Match | Table |
+|---|---|---|
+| 1 | A vs Y | 1 |
+| 2 | B vs X | 2 |
+| 3 | C vs W | 1 |
+| 4 | D vs Z | 2 |
+| 5 | B vs W | 1 |
+| 6 | A vs Z | 2 |
+| 7 | AC vs XZ | 1 |
+| 8 | BD vs WY | 2 |
+| 9 | C vs X | 1 |
+| 10 | D vs Y | 2 |
+| 11 | A vs W | 1 |
+| 12 | B vs Z | 2 |
+| 13 | C vs Y | 1 |
+| 14 | D vs X | 2 |
+
+- each table plays its own matches in order
+- the doubles don't start until all of the first 6 singles are finished, and the 2 doubles start at the same time; the last 6 singles follow once the doubles are done
+- a match whose player is still playing on the other table waits on its table (the tablet shows who it is waiting for) and starts when they are free
 
 The 4 singles pairings not played are A vs X, B vs Y, C vs Z, D vs W.
 

@@ -112,6 +112,9 @@ export interface Match {
   // they must run on.
   parentMatchId?: string
   lockedTableNumber?: number
+  // A league tie played on two tables (French League): both, the first being
+  // lockedTableNumber. Each sub-match is locked to its own one of them.
+  lockedTableNumbers?: number[]
   // Set by an admin's "Play Now" on an RR Singles league round: this pending
   // sub-match is the one the queue offers next. Purely about scheduling —
   // the sub-matches keep their listed order and numbering.

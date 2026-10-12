@@ -14,7 +14,13 @@ import {
   getRoundsPerPhase,
   getTotalRounds,
   getLeagueSubMatchCount,
+  getTablesPerFixture,
+  getTablePairs,
+  getTablePairOf,
+  getFixtureTables,
+  withTablePairs,
   FRENCH_LEAGUE_MATCH_TYPE,
+  FRENCH_LEAGUE_TABLES,
   isRoundSelectionComplete,
   findDoubleBookedPlayers,
   ratingAtDate,
@@ -122,11 +128,20 @@ const toRoundSummary = (round) => ({
   roundIndex: round.roundIndex,
   date: round.date,
   time: round.time,
-  pairings: round.leaguePairings || [],
+  pairings: roundPairings(round),
   byeParticipantId: round.leagueByeParticipantId,
   selections: round.leagueSelections || [],
   matches: getRoundMatches(round),
 })
+
+// This round's fixtures with their tables: both of them for a two-table
+// format, even for a league scheduled before it took two (withTablePairs).
+const roundPairings = (round) => {
+  const pairings = round.leaguePairings || []
+  return getTablesPerFixture(round.league?.format) > 1
+    ? withTablePairs(pairings, club.tables?.all || [])
+    : pairings
+}
 
 const getRoundMatches = (round) => {
   const group = (round.eventStages || []).find((s) => s.type === 'group')
@@ -195,6 +210,7 @@ export const generateLeagueSchedule = async (body) => {
     phases: root.league?.numOfPhases || 1,
     tables: club.tables?.all || [],
     startDate: root.league?.startDate || root.date,
+    tablesPerFixture: getTablesPerFixture(root.league?.format),
   })
 
   const leagueMeta = {
@@ -239,10 +255,12 @@ const validateGenerateSchedule = (root, rounds) => {
     errors.push('Matches have already been generated for this league')
   }
   const tables = club.tables?.all || []
-  const needed = Math.floor(teamCount / 2)
-  if (tables.length < needed) {
+  const perFixture = getTablesPerFixture(root.league?.format)
+  const fixtures = Math.floor(teamCount / 2)
+  const usable = perFixture > 1 ? getTablePairs(tables).length : tables.length
+  if (usable < fixtures) {
     errors.push(
-      `${teamCount} teams need ${needed} tables, and this club has ${tables.length}`,
+      `${teamCount} teams need ${fixtures * perFixture} tables, and this club has ${tables.length}`,
     )
   }
   throwErrors(errors)
@@ -620,20 +638,22 @@ export const switchLeagueFixtureTable = async (body) => {
     throwError('This week already has matches — switch the match instead')
   }
 
-  const pairings = [...(event.leaguePairings || [])]
+  const pairings = [...roundPairings(event)]
   const mine = pairings.findIndex(
     (p) => p.homeParticipantId === body.homeParticipantId,
   )
   if (mine === -1) throwError('Fixture not found in this round')
-  const fromTable = pairings[mine].tableNumber
-  if (fromTable === body.tableNumber) throwError('Already on that table')
+  const fromTables = getFixtureTables(pairings[mine])
+  const toTables = targetTables(event, body.tableNumber)
+  if (fromTables.includes(body.tableNumber)) throwError('Already on that table')
 
+  // Whichever fixture is on the target takes this one's table(s) in return.
   const theirs = pairings.findIndex(
-    (p, i) => i !== mine && p.tableNumber === body.tableNumber,
+    (p, i) => i !== mine && getFixtureTables(p).includes(body.tableNumber),
   )
-  pairings[mine] = { ...pairings[mine], tableNumber: body.tableNumber }
+  pairings[mine] = withFixtureTables(pairings[mine], toTables)
   if (theirs !== -1) {
-    pairings[theirs] = { ...pairings[theirs], tableNumber: fromTable }
+    pairings[theirs] = withFixtureTables(pairings[theirs], fromTables)
   }
 
   await collection.updateOne(
@@ -642,6 +662,21 @@ export const switchLeagueFixtureTable = async (body) => {
   )
   return { success: true }
 }
+
+// A two-table fixture moves as a pair: picking either table of a pair takes
+// both.
+const targetTables = (event, tableNumber) => {
+  if (getTablesPerFixture(event.league?.format) === 1) return [tableNumber]
+  const pair = getTablePairOf(club.tables?.all || [], tableNumber)
+  if (!pair) throwError(`Table ${tableNumber} has no partner table for a French League fixture`)
+  return pair
+}
+
+const withFixtureTables = (pairing, tables) => ({
+  ...pairing,
+  tableNumber: tables[0],
+  ...(tables.length > 1 ? { tableNumbers: tables } : {}),
+})
 
 // ==================== Generating a round's matches ====================
 
@@ -660,7 +695,7 @@ export const generateLeagueRoundMatches = async (body) => {
 
   validateGenerateRoundMatches(event)
 
-  const matches = (event.leaguePairings || []).map((pairing) =>
+  const matches = roundPairings(event).map((pairing) =>
     buildLeagueTeamMatch(event, pairing),
   )
 
@@ -776,5 +811,17 @@ const buildUnassignedLeagueTeamMatch = (event, pairing) => {
     // sub-matches are expanded when the second one is saved (French League
     // fills them in straight away, see autoScheduleTeamMatch).
     lockedTableNumber: pairing.tableNumber,
+    ...twoTablePlay(event, pairing),
   }
+}
+
+// French League plays the tie on the fixture's two tables at once
+// (match.md): the first table's sub-matches on tableNumbers[0], the
+// second's on tableNumbers[1] (buildTeamSubMatches).
+const twoTablePlay = (event, pairing) => {
+  const tables = getFixtureTables(pairing)
+  if (getTablesPerFixture(event.league?.format) === 1 || tables.length < 2) {
+    return {}
+  }
+  return { parallelTables: FRENCH_LEAGUE_TABLES, lockedTableNumbers: tables }
 }

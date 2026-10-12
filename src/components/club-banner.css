@@ -5,7 +5,12 @@
 .club-banner {
   position: relative;
   background-color: var(--banner-bg, #0b2a52);
-  background-size: cover;
+  background-image: var(--banner-image);
+  background-repeat: no-repeat;
+  /* cover crops to fill; a theme can set "auto 100%" to always show the
+   * whole artwork at the banner's height, the background colour filling
+   * the rest. */
+  background-size: var(--banner-size, cover);
   background-position: var(--banner-position, right center);
   color: var(--banner-ink, #ffffff);
   overflow: hidden;
@@ -74,6 +79,9 @@
   white-space: nowrap;
 }
 @media (max-width: 640px) {
+  .club-banner {
+    background-image: var(--banner-image-mobile, var(--banner-image));
+  }
   .club-banner-tagline {
     display: none;
   }

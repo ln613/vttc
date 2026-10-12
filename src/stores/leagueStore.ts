@@ -14,6 +14,7 @@ import {
   computeLeagueStandings,
   isRoundSelectionComplete,
 } from '../../shared/rules/leagueRules'
+import { getFixtureTables } from '../../shared/rules/leagueSchedule'
 import { apiGet, apiPost } from '../utils/api'
 import { formatLocalDate } from '../utils/date'
 import {
@@ -226,6 +227,16 @@ export const leagueActions = {
       .getSelectedRound()
       ?.pairings.find((p) => p.homeParticipantId === homeParticipantId)
       ?.tableNumber,
+
+  // A French League fixture is played on two tables: "5 & 6".
+  getFixtureTableLabel: (homeParticipantId: string): string | undefined => {
+    const tables = getFixtureTables(
+      leagueActions
+        .getSelectedRound()
+        ?.pairings.find((p) => p.homeParticipantId === homeParticipantId),
+    )
+    return tables.length > 0 ? tables.join(' & ') : undefined
+  },
 
   // Simulated leagues only — fills in every team's line-up at once.
   autoSelectPlayers: async (): Promise<boolean> => {

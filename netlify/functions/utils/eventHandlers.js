@@ -1637,8 +1637,8 @@ const teamMatchShape = (event, bestOf) => {
       teamMatchType: FRENCH_LEAGUE_MATCH_TYPE,
       numberOfMatches: FRENCH_LEAGUE_MATCH_COUNT,
       // Played on two tables at once (match.md, "French League"). A league
-      // fixture is pinned to one table, so it doesn't get this and plays
-      // the same order one match at a time.
+      // fixture gets the same from its pair of tables (leagueHandlers.js,
+      // twoTablePlay).
       parallelTables: FRENCH_LEAGUE_TABLES,
     }
   }
@@ -3893,10 +3893,15 @@ export const buildTeamSubMatches = (parent, lockedTableNumber) => {
     gamesWon2: 0,
     winningSide: undefined,
     parentMatchId: parent._id,
-    lockedTableNumber: effectiveLockedTable,
+    lockedTableNumber: laneTable(parent, entry) ?? effectiveLockedTable,
     ...playingPlan(entry),
   }))
 }
+
+// A league tie played on two tables (French League) pins each of its tables'
+// sub-matches to that table: lockedTableNumbers[lane].
+const laneTable = (parent, entry) =>
+  entry.lane != null ? parent.lockedTableNumbers?.[entry.lane] : undefined
 
 // Where a sub-match sits in a tie played on more than one table (French
 // League): its phase, which of the tie's tables it is played on, and

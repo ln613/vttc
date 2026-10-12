@@ -1,0 +1,349 @@
+{
+  "media": {
+    "video": "https://res.cloudinary.com/ln613/video/upload/f_auto,q_auto/v1791797615/NovaPing/promo.mp4",
+    "poster": "https://res.cloudinary.com/ln613/video/upload/so_3.5,w_1280,f_jpg,q_auto/v1791797615/NovaPing/promo.jpg",
+    "scoring": "https://res.cloudinary.com/ln613/video/upload/so_3.5,c_crop,w_1160,h_740,x_100,y_170/w_960,f_auto,q_auto/v1791797615/NovaPing/promo.jpg",
+    "live": "https://res.cloudinary.com/ln613/video/upload/so_6.5,c_crop,w_1460,h_900,x_380,y_90/w_960,f_auto,q_auto/v1791797615/NovaPing/promo.jpg",
+    "schedule": "https://res.cloudinary.com/ln613/video/upload/so_9.5,c_crop,w_1440,h_870,x_100,y_130/w_960,f_auto,q_auto/v1791797615/NovaPing/promo.jpg",
+    "groups": "https://res.cloudinary.com/ln613/image/upload/w_1200,f_auto,q_auto/v1791799503/NovaPing/groups.jpg",
+    "bracket": "https://res.cloudinary.com/ln613/video/upload/so_12.9,c_crop,w_1440,h_870,x_420,y_130/w_960,f_auto,q_auto/v1791797615/NovaPing/promo.jpg"
+  },
+  "en": {
+    "hero": {
+      "kicker": "For clubs and tournaments",
+      "title": [
+        "Every point.",
+        "Every table.",
+        "Live."
+      ],
+      "text": "Umpires score on a tablet at the table. Players, coaches and families follow every match the moment a point is won — at the venue, on a TV, or at home.",
+      "primary": {
+        "label": "Watch live scores",
+        "href": "/live-score"
+      },
+      "secondary": {
+        "label": "Browse events",
+        "href": "/events"
+      },
+      "videoLabel": "NovaPing in 15 seconds"
+    },
+    "steps": {
+      "kicker": "How it works",
+      "title": "From the table to every screen",
+      "items": [
+        {
+          "title": "Tap",
+          "text": "The umpire taps + for each point. Serve, ends and games are tracked for them."
+        },
+        {
+          "title": "Live",
+          "text": "The score is on every phone, TV and laptop in the same second — no refreshing."
+        },
+        {
+          "title": "Next",
+          "text": "Results go straight into the groups and the bracket, and the next match is called to the free table."
+        }
+      ]
+    },
+    "showcase": {
+      "kicker": "Key features",
+      "title": "Built for tournament day",
+      "items": [
+        {
+          "image": "scoring",
+          "tag": "01 · Scoring",
+          "title": "Tap to score",
+          "text": "A big, clear scoreboard on a tablet at each table, made to be used mid-rally.",
+          "points": [
+            "One tap per point, with undo",
+            "Serve, ends and games tracked",
+            "Time-outs for both players",
+            "Umpire passwords or a tablet per table"
+          ]
+        },
+        {
+          "image": "live",
+          "tag": "02 · Live",
+          "title": "Every table, live",
+          "text": "One board shows every table at once, with the queue of matches up next — on the venue TV and on everyone's phone.",
+          "points": [
+            "Updates the moment a point is won",
+            "Free tables shown at a glance",
+            "Match queue for what's on next"
+          ]
+        },
+        {
+          "image": "schedule",
+          "tag": "03 · Schedule",
+          "title": "Tables assigned for you",
+          "text": "When a table frees up, the next match is called to it. Players know where to go and when.",
+          "points": [
+            "Automatic table assignment",
+            "Stronger divisions on your best tables",
+            "Two-table team matches kept together"
+          ]
+        },
+        {
+          "image": "groups",
+          "tag": "04 · Groups",
+          "title": "Groups ranked instantly",
+          "text": "Round-robin standings update the moment each match ends, with every match's game scores one tap away.",
+          "points": [
+            "Standings live as results come in",
+            "Match details: every game score, one tap away",
+            "Tiebreakers handled automatically"
+          ]
+        },
+        {
+          "image": "bracket",
+          "tag": "05 · Knockout",
+          "title": "Brackets fill themselves",
+          "text": "The knockout draw comes from the group results, and winners move on to their next match by themselves.",
+          "points": [
+            "Draw made from the group results",
+            "Winners advance automatically",
+            "Every result in each player's history"
+          ]
+        }
+      ]
+    },
+    "features": {
+      "kicker": "And everything around it",
+      "title": "One system for the whole event",
+      "items": [
+        {
+          "icon": "group",
+          "title": "Singles, doubles and teams",
+          "text": "Team matches with their own order of play, including formats played on two tables at once."
+        },
+        {
+          "icon": "medal",
+          "title": "Players and ratings",
+          "text": "Your players with their ratings, and every match they have played."
+        },
+        {
+          "icon": "palette",
+          "title": "Your club's brand",
+          "text": "Your logo, colours, banner and web address — NovaPing works behind the scenes."
+        }
+      ],
+      "panels": [
+        {
+          "icon": "clipboard",
+          "title": "Sign-in and event registration",
+          "text": "Players sign up once and enter events themselves. NovaPing checks who can play before the entry goes in.",
+          "points": [
+            "Sign up with email, Google or a phone code",
+            "Eligibility checked: rating limit, age and sex",
+            "Choose a doubles partner or teammates — or be picked later",
+            "Fee instructions on entry; paid entries tracked",
+            "Full or started events closed automatically"
+          ]
+        },
+        {
+          "icon": "sliders",
+          "title": "Tournament director's desk",
+          "text": "When plans change on the day, fix it in a tap — the live board and the match queue follow.",
+          "points": [
+            "Reset a game or a whole match",
+            "Postpone a match, or send it back to the queue",
+            "Switch tables, or put a match on a table by hand",
+            "Enter scores, forfeits and withdrawals",
+            "Reorder the knockout draw by drag and drop",
+            "Assign umpires to tables"
+          ]
+        }
+      ]
+    },
+    "brand": {
+      "kicker": "Made for your club",
+      "title": "Your name on the scoreboard",
+      "text": "NovaPing is a scoring and live-score system that each club makes its own. Your players see your club, your colours and your domain — not ours.",
+      "points": [
+        "Logo, colours and fonts",
+        "Banner artwork for every page",
+        "Your own web address"
+      ],
+      "samples": [
+        "Your club",
+        "Riverside TTC",
+        "Summit Open"
+      ]
+    },
+    "cta": {
+      "title": "Bring live scoring to your club",
+      "text": "Tell us about your club or your next tournament, and we'll set NovaPing up in your colours.",
+      "button": "Email us",
+      "email": "novapingpong@gmail.com"
+    }
+  },
+  "zh": {
+    "hero": {
+      "kicker": "为俱乐部和赛事打造",
+      "title": [
+        "每一分",
+        "每一张球台",
+        "实时呈现"
+      ],
+      "text": "裁判在球台边用平板记分，球员、教练和家人在得分的瞬间就能看到比分——无论在赛场、电视前还是在家里。",
+      "primary": {
+        "label": "观看实时比分",
+        "href": "/live-score"
+      },
+      "secondary": {
+        "label": "浏览赛事",
+        "href": "/events"
+      },
+      "videoLabel": "15 秒了解 NovaPing"
+    },
+    "steps": {
+      "kicker": "使用方式",
+      "title": "从球台到每一块屏幕",
+      "items": [
+        {
+          "title": "记分",
+          "text": "裁判每得一分点一下 +，发球、换边和局数自动记录。"
+        },
+        {
+          "title": "直播",
+          "text": "同一秒内，比分出现在每一部手机、电视和电脑上，无需刷新。"
+        },
+        {
+          "title": "下一场",
+          "text": "结果直接进入小组和对阵表，下一场比赛自动安排到空闲球台。"
+        }
+      ]
+    },
+    "showcase": {
+      "kicker": "主要功能",
+      "title": "为比赛日而生",
+      "items": [
+        {
+          "image": "scoring",
+          "tag": "01 · 记分",
+          "title": "轻点即记分",
+          "text": "每张球台一块平板，记分板大而清晰，比赛中也能轻松操作。",
+          "points": [
+            "每分一点，可撤销",
+            "发球、换边和局数自动记录",
+            "双方暂停",
+            "裁判密码或每台专用平板"
+          ]
+        },
+        {
+          "image": "live",
+          "tag": "02 · 直播",
+          "title": "所有球台，实时同步",
+          "text": "一块看板同时显示所有球台和即将进行的比赛——在场馆电视上，也在每个人的手机上。",
+          "points": [
+            "得分瞬间即更新",
+            "空闲球台一目了然",
+            "比赛队列显示接下来的场次"
+          ]
+        },
+        {
+          "image": "schedule",
+          "tag": "03 · 赛程",
+          "title": "自动分配球台",
+          "text": "球台一空出，下一场比赛就会被安排上去。球员清楚知道去哪里、什么时候上场。",
+          "points": [
+            "自动分配球台",
+            "高水平组别使用最好的球台",
+            "两台进行的团体赛保持在一起"
+          ]
+        },
+        {
+          "image": "groups",
+          "tag": "04 · 小组",
+          "title": "小组即时排名",
+          "text": "每场比赛一结束，小组循环赛排名立即更新；每场比赛的各局比分，一点即可查看。",
+          "points": [
+            "成绩一出，排名即刻更新",
+            "比赛详情：每一局比分，一点即看",
+            "同分排名自动判定"
+          ]
+        },
+        {
+          "image": "bracket",
+          "tag": "05 · 淘汰赛",
+          "title": "对阵表自动生成",
+          "text": "淘汰赛对阵根据小组成绩生成，胜者自动进入下一场比赛。",
+          "points": [
+            "根据小组成绩生成对阵",
+            "胜者自动晋级",
+            "每场成绩记入球员历史"
+          ]
+        }
+      ]
+    },
+    "features": {
+      "kicker": "更多功能",
+      "title": "一个系统管理整场赛事",
+      "items": [
+        {
+          "icon": "group",
+          "title": "单打、双打和团体",
+          "text": "团体赛可设定出场顺序，也支持两张球台同时进行的赛制。"
+        },
+        {
+          "icon": "medal",
+          "title": "球员与积分",
+          "text": "球员积分以及每一场比赛记录。"
+        },
+        {
+          "icon": "palette",
+          "title": "您俱乐部的品牌",
+          "text": "您的标志、颜色、横幅和网址——NovaPing 在幕后运行。"
+        }
+      ],
+      "panels": [
+        {
+          "icon": "clipboard",
+          "title": "登录与赛事报名",
+          "text": "球员注册一次，即可自行报名参赛。报名前 NovaPing 会先检查参赛资格。",
+          "points": [
+            "邮箱、Google 或手机验证码注册",
+            "自动检查资格：积分上限、年龄和性别",
+            "选择双打搭档或队友，也可以等对方来选",
+            "报名时显示缴费方式，已缴费报名一目了然",
+            "名额已满或已开赛的赛事自动关闭报名"
+          ]
+        },
+        {
+          "icon": "sliders",
+          "title": "赛事总监控制台",
+          "text": "比赛当天计划有变，轻点即可调整——实时看板和比赛队列随之更新。",
+          "points": [
+            "重置一局或整场比赛",
+            "推迟比赛，或把比赛放回队列",
+            "交换球台，或手动安排比赛上台",
+            "录入比分、弃权和退赛",
+            "拖放调整淘汰赛对阵",
+            "为球台分配裁判"
+          ]
+        }
+      ]
+    },
+    "brand": {
+      "kicker": "为您的俱乐部定制",
+      "title": "记分板上是您的名字",
+      "text": "NovaPing 是一套由每个俱乐部打造成自己品牌的记分与实时比分系统。球员看到的是您的俱乐部、您的颜色和您的网址，而不是我们的。",
+      "points": [
+        "标志、颜色和字体",
+        "每个页面的横幅设计",
+        "您自己的网址"
+      ],
+      "samples": [
+        "您的俱乐部",
+        "Riverside TTC",
+        "Summit Open"
+      ]
+    },
+    "cta": {
+      "title": "让您的俱乐部用上实时比分",
+      "text": "告诉我们您的俱乐部或下一场比赛，我们会用您的颜色为您设置好 NovaPing。",
+      "button": "发邮件给我们",
+      "email": "novapingpong@gmail.com"
+    }
+  }
+}

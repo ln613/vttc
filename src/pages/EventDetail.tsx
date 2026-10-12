@@ -1207,6 +1207,14 @@ export const deriveTeamMatchType = (
   return undefined
 }
 
+// A league tie on two tables (French League) is pinned to both: "5 & 6".
+const isTwoTableTie = (match: Match) => (match.lockedTableNumbers?.length ?? 0) > 1
+
+const lockedTableLabel = (match: Match) =>
+  isTwoTableTie(match)
+    ? match.lockedTableNumbers!.join(' & ')
+    : match.lockedTableNumber
+
 export const getTeamSubMatchTitle = (
   parent: Match,
   subMatchIndex: number,
@@ -1610,6 +1618,8 @@ export const MatchRow = (props: MatchRowProps) => {
     if (hasStarted()) return false
     const onTable = assignedTable() !== undefined
     if (isTeamParent()) {
+      // French League generates its order of play, so there is none to set.
+      if (props.match.autoScheduled) return false
       // Set Order: normally on a table; also allowed off-table for admin
       // management of not-started team matches in the Group/Knockout tabs.
       if (!onTable && !(props.adminManage && authState.isAdmin)) return false
@@ -1719,6 +1729,17 @@ export const MatchRow = (props: MatchRowProps) => {
       e?.preventDefault()
       setPostponeOpen(true)
     }
+    const setOrderAction = (started: boolean) => ({
+      key: 'setOrder',
+      label: 'Set Order',
+      description: 'Set the order of play for both teams.',
+      color: '#27ae60',
+      onClick: handleStartClick,
+      enabled: showStart(),
+      busy: false,
+      reason: started ? 'The order is already set' : 'Assign a table first',
+    })
+
     const openEnterScore = (e?: MouseEvent) => {
       e?.stopPropagation()
       e?.preventDefault()
@@ -1727,16 +1748,7 @@ export const MatchRow = (props: MatchRowProps) => {
 
     if (isTeamParent()) {
       return [
-        {
-          key: 'setOrder',
-          label: 'Set Order',
-          description: 'Set the order of play for both teams.',
-          color: '#27ae60',
-          onClick: handleStartClick,
-          enabled: showStart(),
-          busy: false,
-          reason: started ? 'The order is already set' : 'Assign a table first',
-        },
+        ...(props.match.autoScheduled ? [] : [setOrderAction(started)]),
         {
           key: 'switchTable',
           label: 'Switch Table',
@@ -1933,7 +1945,7 @@ export const MatchRow = (props: MatchRowProps) => {
   // run on the same table sequentially. When the sub-match is waiting
   // in the queue, surface that table number as its badge.
   const lockedTable = () =>
-    assignedTable() === undefined ? props.match.lockedTableNumber : undefined
+    assignedTable() === undefined ? lockedTableLabel(props.match) : undefined
   // Finished rows don't need any table/queue badge — they're history.
   const showAssignedBadge = () =>
     !props.hideTableBadge &&
@@ -1974,7 +1986,16 @@ export const MatchRow = (props: MatchRowProps) => {
         <div style={matchRowTableNumberStyle}>{assignedTable()}</div>
       </Show>
       <Show when={showLockedBadge()}>
-        <div style={matchRowTableNumberStyle}>{lockedTable()}</div>
+        <Show
+          when={isTwoTableTie(props.match)}
+          fallback={<div style={matchRowTableNumberStyle}>{lockedTable()}</div>}
+        >
+          <div style={matchRowTablePairStyle}>
+            <For each={props.match.lockedTableNumbers}>
+              {(table) => <span>{table}</span>}
+            </For>
+          </div>
+        </Show>
       </Show>
       <Show when={showQueueBadge()}>
         <div style={matchRowTableNumberStyle}>Q</div>
@@ -2422,9 +2443,11 @@ const TeamSubMatches = (props: {
     eventDetailActions.isTeamSubMatchesExpanded(props.parent._id)
   // Only drop the sub-matches' table badges when the parent's own row is
   // showing one — otherwise the number would disappear entirely.
+  // A tie on two tables keeps them: each sub-match is on its own one.
   const parentShowsTable = () =>
-    props.parent.lockedTableNumber != null ||
-    liveScoreActions.getTableForMatch(props.parent._id) !== undefined
+    !isTwoTableTie(props.parent) &&
+    (props.parent.lockedTableNumber != null ||
+      liveScoreActions.getTableForMatch(props.parent._id) !== undefined)
   // Show every sub-match that's still in play (played + current + pending);
   // cancelled subs (auto-dropped once the team match is decided) are hidden.
   const playedSubs = () =>
@@ -3561,8 +3584,9 @@ const RoundPlayerSelection = () => {
                   </td>
                   <td style={fixtureTableCellStyle}>
                     <div style={fixtureTableNumberStyle}>
-                      {leagueActions.getFixtureTable(pairing.homeParticipantId) ??
-                        '-'}
+                      {leagueActions.getFixtureTableLabel(
+                        pairing.homeParticipantId,
+                      ) ?? '-'}
                     </div>
                     <Show when={authState.isAdmin}>
                       <Button
@@ -4329,6 +4353,17 @@ const matchRowTableNumberStyle: JSX.CSSProperties = {
   color: '#f1c40f',
   'line-height': 1,
   'pointer-events': 'none',
+}
+
+// A tie on two tables: its two numbers stacked, so they fit the badge's
+// column beside the teams.
+const matchRowTablePairStyle: JSX.CSSProperties = {
+  ...matchRowTableNumberStyle,
+  display: 'flex',
+  'flex-direction': 'column',
+  'align-items': 'center',
+  gap: '4px',
+  'font-size': '32px',
 }
 
 const matchContentContainerStyle: JSX.CSSProperties = {

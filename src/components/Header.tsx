@@ -25,6 +25,7 @@ import clubConfig from 'club-config'
 import { modulesActions } from '../stores/modulesStore'
 import { langState, langActions } from '../stores/langStore'
 import { hasSite, hasSiteLook } from '../site/siteContent'
+import { hasLanding } from '../site/landingContent'
 import { pointsModel } from '../i18n/wallet'
 import DialogFrame from './DialogFrame'
 import SiteBanner from './SiteBanner'
@@ -266,7 +267,7 @@ const TopBar = () => {
 // the website's own pages only exist for a club that has one.
 const navItems = () =>
   [
-    { label: 'nav.home', path: '/', show: hasSite() },
+    { label: 'nav.home', path: '/', show: hasSite() || hasLanding() },
     { label: 'nav.events', path: '/events', show: modulesActions.on('events') },
     { label: 'nav.schedule', path: '/schedule', show: modulesActions.on('schedule') },
     { label: 'nav.players', path: '/players', show: modulesActions.on('players') },
@@ -490,42 +491,9 @@ const AuthDialog = () => (
           <SignUpWizardSection />
         </Match>
       </Switch>
-      <PrivacyLink />
     </DialogFrame>
   </Show>
 )
-
-// Where the club has a privacy policy (branding.privacyUrl), it is a click
-// away from signing in or up. A real page, not one of the app's routes, so
-// the router leaves the link alone (rel="external").
-const PrivacyLink = () => (
-  <Show when={clubConfig.branding.privacyUrl}>
-    {(url) => (
-      <div style={privacyLinkRowStyle}>
-        <a
-          href={url()}
-          rel="external"
-          target="_blank"
-          {...themed(privacyLinkStyle, 'bk-link')}
-        >
-          {langActions.t('footer.privacy')}
-        </a>
-      </div>
-    )}
-  </Show>
-)
-
-const privacyLinkRowStyle: JSX.CSSProperties = {
-  'margin-top': '14px',
-  'text-align': 'center',
-  'font-size': '13px',
-}
-
-const privacyLinkStyle: JSX.CSSProperties = {
-  color: '#888',
-  'font-size': '13px',
-  'text-decoration': 'underline',
-}
 
 const closeAuthDialog = () => {
   authActions.hideDialog()

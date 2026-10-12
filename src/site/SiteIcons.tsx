@@ -119,6 +119,39 @@ const Instagram = () => (
     <circle cx="17.5" cy="6.5" r="0.6" fill="currentColor" />
   </Svg>
 )
+const Globe = () => (
+  <Svg>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18" />
+  </Svg>
+)
+const Palette = () => (
+  <Svg>
+    <path d="M12 3a9 9 0 000 18c1.4 0 2-1 2-2s-1-1.6-1-2.6 1-1.4 2-1.4h2a4 4 0 004-4c0-4.4-4-8-9-8z" />
+    <circle cx="7.5" cy="11" r="1" fill="currentColor" />
+    <circle cx="10" cy="7" r="1" fill="currentColor" />
+    <circle cx="15" cy="7" r="1" fill="currentColor" />
+  </Svg>
+)
+const Clipboard = () => (
+  <Svg>
+    <rect x="5" y="4" width="14" height="17" rx="2" />
+    <path d="M9 4V3h6v1M9 11l2 2 4-4M9 17h6" />
+  </Svg>
+)
+const Sliders = () => (
+  <Svg>
+    <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" />
+    <circle cx="16" cy="6" r="2" />
+    <circle cx="10" cy="12" r="2" />
+    <circle cx="18" cy="18" r="2" />
+  </Svg>
+)
+const Check = () => (
+  <Svg>
+    <path d="M5 12.5l4.5 4.5L19 7.5" />
+  </Svg>
+)
 
 const ICONS: Record<string, () => JSX.Element> = {
   court: Court,
@@ -138,6 +171,11 @@ const ICONS: Record<string, () => JSX.Element> = {
   mail: Mail,
   phone: Phone,
   instagram: Instagram,
+  globe: Globe,
+  palette: Palette,
+  check: Check,
+  clipboard: Clipboard,
+  sliders: Sliders,
 }
 
 export const SiteIcon = (props: { name: string }) => (

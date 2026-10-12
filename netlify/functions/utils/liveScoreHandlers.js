@@ -1,10 +1,12 @@
 import { getDB, toObjectId } from './db.js'
 import {
+  club,
   clubDate,
   getClubTimezone,
   getTableConfig,
   eventIsInTier,
 } from './club.js'
+import { getTablePairOf } from '../../../shared/rules/leagueSchedule.js'
 import { sanitizeForOutput } from './embeddedPlayers.js'
 import {
   autoGenerateForEvent,
@@ -1829,6 +1831,9 @@ const switchPinnedTables = async ({ _id, matchId, tableNumber }) => {
 
   const moving = findTopLevelMatch(event, matchId)
   if (!moving) throwError('That match is not in this event')
+  if (isTwoTableTie(moving)) {
+    return switchPinnedPairs(collection, event, moving, tableNumber)
+  }
   const fromTable = moving.lockedTableNumber
   if (fromTable == null) throwError('That match has no table to switch')
   if (fromTable === tableNumber) throwError('That match is already on this table')
@@ -1846,6 +1851,36 @@ const switchPinnedTables = async ({ _id, matchId, tableNumber }) => {
     )
   }
   await collection.updateOne({ _id: toObjectId(_id) }, { $set: { eventStages: stages } })
+  return { success: true, switchedWith: displaced ? displaced._id : null }
+}
+
+const isTwoTableTie = (match) => (match.lockedTableNumbers || []).length > 1
+
+// A two-table league tie (French League) before its week starts: it moves to
+// the pair holding the picked table, and whichever tie had that pair takes
+// this one's.
+const switchPinnedPairs = async (collection, event, moving, tableNumber) => {
+  const fromTables = moving.lockedTableNumbers
+  if (fromTables.includes(tableNumber)) throwError('That match is already on this table')
+  const toTables = getTablePairOf(club.tables?.all || [], tableNumber)
+  if (!toTables) throwError(`Table ${tableNumber} has no partner table for a French League match`)
+
+  const displaced = topLevelMatches(event).find(
+    (m) =>
+      m._id !== moving._id &&
+      [m.lockedTableNumber, ...(m.lockedTableNumbers || [])].some((t) =>
+        toTables.includes(t),
+      ),
+  )
+  let stages = updateMatchInStages(event.eventStages, moving._id, (m) =>
+    withRelockedPair(m, toTables),
+  )
+  if (displaced) {
+    stages = updateMatchInStages(stages, displaced._id, (m) =>
+      isTwoTableTie(m) ? withRelockedPair(m, fromTables) : withRelockedTable(m, fromTables[0]),
+    )
+  }
+  await collection.updateOne({ _id: event._id }, { $set: { eventStages: stages } })
   return { success: true, switchedWith: displaced ? displaced._id : null }
 }
 
@@ -1898,10 +1933,32 @@ const relockMatchTable = async (item, tableNumber) => {
 
 const withRelockedLane = (match, tableNumber, lane) => ({
   ...match,
+  ...(Array.isArray(match.lockedTableNumbers)
+    ? { lockedTableNumbers: withLaneTable(match, lane, tableNumber) }
+    : {}),
+  ...(lane === 0 && match.lockedTableNumber != null
+    ? { lockedTableNumber: tableNumber }
+    : {}),
   subMatches: (match.subMatches || []).map((sub) =>
     sub.lane === lane && sub.winningSide == null
       ? { ...sub, lockedTableNumber: tableNumber }
       : sub,
+  ),
+})
+
+const withLaneTable = (match, lane, tableNumber) =>
+  match.lockedTableNumbers.map((t, i) => (i === lane ? tableNumber : t))
+
+// A league tie on two tables (French League) moves to another pair as a
+// whole: each table's sub-matches follow their own table.
+const withRelockedPair = (match, tables) => ({
+  ...match,
+  lockedTableNumber: tables[0],
+  lockedTableNumbers: tables,
+  subMatches: (match.subMatches || []).map((sub) =>
+    sub.winningSide != null || sub.lane == null
+      ? sub
+      : { ...sub, lockedTableNumber: tables[sub.lane] },
   ),
 })
 

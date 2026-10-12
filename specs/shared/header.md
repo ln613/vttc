@@ -47,7 +47,7 @@
 
 ## Sign in dialog
 
-A club with a privacy policy (`branding.privacyUrl` in its config, a page in `clubs/<slug>/public/`) shows a small "Privacy Policy" link at the bottom of the sign in / sign up dialog, opening the page in a new tab. Timing Sports and NovaPing have one.
+The sign in / sign up dialog has no privacy link; a club's privacy policy (`branding.privacyUrl`, a page in `clubs/<slug>/public/`) is linked from its site footer and landing page footer instead.
 
 A club with its own website (specs/pages/Club Site.md) shows the sign in, sign up, "Change your password" and "Umpire a Match" dialogs — and every confirm box in the app (e.g. "Delete …?", "Discard unsaved changes?"; red confirms become the site's red button, the rest its yellow one; "OK"/"Cancel" in the site's language) — in its site's look, on any page: the title in the purple heading band, the site's pill buttons ("Sign in" full width), links, progress dots and choice tiles in its colours. Other clubs keep the plain white dialog.
 

@@ -12,6 +12,7 @@
 // so the images are not bundled into the app. With --no-manifest the
 // addresses are only printed — for images a club's config points at
 // directly (a logo, a banner background) rather than its website's.
+// Videos (.mp4, .webm) go up the same way, as Cloudinary videos.
 //
 // Needs CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET.
 
@@ -20,6 +21,9 @@ import { readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { extname, basename, join } from 'node:path'
 
 const IMAGE_TYPES = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif' }
+const VIDEO_TYPES = { '.mp4': 'video/mp4', '.webm': 'video/webm' }
+const MEDIA_TYPES = { ...IMAGE_TYPES, ...VIDEO_TYPES }
+const isVideo = (path) => !!VIDEO_TYPES[extname(path).toLowerCase()]
 
 const fail = (message) => {
   console.error(message)
@@ -43,7 +47,7 @@ const readEnv = () => {
 
 const imagesIn = (dir) => {
   if (!dir || !existsSync(dir)) fail(`No images folder: ${dir}`)
-  return readdirSync(dir).filter((f) => IMAGE_TYPES[extname(f).toLowerCase()]).sort()
+  return readdirSync(dir).filter((f) => MEDIA_TYPES[extname(f).toLowerCase()]).sort()
 }
 
 // Cloudinary's signed upload: the parameters sorted, joined, and hashed with
@@ -69,8 +73,9 @@ const upload = async ({ cloud, key, secret }, folder, path) => {
   for (const [k, v] of Object.entries(params)) form.append(k, v)
   form.append('api_key', key)
   form.append('signature', sign(params, secret))
-  form.append('file', new Blob([readFileSync(path)], { type: IMAGE_TYPES[extname(path).toLowerCase()] }), basename(path))
-  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/image/upload`, { method: 'POST', body: form })
+  form.append('file', new Blob([readFileSync(path)], { type: MEDIA_TYPES[extname(path).toLowerCase()] }), basename(path))
+  const kind = isVideo(path) ? 'video' : 'image'
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/${kind}/upload`, { method: 'POST', body: form })
   const body = await res.json()
   if (!res.ok) throw new Error(`${basename(path)}: ${body?.error?.message || res.status}`)
   return body.secure_url
@@ -78,7 +83,7 @@ const upload = async ({ cloud, key, secret }, folder, path) => {
 
 // Let Cloudinary pick the format (WebP/AVIF where the browser takes it) and
 // the compression.
-const optimised = (url) => url.replace('/image/upload/', '/image/upload/f_auto,q_auto/')
+const optimised = (url) => url.replace(/\/(image|video)\/upload\//, '/$1/upload/f_auto,q_auto/')
 
 const main = async () => {
   const env = readEnv()
