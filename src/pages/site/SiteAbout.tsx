@@ -4,6 +4,7 @@ import { SiteIcon } from '../../site/SiteIcons'
 import { siteImage, loadSiteFonts } from '../../site/siteContent'
 import { langActions } from '../../stores/langStore'
 import '../../site/site.css'
+import SiteFooter from './SiteFooter'
 
 // About the venue, and every way to reach the club: address, email, phone,
 // Instagram, and the WhatsApp and WeChat codes. See specs/pages/Club Site.md.
@@ -97,6 +98,7 @@ const SiteAbout = () => {
         </div>
       </section>
       <div class="ts-slogan ts-script">{langActions.site().home.slogan}</div>
+      <SiteFooter />
     </div>
   )
 }

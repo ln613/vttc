@@ -318,5 +318,8 @@
     "accept": "Accept and continue",
     "decline": "I don't agree — sign out",
     "failed": "Could not save. Please try again."
+  },
+  "footer": {
+    "privacy": "Privacy Policy"
   }
 }

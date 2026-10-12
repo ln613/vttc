@@ -6,6 +6,7 @@ import { loadSiteFonts } from '../../site/siteContent'
 import { langState, langActions } from '../../stores/langStore'
 import { priceGroups } from '../../site/pricing'
 import '../../site/site.css'
+import SiteFooter from './SiteFooter'
 
 // Court rental prices by day and time of day. See specs/pages/Club Site.md.
 const SitePricing = () => {
@@ -80,6 +81,7 @@ const SitePricing = () => {
           </p>
         </div>
       </section>
+      <SiteFooter />
     </div>
   )
 }

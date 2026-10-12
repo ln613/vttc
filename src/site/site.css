@@ -953,3 +953,25 @@ a.ts-contact-value:hover {
     transition: none;
   }
 }
+
+/* ---------- footer (every website page) ---------- */
+
+.ts-footer {
+  background: var(--ts-night);
+  color: #cfc5ef;
+  font-size: 14px;
+}
+.ts-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 22px;
+  padding-block: 22px;
+  text-align: center;
+}
+.ts-footer a {
+  color: #ffffff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

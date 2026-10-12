@@ -9,6 +9,7 @@ import {
 } from '../../site/siteContent'
 import { langActions } from '../../stores/langStore'
 import '../../site/site.css'
+import SiteFooter from './SiteFooter'
 
 // The coaches: lesson formats, each coach's credentials, results and
 // coaching style, and who the lessons suit. See specs/pages/Club Site.md.
@@ -70,6 +71,7 @@ const SiteCoaches = () => {
           </A>
         </div>
       </section>
+      <SiteFooter />
     </div>
   )
 }

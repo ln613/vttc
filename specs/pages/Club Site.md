@@ -7,7 +7,13 @@ A club's own public website, shown inside the app: Home, Coaches, Pricing, About
 "branding": { "topBarColor": "#3b1d82" }
 ```
 
-Content lives in `clubs/<slug>/site/`: one resource file per language (`en.json`, `zh.json`) and `images.json`, which maps each image's name ("hero-1", "coach-nathan", "qr-wechat"…) to its address on Cloudinary (folder "Timing Sports"), served as `f_auto,q_auto` so each browser gets the smallest format it takes. To add or replace images, run `node scripts/with-club.mjs --club <slug> node scripts/upload-site-images.mjs <folder of images> --folder "<Cloudinary folder>"` (needs `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`); it uploads them and updates `images.json`. Images left in an `images/` folder are still bundled. Only the building club's files are included. A club without a site keeps the app exactly as before. Timing Sports is the first.
+Content lives in `clubs/<slug>/site/`: one resource file per language (`en.json`, `zh.json`) and `images.json`, which maps each image's name ("hero-1", "coach-nathan", "qr-wechat"…) to its address on Cloudinary (folder "Timing Sports"), served as `f_auto,q_auto` so each browser gets the smallest format it takes. To add or replace images, run `node scripts/with-club.mjs --club <slug> node scripts/upload-site-images.mjs <folder of images> --folder "<Cloudinary folder>"` (needs `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`); it uploads them and updates `images.json`. Images left in an `images/` folder are still bundled. Only the building club's files are included.
+
+Plain pages that must exist as real files (not app routes) go in `clubs/<slug>/public/`; the build publishes them at the site root, for that club only. Timing Sports has `privacy.html`: its privacy policy (English and Chinese), which Google's sign-in review needs as a homepage-linked page.
+
+## Footer
+
+Every website page (Home, Coaches, Pricing, About & Contact) ends with a dark footer: "© {year} {name}", the address, the email (mailto link) and "Privacy Policy" / "隐私政策", which opens `/privacy.html` as a normal page (not an app route). A club without a site keeps the app exactly as before. Timing Sports is the first.
 
 ## Languages
 

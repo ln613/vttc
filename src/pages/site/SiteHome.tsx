@@ -5,6 +5,7 @@ import { SiteIcon } from '../../site/SiteIcons'
 import { heroImages, siteImage, loadSiteFonts } from '../../site/siteContent'
 import { langActions } from '../../stores/langStore'
 import '../../site/site.css'
+import SiteFooter from './SiteFooter'
 
 // The club's home page: a rotating photo hero, what the venue offers, the
 // coaches, the venue, and the club's motto. See specs/pages/Club Site.md.
@@ -24,6 +25,7 @@ const SiteHome = () => {
       <CoachTeaser />
       <Venue />
       <div class="ts-slogan ts-script">{langActions.site().home.slogan}</div>
+      <SiteFooter />
     </div>
   )
 }
