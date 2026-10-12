@@ -10,7 +10,8 @@
     "contactName": "Timing Sports",
     "faviconUrl": "/images/logo.png",
     "pageTitle": "Timing Sports",
-    "topBarColor": "#3b1d82"
+    "topBarColor": "#3b1d82",
+    "privacyUrl": "/privacy.html"
   },
   "tables": {
     "all": [
@@ -42,7 +43,10 @@
     "high": []
   },
   "creditModel": "points",
-  "liabilityWaiver": { "required": true, "version": "2026-10-11" },
+  "liabilityWaiver": {
+    "required": true,
+    "version": "2026-10-11"
+  },
   "booking": {
     "enabled": true,
     "courtLabel": "Pickleball Court",

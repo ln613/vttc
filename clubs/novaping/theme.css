@@ -1,0 +1,83 @@
+/* NovaPing's own look (see src/site/siteContent.ts, hasSiteLook): midnight
+ * navy and night sky, a cyan "nova" accent and coral-orange action buttons,
+ * upright geometric type (Sora) over Inter, and squared-off buttons rather
+ * than pills. Everything is CSS variables over the shared styles
+ * (booking.css, club-banner.css), plus a few rules where a style was fixed.
+ * `html .bk-site` outranks booking.css's own `.bk-site` defaults. */
+
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
+html .bk-site {
+  --bk-bg: #eef4fb;
+  --bk-surface: #ffffff;
+  --bk-ink: #0f1d33;
+  --bk-soft: #50617c;
+  --bk-line: #d7e3f3;
+  --bk-card-line: #d7e3f3;
+  --bk-accent: #0a7f99;
+  --bk-free-bg: #e8f8fb;
+  --bk-free-line: #9fe3ee;
+  --bk-free-ink: #075b6e;
+  --bk-free-hover: #d3f3f8;
+  --bk-mine-bg: #ffe2d6;
+  --bk-mine-line: #ff6a3d;
+  --bk-mine-ink: #5a1d07;
+  --bk-taken-bg: #0b2a52;
+  --bk-taken-line: #061428;
+  --bk-taken-ink: #ffffff;
+  --bk-off-bg: #f1f5fa;
+  --bk-off-ink: #a7b4c6;
+  --bk-primary: #f05a28;
+  --bk-primary-ink: #ffffff;
+  --bk-secondary: #e3edf9;
+  --bk-secondary-ink: #0b2a52;
+  --bk-radius: 12px;
+  --bk-head-bg:
+    radial-gradient(circle at 85% 20%, rgba(34, 211, 238, 0.28), transparent 45%),
+    linear-gradient(135deg, #0b2a52, #061428 85%);
+  --bk-head-ink: #ffffff;
+  --bk-display: 'Sora', 'Inter', 'Noto Sans SC', system-ui, sans-serif;
+  --bk-display-style: normal;
+  --bk-display-weight: 700;
+  font-family: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+}
+
+/* Squared-off buttons, upright and unspaced. */
+html .bk-site .bk-btn {
+  border-radius: 10px;
+  letter-spacing: 0;
+}
+html .bk-site .bk-btn-primary {
+  box-shadow: 0 6px 16px rgba(240, 90, 40, 0.28);
+}
+html .bk-site .bk-kicker {
+  color: #22d3ee;
+}
+html .bk-site .bk-title,
+html .bk-site .bk-dialog-title {
+  letter-spacing: -0.01em;
+}
+html .bk-site .bk-option.is-on,
+html .bk-site .su-match.is-on {
+  border-color: #0a7f99;
+}
+
+/* The banner (ClubBanner). */
+.club-banner {
+  --banner-bg: #061428;
+  --banner-position: right center;
+  --banner-overlay: linear-gradient(
+    90deg,
+    rgba(6, 20, 40, 0.92) 0%,
+    rgba(11, 42, 82, 0.62) 42%,
+    rgba(11, 42, 82, 0.05) 75%
+  );
+  --banner-display: 'Sora', 'Inter', system-ui, sans-serif;
+  --banner-display-weight: 800;
+  --banner-display-case: uppercase;
+  --banner-display-spacing: 0.02em;
+  --banner-soft: #9fd9e6;
+  --banner-tagline-font: 'Sora', 'Inter', system-ui, sans-serif;
+  --banner-tagline-ink: #22d3ee;
+  --banner-logo-ring: 0 0 0 3px rgba(34, 211, 238, 0.7), 0 8px 22px rgba(0, 0, 0, 0.4);
+}

@@ -23,7 +23,7 @@ import {
 import { creditsState, creditsActions } from '../stores/creditsStore'
 import { authState, authActions } from '../stores/authStore'
 import { langActions } from '../stores/langStore'
-import { hasSite, loadSiteFonts } from '../site/siteContent'
+import { hasSiteLook, loadSiteFonts } from '../site/siteContent'
 import { formatDollars } from '../../shared/rules/booking'
 import { formatBalance, walletT } from '../i18n/wallet'
 import './booking.css'
@@ -53,9 +53,9 @@ const Booking = () => {
   )
 
   return (
-    <div class={hasSite() ? 'bk bk-site' : 'bk'}>
+    <div class={hasSiteLook() ? 'bk bk-site' : 'bk'}>
       <Header />
-      <Show when={hasSite()} fallback={<PlainHead />}>
+      <Show when={hasSiteLook()} fallback={<PlainHead />}>
         <SiteHead />
       </Show>
       <div class="bk-wrap">

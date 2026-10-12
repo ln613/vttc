@@ -24,10 +24,11 @@ import TablePickerDialog, {
 import clubConfig from 'club-config'
 import { modulesActions } from '../stores/modulesStore'
 import { langState, langActions } from '../stores/langStore'
-import { hasSite } from '../site/siteContent'
+import { hasSite, hasSiteLook } from '../site/siteContent'
 import { pointsModel } from '../i18n/wallet'
 import DialogFrame from './DialogFrame'
 import SiteBanner from './SiteBanner'
+import ClubBanner from './ClubBanner'
 import ThemeButton from './ThemeButton'
 import { themed } from '../site/themed'
 
@@ -49,10 +50,20 @@ const MOBILE_BANNER_MAX_WIDTH = 768
 // to make the element conditional.
 // A club with its own website gets its site's banner (SiteBanner): a
 // photo with the logo and name over it, which can't be squashed.
+// A club without a website can have a banner built the same way from its
+// config (ClubBanner: artwork with its logo and name over it).
 const Banner = () => (
-  <Show when={!hasSite()} fallback={<SiteBanner />}>
-    <PictureBanner />
-  </Show>
+  <Switch>
+    <Match when={hasSite()}>
+      <SiteBanner />
+    </Match>
+    <Match when={clubConfig.branding.banner}>
+      <ClubBanner />
+    </Match>
+    <Match when={true}>
+      <PictureBanner />
+    </Match>
+  </Switch>
 )
 
 const PictureBanner = () => (
@@ -479,9 +490,42 @@ const AuthDialog = () => (
           <SignUpWizardSection />
         </Match>
       </Switch>
+      <PrivacyLink />
     </DialogFrame>
   </Show>
 )
+
+// Where the club has a privacy policy (branding.privacyUrl), it is a click
+// away from signing in or up. A real page, not one of the app's routes, so
+// the router leaves the link alone (rel="external").
+const PrivacyLink = () => (
+  <Show when={clubConfig.branding.privacyUrl}>
+    {(url) => (
+      <div style={privacyLinkRowStyle}>
+        <a
+          href={url()}
+          rel="external"
+          target="_blank"
+          {...themed(privacyLinkStyle, 'bk-link')}
+        >
+          {langActions.t('footer.privacy')}
+        </a>
+      </div>
+    )}
+  </Show>
+)
+
+const privacyLinkRowStyle: JSX.CSSProperties = {
+  'margin-top': '14px',
+  'text-align': 'center',
+  'font-size': '13px',
+}
+
+const privacyLinkStyle: JSX.CSSProperties = {
+  color: '#888',
+  'font-size': '13px',
+  'text-decoration': 'underline',
+}
 
 const closeAuthDialog = () => {
   authActions.hideDialog()
@@ -529,7 +573,7 @@ const SignInDialogContent = () => {
         <ThemeButton
           variant="primary"
           plainColor="#2185d0"
-          fill={hasSite()}
+          fill={hasSiteLook()}
           onClick={handleSignIn}
           disabled={authState.loading}
         >

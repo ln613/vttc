@@ -14,7 +14,7 @@ import {
 } from '../../shared/rules/booking'
 import ThemeButton from '../components/ThemeButton'
 import { langActions } from '../stores/langStore'
-import { hasSite, loadSiteFonts } from '../site/siteContent'
+import { hasSiteLook, loadSiteFonts } from '../site/siteContent'
 import { pointsModel } from '../i18n/wallet'
 import type { TopUpOption } from '../../shared/rules/wallet'
 import { themed } from '../site/themed'
@@ -35,7 +35,7 @@ const Settings = () => {
     <div {...themed(containerStyle, 'bk bk-site')}>
       <Header />
       <Show when={authState.isAdmin}>
-        <Show when={hasSite()}>
+        <Show when={hasSiteLook()}>
           <header class="bk-head">
             <div class="bk-head-inner bk-head-row">
               <div>
@@ -47,7 +47,7 @@ const Settings = () => {
           </header>
         </Show>
         <div {...themed(contentStyle, 'bk-wrap')}>
-          <Show when={!hasSite()}>
+          <Show when={!hasSiteLook()}>
             <TitleRow />
           </Show>
           <Show when={settingsState.error}>
@@ -169,7 +169,7 @@ const UpdateSection = () => (
       {t('settings.update')}
     </h4>
     <Show
-      when={hasSite()}
+      when={hasSiteLook()}
       fallback={
         <button
           type="button"

@@ -5,7 +5,7 @@ import ThemeButton from './ThemeButton'
 import { authState } from '../stores/authStore'
 import { waiverState, waiverActions } from '../stores/waiverStore'
 import { langActions } from '../stores/langStore'
-import { hasSite } from '../site/siteContent'
+import { hasSiteLook } from '../site/siteContent'
 import '../pages/booking.css'
 
 // The club's liability waiver (specs/rules/waiver.md). Checked whenever who
@@ -36,7 +36,7 @@ const WaiverGate = () => {
             <div class="waiver-actions">
               <ThemeButton
                 variant="primary"
-                fill={hasSite()}
+                fill={hasSiteLook()}
                 onClick={() => void waiverActions.accept()}
                 disabled={!waiverState.agreed || waiverState.saving}
               >

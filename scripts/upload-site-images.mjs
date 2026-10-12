@@ -3,12 +3,15 @@
 //
 //   node scripts/with-club.mjs --club timingsports \
 //     node scripts/upload-site-images.mjs <images dir> [--folder "Timing Sports"]
+//     [--no-manifest]
 //
 // Every image in <images dir> is uploaded to the folder (overwriting one of
 // the same name), and clubs/<club>/site/images.json maps each file's name
 // ("hero-1") to its address, served in the best format and quality for the
 // browser (f_auto,q_auto). The site reads that file (src/site/siteContent.ts),
-// so the images are not bundled into the app.
+// so the images are not bundled into the app. With --no-manifest the
+// addresses are only printed — for images a club's config points at
+// directly (a logo, a banner background) rather than its website's.
 //
 // Needs CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET.
 
@@ -27,7 +30,8 @@ const readArgs = () => {
   const args = process.argv.slice(2)
   const flag = args.indexOf('--folder')
   const folder = flag === -1 ? null : args.splice(flag, 2)[1]
-  return { dir: args[0], folder }
+  const noManifest = args.includes('--no-manifest')
+  return { dir: args.filter((a) => a !== '--no-manifest')[0], folder, noManifest }
 }
 
 const readEnv = () => {
@@ -78,16 +82,18 @@ const optimised = (url) => url.replace('/image/upload/', '/image/upload/f_auto,q
 
 const main = async () => {
   const env = readEnv()
-  const { dir, folder: folderArg } = readArgs()
+  const { dir, folder: folderArg, noManifest } = readArgs()
   const configPath = `clubs/${env.club}/config.json`
   const folder = folderArg || JSON.parse(readFileSync(configPath, 'utf8')).name
   const manifestPath = `clubs/${env.club}/site/images.json`
   const manifest = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, 'utf8')) : {}
 
   for (const file of imagesIn(dir)) {
-    manifest[basename(file, extname(file))] = optimised(await upload(env, folder, join(dir, file)))
-    console.log(`uploaded ${file}`)
+    const url = optimised(await upload(env, folder, join(dir, file)))
+    manifest[basename(file, extname(file))] = url
+    console.log(noManifest ? `${file}: ${url}` : `uploaded ${file}`)
   }
+  if (noManifest) return
   const sorted = Object.fromEntries(Object.entries(manifest).sort(([a], [b]) => a.localeCompare(b)))
   writeFileSync(manifestPath, JSON.stringify(sorted, null, 2) + '\n')
   console.log(`${Object.keys(sorted).length} images in ${manifestPath} (folder "${folder}")`)

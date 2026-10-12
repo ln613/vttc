@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js'
 import Button from './Button'
-import { hasSite } from '../site/siteContent'
+import { hasSiteLook } from '../site/siteContent'
 import '../pages/booking.css'
 
 // A button in the page's look: the club website's pill buttons (booking.css)
@@ -28,7 +28,7 @@ const ThemeButton = (props: {
   plainColor?: string
   children: JSX.Element
 }) =>
-  hasSite() ? (
+  hasSiteLook() ? (
     <button
       type={props.type ?? 'button'}
       class={`bk-btn bk-btn-${props.variant}${props.fill ? ' bk-btn-fill' : ''}${props.small ? ' bk-btn-small' : ''}`}

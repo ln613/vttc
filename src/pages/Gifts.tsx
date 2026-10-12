@@ -8,7 +8,7 @@ import { giftsAdminState, giftsAdminActions } from '../stores/giftsAdminStore'
 import type { Gift } from '../stores/rewardsStore'
 import { langActions } from '../stores/langStore'
 import { formatPoints } from '../i18n/wallet'
-import { hasSite, loadSiteFonts } from '../site/siteContent'
+import { hasSiteLook, loadSiteFonts } from '../site/siteContent'
 import './booking.css'
 
 // Admin: the gifts members can redeem their points for — name, description,
@@ -24,7 +24,7 @@ const Gifts = () => {
   onCleanup(() => giftsAdminActions.reset())
 
   return (
-    <div class={hasSite() ? 'bk bk-site' : 'bk'}>
+    <div class={hasSiteLook() ? 'bk bk-site' : 'bk'}>
       <Header />
       <Show when={authState.isAdmin}>
         <PageHead

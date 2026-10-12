@@ -1,5 +1,5 @@
 import { Show, type JSX } from 'solid-js'
-import { hasSite } from '../site/siteContent'
+import { hasSiteLook } from '../site/siteContent'
 import '../pages/booking.css'
 
 // A page's heading in booking.css's look: the site's coloured band for a club
@@ -10,7 +10,7 @@ const PageHead = (props: {
   actions?: JSX.Element
 }) => (
   <Show
-    when={hasSite()}
+    when={hasSiteLook()}
     fallback={
       <div class="bk-wrap" style={{ 'padding-bottom': 0 }}>
         <div class="bk-head-row" style={plainRowStyle}>

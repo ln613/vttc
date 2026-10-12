@@ -82,8 +82,15 @@ TABLE_ROWS=
 
 # Which existing club to copy as a starting point — its tournament formats
 # and its player roster are both copied into the new club's databases.
-# Optional — defaults to vttc.
+# Optional — defaults to vttc. "none" copies nothing: the club starts with
+# no tournaments and no players (or the players below).
 MONGODB_SOURCE_DB=
+
+# Optional — the club's own starting players instead of the source club's:
+# a JSON file, an array of { "firstName", "lastName", "sex": "M"|"F",
+# "rating" }, e.g. clubs/<slug>/seed-players.json. Loaded into both the
+# club's database and its -dev one, only while their players are empty.
+SEED_PLAYERS_FILE=
 
 # Only needed when the source db above lives on a DIFFERENT cluster than the
 # one this machine's MONGODB_URI points at — which is the case for every club

@@ -3,6 +3,7 @@
 ## Layout
 
 - banner https://res.cloudinary.com/vttc/image/upload/v1767957616/banner.jpg
+  - a club without a website but with `branding.banner` in its config (NovaPing) gets a banner built the same way from it: the background image cropped to fill, its logo, name and services line laid over it, styled by its theme.css
   - a club with its own website (specs/pages/Club Site.md) instead gets a banner built like its home hero: a photo of the court ("hero-2", cropped to the court floor and the net) as the background under a purple gradient that is dark behind the text and opens up over the court, with the round logo, the name ("TIMING SPORTS", italic display type), the services line and the script tagline ("Play · Connect · Enjoy", hidden on phones) laid over it as text in the current language — so it never stretches at any width
 - Top bar (blue bg, white text). Every link and button follows its module (rules/modules.md); one that is off is not shown
   - Live score icon (for tablet, show Tablet)
@@ -45,6 +46,8 @@
 - on failure, keep the dialog open and show the error
 
 ## Sign in dialog
+
+A club with a privacy policy (`branding.privacyUrl` in its config, a page in `clubs/<slug>/public/`) shows a small "Privacy Policy" link at the bottom of the sign in / sign up dialog, opening the page in a new tab. Timing Sports and NovaPing have one.
 
 A club with its own website (specs/pages/Club Site.md) shows the sign in, sign up, "Change your password" and "Umpire a Match" dialogs — and every confirm box in the app (e.g. "Delete …?", "Discard unsaved changes?"; red confirms become the site's red button, the rest its yellow one; "OK"/"Cancel" in the site's language) — in its site's look, on any page: the title in the purple heading band, the site's pill buttons ("Sign in" full width), links, progress dots and choice tiles in its colours. Other clubs keep the plain white dialog.
 

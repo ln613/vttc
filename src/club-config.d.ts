@@ -89,6 +89,25 @@ declare module 'club-config' {
     branding: {
       /** The top bar's colour; VTTC blue without it. */
       topBarColor?: string
+      /**
+       * The club's privacy policy (a page in clubs/<slug>/public), linked
+       * from the sign-in and sign-up dialog. Google sign-in can only be
+       * published with one.
+       */
+      privacyUrl?: string
+      /**
+       * A banner built from a background image with the logo and name laid
+       * over it as text (ClubBanner), instead of one picture — it can't be
+       * squashed. Used by a club without a website; a website club's banner
+       * comes from its site (SiteBanner).
+       */
+      banner?: {
+        background: string
+        logo: string
+        name: string
+        tagline?: string
+        services?: string
+      }
       bannerUrl: string
       /** Optional narrow-screen crop; the wide banner is used without it. */
       bannerUrlMobile?: string

@@ -1,0 +1,302 @@
+[
+  {
+    "firstName": "Mathis",
+    "lastName": "Mercier",
+    "sex": "M",
+    "rating": 2535
+  },
+  {
+    "firstName": "Guillaume",
+    "lastName": "François",
+    "sex": "M",
+    "rating": 2290
+  },
+  {
+    "firstName": "Amélie",
+    "lastName": "Arnaud",
+    "sex": "F",
+    "rating": 2200
+  },
+  {
+    "firstName": "Nicolas",
+    "lastName": "David",
+    "sex": "M",
+    "rating": 2125
+  },
+  {
+    "firstName": "Jules",
+    "lastName": "Mercier",
+    "sex": "M",
+    "rating": 1990
+  },
+  {
+    "firstName": "Léa",
+    "lastName": "Guérin",
+    "sex": "F",
+    "rating": 1945
+  },
+  {
+    "firstName": "Olivier",
+    "lastName": "Caron",
+    "sex": "M",
+    "rating": 1930
+  },
+  {
+    "firstName": "Léa",
+    "lastName": "Richard",
+    "sex": "F",
+    "rating": 1925
+  },
+  {
+    "firstName": "Pauline",
+    "lastName": "Michel",
+    "sex": "F",
+    "rating": 1860
+  },
+  {
+    "firstName": "Clara",
+    "lastName": "Martin",
+    "sex": "F",
+    "rating": 1815
+  },
+  {
+    "firstName": "Sébastien",
+    "lastName": "Bernard",
+    "sex": "M",
+    "rating": 1790
+  },
+  {
+    "firstName": "Émile",
+    "lastName": "Robin",
+    "sex": "M",
+    "rating": 1705
+  },
+  {
+    "firstName": "Julien",
+    "lastName": "Rey",
+    "sex": "M",
+    "rating": 1640
+  },
+  {
+    "firstName": "Louis",
+    "lastName": "Aubert",
+    "sex": "M",
+    "rating": 1445
+  },
+  {
+    "firstName": "Lucie",
+    "lastName": "Fournier",
+    "sex": "F",
+    "rating": 1425
+  },
+  {
+    "firstName": "Océane",
+    "lastName": "Blanc",
+    "sex": "F",
+    "rating": 1425
+  },
+  {
+    "firstName": "Céline",
+    "lastName": "Garcia",
+    "sex": "F",
+    "rating": 1400
+  },
+  {
+    "firstName": "Olivier",
+    "lastName": "Leroy",
+    "sex": "M",
+    "rating": 1350
+  },
+  {
+    "firstName": "Pauline",
+    "lastName": "Muller",
+    "sex": "F",
+    "rating": 1250
+  },
+  {
+    "firstName": "Emma",
+    "lastName": "Roussel",
+    "sex": "F",
+    "rating": 1245
+  },
+  {
+    "firstName": "Antoine",
+    "lastName": "Bonnet",
+    "sex": "M",
+    "rating": 1230
+  },
+  {
+    "firstName": "Cédric",
+    "lastName": "Guérin",
+    "sex": "M",
+    "rating": 1230
+  },
+  {
+    "firstName": "Jade",
+    "lastName": "Denis",
+    "sex": "F",
+    "rating": 1195
+  },
+  {
+    "firstName": "Valentin",
+    "lastName": "Collet",
+    "sex": "M",
+    "rating": 1175
+  },
+  {
+    "firstName": "Florian",
+    "lastName": "Richard",
+    "sex": "M",
+    "rating": 1160
+  },
+  {
+    "firstName": "Lucas",
+    "lastName": "Caron",
+    "sex": "M",
+    "rating": 1145
+  },
+  {
+    "firstName": "Mathis",
+    "lastName": "Fournier",
+    "sex": "M",
+    "rating": 1145
+  },
+  {
+    "firstName": "Alexandre",
+    "lastName": "Marchand",
+    "sex": "M",
+    "rating": 1125
+  },
+  {
+    "firstName": "Benoît",
+    "lastName": "Picard",
+    "sex": "M",
+    "rating": 1095
+  },
+  {
+    "firstName": "Clara",
+    "lastName": "Dubois",
+    "sex": "F",
+    "rating": 1070
+  },
+  {
+    "firstName": "Jade",
+    "lastName": "Bertrand",
+    "sex": "F",
+    "rating": 1065
+  },
+  {
+    "firstName": "Zoé",
+    "lastName": "Guérin",
+    "sex": "F",
+    "rating": 1040
+  },
+  {
+    "firstName": "Simon",
+    "lastName": "Picard",
+    "sex": "M",
+    "rating": 1030
+  },
+  {
+    "firstName": "Lucas",
+    "lastName": "Perrin",
+    "sex": "M",
+    "rating": 955
+  },
+  {
+    "firstName": "Gabriel",
+    "lastName": "Dubois",
+    "sex": "M",
+    "rating": 950
+  },
+  {
+    "firstName": "Paul",
+    "lastName": "Muller",
+    "sex": "M",
+    "rating": 940
+  },
+  {
+    "firstName": "Yannick",
+    "lastName": "Roux",
+    "sex": "M",
+    "rating": 925
+  },
+  {
+    "firstName": "Margaux",
+    "lastName": "Lambert",
+    "sex": "F",
+    "rating": 925
+  },
+  {
+    "firstName": "Adrien",
+    "lastName": "Chevalier",
+    "sex": "M",
+    "rating": 885
+  },
+  {
+    "firstName": "Yannick",
+    "lastName": "Brun",
+    "sex": "M",
+    "rating": 870
+  },
+  {
+    "firstName": "Cédric",
+    "lastName": "Michel",
+    "sex": "M",
+    "rating": 860
+  },
+  {
+    "firstName": "Loïc",
+    "lastName": "Robert",
+    "sex": "M",
+    "rating": 845
+  },
+  {
+    "firstName": "Clara",
+    "lastName": "Legrand",
+    "sex": "F",
+    "rating": 805
+  },
+  {
+    "firstName": "Lucie",
+    "lastName": "Fontaine",
+    "sex": "F",
+    "rating": 795
+  },
+  {
+    "firstName": "Théo",
+    "lastName": "Dupont",
+    "sex": "M",
+    "rating": 760
+  },
+  {
+    "firstName": "Gabriel",
+    "lastName": "Lefebvre",
+    "sex": "M",
+    "rating": 750
+  },
+  {
+    "firstName": "Gabriel",
+    "lastName": "Roussel",
+    "sex": "M",
+    "rating": 745
+  },
+  {
+    "firstName": "Hugo",
+    "lastName": "Dupont",
+    "sex": "M",
+    "rating": 690
+  },
+  {
+    "firstName": "Raphaël",
+    "lastName": "Perrin",
+    "sex": "M",
+    "rating": 620
+  },
+  {
+    "firstName": "Élodie",
+    "lastName": "Robin",
+    "sex": "F",
+    "rating": 550
+  }
+]

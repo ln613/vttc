@@ -1,0 +1,80 @@
+/* ClubBanner: a club's banner as a photo or artwork with text over it. Every
+ * colour and font is a variable with a neutral fallback; a club's theme.css
+ * sets them. */
+
+.club-banner {
+  position: relative;
+  background-color: var(--banner-bg, #0b2a52);
+  background-size: cover;
+  background-position: var(--banner-position, right center);
+  color: var(--banner-ink, #ffffff);
+  overflow: hidden;
+}
+.club-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(
+    --banner-overlay,
+    linear-gradient(90deg, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.1))
+  );
+}
+.club-banner-inner {
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1120px;
+  margin-inline: auto;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 2vw, 20px);
+  min-height: clamp(84px, 12vw, 132px);
+  text-align: left;
+}
+.club-banner-logo {
+  width: clamp(54px, 7.5vw, 88px);
+  height: clamp(54px, 7.5vw, 88px);
+  box-sizing: border-box;
+  padding: 0;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: var(--banner-logo-ring, 0 0 0 3px rgba(255, 255, 255, 0.85));
+}
+.club-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.club-banner-name {
+  font-family: var(--banner-display, inherit);
+  font-weight: var(--banner-display-weight, 800);
+  font-style: var(--banner-display-style, normal);
+  letter-spacing: var(--banner-display-spacing, 0);
+  text-transform: var(--banner-display-case, none);
+  font-size: clamp(26px, 4.6vw, 52px);
+  line-height: 0.95;
+}
+.club-banner-services {
+  font-weight: 700;
+  font-size: clamp(10px, 1.25vw, 13px);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--banner-soft, rgba(255, 255, 255, 0.75));
+}
+.club-banner-tagline {
+  margin-left: auto;
+  font-family: var(--banner-tagline-font, inherit);
+  font-weight: 600;
+  font-size: clamp(18px, 2.4vw, 28px);
+  color: var(--banner-tagline-ink, #ffffff);
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .club-banner-tagline {
+    display: none;
+  }
+}

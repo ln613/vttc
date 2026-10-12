@@ -30,7 +30,7 @@ import {
   walletT,
 } from '../i18n/wallet'
 import { langActions } from '../stores/langStore'
-import { hasSite, loadSiteFonts } from '../site/siteContent'
+import { hasSiteLook, loadSiteFonts } from '../site/siteContent'
 import { themed } from '../site/themed'
 import './booking.css'
 
@@ -248,7 +248,7 @@ const Account = () => {
       <Header />
       <SavingOverlay />
       <SavedOverlay />
-      <Show when={hasSite()}>
+      <Show when={hasSiteLook()}>
         <header class="bk-head">
           <div class="bk-head-inner">
             <p class="bk-kicker">{t('account.kicker')}</p>
@@ -257,7 +257,7 @@ const Account = () => {
         </header>
       </Show>
       <div {...themed(contentStyle, 'bk-wrap')}>
-        <Show when={!hasSite()}>
+        <Show when={!hasSiteLook()}>
           <h1 style={titleStyle}>{accountPageActions.getTitle()}</h1>
         </Show>
         <div {...themed(sectionsStyle, 'bk-sections')}>
@@ -555,14 +555,14 @@ const BalanceAmount = () => (
     when={pointsModel}
     fallback={
       <>
-        <strong style={hasSite() ? undefined : creditsAmountStyle}>
+        <strong style={hasSiteLook() ? undefined : creditsAmountStyle}>
           {formatCredits(creditsState.balance ?? 0)}
         </strong>
         <span style={creditsMutedStyle}>{t('account.creditsUnit')}</span>
       </>
     }
   >
-    <strong style={hasSite() ? undefined : creditsAmountStyle}>
+    <strong style={hasSiteLook() ? undefined : creditsAmountStyle}>
       {formatBalance(creditsState.balance ?? 0)}
     </strong>
   </Show>
@@ -711,14 +711,14 @@ const ChangePasswordDialog = () => (
         <ThemeButton
           variant="secondary"
           plainColor="#e74c3c"
-          fill={hasSite()}
+          fill={hasSiteLook()}
           onClick={accountPageActions.hideChangePassword}
         >
           {t('common.cancel')}
         </ThemeButton>
         <ThemeButton
           variant="primary"
-          fill={hasSite()}
+          fill={hasSiteLook()}
           onClick={accountPageActions.changePassword}
           disabled={accountPageState.changingPassword}
         >

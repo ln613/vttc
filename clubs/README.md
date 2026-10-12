@@ -25,5 +25,24 @@ real secrets — fill it in, then:
 
     npm run club:new -- .env.new-club.template
 
+## A club's own look
+
+A club without a website can still have its own look:
+
+- `clubs/<slug>/theme.css` — CSS variables under `html .bk-site` (colours,
+  fonts, radius; see booking.css) and `.club-banner` (see
+  src/components/club-banner.css). Its presence switches the dialogs,
+  buttons, page headings and account pages from the app's plain style to
+  the club's (`hasSiteLook()` in src/site/siteContent.ts). Only that club's
+  build includes it.
+- `branding.banner` in config.json — `{ background, logo, name, services?,
+  tagline? }`: the banner is built from the background image with the logo
+  and name laid over it, so it never stretches.
+- `branding.topBarColor` — the top bar.
+
+NovaPing is the first (navy, cyan and coral; Sora type; squared buttons).
+Its logo and banner background are on Cloudinary in the "NovaPing" folder,
+uploaded with `scripts/upload-site-images.mjs --no-manifest`.
+
 The rating system is **not** club-configurable yet; `rating.js` still carries
 VTTC's tables. Deferred until a second club needs different ones.

@@ -1,5 +1,5 @@
 import { Show, onMount, type JSX } from 'solid-js'
-import { hasSite, loadSiteFonts } from '../site/siteContent'
+import { hasSiteLook, loadSiteFonts } from '../site/siteContent'
 import '../pages/booking.css'
 
 // A modal dialog with a title. A club with its own website gets its site's
@@ -11,7 +11,7 @@ const DialogFrame = (props: {
   onClose?: () => void
   children: JSX.Element
 }) => (
-  <Show when={hasSite()} fallback={<PlainFrame {...props} />}>
+  <Show when={hasSiteLook()} fallback={<PlainFrame {...props} />}>
     <SiteFrame {...props} />
   </Show>
 )

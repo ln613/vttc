@@ -9,7 +9,7 @@ import {
 } from '../stores/redemptionsStore'
 import { langActions } from '../stores/langStore'
 import { formatPoints } from '../i18n/wallet'
-import { hasSite, loadSiteFonts } from '../site/siteContent'
+import { hasSiteLook, loadSiteFonts } from '../site/siteContent'
 import './booking.css'
 
 // What has been redeemed: a member's own gifts, or — for an admin — every
@@ -25,7 +25,7 @@ const Redemptions = () => {
   onCleanup(() => redemptionsActions.reset())
 
   return (
-    <div class={hasSite() ? 'bk bk-site' : 'bk'}>
+    <div class={hasSiteLook() ? 'bk bk-site' : 'bk'}>
       <Header />
       <PageHead
         kicker={t('redemptions.kicker')}

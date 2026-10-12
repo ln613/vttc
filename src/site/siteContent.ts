@@ -137,6 +137,21 @@ const imagesByName: Record<string, string> = {
 export const hasSite = (): boolean =>
   !!clubConfig.site?.enabled && !!contentByLanguage.en
 
+// A club can have a look of its own without a website: its colours, fonts
+// and button shapes in clubs/<slug>/theme.css (CSS variables under
+// .bk-site, which booking.css and the dialogs read). Imported here, so only
+// that club's build carries it.
+const themeFiles = import.meta.glob('club-dir/theme.css', { eager: true })
+
+/**
+ * The club's own look rather than the app's plain one: a website club
+ * always (its site's look), or any club with a theme.css. Decides the
+ * styling of dialogs, buttons, page headings and the account pages — not
+ * which pages exist, which hasSite() decides.
+ */
+export const hasSiteLook = (): boolean =>
+  hasSite() || Object.keys(themeFiles).length > 0
+
 /** The languages this club's site (and top bar) can be shown in. */
 export const siteLanguages = (): SiteLanguage[] => {
   const listed = clubConfig.site?.languages ?? ['en']

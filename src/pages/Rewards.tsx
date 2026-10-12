@@ -10,7 +10,7 @@ import { rewardsState, rewardsActions, type Gift } from '../stores/rewardsStore'
 import { langActions } from '../stores/langStore'
 import { clubIdOf, MAX_REDEEM_QUANTITY } from '../../shared/rules/wallet'
 import { formatPoints } from '../i18n/wallet'
-import { hasSite, loadSiteFonts } from '../site/siteContent'
+import { hasSiteLook, loadSiteFonts } from '../site/siteContent'
 import './booking.css'
 
 // The club's gifts and the points each takes. Members look; an admin
@@ -26,7 +26,7 @@ const Rewards = () => {
   onCleanup(() => rewardsActions.reset())
 
   return (
-    <div class={hasSite() ? 'bk bk-site' : 'bk'}>
+    <div class={hasSiteLook() ? 'bk bk-site' : 'bk'}>
       <Header />
       <PageHead kicker={t('rewards.kicker')} title={t('rewards.title')} />
       <div class="bk-wrap">

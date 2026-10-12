@@ -7,7 +7,7 @@ import {
   confirmDialogActions,
 } from '../stores/confirmDialogStore'
 import { langActions } from '../stores/langStore'
-import { hasSite, loadSiteFonts } from '../site/siteContent'
+import { hasSiteLook, loadSiteFonts } from '../site/siteContent'
 import '../pages/booking.css'
 
 // The app's confirm/alert box (customConfirm). A club with its own website
@@ -15,7 +15,7 @@ import '../pages/booking.css'
 // every other club the plain box.
 const ConfirmDialog = () => (
   <Show when={confirmDialogState.open}>
-    <Show when={hasSite()} fallback={<PlainConfirm />}>
+    <Show when={hasSiteLook()} fallback={<PlainConfirm />}>
       <SiteConfirm />
     </Show>
   </Show>

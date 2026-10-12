@@ -105,6 +105,9 @@ const readClubInput = (template) => ({
   pageTitle: template.PAGE_TITLE?.trim() || template.CLUB_NAME?.trim(),
   tableRows: parseTableRows(template.TABLE_ROWS),
   sourceDb: template.MONGODB_SOURCE_DB?.trim() || 'vttc',
+  // A club's own starting players (a JSON array of { firstName, lastName,
+  // sex, rating }), in place of the source club's roster.
+  seedPlayersFile: template.SEED_PLAYERS_FILE?.trim(),
   // Each club has its own cluster, so a source db on another club's
   // cluster needs its own URI — otherwise we look for it on this one
   // and quietly find nothing.
@@ -382,13 +385,31 @@ const buildUri = (host, { username, password }) =>
   `mongodb+srv://${username}:${encodeURIComponent(password)}@${host}/?retryWrites=true`
 
 // Copied wholesale from the source club so a new club opens with the
-// tournament formats and the player roster already in place.
+// tournament formats and the player roster already in place — unless the
+// source is "none" (start empty), and with the club's own players instead
+// when it has a seed file.
 const SEED_COLLECTIONS = ['tournaments', 'players']
 
-const seedDatabases = async ({ uri, sourceUri, sourceDb, databases }) => {
-  if (!uri || !sourceUri) throwError('Both cluster URIs are required')
+const NO_SOURCE = 'none'
 
-  const source = await readSourceCollections(sourceUri, sourceDb)
+const emptySource = () =>
+  Object.fromEntries(SEED_COLLECTIONS.map((name) => [name, []]))
+
+const readSeedPlayers = (path) => {
+  if (!existsSync(path)) throwError(`SEED_PLAYERS_FILE not found: ${path}`)
+  const players = JSON.parse(readFileSync(path, 'utf8'))
+  if (!Array.isArray(players)) throwError(`${path} must be a JSON array of players`)
+  // Mongo gives each its own _id.
+  return players.map(({ _id, ...player }) => player)
+}
+
+const seedDatabases = async ({ uri, sourceUri, sourceDb, seedPlayersFile, databases }) => {
+  if (!uri) throwError('The cluster URI is required')
+  if (sourceDb !== NO_SOURCE && !sourceUri) throwError('The source cluster URI is required')
+
+  const source =
+    sourceDb === NO_SOURCE ? emptySource() : await readSourceCollections(sourceUri, sourceDb)
+  if (seedPlayersFile) source.players = readSeedPlayers(seedPlayersFile)
   const client = new MongoClient(uri)
   await client.connect()
   const report = []
@@ -836,10 +857,15 @@ const run = async () => {
     uri: buildUri(host, credentials),
     sourceUri: club.sourceUri || process.env.MONGODB_URI,
     sourceDb: club.sourceDb,
+    seedPlayersFile: club.seedPlayersFile,
     databases: [club.slug, `${club.slug}-dev`],
   })
-  console.log(`source:       ${describeSource(source)} in ${club.sourceDb}`)
-  if (isSourceEmpty(source)) console.log(warnEmptySource(club))
+  console.log(
+    `source:       ${describeSource(source)} ${
+      club.sourceDb === NO_SOURCE ? '(no source club' : `in ${club.sourceDb}`
+    }${club.seedPlayersFile ? `${club.sourceDb === NO_SOURCE ? '; ' : ' — '}players from ${club.seedPlayersFile}` : ''}${club.sourceDb === NO_SOURCE ? ')' : ''}`,
+  )
+  if (club.sourceDb !== NO_SOURCE && isSourceEmpty(source)) console.log(warnEmptySource(club))
   for (const line of report) console.log(`              ${line}`)
 
   const uri = buildClubUri(host, credentials, club.slug)

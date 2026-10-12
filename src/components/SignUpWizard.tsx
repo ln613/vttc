@@ -14,7 +14,7 @@ import {
 } from '../stores/signUpStore'
 import { formatPhone } from '../../shared/rules/contact'
 import { modulesActions } from '../stores/modulesStore'
-import { hasSite } from '../site/siteContent'
+import { hasSiteLook } from '../site/siteContent'
 import { themed } from '../site/themed'
 
 // The self sign-up wizard (specs/shared/header.md). One screen per step, all
@@ -169,9 +169,9 @@ const ResendLink = () => {
   const waiting = () => signUpState.resendCountdown > 0 || signUpState.loading
   return (
     <span
-      class={hasSite() ? 'bk-link' : undefined}
+      class={hasSiteLook() ? 'bk-link' : undefined}
       style={{
-        ...(hasSite() ? {} : linkStyle),
+        ...(hasSiteLook() ? {} : linkStyle),
         opacity: waiting() ? 0.5 : 1,
         cursor: waiting() ? 'default' : 'pointer',
       }}
@@ -464,7 +464,7 @@ const progressDotsStyle: JSX.CSSProperties = {
 // The site's own colours where the club has a website (done, current, to
 // come); the app's green, blue and grey otherwise.
 const dotColor = (n: number, current: number) => {
-  if (hasSite()) {
+  if (hasSiteLook()) {
     if (n < current) return 'var(--bk-free-line, #cdbcfb)'
     return n === current ? 'var(--bk-accent, #3b1d82)' : 'var(--bk-line, #e2d8fa)'
   }

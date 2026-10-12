@@ -1,0 +1,87 @@
+{
+  "slug": "novaping",
+  "name": "NovaPing",
+  "appName": "NovaPing Live",
+  "timezone": "America/Vancouver",
+  "branding": {
+    "topBarColor": "#0b2a52",
+    "bannerUrl": "https://res.cloudinary.com/ln613/image/upload/f_auto,q_auto/v1791777667/NovaPing/banner-bg.jpg",
+    "bannerAlt": "NovaPing Banner",
+    "banner": {
+      "background": "https://res.cloudinary.com/ln613/image/upload/f_auto,q_auto/v1791777667/NovaPing/banner-bg.jpg",
+      "logo": "https://res.cloudinary.com/ln613/image/upload/f_auto,q_auto/v1791777668/NovaPing/logo.png",
+      "name": "NovaPing",
+      "services": "Table Tennis Club"
+    },
+    "contactName": "NovaPing",
+    "faviconUrl": "https://res.cloudinary.com/ln613/image/upload/f_png,w_96,h_96/v1791777668/NovaPing/logo.png",
+    "pageTitle": "NovaPing",
+    "privacyUrl": "/privacy.html"
+  },
+  "tables": {
+    "all": [
+      5,
+      6,
+      7,
+      8,
+      1,
+      2,
+      3,
+      4
+    ],
+    "rows": [
+      [
+        5,
+        6,
+        7,
+        8
+      ],
+      [
+        1,
+        2,
+        3,
+        4
+      ]
+    ],
+    "order": [
+      5,
+      6,
+      7,
+      8,
+      1,
+      2,
+      3,
+      4
+    ],
+    "lowTierOrder": [
+      5,
+      6,
+      7,
+      8,
+      1,
+      2,
+      3,
+      4
+    ],
+    "highTierOrder": [
+      5,
+      6,
+      7,
+      8,
+      1,
+      2,
+      3,
+      4
+    ],
+    "knockoutExcluded": [],
+    "generalExcluded": [],
+    "highTierExcluded": [],
+    "highTierSemifinalExcluded": [],
+    "highTierFinalOnly": [],
+    "lowTierBigMatchPreferred": []
+  },
+  "tiers": {
+    "low": [],
+    "high": []
+  }
+}
