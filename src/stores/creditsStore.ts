@@ -16,6 +16,12 @@ import {
   type TopUpOption,
 } from '../../shared/rules/wallet'
 import { pointsModel } from '../i18n/wallet'
+import {
+  NO_CHECKOUT,
+  paymentLanguage,
+  renewPaymentTicket,
+  type PaymentCheckout,
+} from '../utils/payment'
 
 // A player's court-booking balance, and topping it up. Shared by the
 // Account page (balance, Top up) and the Booking page (pay from the
@@ -39,6 +45,8 @@ interface CreditsState {
   dollars: string
   paymentId: string
   amountCents: number
+  // How the card is taken (Moneris's form, or the placeholder).
+  checkout: PaymentCheckout
   creditsBought: number
   pointsEarned: number
   busy: boolean
@@ -57,6 +65,7 @@ const getInitialState = (): CreditsState => ({
   dollars: '',
   paymentId: '',
   amountCents: 0,
+  checkout: NO_CHECKOUT,
   creditsBought: 0,
   pointsEarned: 0,
   busy: false,
@@ -180,6 +189,7 @@ interface TopUpResponse {
   credits: number
   points?: number
   paymentsAvailable: boolean
+  checkout?: PaymentCheckout
 }
 
 const startTopUp = async () => {
@@ -193,6 +203,7 @@ const startTopUp = async () => {
   try {
     const result = await apiPost<TopUpResponse>('topUpCredits', {
       dollars: dollarsValue(),
+      language: paymentLanguage(),
     })
     setCreditsState({
       busy: false,
@@ -202,6 +213,7 @@ const startTopUp = async () => {
       creditsBought: result.credits,
       pointsEarned: result.points ?? 0,
       paymentsAvailable: result.paymentsAvailable,
+      checkout: result.checkout ?? NO_CHECKOUT,
     })
   } catch (err) {
     setCreditsState({
@@ -229,12 +241,32 @@ const payTopUp = async () => {
       busy: false,
       topUpError: errorMessage(err, 'Payment failed'),
     })
+    await offerNewCardForm()
+  }
+}
+
+// The card form said something went wrong: say so, and open a fresh one.
+const cardError = async (message: string) => {
+  setCreditsState('topUpError', message)
+  await offerNewCardForm()
+}
+
+// After a decline or a broken form, Moneris needs a new ticket for the same
+// payment. The placeholder has nothing to renew.
+const offerNewCardForm = async () => {
+  if (creditsState.checkout.provider !== 'moneris') return
+  try {
+    const renewed = await renewPaymentTicket(creditsState.paymentId)
+    setCreditsState('checkout', renewed.checkout)
+  } catch (err) {
+    setCreditsState('topUpError', errorMessage(err, 'Payment failed'))
   }
 }
 
 const reset = () => setCreditsState(getInitialState())
 
 export const creditsActions = {
+  cardError,
   isCreditOn,
   paysWithCredits,
   hasMyBookings,

@@ -13,7 +13,7 @@ import { A, useNavigate } from '@solidjs/router'
 import { Header } from '../components/Header'
 import Input from '../components/Input'
 import Select from '../components/Select'
-import PaymentPlaceholder from '../components/PaymentPlaceholder'
+import CardPayment from '../components/CardPayment'
 import TopUpDialog from '../components/TopUpDialog'
 import {
   bookingState,
@@ -609,12 +609,14 @@ const PayStep = () => (
           : '',
       })}
     </p>
-    <PaymentPlaceholder
+    <CardPayment
       amountCents={bookingState.amountCents}
+      checkout={bookingState.checkout}
       available={bookingState.day?.paymentsAvailable ?? false}
       busy={bookingState.busy}
       onPay={bookingActions.payAsGuest}
       onBack={bookingActions.closeDialog}
+      onCardError={bookingActions.cardError}
     />
   </>
 )

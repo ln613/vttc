@@ -1,6 +1,6 @@
 import { Show, Switch, Match, For } from 'solid-js'
 import Input from './Input'
-import PaymentPlaceholder from './PaymentPlaceholder'
+import CardPayment from './CardPayment'
 import { creditsState, creditsActions } from '../stores/creditsStore'
 import { formatCredits, formatDollars } from '../../shared/rules/booking'
 import type { TopUpOption } from '../../shared/rules/wallet'
@@ -35,12 +35,14 @@ const TopUpDialog = () => (
               <AmountStep />
             </Match>
             <Match when={creditsState.topUpStep === 'pay'}>
-              <PaymentPlaceholder
+              <CardPayment
                 amountCents={creditsState.amountCents}
+                checkout={creditsState.checkout}
                 available={creditsState.paymentsAvailable}
                 busy={creditsState.busy}
                 onPay={creditsActions.payTopUp}
                 onBack={creditsActions.closeTopUp}
+                onCardError={creditsActions.cardError}
               />
             </Match>
             <Match when={creditsState.topUpStep === 'done'}>

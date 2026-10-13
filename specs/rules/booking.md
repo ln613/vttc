@@ -70,13 +70,23 @@ Prices follow the day of the week and the time of day, from `booking.rates` in t
 - points model: one of the amounts on offer, which adds the same dollars to the balance plus its reward points (rules/wallet.md)
 - paid by card
 
-## Payment (Stripe placeholder)
+## Card payment (Moneris)
 
-Card payment through Stripe is not connected yet. The payment step shows the amount and a "Card payment (Stripe) — coming soon" area.
+A guest's booking and a top-up are paid by card through Moneris Checkout: Moneris's own card form, embedded in the payment step, so card details go to Moneris and never to the site.
 
+- the payment step shows the amount, the card form, "Your card is processed securely by Moneris. We never see your card number." and Back
+- when the payment starts, the server asks Moneris for a one-time ticket for exactly that amount (`preload`), with an order number unique to the payment and attempt (`{club}-{paymentId}-{n}`); the form opens with the ticket, in English or French (Chinese shows English)
+- when the form reports it finished, the server asks Moneris for the receipt: only an approved receipt ("a") for that order number and exactly that amount marks the payment paid. The browser's word is never enough. The receipt's approval code, reference number, card type and last 4 digits are kept with the payment (never the card number)
+- declined, not finished, or the form failing: the reason is shown ("The card was declined. Please try again.") and a fresh form opens for the same payment (a new ticket; a ticket lasts 30 minutes)
+- Moneris refusing to issue a ticket (not set up right, or down): "Card payments are not working right now. Please try again later or contact the club."; a guest's held time is let go at once, the payment marked failed, and the details logged for whoever sets the site up
+- a guest's hold that runs out before a card is charged: refused, "Your hold on this time ran out. Please book again." A card already charged is honoured: the booking keeps its time if it is still its own or still free; if someone else took it, the payment is flagged for a refund ("We received your payment, but this time was booked by someone else after your hold ran out. The club will refund you."), refunded by the club from Moneris
+- a guest who pays and closes the page before it reports back: when the lapsed hold is next cleared (someone booking that court and day), Moneris is asked first, and a payment it approved confirms the booking instead of letting the time go
+- a payment can be completed once only; a top-up only by the player it is for
+- environment: `MONERIS_STORE_ID`, `MONERIS_API_TOKEN` (Merchant Resource Center → Admin → Store Settings), `MONERIS_CHECKOUT_ID` (Admin → Moneris Checkout Config: "I have my custom order form…", card payments), `MONERIS_ENVIRONMENT` (`qa` test — the default — or `prod`). The test environment's Merchant Resource Center is https://esqa.moneris.com/mpg; the live one is the club's own
+
+Without Moneris set up:
 - `PAYMENTS_MODE=placeholder` (local development only, never on a Netlify site): a "Simulate payment" button completes the payment without a card
 - otherwise: "Online payment is not available yet. Please pay at the club." and the payment cannot be completed
-- a payment can be completed once only; a top-up only by the player it is for
 
 ## Privacy
 

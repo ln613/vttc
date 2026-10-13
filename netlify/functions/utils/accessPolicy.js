@@ -63,6 +63,7 @@ export const ACCESS = {
     bookCourtAsGuest: PUBLIC, // held until paid
     topUpCredits: USER,
     confirmPayment: PUBLIC, // a guest pays too; a top-up is checked against the caller
+    renewPaymentTicket: PUBLIC, // a new card form for the same payment; same checks
     acceptWaiver: USER, // the caller accepts it for themselves
     saveGift: ADMIN,
     deleteGift: ADMIN,

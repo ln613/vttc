@@ -67,9 +67,11 @@ the player's confirmed bookings, newest first: [{ _id, date, court, start, minut
 
 { paymentId, amountCents, credits, points, paymentsAvailable } — a pending payment; `points` the reward points it will give (0 on the credits model)
 
+Book as guest and Top up also return `checkout`: how the browser takes the card — { provider: "moneris", ticket, environment: "qa" | "prod", scriptUrl } (Moneris's card form), { provider: "placeholder" } (PAYMENTS_MODE=placeholder), or { provider: "none" }. Both take an optional `language` for the card form.
+
 ## Confirm payment (POST confirmPayment, public)
 
-The Stripe placeholder: only with PAYMENTS_MODE=placeholder. Once Stripe is connected, a Stripe webhook takes its place.
+Called when the card form reports it finished (or the placeholder's button).
 
 ### input
 
@@ -77,12 +79,22 @@ The Stripe placeholder: only with PAYMENTS_MODE=placeholder. Once Stripe is conn
 
 ### Action
 
-- the payment must be pending; a top-up must belong to the signed-in player; a guest hold must not have run out
-- mark it paid, then confirm the guest's booking, or add the credits (and a ledger entry)
+- the payment must be pending; a top-up must belong to the signed-in player
+- the placeholder: a guest hold must not have run out
+- Moneris: the receipt is fetched from Moneris and must be approved, for the payment's order number and exact amount; otherwise the reason is returned ("The card was declined. Please try again.") and the payment stays pending
+- mark it paid (with the receipt's approval code, reference, card type, last 4), then confirm the guest's booking, or add the credits (and a ledger entry). A guest booking paid after its hold ran out keeps its time if it is still free; if not, the payment is flagged `refundDue` and the reason returned (rules/booking.md)
 
 ### Output
 
 guest booking (then the door code and the receipt email): { kind, ok, booking: { date, court, start, minutes }, doorCode | null, receiptSentTo | null }; top-up: { kind, ok, balance, points? } — `points`, the member's reward points after, when the top-up gave some
+
+## Renew payment ticket (POST renewPaymentTicket, public)
+
+A fresh Moneris card form for a pending payment, after a decline or a form that failed or expired.
+
+- input: paymentId*, language
+- the same checks as Confirm payment (pending; a top-up only its own player's; a guest hold not run out)
+- output: { paymentId, checkout } with a new ticket and order number
 
 # Reward APIs
 

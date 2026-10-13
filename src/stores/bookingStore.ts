@@ -17,6 +17,12 @@ import { langActions } from './langStore'
 import { isValidEmail, isValidPhone } from '../../shared/rules/contact'
 import { requiredWaiver } from '../../shared/rules/waiver'
 import { waiverState } from './waiverStore'
+import {
+  NO_CHECKOUT,
+  paymentLanguage,
+  renewPaymentTicket,
+  type PaymentCheckout,
+} from '../utils/payment'
 
 // The Booking page: a week of days to pick from, the chosen day's court
 // times, and the dialog that books one. See specs/pages/Booking.md.
@@ -82,6 +88,8 @@ interface BookingState {
   paymentId: string
   amountCents: number
   heldUntil: string
+  // How the guest's card is taken (Moneris's form, or the placeholder).
+  checkout: PaymentCheckout
   busy: boolean
   dialogError: string | null
   bookedCredits: number
@@ -110,6 +118,7 @@ const getInitialState = (): BookingState => ({
   paymentId: '',
   amountCents: 0,
   heldUntil: '',
+  checkout: NO_CHECKOUT,
   busy: false,
   dialogError: null,
   bookedCredits: 0,
@@ -395,6 +404,7 @@ interface GuestHold {
   amountCents: number
   heldUntil: string
   paymentsAvailable: boolean
+  checkout?: PaymentCheckout
 }
 
 // The club's waiver, when it requires one. A signed-in member has accepted
@@ -440,6 +450,7 @@ const holdForGuest = async () => {
       ...(clubWaiver && bookingState.waiverAccepted
         ? { waiverVersion: clubWaiver.version }
         : {}),
+      language: paymentLanguage(),
     })
     setBookingState({
       busy: false,
@@ -447,6 +458,7 @@ const holdForGuest = async () => {
       paymentId: hold.paymentId,
       amountCents: hold.amountCents,
       heldUntil: hold.heldUntil,
+      checkout: hold.checkout ?? NO_CHECKOUT,
     })
     void fetchDay(bookingState.date)
   } catch (err) {
@@ -477,6 +489,25 @@ const payAsGuest = async () => {
       busy: false,
       dialogError: errorMessage(err, 'Payment failed'),
     })
+    await offerNewCardForm()
+  }
+}
+
+// The card form said something went wrong: say so, and open a fresh one.
+const cardError = async (message: string) => {
+  setBookingState('dialogError', message)
+  await offerNewCardForm()
+}
+
+// After a decline or a broken form, Moneris needs a new ticket for the same
+// payment. The placeholder has nothing to renew.
+const offerNewCardForm = async () => {
+  if (bookingState.checkout.provider !== 'moneris') return
+  try {
+    const renewed = await renewPaymentTicket(bookingState.paymentId)
+    setBookingState('checkout', renewed.checkout)
+  } catch (err) {
+    setBookingState('dialogError', errorMessage(err, 'Payment failed'))
   }
 }
 
@@ -484,6 +515,7 @@ const reset = () => setBookingState(getInitialState())
 
 export const bookingActions = {
   init,
+  cardError,
   selectDate,
   shiftWeek,
   selectSlot,

@@ -92,12 +92,15 @@
   },
   "payment": {
     "amountToPay": "Amount to pay",
-    "cardTitle": "Card payment (Stripe)",
+    "cardTitle": "Card payment",
     "comingSoon": "Card payments are coming soon.",
     "testMode": "Test mode: no card is charged.",
     "unavailable": "Online payment is not available yet. Please pay at the club.",
     "simulate": "Simulate payment",
-    "paying": "Paying..."
+    "paying": "Paying...",
+    "checking": "Checking your payment...",
+    "secure": "Your card is processed securely by Moneris. We never see your card number.",
+    "formFailed": "The card form could not be loaded. Please try again."
   },
   "topUp": {
     "title": "Top up credits",

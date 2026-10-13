@@ -92,12 +92,15 @@
   },
   "payment": {
     "amountToPay": "应付金额",
-    "cardTitle": "银行卡支付（Stripe）",
+    "cardTitle": "银行卡付款",
     "comingSoon": "银行卡支付即将开通。",
     "testMode": "测试模式：不会实际扣款。",
     "unavailable": "暂不支持在线支付，请到店付款。",
     "simulate": "模拟付款",
-    "paying": "付款中…"
+    "paying": "付款中…",
+    "checking": "正在确认付款……",
+    "secure": "您的银行卡由 Moneris 安全处理，我们不会看到您的卡号。",
+    "formFailed": "无法加载付款表单，请重试。"
   },
   "topUp": {
     "title": "充值积分",

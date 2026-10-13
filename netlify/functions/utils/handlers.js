@@ -59,6 +59,7 @@ import {
   bookCourtAsGuest,
   topUpCredits,
   confirmPayment,
+  renewPaymentTicket,
 } from './bookingHandlers.js'
 import { getMyWaiver, acceptWaiver } from './waiverHandlers.js'
 import {
@@ -273,6 +274,7 @@ export const apiHandlers = {
     bookCourtAsGuest: (body, auth) => bookCourtAsGuest(body, auth),
     topUpCredits: (body, auth) => topUpCredits(body, auth),
     confirmPayment: (body, auth) => confirmPayment(body, auth),
+    renewPaymentTicket: (body, auth) => renewPaymentTicket(body, auth),
     acceptWaiver: (body, auth) => acceptWaiver(body, auth),
     saveGift: (body) => saveGift(body),
     deleteGift: (body) => deleteGift(body),

@@ -37,8 +37,11 @@ import {
   findPayment,
   markPaymentPaid,
   markPaymentFailed,
-  isPlaceholderPaymentAllowed,
+  markRefundDue,
   paymentsAvailable,
+  checkoutFor,
+  renewTicket,
+  verifyCardPayment,
 } from './payments.js'
 
 const BOOKINGS = 'bookings'
@@ -77,17 +80,42 @@ const getSlots = async () => {
   return collection
 }
 
-// A guest who never finished paying no longer holds anything.
+// A guest who never finished paying no longer holds anything — unless their
+// card did go through and the page just never said so (closed right after
+// paying): then the booking is confirmed instead of let go.
 const releaseExpiredHolds = async (slots, { court, date }) => {
   const expired = await slots
     .find({ court, date, heldUntil: { $ne: null, $lt: new Date() } }, { projection: { bookingId: 1 } })
     .toArray()
   if (!expired.length) return
-  const bookingIds = [...new Set(expired.map((s) => s.bookingId.toString()))].map(toObjectId)
+  const lapsed = [...new Set(expired.map((s) => s.bookingId.toString()))].map(toObjectId)
+  const bookingIds = []
+  for (const bookingId of lapsed) {
+    if (!(await completePaidInTheMeantime(bookingId))) bookingIds.push(bookingId)
+  }
+  if (!bookingIds.length) return
   await slots.deleteMany({ bookingId: { $in: bookingIds } })
   await getDB()
     .collection(BOOKINGS)
     .updateMany({ _id: { $in: bookingIds }, status: 'pending_payment' }, { $set: { status: 'expired' } })
+}
+
+// Asks the card provider about a lapsed guest booking's payment; when it was
+// in fact paid, completes it as confirmPayment would have.
+const completePaidInTheMeantime = async (bookingId) => {
+  const booking = await getDB().collection(BOOKINGS).findOne({ _id: bookingId })
+  if (!booking?.paymentId || booking.status !== 'pending_payment') return false
+  const payment = await findPayment(booking.paymentId)
+  if (payment?.provider !== 'moneris' || payment.status !== 'pending' || !payment.ticket) return false
+  try {
+    const verified = await verifyCardPayment(payment)
+    if (!verified.ok) return false
+    if (!(await markPaymentPaid(payment._id, verified.receipt))) return false
+    const result = await applyGuestBookingPayment(payment)
+    return result.ok
+  } catch {
+    return false
+  }
 }
 
 const DUPLICATE_KEY = 11000
@@ -373,7 +401,16 @@ export const bookCourtAsGuest = async (body, auth) => {
     throw err
   }
 
-  const payment = await createPayment({ kind: 'guestBooking', amountCents, bookingId })
+  let payment
+  try {
+    payment = await createPayment({ kind: 'guestBooking', amountCents, bookingId, language: body.language })
+  } catch (err) {
+    // No card form to pay with (Moneris unreachable or refusing): let the
+    // time go rather than hold it for nobody.
+    await releaseSlots(bookingId)
+    await db.collection(BOOKINGS).deleteOne({ _id: bookingId })
+    throw err
+  }
   await db.collection(BOOKINGS).updateOne({ _id: bookingId }, { $set: { paymentId: payment._id } })
   return {
     bookingId: bookingId.toString(),
@@ -381,6 +418,7 @@ export const bookCourtAsGuest = async (body, auth) => {
     amountCents,
     heldUntil,
     paymentsAvailable: paymentsAvailable(),
+    checkout: checkoutFor(payment),
   }
 }
 
@@ -403,6 +441,7 @@ export const topUpCredits = async (body, auth) => {
     credits: creditsForDollars(r, dollars),
     points,
     playerId: toObjectId(auth.playerId),
+    language: body?.language,
   })
   return {
     paymentId: payment._id.toString(),
@@ -410,6 +449,7 @@ export const topUpCredits = async (body, auth) => {
     credits: payment.credits,
     points: payment.points,
     paymentsAvailable: paymentsAvailable(),
+    checkout: checkoutFor(payment),
   }
 }
 
@@ -541,10 +581,20 @@ const completeBooking = async (bookingId) => {
 const applyGuestBookingPayment = async (payment) => {
   const db = getDB()
   const booking = await db.collection(BOOKINGS).findOne({ _id: payment.bookingId })
-  // The hold ran out (and the slots may already be someone else's), so the
-  // money is not taken for a booking that no longer exists.
-  if (!booking || booking.status !== 'pending_payment' || booking.heldUntil < new Date()) {
-    return { ok: false, reason: 'Your hold on this time ran out. Please book again.' }
+  // The card is already charged here: the booking stands if its time is
+  // still this booking's (or still free to take back); otherwise the club
+  // owes a refund.
+  if (!booking || !(await keepsItsTime(booking))) {
+    const reason = 'paid after the hold ran out; the time was taken'
+    await markRefundDue(payment._id, reason)
+    if (booking) {
+      await db.collection(BOOKINGS).updateOne({ _id: booking._id }, { $set: { status: 'refund_due' } })
+    }
+    return {
+      ok: false,
+      reason:
+        'We received your payment, but this time was booked by someone else after your hold ran out. The club will refund you.',
+    }
   }
   await db.collection(BOOKINGS).updateOne(
     { _id: booking._id },
@@ -556,6 +606,25 @@ const applyGuestBookingPayment = async (payment) => {
     ok: true,
     booking: { date: booking.date, court: booking.court, start: booking.start, minutes: booking.minutes },
     ...completed,
+  }
+}
+
+// Whether a paid guest booking still has its court time: held for it, or
+// — the hold ran out and was let go — free to take again.
+const keepsItsTime = async (booking) => {
+  const held = await (await getSlots()).countDocuments({ bookingId: booking._id })
+  if (held === slotsCovered(rules(), booking.start, booking.minutes).length) return true
+  try {
+    await claimSlots({
+      bookingId: booking._id,
+      court: booking.court,
+      date: booking.date,
+      start: booking.start,
+      minutes: booking.minutes,
+    })
+    return true
+  } catch {
+    return false
   }
 }
 
@@ -578,11 +647,43 @@ const applyTopUpPayment = async (payment) => {
 const APPLY = { guestBooking: applyGuestBookingPayment, topUp: applyTopUpPayment }
 
 /**
- * Complete a payment through the placeholder (see payments.js). A top-up can
- * only be completed by the player it is for.
+ * Complete a payment once the card form says it is done. Whether it was paid
+ * is asked of the card provider (verifyCardPayment), never taken from the
+ * browser. A top-up can only be completed by the player it is for.
  */
 export const confirmPayment = async (body, auth) => {
-  if (!isPlaceholderPaymentAllowed()) throwError('Online payment is not available yet')
+  const payment = await loadPayablePayment(body, auth)
+
+  // Nothing has been charged yet with the placeholder, so a lapsed hold is
+  // simply refused; a real card is checked first and then honoured.
+  if (payment.provider !== 'moneris' && payment.kind === 'guestBooking') {
+    await refuseLapsedHold(payment)
+  }
+
+  const verified = await verifyCardPayment(payment)
+  if (!verified.ok) throwError(verified.reason)
+  if (!(await markPaymentPaid(payment._id, verified.receipt))) {
+    throwError('This payment has already been completed')
+  }
+  const result = await APPLY[payment.kind](payment)
+  if (!result.ok) throwError(result.reason)
+  return { kind: payment.kind, ...result }
+}
+
+/**
+ * A fresh card form for a pending payment — after a decline, or a form left
+ * or expired (a Moneris ticket lasts 30 minutes).
+ */
+export const renewPaymentTicket = async (body, auth) => {
+  const payment = await loadPayablePayment(body, auth)
+  if (payment.kind === 'guestBooking') await refuseLapsedHold(payment)
+  const renewed = await renewTicket(payment, { language: body?.language })
+  return { paymentId: renewed._id.toString(), checkout: checkoutFor(renewed) }
+}
+
+// The pending payment the caller may complete: anyone's guest booking (a
+// guest has no account), only their own top-up.
+const loadPayablePayment = async (body, auth) => {
   if (!body?.paymentId) throwError('Payment is required')
   const payment = await findPayment(body.paymentId)
   if (!payment) throwError('Payment not found')
@@ -591,18 +692,14 @@ export const confirmPayment = async (body, auth) => {
     throwError('Payment not found')
   }
   if (payment.status !== 'pending') throwError('This payment has already been completed')
+  return payment
+}
 
-  // A guest booking whose hold has lapsed is refused before anything is paid.
-  if (payment.kind === 'guestBooking') {
-    const booking = await getDB().collection(BOOKINGS).findOne({ _id: payment.bookingId })
-    if (!booking || booking.status !== 'pending_payment' || booking.heldUntil < new Date()) {
-      await markPaymentFailed(payment._id, 'hold expired')
-      throwError('Your hold on this time ran out. Please book again.')
-    }
+// A guest booking whose hold has lapsed is refused before anything is paid.
+const refuseLapsedHold = async (payment) => {
+  const booking = await getDB().collection(BOOKINGS).findOne({ _id: payment.bookingId })
+  if (!booking || booking.status !== 'pending_payment' || booking.heldUntil < new Date()) {
+    await markPaymentFailed(payment._id, 'hold expired')
+    throwError('Your hold on this time ran out. Please book again.')
   }
-
-  if (!(await markPaymentPaid(payment._id))) throwError('This payment has already been completed')
-  const result = await APPLY[payment.kind](payment)
-  if (!result.ok) throwError(result.reason)
-  return { kind: payment.kind, ...result }
 }
