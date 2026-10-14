@@ -140,9 +140,11 @@ PUSHER_CLUSTER=
 # account itself needs a human (same CAPTCHA/SSO wall as Gmail):
 #   1. app.netlify.com — create the account (same Google account is fine)
 #   2. User settings → Applications → Personal access tokens → New token
-#   3. Paste it below — the script uses it once to create the site and
-#      set every env var, then you can delete the token if you'd rather
-#      not leave it lying around
+#      (expiration: No expiration)
+#   3. Paste it below — the script uses it to create the site and set
+#      every env var, and saves it as NETLIFY_AUTH_TOKEN in the club's
+#      .env.<slug> (gitignored), so the site's settings and deploys can
+#      be managed later without asking for it again
 # ============================================================
 
 NETLIFY_AUTH_TOKEN=

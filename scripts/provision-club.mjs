@@ -748,6 +748,9 @@ const buildLocalEnvEntries = (club, { uri, siteUrl, secrets }) => [
   ...(club.googleClientId
     ? [['GOOGLE_CLIENT_ID', club.googleClientId], ['GOOGLE_CLIENT_SECRET', club.googleClientSecret]]
     : []),
+  // The club's own Netlify token, for its site's settings and deploys later
+  // (each club's site lives on its own Netlify team).
+  ...(club.netlifyToken ? [['NETLIFY_AUTH_TOKEN', club.netlifyToken]] : []),
 ]
 
 const ensureLocalEnvFile = (club, values) => {

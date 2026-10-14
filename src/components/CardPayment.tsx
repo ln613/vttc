@@ -21,7 +21,7 @@ const CardPayment = (props: {
   // The placeholder's button, or Moneris's form reporting it finished.
   onPay: () => void
   onBack: () => void
-  onCardError: (message: string) => void
+  onCardError: (message: string, detail?: string) => void
 }) => (
   <div style={{ display: 'flex', 'flex-direction': 'column', gap: '12px' }}>
     <div class="bk-pay-amount">
@@ -78,7 +78,7 @@ const MonerisForm = (props: {
   checkout: PaymentCheckout
   onComplete: () => void
   onCancel: () => void
-  onError: (message: string) => void
+  onError: (message: string, detail?: string) => void
 }) => {
   const divId = `moneris-checkout-${props.ticket}`
   let close: () => void = () => undefined
@@ -86,11 +86,14 @@ const MonerisForm = (props: {
     openMonerisCheckout(divId, props.checkout, {
       onComplete: () => props.onComplete(),
       onCancel: () => props.onCancel(),
-      onError: (message) => props.onError(message),
+      onError: (message, detail) => props.onError(message, detail),
     })
       .then((closeForm) => (close = closeForm))
       .catch((err: unknown) =>
-        props.onError(err instanceof Error ? err.message : t('payment.formFailed')),
+        props.onError(
+          t('payment.formFailed'),
+          `load ${err instanceof Error ? err.message : String(err)}`,
+        ),
       )
   })
   onCleanup(() => close())

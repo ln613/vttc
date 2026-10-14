@@ -42,6 +42,7 @@ import {
   checkoutFor,
   renewTicket,
   verifyCardPayment,
+  logAttempt,
 } from './payments.js'
 
 const BOOKINGS = 'bookings'
@@ -661,7 +662,10 @@ export const confirmPayment = async (body, auth) => {
   }
 
   const verified = await verifyCardPayment(payment)
-  if (!verified.ok) throwError(verified.reason)
+  if (!verified.ok) {
+    await logAttempt(payment, `not paid: ${verified.reason}`, verified.receipt)
+    throwError(verified.reason)
+  }
   if (!(await markPaymentPaid(payment._id, verified.receipt))) {
     throwError('This payment has already been completed')
   }
@@ -676,8 +680,16 @@ export const confirmPayment = async (body, auth) => {
  */
 export const renewPaymentTicket = async (body, auth) => {
   const payment = await loadPayablePayment(body, auth)
+  // A card that did go through on an earlier form must not be asked for
+  // again: the page completes the payment instead (confirmPayment).
+  if (payment.provider === 'moneris' && (await verifyCardPayment(payment)).ok) {
+    return { paymentId: payment._id.toString(), paid: true }
+  }
   if (payment.kind === 'guestBooking') await refuseLapsedHold(payment)
-  const renewed = await renewTicket(payment, { language: body?.language })
+  const renewed = await renewTicket(payment, {
+    language: body?.language,
+    reason: body?.reason ? `form: ${body.reason}` : undefined,
+  })
   return { paymentId: renewed._id.toString(), checkout: checkoutFor(renewed) }
 }
 

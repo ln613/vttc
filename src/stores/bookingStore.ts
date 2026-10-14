@@ -470,7 +470,8 @@ const holdForGuest = async () => {
   }
 }
 
-const payAsGuest = async () => {
+// `completing`: called because an earlier card form turned out to be paid.
+const payAsGuest = async (completing = false) => {
   setBookingState({ busy: true, dialogError: null })
   try {
     const result = await apiPost<BookingCompleted>('confirmPayment', {
@@ -489,23 +490,27 @@ const payAsGuest = async () => {
       busy: false,
       dialogError: errorMessage(err, 'Payment failed'),
     })
-    await offerNewCardForm()
+    await offerNewCardForm(undefined, completing)
   }
 }
 
 // The card form said something went wrong: say so, and open a fresh one.
-const cardError = async (message: string) => {
+// `detail` is what Moneris reported, kept on the payment's record.
+const cardError = async (message: string, detail?: string) => {
   setBookingState('dialogError', message)
-  await offerNewCardForm()
+  await offerNewCardForm(detail || message)
 }
 
 // After a decline or a broken form, Moneris needs a new ticket for the same
-// payment. The placeholder has nothing to renew.
-const offerNewCardForm = async () => {
+// payment. The placeholder has nothing to renew. If an earlier form did
+// take the card after all, the payment is completed instead — once, so a
+// payment the server won't complete can't loop.
+const offerNewCardForm = async (reason?: string, completing = false) => {
   if (bookingState.checkout.provider !== 'moneris') return
   try {
-    const renewed = await renewPaymentTicket(bookingState.paymentId)
-    setBookingState('checkout', renewed.checkout)
+    const renewed = await renewPaymentTicket(bookingState.paymentId, reason)
+    if (renewed.paid && !completing) return await payAsGuest(true)
+    if (renewed.checkout) setBookingState('checkout', renewed.checkout)
   } catch (err) {
     setBookingState('dialogError', errorMessage(err, 'Payment failed'))
   }

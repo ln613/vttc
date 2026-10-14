@@ -76,7 +76,9 @@ export const createPayment = async ({ kind, amountCents, language, ...details })
 const orderNumber = (payment, attempt) =>
   `${club.slug || 'club'}-${payment._id.toString()}-${attempt}`
 
-// A ticket for the payment's card form; the payment remembers the latest.
+// A ticket for the payment's card form. The payment keeps every ticket it
+// was given (`tickets`), not just the latest (`ticket`, `orderNo`): any of
+// them may be the one the card was charged on.
 const issueTicket = async (payment, { language } = {}) => {
   const attempt = (payment.attempts || 0) + 1
   const orderNo = orderNumber(payment, attempt)
@@ -85,17 +87,59 @@ const issueTicket = async (payment, { language } = {}) => {
     orderNo,
     language: language === 'fr' ? 'fr' : 'en',
   })
-  const update = { ticket, orderNo, attempts: attempt, ticketIssuedAt: new Date() }
-  await getDB().collection(COLLECTION).updateOne({ _id: payment._id }, { $set: update })
-  return { ...payment, ...update }
+  const issuedAt = new Date()
+  const update = { ticket, orderNo, attempts: attempt, ticketIssuedAt: issuedAt }
+  await getDB()
+    .collection(COLLECTION)
+    .updateOne(
+      { _id: payment._id },
+      { $set: update, $push: { tickets: { ticket, orderNo, attempt, issuedAt } } },
+    )
+  return {
+    ...payment,
+    ...update,
+    tickets: [...ticketsOf(payment), { ticket, orderNo, attempt, issuedAt }],
+  }
 }
 
-/** A new ticket for a pending payment whose card form was declined or left. */
-export const renewTicket = async (payment, options) => {
+// Every ticket of a payment, latest last — including a payment made before
+// the history was kept, which has only its latest.
+const ticketsOf = (payment) =>
+  payment.tickets?.length
+    ? payment.tickets
+    : payment.ticket
+      ? [{ ticket: payment.ticket, orderNo: payment.orderNo, attempt: payment.attempts || 1 }]
+      : []
+
+/**
+ * A new ticket for a pending payment whose card form was declined, failed or
+ * was left. `reason` — why a new one is needed — is kept on the payment
+ * (`attemptLog`), so a failed payment can be understood afterwards.
+ */
+export const renewTicket = async (payment, { language, reason } = {}) => {
   if (payment.status !== 'pending') throwError('This payment has already been completed')
   if (payment.provider !== 'moneris') throwError('This payment has no card form')
-  return issueTicket(payment, options)
+  if (reason) await logAttempt(payment, reason)
+  return issueTicket(payment, { language })
 }
+
+/** Note on the payment why its latest card form didn't end in a payment. */
+export const logAttempt = (payment, reason, receipt = null) =>
+  getDB()
+    .collection(COLLECTION)
+    .updateOne(
+      { _id: payment._id },
+      {
+        $push: {
+          attemptLog: {
+            attempt: payment.attempts || 1,
+            reason: String(reason).slice(0, 500),
+            ...(receipt ? { receipt } : {}),
+            at: new Date(),
+          },
+        },
+      },
+    )
 
 /**
  * What the browser needs to take the card: the Moneris ticket, environment
@@ -117,20 +161,39 @@ export const checkoutFor = (payment) =>
  * is allowed.
  */
 export const verifyCardPayment = async (payment) => {
-  if (payment.provider === 'moneris') {
-    const { approved, details, error } = await checkoutReceipt({
-      ticket: payment.ticket,
-      orderNo: payment.orderNo,
-      amountCents: payment.amountCents,
-    })
-    return approved
-      ? { ok: true, receipt: details }
-      : { ok: false, receipt: details, reason: declineReason(details, error) }
-  }
+  if (payment.provider === 'moneris') return verifyMonerisPayment(payment)
   if (payment.provider === 'placeholder' && isPlaceholderPaymentAllowed()) {
     return { ok: true, receipt: null }
   }
   return { ok: false, reason: 'Online payment is not available yet' }
+}
+
+// Every ticket the payment was given is asked, latest first: the card may
+// have gone through on an earlier form than the one on screen now. Approved
+// on more than one means the card was charged twice — the extra is flagged
+// for the club to refund.
+const verifyMonerisPayment = async (payment) => {
+  const tickets = [...ticketsOf(payment)].reverse()
+  const approved = []
+  let latest = null
+  for (const t of tickets) {
+    const result = await checkoutReceipt({
+      ticket: t.ticket,
+      orderNo: t.orderNo,
+      amountCents: payment.amountCents,
+    })
+    if (!latest) latest = result
+    if (result.approved) approved.push(result.details)
+  }
+  if (approved.length > 1) {
+    await markRefundDue(payment._id, `charged ${approved.length} times (orders ${approved.map((d) => d.orderNo).join(', ')}); refund all but one`)
+  }
+  if (approved.length) return { ok: true, receipt: approved[0] }
+  return {
+    ok: false,
+    receipt: latest?.details || null,
+    reason: declineReason(latest?.details || {}, latest?.error),
+  }
 }
 
 const declineReason = (details, error) => {
