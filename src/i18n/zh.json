@@ -100,7 +100,10 @@
     "paying": "付款中…",
     "checking": "正在确认付款……",
     "secure": "您的银行卡由 Moneris 安全处理，我们不会看到您的卡号。",
-    "formFailed": "无法加载付款表单，请重试。"
+    "formFailed": "无法加载付款表单，请重试。",
+    "subtotal": "小计",
+    "total": "合计",
+    "plusTax": "另加 {taxes}。"
   },
   "topUp": {
     "title": "充值积分",

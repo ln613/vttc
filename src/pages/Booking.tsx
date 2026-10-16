@@ -25,6 +25,7 @@ import { authState, authActions } from '../stores/authStore'
 import { langActions } from '../stores/langStore'
 import { hasSiteLook, loadSiteFonts } from '../site/siteContent'
 import { formatDollars } from '../../shared/rules/booking'
+import { clubTaxNote } from '../utils/tax'
 import { formatBalance, walletT } from '../i18n/wallet'
 import './booking.css'
 import WaiverContent from '../components/WaiverContent'
@@ -467,6 +468,9 @@ const GuestPayment = () => (
       <span>{t('booking.price')}</span>
       <span class="bk-price">{formatDollars(bookingActions.priceCents())}</span>
     </div>
+    <Show when={clubTaxNote()}>
+      <p class="bk-note">{t('payment.plusTax', { taxes: clubTaxNote() })}</p>
+    </Show>
     <Show when={!authActions.isSignedIn()}>
       <p class="bk-note">
         {t('booking.haveAccount')}{' '}
@@ -611,6 +615,8 @@ const PayStep = () => (
     </p>
     <CardPayment
       amountCents={bookingState.amountCents}
+      subtotalCents={bookingState.subtotalCents}
+      taxes={bookingState.taxes}
       checkout={bookingState.checkout}
       available={bookingState.day?.paymentsAvailable ?? false}
       busy={bookingState.busy}

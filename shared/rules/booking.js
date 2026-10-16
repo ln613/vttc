@@ -212,8 +212,10 @@ export const formatLength = (minutes) => {
 }
 
 // "$30", "$22.50", "$1,000".
-export const formatDollars = (cents) => {
-  const digits = cents % 100 === 0 ? 0 : 2
+// "$35" for a whole-dollar price; `exact` always shows the cents ("$35.00"),
+// as a subtotal / tax / total breakdown must.
+export const formatDollars = (cents, exact = false) => {
+  const digits = exact || cents % 100 !== 0 ? 2 : 0
   return `$${(cents / 100).toLocaleString('en-US', {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,

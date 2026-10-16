@@ -75,6 +75,11 @@ declare module 'club-config' {
       guestHoldMinutes?: number
     doorCodeLeadMinutes?: number
     doorCodeTrailMinutes?: number
+      /**
+       * Sales tax added to card payments (a guest's booking, a top-up), e.g.
+       * [{ name: 'GST', rate: 5 }] — rate in percent. See shared/rules/tax.js.
+       */
+      taxes?: Array<{ name: string; rate: number }>
     }
     /**
      * A public website (Home, Coaches, Pricing, About & Contact) whose

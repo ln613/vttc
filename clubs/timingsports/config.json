@@ -60,6 +60,7 @@
     "guestHoldMinutes": 15,
     "doorCodeLeadMinutes": 15,
     "doorCodeTrailMinutes": 15,
+    "taxes": [{ "name": "GST", "rate": 5 }],
     "rates": [
       {
         "days": [

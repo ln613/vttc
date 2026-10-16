@@ -70,6 +70,17 @@ Prices follow the day of the week and the time of day, from `booking.rates` in t
 - points model: one of the amounts on offer, which adds the same dollars to the balance plus its reward points (rules/wallet.md)
 - paid by card
 
+## Tax
+
+A club can charge sales tax on card payments: `booking.taxes` in its config, e.g. Timing Sports (BC): `[{ "name": "GST", "rate": 5 }]` (rate in percent; shared/rules/tax.js). Without it, no tax.
+
+- added on top: a guest's card booking and a top-up are charged the price plus each tax, rounded to the cent per tax ($40 + GST $2.00 = $42.00)
+- a top-up's balance and reward points come from the amount before tax (top up $100: the card pays $105, the balance gets $100)
+- a booking paid from the balance adds no tax: it was paid when the balance was topped up
+- the booking dialog shows "Plus GST (5%)." under the price, and the top-up amount step says the same; the payment step shows Subtotal, GST (5%) and Total, all with cents
+- the booking and the payment keep `subtotalCents` and `taxes` ([{ name, rate, cents }]) beside `amountCents`, the total charged; the receipt email lists Subtotal, GST (5%) and "Paid $42.00 by card"
+- no GST registration number on receipts yet
+
 ## Card payment (Moneris)
 
 A guest's booking and a top-up are paid by card through Moneris Checkout: Moneris's own card form, embedded in the payment step, so card details go to Moneris and never to the site.

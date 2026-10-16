@@ -100,7 +100,10 @@
     "paying": "Paying...",
     "checking": "Checking your payment...",
     "secure": "Your card is processed securely by Moneris. We never see your card number.",
-    "formFailed": "The card form could not be loaded. Please try again."
+    "formFailed": "The card form could not be loaded. Please try again.",
+    "subtotal": "Subtotal",
+    "total": "Total",
+    "plusTax": "Plus {taxes}."
   },
   "topUp": {
     "title": "Top up credits",

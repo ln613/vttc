@@ -1,4 +1,5 @@
 import { createStore } from 'solid-js/store'
+import type { TaxLine } from '../../shared/rules/tax'
 import clubConfig from 'club-config'
 import { apiGet, apiPost } from '../utils/api'
 import { parseLocalDate, formatLocalDate } from '../utils/date'
@@ -87,6 +88,9 @@ interface BookingState {
   waiverAccepted: boolean
   paymentId: string
   amountCents: number
+  // The card amount's breakdown when the club charges tax.
+  subtotalCents: number
+  taxes: TaxLine[]
   heldUntil: string
   // How the guest's card is taken (Moneris's form, or the placeholder).
   checkout: PaymentCheckout
@@ -117,6 +121,8 @@ const getInitialState = (): BookingState => ({
   waiverAccepted: false,
   paymentId: '',
   amountCents: 0,
+  subtotalCents: 0,
+  taxes: [],
   heldUntil: '',
   checkout: NO_CHECKOUT,
   busy: false,
@@ -402,6 +408,8 @@ const validateGuest = (): string | null => {
 interface GuestHold {
   paymentId: string
   amountCents: number
+  subtotalCents?: number
+  taxes?: TaxLine[]
   heldUntil: string
   paymentsAvailable: boolean
   checkout?: PaymentCheckout
@@ -457,6 +465,8 @@ const holdForGuest = async () => {
       step: 'pay',
       paymentId: hold.paymentId,
       amountCents: hold.amountCents,
+      subtotalCents: hold.subtotalCents ?? hold.amountCents,
+      taxes: hold.taxes ?? [],
       heldUntil: hold.heldUntil,
       checkout: hold.checkout ?? NO_CHECKOUT,
     })

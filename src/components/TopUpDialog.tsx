@@ -1,6 +1,7 @@
 import { Show, Switch, Match, For } from 'solid-js'
 import Input from './Input'
 import CardPayment from './CardPayment'
+import { clubTaxNote } from '../utils/tax'
 import { creditsState, creditsActions } from '../stores/creditsStore'
 import { formatCredits, formatDollars } from '../../shared/rules/booking'
 import type { TopUpOption } from '../../shared/rules/wallet'
@@ -37,6 +38,8 @@ const TopUpDialog = () => (
             <Match when={creditsState.topUpStep === 'pay'}>
               <CardPayment
                 amountCents={creditsState.amountCents}
+                subtotalCents={creditsState.subtotalCents}
+                taxes={creditsState.taxes}
                 checkout={creditsState.checkout}
                 available={creditsState.paymentsAvailable}
                 busy={creditsState.busy}
@@ -69,6 +72,7 @@ const AmountStep = () => {
           credits: r.creditsPerDollar,
           min: r.minTopUpDollars,
         })}
+        <Show when={clubTaxNote()}> {t('payment.plusTax', { taxes: clubTaxNote() })}</Show>
       </p>
       <Input
         label={t('topUp.amount')}
@@ -111,7 +115,10 @@ const AmountStep = () => {
 // A points club: one of its amounts, each showing the points it gives.
 const OptionsStep = () => (
   <>
-    <p class="bk-note">{t('topUp.chooseAmount')}</p>
+    <p class="bk-note">
+      {t('topUp.chooseAmount')}
+      <Show when={clubTaxNote()}> {t('payment.plusTax', { taxes: clubTaxNote() })}</Show>
+    </p>
     <div class="bk-options">
       <For each={creditsState.topUpOptions}>
         {(option) => <OptionButton option={option} />}

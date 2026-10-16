@@ -30,6 +30,7 @@ import {
   isValidTopUp,
 } from '../../../shared/rules/booking.js'
 import { isValidEmail, normalizePhone } from '../../../shared/rules/contact.js'
+import { clubTaxes, withTaxes } from '../../../shared/rules/tax.js'
 import { findTopUpOption, isPointsModel } from '../../../shared/rules/wallet.js'
 import { toTitleCase } from '../../../shared/rules/nameMatch.js'
 import {
@@ -370,7 +371,12 @@ export const bookCourtAsGuest = async (body, auth) => {
   const request = validateBookingRequest(body, r)
   validateGuest(body)
   const waiver = await guestWaiverAcceptance(body, auth)
-  const amountCents = bookingPriceCents(r, request.minutes, request.date, request.start)
+  // Charged by card with the club's tax on top (tax.js).
+  const priced = withTaxes(
+    clubTaxes(club.booking),
+    bookingPriceCents(r, request.minutes, request.date, request.start),
+  )
+  const amountCents = priced.totalCents
   const guest = {
     firstName: toTitleCase(body.firstName),
     lastName: toTitleCase(body.lastName),
@@ -388,6 +394,8 @@ export const bookCourtAsGuest = async (body, auth) => {
     ...(auth?.playerId ? { playerId: toObjectId(auth.playerId) } : {}),
     name: `${guest.firstName} ${guest.lastName}`,
     amountCents,
+    subtotalCents: priced.subtotalCents,
+    taxes: priced.taxes,
     status: 'pending_payment',
     paidWith: 'card',
     heldUntil,
@@ -404,7 +412,14 @@ export const bookCourtAsGuest = async (body, auth) => {
 
   let payment
   try {
-    payment = await createPayment({ kind: 'guestBooking', amountCents, bookingId, language: body.language })
+    payment = await createPayment({
+      kind: 'guestBooking',
+      amountCents,
+      subtotalCents: priced.subtotalCents,
+      taxes: priced.taxes,
+      bookingId,
+      language: body.language,
+    })
   } catch (err) {
     // No card form to pay with (Moneris unreachable or refusing): let the
     // time go rather than hold it for nobody.
@@ -417,6 +432,8 @@ export const bookCourtAsGuest = async (body, auth) => {
     bookingId: bookingId.toString(),
     paymentId: payment._id.toString(),
     amountCents,
+    subtotalCents: priced.subtotalCents,
+    taxes: priced.taxes,
     heldUntil,
     paymentsAvailable: paymentsAvailable(),
     checkout: checkoutFor(payment),
@@ -436,9 +453,13 @@ export const topUpCredits = async (body, auth) => {
   const r = rules()
   const dollars = Number(body?.dollars)
   const points = await topUpRewardPoints(r, dollars)
+  // The balance gets the top-up's own amount; the card pays it plus tax.
+  const priced = withTaxes(clubTaxes(club.booking), dollars * 100)
   const payment = await createPayment({
     kind: 'topUp',
-    amountCents: dollars * 100,
+    amountCents: priced.totalCents,
+    subtotalCents: priced.subtotalCents,
+    taxes: priced.taxes,
     credits: creditsForDollars(r, dollars),
     points,
     playerId: toObjectId(auth.playerId),
@@ -447,6 +468,8 @@ export const topUpCredits = async (body, auth) => {
   return {
     paymentId: payment._id.toString(),
     amountCents: payment.amountCents,
+    subtotalCents: priced.subtotalCents,
+    taxes: priced.taxes,
     credits: payment.credits,
     points: payment.points,
     paymentsAvailable: paymentsAvailable(),

@@ -62,7 +62,18 @@ const paymentLines = (booking) =>
           ? [{ label: 'Balance after', value: balanceAmount(booking.balanceAfter) }]
           : []),
       ]
-    : [{ label: 'Paid', value: `${formatDollars(booking.amountCents)} by card` }]
+    : cardLines(booking)
+
+// A card payment: with the club's tax, the subtotal and each tax first.
+const cardLines = (booking) => [
+  ...(booking.taxes?.length
+    ? [
+        { label: 'Subtotal', value: formatDollars(booking.subtotalCents, true) },
+        ...booking.taxes.map((t) => ({ label: `${t.name} (${t.rate}%)`, value: formatDollars(t.cents, true) })),
+      ]
+    : []),
+  { label: 'Paid', value: `${formatDollars(booking.amountCents, !!booking.taxes?.length)} by card` },
+]
 
 // The liability waiver the booker accepted (specs/rules/waiver.md), when the
 // club requires one: which version, and when.

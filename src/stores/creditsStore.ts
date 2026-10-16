@@ -1,4 +1,5 @@
 import { createStore } from 'solid-js/store'
+import type { TaxLine } from '../../shared/rules/tax'
 import clubConfig from 'club-config'
 import { apiGet, apiPost } from '../utils/api'
 import { authState, authActions } from './authStore'
@@ -45,6 +46,9 @@ interface CreditsState {
   dollars: string
   paymentId: string
   amountCents: number
+  // The card amount's breakdown when the club charges tax.
+  subtotalCents: number
+  taxes: TaxLine[]
   // How the card is taken (Moneris's form, or the placeholder).
   checkout: PaymentCheckout
   creditsBought: number
@@ -65,6 +69,8 @@ const getInitialState = (): CreditsState => ({
   dollars: '',
   paymentId: '',
   amountCents: 0,
+  subtotalCents: 0,
+  taxes: [],
   checkout: NO_CHECKOUT,
   creditsBought: 0,
   pointsEarned: 0,
@@ -186,6 +192,8 @@ const setDollars = (value: string) =>
 interface TopUpResponse {
   paymentId: string
   amountCents: number
+  subtotalCents?: number
+  taxes?: TaxLine[]
   credits: number
   points?: number
   paymentsAvailable: boolean
@@ -210,6 +218,8 @@ const startTopUp = async () => {
       topUpStep: 'pay',
       paymentId: result.paymentId,
       amountCents: result.amountCents,
+      subtotalCents: result.subtotalCents ?? result.amountCents,
+      taxes: result.taxes ?? [],
       creditsBought: result.credits,
       pointsEarned: result.points ?? 0,
       paymentsAvailable: result.paymentsAvailable,

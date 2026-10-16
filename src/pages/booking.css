@@ -578,6 +578,21 @@
   align-items: baseline;
   font-size: 15px;
 }
+/* Subtotal and tax lines above the total, when the club charges tax. */
+.bk-pay-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--bk-line, #e3e3e3);
+  font-size: 14px;
+  color: var(--bk-soft, #555555);
+  font-variant-numeric: tabular-nums;
+}
+.bk-pay-line {
+  display: flex;
+  justify-content: space-between;
+}
 .bk-pay-card {
   display: flex;
   flex-direction: column;

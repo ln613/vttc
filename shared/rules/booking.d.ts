@@ -58,5 +58,5 @@ export declare const isValidTopUp: (rules: BookingRules, dollars: number) => boo
 export declare const formatClock: (minutes: number) => string
 export declare const formatClockShort: (minutes: number) => string
 export declare const formatLength: (minutes: number) => string
-export declare const formatDollars: (cents: number) => string
+export declare const formatDollars: (cents: number, exact?: boolean) => string
 export declare const formatCredits: (credits: number) => string

@@ -1,7 +1,8 @@
-import { Show, onMount, onCleanup } from 'solid-js'
+import { Show, For, onMount, onCleanup } from 'solid-js'
 import { formatDollars } from '../../shared/rules/booking'
 import { langActions } from '../stores/langStore'
 import { openMonerisCheckout, type PaymentCheckout } from '../utils/payment'
+import { taxLabel, type TaxLine } from '../../shared/rules/tax'
 import '../pages/booking.css'
 
 const t = langActions.t
@@ -15,6 +16,9 @@ const t = langActions.t
 // booking.css, so it takes the look of whichever page opens it.
 const CardPayment = (props: {
   amountCents: number
+  // With the club's tax: the amount before it and each tax (tax.js).
+  subtotalCents?: number
+  taxes?: TaxLine[]
   checkout: PaymentCheckout
   available: boolean
   busy: boolean
@@ -24,9 +28,25 @@ const CardPayment = (props: {
   onCardError: (message: string, detail?: string) => void
 }) => (
   <div style={{ display: 'flex', 'flex-direction': 'column', gap: '12px' }}>
+    <Show when={props.taxes?.length}>
+      <div class="bk-pay-lines">
+        <div class="bk-pay-line">
+          <span>{t('payment.subtotal')}</span>
+          <span>{formatDollars(props.subtotalCents ?? 0, true)}</span>
+        </div>
+        <For each={props.taxes}>
+          {(tax) => (
+            <div class="bk-pay-line">
+              <span>{taxLabel(tax)}</span>
+              <span>{formatDollars(tax.cents, true)}</span>
+            </div>
+          )}
+        </For>
+      </div>
+    </Show>
     <div class="bk-pay-amount">
-      <span>{t('payment.amountToPay')}</span>
-      <span class="bk-price">{formatDollars(props.amountCents)}</span>
+      <span>{props.taxes?.length ? t('payment.total') : t('payment.amountToPay')}</span>
+      <span class="bk-price">{formatDollars(props.amountCents, !!props.taxes?.length)}</span>
     </div>
     <Show
       when={props.checkout.provider === 'moneris' && props.checkout.ticket}
