@@ -1,7 +1,9 @@
 import clubConfig from 'club-config'
 import { clockFor } from '../i18n/format'
+import { bookingRatesState } from '../stores/bookingRatesStore'
 import {
   bookingRules,
+  toMinutes,
   WEEK_DAYS,
   type BookingRate,
   type WeekDay,
@@ -9,8 +11,10 @@ import {
 import { langActions } from '../stores/langStore'
 import type { SiteLanguage } from './siteContent'
 
-// The Pricing page's table, built from the same rates the booking system
-// charges (`booking.rates` in the club config), so the two always agree.
+// The Pricing page's tables, built from the same prices the booking system
+// charges — the weekly ones an admin sets (starting from `booking.rates` in
+// the club config), and the one-time ones still to come as promotions — so
+// the two always agree.
 
 export interface PriceRow {
   period: 'day' | 'night'
@@ -51,7 +55,11 @@ const rowFor = (lang: SiteLanguage, r: BookingRate): PriceRow => ({
 export const priceGroups = (lang: SiteLanguage): PriceGroup[] => {
   const groups: Array<{ key: string; days: WeekDay[]; rates: BookingRate[] }> =
     []
-  for (const rate of bookingRules(clubConfig.booking).rates) {
+  const { rates } = bookingRules({
+    ...clubConfig.booking,
+    rates: bookingRatesState.weekly,
+  })
+  for (const rate of rates) {
     const key = [...rate.days].sort().join(',')
     const group = groups.find((g) => g.key === key)
     if (group) group.rates.push(rate)
@@ -63,4 +71,27 @@ export const priceGroups = (lang: SiteLanguage): PriceGroup[] => {
       .sort((a, b) => a.fromMinutes - b.fromMinutes)
       .map((r) => rowFor(lang, r)),
   }))
+}
+
+// "Sat, Nov 1" in the page's language.
+const promotionDate = (date: string) =>
+  langActions.date(date, { weekday: 'short', month: 'short', day: 'numeric' })
+
+/** One-time prices still to come, a group per day. */
+export const promotionGroups = (lang: SiteLanguage): PriceGroup[] => {
+  const byDate = new Map<string, PriceGroup>()
+  for (const rate of bookingRatesState.oneTime) {
+    const group = byDate.get(rate.date) ?? {
+      days: promotionDate(rate.date),
+      rows: [],
+    }
+    const fromMinutes = toMinutes(rate.from)
+    group.rows.push({
+      period: fromMinutes >= EVENING ? 'night' : 'day',
+      time: `${formatTime(lang, fromMinutes)} – ${formatTime(lang, toMinutes(rate.to))}`,
+      price: rate.dollarsPerHour,
+    })
+    byDate.set(rate.date, group)
+  }
+  return [...byDate.values()]
 }

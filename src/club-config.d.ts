@@ -70,6 +70,16 @@ declare module 'club-config' {
       slotMinutes?: number
       minMinutes?: number
       creditsPerSlot?: number
+      /**
+       * The weekly prices booking starts from, until an admin sets them on
+       * the Settings page — see shared/rules/bookingRates.js.
+       */
+      rates?: Array<{
+        days: Array<'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'>
+        from: string
+        to: string
+        dollarsPerHour: number
+      }>
       creditsPerDollar?: number
       minTopUpDollars?: number
       guestHoldMinutes?: number

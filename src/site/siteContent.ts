@@ -68,8 +68,10 @@ export interface SiteContent {
   pricing: {
     kicker: string
     title: string
-    headers: { days: string; time: string; price: string }
+    headers: { days: string; date: string; time: string; price: string }
     perHour: string
+    promotionsTitle: string
+    promotionsNote: string
     tagline: string
     bookCta: string
     coachingNote: string

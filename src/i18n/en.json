@@ -88,7 +88,13 @@
     "enterLastName": "Enter your last name",
     "enterEmail": "Enter a valid email address",
     "enterPhone": "Enter a valid Canadian/US phone number",
-    "loadFailed": "Could not load bookings"
+    "loadFailed": "Could not load bookings",
+    "blocked": "Blocked",
+    "block": "Block this time",
+    "blockNote": "Admin: hold this time without a booking. No payment, door code or email.",
+    "unblockTitle": "Blocked time",
+    "unblockNote": "This time is blocked. Unblock it to let players book it again.",
+    "unblock": "Unblock"
   },
   "payment": {
     "amountToPay": "Amount to pay",
@@ -116,7 +122,8 @@
     "chooseAmount": "Choose an amount. Your balance goes up by the same amount, and pays for bookings.",
     "bonus": "+{points} points",
     "noBonus": "No bonus points",
-    "pointsAdded": "+{points} reward points — you now have {total}."
+    "pointsAdded": "+{points} reward points — you now have {total}.",
+    "noRefund": "Top-ups are non-refundable."
   },
   "account": {
     "title": "Account",
@@ -159,7 +166,11 @@
     "points": "Reward points",
     "clubId": "Club ID",
     "rewards": "Rewards",
-    "redemptionHistory": "Redemption history"
+    "redemptionHistory": "Redemption history",
+    "topUpHistory": "Top-up history",
+    "topUpPaid": "Paid {amount}",
+    "cardEnding": "{card} ending {last4}",
+    "card": "Card"
   },
   "password": {
     "min8": "At least 8 characters",
@@ -222,7 +233,20 @@
     "addTopUp": "Add amount",
     "removeTopUp": "Remove",
     "gifts": "Gifts",
-    "redemptions": "Redemption History"
+    "redemptions": "Redemption History",
+    "courtPrices": "Court Prices",
+    "weeklyPrices": "Weekly prices",
+    "oneTimePrices": "One-time prices (promotions)",
+    "removePrice": "Remove this price",
+    "setPrice": "Set a price",
+    "weekly": "Weekly",
+    "oneTime": "One-time",
+    "priceDate": "Date",
+    "priceFrom": "From",
+    "priceTo": "To",
+    "hourlyRate": "Hourly rate ($)",
+    "savePrice": "Save price",
+    "priceSaved": "Price saved. Booking and the Pricing page now use it."
   },
   "datePicker": {
     "weekdays": [

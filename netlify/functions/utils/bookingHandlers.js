@@ -14,9 +14,10 @@
 import { getDB, toObjectId } from './db.js'
 import { club, clubDate, clubMinutesOfDay, clubTimeToDate } from './club.js'
 import { issueDoorCode, doorAccessAvailable } from './doorAccess.js'
-import { buildReceipt, doorCodeView } from './bookingReceipt.js'
-import { sendBookingReceiptEmail } from './email.js'
+import { buildReceipt, buildTopUpReceipt, doorCodeView } from './bookingReceipt.js'
+import { sendBookingReceiptEmail, sendReceiptEmail } from './email.js'
 import { getBookingHours, getTopUpOptions } from './settingsHandlers.js'
+import { loadBookingRates, loadBookingRules } from './bookingRatesHandlers.js'
 import { addRewardPoints } from './rewardsHandlers.js'
 import { requireWaiverAccepted, guestWaiverAcceptance } from './waiverHandlers.js'
 import { requireModules } from './modulesHandlers.js'
@@ -39,6 +40,8 @@ import {
   markPaymentPaid,
   markPaymentFailed,
   markRefundDue,
+  markReceiptSent,
+  findPaidTopUps,
   paymentsAvailable,
   checkoutFor,
   renewTicket,
@@ -57,9 +60,10 @@ const throwError = (message) => {
 
 const rules = () => bookingRules(club.booking)
 
-// The rules with today's opening hours, which an admin sets on the Settings
-// page (settingsHandlers.js) — the club config's are only the default.
-const loadRules = async () => bookingRules({ ...club.booking, ...(await getBookingHours()) })
+// The rules with today's opening hours and prices, which an admin sets on
+// the Settings page (settingsHandlers.js, bookingRatesHandlers.js) — the
+// club config's are only the default.
+const loadRules = loadBookingRules
 
 // The courts that can be booked: the club's tables, which for a club that
 // books courts are its courts.
@@ -210,12 +214,12 @@ export const getBookingDay = async (params, auth) => {
   if (!isClubDate(params?.date)) throwError('Choose a date')
   const slots = await getSlots()
   for (const court of courts()) await releaseExpiredHolds(slots, { court, date: params.date })
-  const hours = await getBookingHours()
+  const [hours, rates] = await Promise.all([getBookingHours(), loadBookingRates()])
 
   const bookings = await getDB()
     .collection(BOOKINGS)
     .find(
-      { date: params.date, status: { $in: ['confirmed', 'pending_payment'] } },
+      { date: params.date, status: { $in: ['confirmed', 'pending_payment', 'blocked'] } },
       { projection: { court: 1, start: 1, minutes: 1, status: 1, playerId: 1, name: 1 } },
     )
     .sort({ start: 1 })
@@ -228,6 +232,9 @@ export const getBookingDay = async (params, auth) => {
     courts: courts(),
     openTime: hours.openTime,
     closeTime: hours.closeTime,
+    // The day's prices, so the page shows what booking will charge.
+    rates: rates.weekly,
+    oneTimeRates: rates.oneTime.filter((r) => r.date === params.date),
     paymentsAvailable: paymentsAvailable(),
     bookings: bookings.map((b) => {
       const mine = !!auth?.playerId && b.playerId?.toString() === auth.playerId
@@ -237,6 +244,8 @@ export const getBookingDay = async (params, auth) => {
         start: b.start,
         minutes: b.minutes,
         mine,
+        // A time an admin has blocked looks booked to everyone else.
+        ...(auth?.isAdmin && b.status === 'blocked' ? { blocked: true } : {}),
         ...(mine || auth?.isAdmin ? { name: b.name } : {}),
       }
     }),
@@ -318,8 +327,9 @@ export const bookCourt = async (body, auth) => {
   await requireModules('booking', 'calendar', 'credit')
   validatePlayer(auth)
   const waiver = await requireWaiverAccepted(auth.playerId)
-  const request = validateBookingRequest(body, await loadRules())
-  const credits = bookingCredits(rules(), request.minutes, request.date, request.start)
+  const r = await loadRules()
+  const request = validateBookingRequest(body, r)
+  const credits = bookingCredits(r, request.minutes, request.date, request.start)
 
   const db = getDB()
   const player = await db.collection(PLAYERS).findOne({ _id: toObjectId(auth.playerId) })
@@ -357,6 +367,46 @@ export const bookCourt = async (body, auth) => {
   await recordLedger({ playerId: player._id, kind: 'booking', credits: -credits, balanceAfter: balance, bookingId })
   const completed = await completeBooking(bookingId)
   return { bookingId: bookingId.toString(), ...request, credits, balance, ...completed }
+}
+
+// ==================== blocking a time ====================
+
+/**
+ * An admin takes a time off the calendar without booking it: it shows as
+ * booked, but nobody pays, no door code or email, and it is in nobody's
+ * bookings. Unblocking frees it again.
+ */
+export const blockCourt = async (body, auth) => {
+  await requireModules('booking', 'calendar')
+  const request = validateBookingRequest(body, await loadRules())
+  const db = getDB()
+  const { insertedId: bookingId } = await db.collection(BOOKINGS).insertOne({
+    ...request,
+    name: 'Blocked',
+    status: 'blocked',
+    blockedBy: auth?.playerId ? toObjectId(auth.playerId) : 'admin',
+    createdAt: new Date(),
+  })
+  try {
+    await claimSlots({ bookingId, ...request })
+  } catch (err) {
+    await db.collection(BOOKINGS).deleteOne({ _id: bookingId })
+    throw err
+  }
+  return { bookingId: bookingId.toString(), ...request }
+}
+
+/** An admin frees a blocked time. */
+export const unblockCourt = async (body) => {
+  await requireModules('booking', 'calendar')
+  if (!body?.bookingId) throwError('Choose the blocked time')
+  const bookingId = toObjectId(body.bookingId)
+  const result = await getDB()
+    .collection(BOOKINGS)
+    .updateOne({ _id: bookingId, status: 'blocked' }, { $set: { status: 'unblocked', unblockedAt: new Date() } })
+  if (!result.modifiedCount) throwError('That time is not blocked')
+  await releaseSlots(bookingId)
+  return { success: true }
 }
 
 // ==================== booking as a guest ====================
@@ -665,7 +715,45 @@ const applyTopUpPayment = async (payment) => {
   const points = payment.points
     ? await addRewardPoints(payment.playerId, payment.points, { kind: 'topUpReward', paymentId: payment._id })
     : null
-  return { ok: true, balance: after.credits, ...(points !== null ? { points } : {}) }
+  const receiptSentTo = await sendTopUpReceipt(payment._id, after.credits)
+  return { ok: true, balance: after.credits, ...(points !== null ? { points } : {}), receiptSentTo }
+}
+
+// The top-up's receipt by email, as paid (with the card's details). Like a
+// booking's, a failure to send never undoes it: it is noted on the payment.
+const sendTopUpReceipt = async (paymentId, balanceAfter) => {
+  const payment = await findPayment(paymentId)
+  const player = await getDB()
+    .collection(PLAYERS)
+    .findOne({ _id: payment.playerId }, { projection: { firstName: 1, lastName: 1, email: 1 } })
+  try {
+    if (!player?.email) throwError('No email address on file')
+    await sendReceiptEmail(player.email, buildTopUpReceipt(payment, { name: playerName(player), balanceAfter }))
+    await markReceiptSent(payment._id, { sentTo: player.email })
+    return player.email
+  } catch (err) {
+    console.error(`Receipt for top-up ${payment._id}:`, err.message)
+    await markReceiptSent(payment._id, { error: err.message })
+    return null
+  }
+}
+
+/** The signed-in player's paid top-ups, newest first. */
+export const getMyTopUps = async (_params, auth) => {
+  await requireModules('credit')
+  validatePlayer(auth)
+  const payments = await findPaidTopUps(toObjectId(auth.playerId))
+  return payments.map((p) => ({
+    _id: p._id.toString(),
+    paidAt: p.paidAt ?? p.createdAt,
+    amountCents: p.amountCents,
+    subtotalCents: p.subtotalCents ?? p.amountCents,
+    taxes: p.taxes ?? [],
+    credits: p.credits,
+    points: p.points || 0,
+    cardType: p.receipt?.cardType ?? null,
+    last4: p.receipt?.last4 ?? null,
+  }))
 }
 
 const APPLY = { guestBooking: applyGuestBookingPayment, topUp: applyTopUpPayment }

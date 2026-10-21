@@ -230,6 +230,28 @@ export const markRefundDue = (paymentId, reason) =>
       { $set: { refundDue: true, refundReason: reason } },
     )
 
+// Whether the receipt email went out: `sentTo` when it did, `error` when not.
+export const markReceiptSent = (paymentId, { sentTo, error }) =>
+  getDB()
+    .collection(COLLECTION)
+    .updateOne(
+      { _id: toObjectId(paymentId) },
+      sentTo
+        ? { $set: { receiptSentAt: new Date(), receiptSentTo: sentTo }, $unset: { receiptError: '' } }
+        : { $set: { receiptError: error } },
+    )
+
+const TOP_UP_HISTORY_LIMIT = 100
+
+/** A player's paid top-ups, newest first. */
+export const findPaidTopUps = (playerId) =>
+  getDB()
+    .collection(COLLECTION)
+    .find({ kind: 'topUp', playerId, status: 'paid' })
+    .sort({ paidAt: -1 })
+    .limit(TOP_UP_HISTORY_LIMIT)
+    .toArray()
+
 export const markPaymentFailed = (paymentId, reason) =>
   getDB()
     .collection(COLLECTION)

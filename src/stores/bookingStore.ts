@@ -35,6 +35,15 @@ export interface DayBooking {
   minutes: number
   mine: boolean
   name?: string
+  // A time an admin blocked (only an admin is told).
+  blocked?: boolean
+}
+
+interface DayRate {
+  days: string[]
+  from: string
+  to: string
+  dollarsPerHour: number
 }
 
 interface BookingDay {
@@ -44,6 +53,9 @@ interface BookingDay {
   courts: number[]
   openTime: string
   closeTime: string
+  // The prices an admin has set: weekly, and this day's one-time ones.
+  rates?: DayRate[]
+  oneTimeRates?: Array<{ date: string; from: string; to: string; dollarsPerHour: number }>
   paymentsAvailable: boolean
   bookings: DayBooking[]
 }
@@ -99,6 +111,8 @@ interface BookingState {
   bookedCredits: number
   doorCode: DoorCode | null
   receiptSentTo: string | null
+  // A blocked time an admin is about to free.
+  unblocking: DayBooking | null
 }
 
 const todayLocal = () => formatLocalDate(new Date())
@@ -130,6 +144,7 @@ const getInitialState = (): BookingState => ({
   bookedCredits: 0,
   doorCode: null,
   receiptSentTo: null,
+  unblocking: null,
 })
 
 const [bookingState, setBookingState] =
@@ -137,8 +152,9 @@ const [bookingState, setBookingState] =
 
 export { bookingState }
 
-// The opening hours are an admin setting and come with each day from the
-// server; the club config's are only used before the first day arrives.
+// The opening hours and prices are admin settings and come with each day
+// from the server; the club config's are only used before the first day
+// arrives.
 const rules = () =>
   bookingRules({
     ...clubConfig.booking,
@@ -146,6 +162,8 @@ const rules = () =>
       ? {
           openTime: bookingState.day.openTime,
           closeTime: bookingState.day.closeTime,
+          ...(bookingState.day.rates ? { rates: bookingState.day.rates } : {}),
+          oneTimeRates: bookingState.day.oneTimeRates ?? [],
         }
       : {}),
   })
@@ -526,6 +544,50 @@ const offerNewCardForm = async (reason?: string, completing = false) => {
   }
 }
 
+// ==================== blocking (admin) ====================
+
+// An admin takes the chosen time off the calendar, unpaid: no door code,
+// no email, in nobody's bookings.
+const blockTime = async () => {
+  setBookingState({ busy: true, dialogError: null })
+  try {
+    await apiPost('blockCourt', request())
+    setBookingState({ busy: false, step: null })
+  } catch (err) {
+    setBookingState({
+      busy: false,
+      dialogError: errorMessage(err, 'Could not block this time'),
+    })
+  }
+  void fetchDay(bookingState.date)
+}
+
+const canBlock = (): boolean => authState.isAdmin
+
+const openUnblock = (booking: DayBooking) => {
+  if (!booking.blocked || !authState.isAdmin) return
+  setBookingState({ unblocking: booking, dialogError: null, busy: false })
+}
+
+const closeUnblock = () =>
+  setBookingState({ unblocking: null, dialogError: null })
+
+const confirmUnblock = async () => {
+  const booking = bookingState.unblocking
+  if (!booking) return
+  setBookingState({ busy: true, dialogError: null })
+  try {
+    await apiPost('unblockCourt', { bookingId: booking._id })
+    setBookingState({ busy: false, unblocking: null })
+  } catch (err) {
+    setBookingState({
+      busy: false,
+      dialogError: errorMessage(err, 'Could not unblock this time'),
+    })
+  }
+  void fetchDay(bookingState.date)
+}
+
 const reset = () => setBookingState(getInitialState())
 
 export const bookingActions = {
@@ -546,6 +608,11 @@ export const bookingActions = {
   setGuestField,
   submitGuest,
   payAsGuest,
+  blockTime,
+  canBlock,
+  openUnblock,
+  closeUnblock,
+  confirmUnblock,
   reset,
   today,
   weekDays,

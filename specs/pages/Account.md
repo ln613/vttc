@@ -50,6 +50,7 @@ Credit module (rules/modules.md), on the signed-in player's own account (not whe
 
 - header: "Credits", and the balance "{credits} credits" at the right, so it shows while closed
 - open: balance "{credits}" (large) "credits", "Top up" button (green): opens the Top up dialog (see rules/booking.md)
+- under "Top up": "Top-up history" — the player's paid top-ups, newest first, each: when ("Oct 21, 2026, 3:27 PM"), "Paid $52.50 · Visa ending 6120" on the left; what was added ("+$50" / "+5,000 credits") and any reward points ("+200 points") on the right. Hidden until there is one; reloaded after a top-up
 - points model (rules/wallet.md): titled "Balance", the balance in dollars ("$100"), and under "Top up":
   - "Reward points: {points}" and "Club ID: {club id}"
   - links "Rewards" (Rewards page) and "Redemption history" (Redemption History page)

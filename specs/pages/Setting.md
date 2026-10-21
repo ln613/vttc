@@ -15,6 +15,7 @@ Vertical
     - saving indicator (spinning circle, while saving)
 - Event Setting Section (Tournament module)
 - Court Booking Section (Booking module)
+- Court Prices Section (Booking module)
 - Rewards Section (points model and Credit module — rules/wallet.md)
 - Revenue Section (Tournament module)
 - Modules Section (super admin only): link to the Modules page
@@ -44,6 +45,20 @@ Vertical
 - defaults from the club config's `booking.openTime` / `booking.closeTime` (8:00 AM to midnight for Timing Sports)
 - a later opening that leaves closing too soon moves closing with it
 - validated on save: half-hour times, closing at least the minimum booking length after opening. See `specs/rules/booking.md`
+
+## Court Prices Section
+
+Saved on its own ("Save price"), not with the page's Edit/Save. See rules/booking.md, Price.
+
+- "Weekly prices": the days (Mon – Thu, Fri – Sun…), each time range and "$30/hr" — as the Pricing page shows them
+- "One-time prices (promotions)": those still to come, soonest first: date ("Sat, Oct 24"), time range, "$25/hr", and "×" to remove it (circle button)
+- "Set a price":
+  - a switch "Weekly [switch] One-time" (weekly by default)
+  - weekly: a checkbox for each day, Mon to Sun
+  - one-time: "Date" (date picker)
+  - "From" dropdown: every half hour from opening to the last half hour before closing; "To": from half an hour after From to closing ("12:00 AM (midnight)"). A later From moves To with it. Both start at the opening hours
+  - "Hourly rate ($)"
+  - "Save price": checked first (at least one day, a date not past, To after From, within the opening hours, a price), then saved; "Price saved. Booking and the Pricing page now use it."
 
 ## Rewards Section
 

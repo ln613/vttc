@@ -7,6 +7,7 @@ export interface BookingConfig {
   minMinutes?: number
   creditsPerSlot?: number
   rates?: Array<{ days: string[]; from: string; to: string; dollarsPerHour: number }>
+  oneTimeRates?: Array<{ date: string; from: string; to: string; dollarsPerHour: number }>
   creditsPerDollar?: number
   minTopUpDollars?: number
   guestHoldMinutes?: number
@@ -21,6 +22,7 @@ export interface BookingRules {
   minMinutes: number
   creditsPerSlot: number
   rates: BookingRate[]
+  oneTimeRates: OneTimeBookingRate[]
   creditsPerDollar: number
   minTopUpDollars: number
   guestHoldMinutes: number
@@ -46,9 +48,15 @@ export interface BookingRate {
   toMinutes: number
   dollarsPerHour: number
 }
+export interface OneTimeBookingRate {
+  date: string
+  fromMinutes: number
+  toMinutes: number
+  dollarsPerHour: number
+}
 export declare const WEEK_DAYS: WeekDay[]
 export declare const weekdayOf: (date: string) => WeekDay
-export declare const rateAt: (rules: BookingRules, date: string, minute: number) => BookingRate | undefined
+export declare const rateAt: (rules: BookingRules, date: string, minute: number) => BookingRate | OneTimeBookingRate | undefined
 export declare const slotPriceCents: (rules: BookingRules, date: string | null | undefined, start: number) => number
 export declare const bookingCredits: (rules: BookingRules, minutes: number, date?: string, start?: number) => number
 export declare const bookingPriceCents: (rules: BookingRules, minutes: number, date?: string, start?: number) => number

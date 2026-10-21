@@ -7,13 +7,23 @@ import type { AppSettings } from '../stores/settingsStore'
 import clubConfig from 'club-config'
 import { modulesActions } from '../stores/modulesStore'
 import Select from '../components/Select'
+import Input from '../components/Input'
+import DatePicker from '../components/DatePicker'
 import {
   bookingRules,
   toMinutes,
   toTimeOfDay,
+  WEEK_DAYS,
 } from '../../shared/rules/booking'
+import type { OneTimeRate } from '../../shared/rules/bookingRates'
+import {
+  bookingRatesState,
+  bookingRatesActions,
+} from '../stores/bookingRatesStore'
+import { priceGroups } from '../site/pricing'
+import { parseLocalDate } from '../utils/date'
 import ThemeButton from '../components/ThemeButton'
-import { langActions } from '../stores/langStore'
+import { langActions, langState } from '../stores/langStore'
 import { hasSiteLook, loadSiteFonts } from '../site/siteContent'
 import { pointsModel } from '../i18n/wallet'
 import type { TopUpOption } from '../../shared/rules/wallet'
@@ -28,7 +38,7 @@ const Settings = () => {
   onMount(() => {
     loadSiteFonts()
     if (!authState.isAdmin) return
-    void settingsActions.fetchSettings()
+    void loadSettingsAndPrices()
   })
 
   return (
@@ -59,6 +69,7 @@ const Settings = () => {
           </Show>
           <Show when={modulesActions.on('booking')}>
             <BookingSection />
+            <CourtPricesSection />
           </Show>
           {/* Points model only (specs/rules/wallet.md). */}
           <Show when={pointsModel && modulesActions.on('credit')}>
@@ -93,6 +104,15 @@ const Settings = () => {
       </Show>
     </div>
   )
+}
+
+// The price form starts within the opening hours, so it waits for them.
+const loadSettingsAndPrices = async () => {
+  await Promise.all([
+    settingsActions.fetchSettings(),
+    bookingRatesActions.fetchRates(),
+  ])
+  bookingRatesActions.resetForm()
 }
 
 const UmpireSection = () => {
@@ -341,6 +361,201 @@ const BookingSection = () => (
         disabled={!settingsState.editing}
         noPlaceholder
       />
+    </div>
+  </div>
+)
+
+// ==================== court prices ====================
+//
+// What booking charges, and a form to set a price: weekly (on the chosen
+// days) or one-time (one date, shown on the Pricing page as a promotion).
+// Saved on its own, apart from the page's Edit/Save. See
+// specs/rules/booking.md ("Price").
+
+const CourtPricesSection = () => (
+  <div {...themed(sectionStyle, 'bk-card')}>
+    <h4 {...themed(sectionHeaderStyle, 'bk-section-title')}>
+      {t('settings.courtPrices')}
+    </h4>
+    <Show when={bookingRatesState.error}>
+      <div style={errorStyle}>{bookingRatesState.error}</div>
+    </Show>
+    <WeeklyPrices />
+    <OneTimePrices />
+    <RateForm />
+  </div>
+)
+
+const WeeklyPrices = () => (
+  <div class="rt-list">
+    <span class="rt-list-title">{t('settings.weeklyPrices')}</span>
+    <For each={priceGroups(langState.lang)}>
+      {(group) => (
+        <div class="rt-group">
+          <span class="rt-days">{group.days}</span>
+          <div class="rt-rows">
+            <For each={group.rows}>
+              {(row) => (
+                <div class="rt-row">
+                  <span>{row.time}</span>
+                  <b>
+                    ${row.price}
+                    {t('booking.perHour')}
+                  </b>
+                </div>
+              )}
+            </For>
+          </div>
+        </div>
+      )}
+    </For>
+  </div>
+)
+
+const oneTimeDate = (date: string) =>
+  langActions.date(date, { weekday: 'short', month: 'short', day: 'numeric' })
+
+const oneTimeTime = (rate: OneTimeRate) =>
+  `${langActions.clock(toMinutes(rate.from))} – ${langActions.clock(toMinutes(rate.to))}`
+
+const OneTimePrices = () => (
+  <Show when={bookingRatesState.oneTime.length > 0}>
+    <div class="rt-list">
+      <span class="rt-list-title">{t('settings.oneTimePrices')}</span>
+      <For each={bookingRatesState.oneTime}>
+        {(rate) => (
+          <div class="rt-group">
+            <span class="rt-days">{oneTimeDate(rate.date)}</span>
+            <div class="rt-row">
+              <span>{oneTimeTime(rate)}</span>
+              <b>
+                ${rate.dollarsPerHour}
+                {t('booking.perHour')}
+              </b>
+            </div>
+            <button
+              type="button"
+              class="rt-remove"
+              aria-label={t('settings.removePrice')}
+              title={t('settings.removePrice')}
+              disabled={bookingRatesActions.isRemoving(rate)}
+              onClick={() => void bookingRatesActions.removeOneTime(rate)}
+            >
+              ×
+            </button>
+          </div>
+        )}
+      </For>
+    </div>
+  </Show>
+)
+
+const isOneTime = () => bookingRatesState.form.repeat === 'once'
+
+// "Weekly [switch] One-time": off is weekly, on is one-time.
+const RepeatSwitch = () => (
+  <label class="rt-switch">
+    <span class={isOneTime() ? 'rt-switch-side' : 'rt-switch-side is-on'}>
+      {t('settings.weekly')}
+    </span>
+    <input
+      type="checkbox"
+      role="switch"
+      class="rt-switch-input"
+      checked={isOneTime()}
+      onChange={(e) => bookingRatesActions.setOneTime(e.currentTarget.checked)}
+    />
+    <span class="rt-switch-track" aria-hidden="true">
+      <span class="rt-switch-thumb" />
+    </span>
+    <span class={isOneTime() ? 'rt-switch-side is-on' : 'rt-switch-side'}>
+      {t('settings.oneTime')}
+    </span>
+  </label>
+)
+
+const DayChecks = () => (
+  <div class="rt-days-pick">
+    <For each={WEEK_DAYS}>
+      {(day) => (
+        <label class="rt-day">
+          <input
+            type="checkbox"
+            checked={bookingRatesActions.isDayChosen(day)}
+            onChange={() => bookingRatesActions.toggleDay(day)}
+          />
+          <span>{t(`days.${day}`)}</span>
+        </label>
+      )}
+    </For>
+  </div>
+)
+
+const RateForm = () => (
+  <div class="rt-form">
+    <span class="rt-list-title">{t('settings.setPrice')}</span>
+    <RepeatSwitch />
+    <Show
+      when={isOneTime()}
+      fallback={<DayChecks />}
+    >
+      <DatePicker
+        label={t('settings.priceDate')}
+        value={
+          bookingRatesState.form.date
+            ? parseLocalDate(bookingRatesState.form.date)
+            : null
+        }
+        onChange={bookingRatesActions.setDate}
+        minYear={new Date().getFullYear()}
+        maxYear={new Date().getFullYear() + 2}
+      />
+    </Show>
+    <div style={hoursRowStyle}>
+      <Select
+        label={t('settings.priceFrom')}
+        name="rateFrom"
+        value={bookingRatesState.form.from}
+        onChange={bookingRatesActions.setFrom}
+        options={bookingRatesActions.startOptions()}
+        noPlaceholder
+      />
+      <Select
+        label={t('settings.priceTo')}
+        name="rateTo"
+        value={bookingRatesState.form.to}
+        onChange={bookingRatesActions.setTo}
+        options={bookingRatesActions.endOptions()}
+        noPlaceholder
+      />
+    </div>
+    <div style={{ 'max-width': '232px' }}>
+      <Input
+        label={t('settings.hourlyRate')}
+        name="rateDollars"
+        value={bookingRatesState.form.dollars}
+        onChange={bookingRatesActions.setDollars}
+        inputMode="numeric"
+      />
+    </div>
+    <Show when={bookingRatesState.formError}>
+      <div style={errorStyle}>{bookingRatesState.formError}</div>
+    </Show>
+    <Show when={bookingRatesState.saved}>
+      <div {...themed(ratingResultStyle, 'bk-success')}>
+        {t('settings.priceSaved')}
+      </div>
+    </Show>
+    <div>
+      <ThemeButton
+        variant="primary"
+        disabled={bookingRatesState.saving}
+        onClick={() => void bookingRatesActions.save()}
+      >
+        {bookingRatesState.saving
+          ? t('common.saving')
+          : t('settings.savePrice')}
+      </ThemeButton>
     </div>
   </div>
 )

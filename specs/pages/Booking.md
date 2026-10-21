@@ -24,6 +24,7 @@ Vertical
   - a free half hour that can start a booking: "Available" and its hourly rate ("$30/hr"), clickable
   - a past half hour, or one too close to closing to start a booking: gray, not clickable
   - legend: Available, Your booking, Booked
+  - an admin sees a blocked time as "Blocked" (hatched); tapping it opens the Unblock dialog
 
 ## Booking dialog
 
@@ -38,6 +39,7 @@ Vertical
     - "Price" ${dollars}
     - not signed in: "Have an account? Sign in to book with credits." (Sign in closes the dialog and opens the sign-in dialog)
     - "Cancel", "Book as guest" ("Pay by card" for a signed-in player — Credit off — whose name, email and phone are filled in)
+- admin: under the buttons, "Admin: hold this time without a booking. No payment, door code or email." and "Block this time" — blocks the chosen time and length (rules/booking.md, Blocking a time), closes the dialog and reloads the day
 - guest step: First Name, Last Name, Email, Phone (all required), "Back", "Continue to payment"
 - payment step: "We're holding this time for you until {time}.", then the payment placeholder (rules/booking.md), "Back", "Simulate payment" (placeholder mode only)
 - done: "You're booked!"
@@ -59,14 +61,21 @@ Vertical
 
 Points model (rules/wallet.md): "Your balance: ${balance}", the cost in dollars from the balance, "Not enough balance. Top up to book this time.", "Sign in to book with your balance.", and once booked "${amount} paid from your balance. Your balance is ${balance}."
 
+## Unblock dialog (admin)
+
+- "Blocked time" (h2), the date and time range
+- "This time is blocked. Unblock it to let players book it again."
+- "Cancel", "Unblock": frees the time and reloads the day
+
 ## Top up dialog
 
 Shared with the Account page.
 
 - "Top up credits" (h2)
+- "Top-ups are non-refundable." (until it is paid)
 - "$1 = 100 credits. Minimum $10."
 - "Amount ($)" input (whole dollars), "You get {credits} credits"
 - "Cancel", "Continue": under $10 → "Top up at least $10, in whole dollars"
 - payment placeholder
-- done: "{credits} credits added. Your balance is {balance} credits." "Done"
+- done: "{credits} credits added. Your balance is {balance} credits.", "A receipt has been sent to {email}." (when it was), "Done"
 - points model (rules/wallet.md): "Top up"; "Choose an amount. Your balance goes up by the same amount, and pays for bookings."; the amounts on offer as tiles, each "${amount}" and "+{points} points" (or "No bonus points"), the first chosen; done: "${amount} added to your balance", "+{points} reward points — you now have {total}.", "Your balance: ${balance}"

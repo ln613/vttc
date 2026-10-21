@@ -31,6 +31,19 @@ import {
 
 export type TopUpStep = 'amount' | 'pay' | 'done'
 
+// A paid top-up, for the history under the balance.
+export interface TopUpRecord {
+  _id: string
+  paidAt: string
+  amountCents: number
+  subtotalCents: number
+  taxes: TaxLine[]
+  credits: number
+  points: number
+  cardType: string | null
+  last4: string | null
+}
+
 interface CreditsState {
   balance: number | null
   // Reward points (points model): only ever redeemed for gifts.
@@ -53,8 +66,13 @@ interface CreditsState {
   checkout: PaymentCheckout
   creditsBought: number
   pointsEarned: number
+  // Where the top-up's receipt was emailed.
+  receiptSentTo: string | null
   busy: boolean
   topUpError: string | null
+  // The player's paid top-ups, newest first.
+  topUps: TopUpRecord[]
+  topUpsLoaded: boolean
 }
 
 const getInitialState = (): CreditsState => ({
@@ -74,8 +92,11 @@ const getInitialState = (): CreditsState => ({
   checkout: NO_CHECKOUT,
   creditsBought: 0,
   pointsEarned: 0,
+  receiptSentTo: null,
   busy: false,
   topUpError: null,
+  topUps: [],
+  topUpsLoaded: false,
 })
 
 const [creditsState, setCreditsState] =
@@ -147,6 +168,17 @@ const fetchBalance = async () => {
 
 const setBalance = (balance: number) => setCreditsState('balance', balance)
 
+const fetchTopUps = async () => {
+  if (!paysWithCredits()) return
+  try {
+    const topUps = await apiGet<TopUpRecord[]>('myTopUps')
+    setCreditsState({ topUps, topUpsLoaded: true })
+  } catch {
+    // The history is a convenience; the balance above it still shows.
+    setCreditsState({ topUpsLoaded: true })
+  }
+}
+
 // ==================== top up ====================
 
 const openTopUp = () => {
@@ -159,6 +191,7 @@ const openTopUp = () => {
         : rules.minTopUpDollars,
     ),
     paymentId: '',
+    receiptSentTo: null,
     topUpError: null,
     busy: false,
   })
@@ -237,16 +270,19 @@ const startTopUp = async () => {
 const payTopUp = async (completing = false) => {
   setCreditsState({ busy: true, topUpError: null })
   try {
-    const result = await apiPost<{ balance: number; points?: number }>(
-      'confirmPayment',
-      { paymentId: creditsState.paymentId },
-    )
+    const result = await apiPost<{
+      balance: number
+      points?: number
+      receiptSentTo?: string | null
+    }>('confirmPayment', { paymentId: creditsState.paymentId })
     setCreditsState({
       busy: false,
       topUpStep: 'done',
       balance: result.balance,
+      receiptSentTo: result.receiptSentTo ?? null,
       ...(result.points != null ? { points: result.points } : {}),
     })
+    void fetchTopUps()
   } catch (err) {
     setCreditsState({
       busy: false,
@@ -290,6 +326,7 @@ export const creditsActions = {
   isChosenOption,
   chooseOption,
   fetchBalance,
+  fetchTopUps,
   setBalance,
   openTopUp,
   closeTopUp,

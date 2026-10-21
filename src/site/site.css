@@ -782,6 +782,22 @@
   font-size: 14px;
   margin-left: 4px;
 }
+.ts-days-pill.is-promo {
+  background: var(--ts-yellow);
+  color: var(--ts-night);
+}
+.ts-promo-title {
+  margin: 40px 0 0;
+  font-family: var(--ts-display);
+  font-style: italic;
+  font-weight: 900;
+  font-size: clamp(26px, 4.4vw, 38px);
+  color: var(--ts-yellow);
+  text-wrap: balance;
+}
+.ts-promo-note {
+  margin: 6px 0 18px;
+}
 .ts-price-foot {
   display: flex;
   flex-wrap: wrap;

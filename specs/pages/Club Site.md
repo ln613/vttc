@@ -51,7 +51,8 @@ Booking, Account and Settings take the site's look for a club with a site: a pur
 
 ## Pricing (`/pricing`)
 
-- court rental by day (Mon–Thu, Fri–Sun) and time, price per hour — built from the booking rates (`booking.rates`, rules/booking.md), with the days and times written in the page's language, so the page always shows what booking charges
+- court rental by day (Mon–Thu, Fri–Sun) and time, price per hour — built from the weekly booking prices an admin sets (rules/booking.md, Price), with the days and times written in the page's language, so the page always shows what booking charges
+- "Promotions" (only when there are any): "Special prices for these days only." and the one-time prices still to come, in the same table with a date ("Sat, Oct 24", yellow) in place of the days
 - "Book a Court", and a link to coaching
 
 ## About & Contact (`/about`)

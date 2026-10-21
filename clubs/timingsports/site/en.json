@@ -169,10 +169,13 @@
     "title": "Court pricing",
     "headers": {
       "days": "Days",
+      "date": "Date",
       "time": "Time",
       "price": "Price"
     },
     "perHour": "/ hour",
+    "promotionsTitle": "Promotions",
+    "promotionsNote": "Special prices for these days only.",
     "tagline": "Play pickleball together!",
     "bookCta": "Book a Court",
     "coachingNote": "Looking for lessons?",

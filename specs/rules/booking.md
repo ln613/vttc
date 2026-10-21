@@ -34,7 +34,7 @@ The courts are the club's tables (`tables.all`). Timing Sports has one picklebal
 
 ## Price
 
-Prices follow the day of the week and the time of day, from `booking.rates` in the club config:
+Prices follow the day of the week and the time of day. They start from `booking.rates` in the club config, and from then on an admin sets them on the Settings page ("Court Prices", specs/pages/Setting.md); they are kept in the `settings` collection (`docId: "bookingRates"`: `weekly`, `oneTime`), apart from the other settings so saving those can never put old prices back:
 
 ```json
 "rates": [
@@ -45,11 +45,15 @@ Prices follow the day of the week and the time of day, from `booking.rates` in t
 ]
 ```
 
+- weekly: a price for some days of the week, from one time to another (both on the half hour, within the opening hours)
+- one-time: a price for one date only (a promotion), ahead of the weekly one: `{ "date": "2026-11-01", "from": "12:00", "to": "15:00", "dollarsPerHour": 25 }`. Past dates are dropped as prices are saved
+- a new price is painted over whatever covered its time before; the rest of the day keeps its prices: setting Monday 5–7 PM to $35 leaves Mon 9 AM–5 PM at $30 and 7 PM–midnight at $40. Days left with the same prices all day are kept together (Mon–Thu, Fri–Sun) — shared/rules/bookingRates.js
+- a booking is priced when it is made; changing a price never changes a booking already made
 - each half hour is charged at the rate covering it, so a booking across 6 PM (or noon) pays each rate for its own part: Mon 5–7 PM is $30 + $40 = $70
 - a half hour no rate covers is charged the flat `creditsPerSlot` (the price for a club without rates)
 - registered player: the price from their balance — in credits at the top-up rate ($1 = 100 credits: Mon 9–10 AM is 3,000 credits), or for a club on the points model, in dollars ($30). See rules/wallet.md
 - guest: the same price in dollars
-- the Booking page shows each free half hour's hourly rate; the Pricing page (specs/pages/Club Site.md) is built from the same rates, so the two always agree
+- the Booking page shows each free half hour's hourly rate (each day comes with its prices); the Pricing page (specs/pages/Club Site.md) is built from the same prices — weekly in the table, one-time ones still to come under "Promotions" — so the two always agree
 - Timing Sports opens at 9:00 AM, where its rates begin
 
 ## Booking as a registered player
@@ -57,6 +61,16 @@ Prices follow the day of the week and the time of day, from `booking.rates` in t
 - signed in with a player account (the admin and tablet logins can only book as a guest)
 - the balance is taken atomically: it must cover the cost at the moment of booking, otherwise "Not enough credits. Please top up first." ("Not enough balance. Please top up first." on the points model) and nothing is booked
 - every change to a balance is written to a ledger (creditTransactions) with the balance after it
+
+## Blocking a time (admin)
+
+An admin can take a time off the calendar without booking it ("Block this time" in the booking dialog), e.g. for maintenance or a private event.
+
+- the same times and lengths as a booking, and the time must be free
+- shows as booked to everyone; an admin sees "Blocked" (hatched)
+- nobody pays, no door code, no email, and it is in nobody's My Bookings
+- an admin taps a blocked time to Unblock it, which frees it at once
+- kept as a booking with status `blocked` (`unblocked` once freed), name "Blocked", `blockedBy`
 
 ## Booking as a guest
 
@@ -69,6 +83,8 @@ Prices follow the day of the week and the time of day, from `booking.rates` in t
 - credits model: $1 = 100 credits, whole dollars, at least $10
 - points model: one of the amounts on offer, which adds the same dollars to the balance plus its reward points (rules/wallet.md)
 - paid by card
+- "Top-ups are non-refundable." is said before paying (the top-up dialog) and on the receipt
+- once paid, a receipt is emailed to the player (see Receipt), and the top-up is listed under the balance on the Account page (newest first: when, what the card paid, the card, what was added and any reward points)
 
 ## Tax
 
@@ -131,3 +147,11 @@ Emailed to the booker (the player's email, or the guest's) once the booking is c
 - the door code and "Works {from} – {to}", or "Your door code is not ready yet. Please contact the club before your booking."
 
 A failure to send never undoes the booking; it is recorded on the booking (`receiptError`). Sent from the club's Gmail (`GMAIL_1`).
+
+A top-up's receipt, emailed to the player once it is paid:
+
+- "{club} — Top Up", "Receipt"
+- Top up (ref: the last 8 characters of the payment id), Name, Added to balance, Reward points (when any), Subtotal and each tax (when the club charges tax), "Paid ${total} by {card} ending {last4}", Balance after, Paid on (club time)
+- "Top-ups are non-refundable."
+
+A failure to send never undoes the top-up; it is recorded on the payment (`receiptError`, or `receiptSentAt` / `receiptSentTo` when sent).

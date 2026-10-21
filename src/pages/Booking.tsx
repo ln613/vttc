@@ -68,6 +68,7 @@ const Booking = () => {
         <DayGrid />
       </div>
       <BookingDialog />
+      <UnblockDialog />
       <TopUpDialog />
     </div>
   )
@@ -263,8 +264,15 @@ const SlotCell = (props: {
   )
 }
 
-const bookedLabel = (b: DayBooking) =>
-  b.mine ? t('booking.yourBooking') : b.name || t('booking.booked')
+const bookedLabel = (b: DayBooking) => {
+  if (b.blocked) return t('booking.blocked')
+  return b.mine ? t('booking.yourBooking') : b.name || t('booking.booked')
+}
+
+const bookedClass = (b: DayBooking) => {
+  if (b.blocked) return 'bk-booked is-blocked'
+  return b.mine ? 'bk-booked is-mine' : 'bk-booked'
+}
 
 const timeRange = (start: number, minutes: number) =>
   `${langActions.clock(start)} – ${langActions.clock(start + minutes)}`
@@ -277,11 +285,15 @@ const BookedBlock = (props: {
   const rows = () => props.booking.minutes / bookingActions.rules().slotMinutes
   return (
     <div
-      class={props.booking.mine ? 'bk-booked is-mine' : 'bk-booked'}
+      class={bookedClass(props.booking)}
       style={{
         'grid-row': `${props.row} / span ${rows()}`,
         'grid-column': props.col,
       }}
+      // An admin frees a blocked time by tapping it.
+      role={props.booking.blocked ? 'button' : undefined}
+      tabIndex={props.booking.blocked ? 0 : undefined}
+      onClick={() => bookingActions.openUnblock(props.booking)}
     >
       <strong>{bookedLabel(props.booking)}</strong>
       <span>{timeRange(props.booking.start, props.booking.minutes)}</span>
@@ -409,7 +421,73 @@ const DetailsStep = () => (
         <GuestPayment />
       </Match>
     </Switch>
+    <Show when={bookingActions.canBlock()}>
+      <BlockAction />
+    </Show>
   </>
+)
+
+// Admin only: hold the time with no booking behind it.
+const BlockAction = () => (
+  <div class="bk-block">
+    <p class="bk-note">{t('booking.blockNote')}</p>
+    <button
+      type="button"
+      class="bk-btn bk-btn-secondary bk-btn-fill"
+      onClick={() => void bookingActions.blockTime()}
+      disabled={bookingState.busy}
+    >
+      {bookingState.busy ? t('common.pleaseWait') : t('booking.block')}
+    </button>
+  </div>
+)
+
+const UnblockDialog = () => (
+  <Show when={bookingState.unblocking}>
+    {(booking) => (
+      <div
+        class="bk-overlay"
+        onClick={() => !bookingState.busy && bookingActions.closeUnblock()}
+      >
+        <div class="bk-dialog" onClick={(e) => e.stopPropagation()}>
+          <div class="bk-dialog-head">
+            <h2 class="bk-dialog-title">{t('booking.unblockTitle')}</h2>
+            <div class="bk-dialog-when">
+              {longDate(bookingState.date)}
+              <br />
+              <strong>{timeRange(booking().start, booking().minutes)}</strong>
+            </div>
+          </div>
+          <div class="bk-dialog-body">
+            <p class="bk-note">{t('booking.unblockNote')}</p>
+            <Show when={bookingState.dialogError}>
+              <p class="bk-error" style={{ 'text-align': 'center', margin: 0 }}>
+                {bookingState.dialogError}
+              </p>
+            </Show>
+            <Actions>
+              <button
+                type="button"
+                class="bk-btn bk-btn-secondary bk-btn-fill"
+                onClick={bookingActions.closeUnblock}
+                disabled={bookingState.busy}
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                class="bk-btn bk-btn-primary bk-btn-fill"
+                onClick={() => void bookingActions.confirmUnblock()}
+                disabled={bookingState.busy}
+              >
+                {bookingState.busy ? t('common.pleaseWait') : t('booking.unblock')}
+              </button>
+            </Actions>
+          </div>
+        </div>
+      </div>
+    )}
+  </Show>
 )
 
 const PlayerPayment = () => (

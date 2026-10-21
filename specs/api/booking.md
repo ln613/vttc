@@ -14,13 +14,50 @@ All refuse with "Court booking is not available at this club" unless `booking.en
 
 ### Output
 
-{ date, today (club date), nowMinutes (club time), courts, openTime, closeTime (the admin setting), paymentsAvailable, bookings: [{ _id, court, start, minutes, mine, name (owner or admin only) }] } — confirmed bookings and guest holds still being paid
+{ date, today (club date), nowMinutes (club time), courts, openTime, closeTime (the admin setting), rates (the weekly prices), oneTimeRates (that date's), paymentsAvailable, bookings: [{ _id, court, start, minutes, mine, name (owner or admin only), blocked (admin only) }] } — confirmed bookings, guest holds still being paid, and blocked times
 
 ## My bookings (GET myBookings, signed in)
 
 the player's confirmed bookings, newest first: [{ _id, date, court, start, minutes, credits, createdAt, doorCode: { code, validFrom, validUntil, window } | null, receipt: { title, ref, lines: [{ label, value }] } }]
 
 - first asks UniFi for a code for any booking still to come that has none (rules/booking.md, Door code)
+
+## Booking prices (GET bookingRates, public)
+
+{ weekly: [{ days, from, to, dollarsPerHour }], oneTime: [{ date, from, to, dollarsPerHour }] } — the weekly prices, and the one-time ones from today on, soonest first (rules/booking.md, Price)
+
+## Save a price (POST saveBookingRate, admin)
+
+### input
+
+- repeat* — "weekly" or "once"
+- days* (weekly: ["mon", …]) or date* (once: YYYY-MM-DD, not past)
+- from*, to* ("HH:MM", on the half hour, within the opening hours, to after from)
+- dollarsPerHour* (dollars, more than 0, at most two decimals)
+
+### Action
+
+- paint the price over what covered its time (rules/booking.md); drop one-time prices of past days
+
+### Output
+
+the prices, as GET bookingRates
+
+## Remove a one-time price (POST deleteBookingRate, admin)
+
+- input: date*, from*, to*
+- output: the prices, as GET bookingRates
+
+## Block a time (POST blockCourt, admin)
+
+- input: date*, court*, start*, minutes* — checked as a booking's
+- claim each half hour for a booking with status `blocked`; no payment, door code or email
+- output: { bookingId, date, court, start, minutes }
+
+## Unblock (POST unblockCourt, admin)
+
+- input: bookingId* — a blocked time ("That time is not blocked" otherwise)
+- frees its half hours; output { success }
 
 ## My credits (GET myCredits, signed in)
 
@@ -57,6 +94,10 @@ the player's confirmed bookings, newest first: [{ _id, date, court, start, minut
 
 { bookingId, paymentId, amountCents, heldUntil, paymentsAvailable }
 
+## My top-ups (GET myTopUps, signed in)
+
+the player's paid top-ups, newest first (the latest 100): [{ _id, paidAt, amountCents (what the card paid), subtotalCents, taxes, credits (added), points, cardType, last4 }]
+
 ## Top up (POST topUpCredits, signed in)
 
 ### input
@@ -86,7 +127,7 @@ Called when the card form reports it finished (or the placeholder's button).
 
 ### Output
 
-guest booking (then the door code and the receipt email): { kind, ok, booking: { date, court, start, minutes }, doorCode | null, receiptSentTo | null }; top-up: { kind, ok, balance, points? } — `points`, the member's reward points after, when the top-up gave some
+guest booking (then the door code and the receipt email): { kind, ok, booking: { date, court, start, minutes }, doorCode | null, receiptSentTo | null }; top-up (then the receipt email): { kind, ok, balance, points?, receiptSentTo | null } — `points`, the member's reward points after, when the top-up gave some
 
 ## Renew payment ticket (POST renewPaymentTicket, public)
 

@@ -28,6 +28,9 @@ const TopUpDialog = () => (
           <h2 class="bk-dialog-title">{walletT('topUpTitle')}</h2>
         </div>
         <div class="bk-dialog-body">
+          <Show when={creditsState.topUpStep !== 'done'}>
+            <p class="bk-note bk-no-refund">{t('topUp.noRefund')}</p>
+          </Show>
           <Switch>
             <Match when={creditsState.topUpStep === 'amount' && pointsModel}>
               <OptionsStep />
@@ -185,6 +188,11 @@ const DoneStep = () => (
         amount: formatBalance(creditsState.balance ?? 0),
       })}
     </p>
+    <Show when={creditsState.receiptSentTo}>
+      <p class="bk-note" style={{ 'text-align': 'center' }}>
+        {t('booking.receiptSent', { email: creditsState.receiptSentTo ?? '' })}
+      </p>
+    </Show>
     <div class="bk-actions is-center">
       <button
         type="button"

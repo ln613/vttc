@@ -88,7 +88,13 @@
     "enterLastName": "请输入姓",
     "enterEmail": "请输入有效的邮箱地址",
     "enterPhone": "请输入有效的加拿大/美国电话号码",
-    "loadFailed": "无法加载预订信息"
+    "loadFailed": "无法加载预订信息",
+    "blocked": "已锁定",
+    "block": "锁定此时段",
+    "blockNote": "管理员：不经预订直接占用此时段。不收费，不生成门禁码，不发邮件。",
+    "unblockTitle": "已锁定时段",
+    "unblockNote": "此时段已锁定。解除锁定后，球员即可再次预订。",
+    "unblock": "解除锁定"
   },
   "payment": {
     "amountToPay": "应付金额",
@@ -116,7 +122,8 @@
     "chooseAmount": "请选择充值金额。余额按充值金额等额增加，可用于预订场地。",
     "bonus": "赠送 {points} 积分",
     "noBonus": "无赠送积分",
-    "pointsAdded": "获赠 {points} 积分，当前共 {total} 积分。"
+    "pointsAdded": "获赠 {points} 积分，当前共 {total} 积分。",
+    "noRefund": "充值金额一经支付，概不退款。"
   },
   "account": {
     "title": "账户",
@@ -159,7 +166,11 @@
     "points": "积分",
     "clubId": "会员号",
     "rewards": "积分兑换",
-    "redemptionHistory": "兑换记录"
+    "redemptionHistory": "兑换记录",
+    "topUpHistory": "充值记录",
+    "topUpPaid": "已付 {amount}",
+    "cardEnding": "{card} 尾号 {last4}",
+    "card": "银行卡"
   },
   "password": {
     "min8": "至少 8 个字符",
@@ -222,7 +233,20 @@
     "addTopUp": "添加金额",
     "removeTopUp": "删除",
     "gifts": "礼品管理",
-    "redemptions": "兑换记录"
+    "redemptions": "兑换记录",
+    "courtPrices": "场地价格",
+    "weeklyPrices": "每周价格",
+    "oneTimePrices": "单日价格（优惠活动）",
+    "removePrice": "删除此价格",
+    "setPrice": "设置价格",
+    "weekly": "每周",
+    "oneTime": "单日",
+    "priceDate": "日期",
+    "priceFrom": "开始",
+    "priceTo": "结束",
+    "hourlyRate": "每小时价格（$）",
+    "savePrice": "保存价格",
+    "priceSaved": "价格已保存，预订和价格页面已同步更新。"
   },
   "datePicker": {
     "weekdays": [

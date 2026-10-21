@@ -169,10 +169,13 @@
     "title": "场地价格",
     "headers": {
       "days": "日期",
+      "date": "日期",
       "time": "时间",
       "price": "价格"
     },
     "perHour": "/ 小时",
+    "promotionsTitle": "优惠活动",
+    "promotionsNote": "以下日期限时特价。",
     "tagline": "一起来打匹克球吧！",
     "bookCta": "预订场地",
     "coachingNote": "想上课？",

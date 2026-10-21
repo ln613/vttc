@@ -55,12 +55,16 @@ import {
   getBookingDay,
   getMyBookings,
   getMyCredits,
+  getMyTopUps,
   bookCourt,
   bookCourtAsGuest,
+  blockCourt,
+  unblockCourt,
   topUpCredits,
   confirmPayment,
   renewPaymentTicket,
 } from './bookingHandlers.js'
+import { getBookingRates, saveBookingRate, deleteBookingRate } from './bookingRatesHandlers.js'
 import { getMyWaiver, acceptWaiver } from './waiverHandlers.js'
 import {
   getGifts,
@@ -175,6 +179,8 @@ export const apiHandlers = {
     bookingDay: (params, auth) => getBookingDay(params, auth),
     myBookings: (params, auth) => getMyBookings(params, auth),
     myCredits: (params, auth) => getMyCredits(params, auth),
+    myTopUps: (params, auth) => getMyTopUps(params, auth),
+    bookingRates: () => getBookingRates(),
     // Reward points and gifts (points model) — see specs/rules/wallet.md.
     // The club's liability waiver — see specs/rules/waiver.md.
     myWaiver: (params, auth) => getMyWaiver(params, auth),
@@ -272,6 +278,10 @@ export const apiHandlers = {
     googleSignIn: (body) => googleSignIn(body),
     bookCourt: (body, auth) => bookCourt(body, auth),
     bookCourtAsGuest: (body, auth) => bookCourtAsGuest(body, auth),
+    blockCourt: (body, auth) => blockCourt(body, auth),
+    unblockCourt: (body) => unblockCourt(body),
+    saveBookingRate: (body) => saveBookingRate(body),
+    deleteBookingRate: (body) => deleteBookingRate(body),
     topUpCredits: (body, auth) => topUpCredits(body, auth),
     confirmPayment: (body, auth) => confirmPayment(body, auth),
     renewPaymentTicket: (body, auth) => renewPaymentTicket(body, auth),

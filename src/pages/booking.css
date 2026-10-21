@@ -335,6 +335,26 @@
   background: var(--bk-mine-bg, #d6eaf8);
   color: var(--bk-mine-ink, #1b4f72);
 }
+/* A time an admin blocked: hatched, and tapping it offers Unblock. */
+.bk-booked.is-blocked {
+  border-left-color: var(--bk-soft, #666666);
+  background: repeating-linear-gradient(
+    135deg,
+    var(--bk-off-bg, #f3f4f6) 0 8px,
+    var(--bk-surface, #ffffff) 8px 16px
+  );
+  color: var(--bk-ink, #333333);
+  cursor: pointer;
+}
+
+/* Admin only, under the booking dialog's own buttons. */
+.bk-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--bk-line, #e5e7eb);
+}
 
 .bk-legend {
   display: flex;
@@ -515,6 +535,56 @@
   font-size: 14px;
   color: var(--bk-soft, #666666);
   margin: 0;
+}
+/* Said before any top-up is paid. */
+.bk-no-refund {
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--bk-free-bg, #f5f7fa);
+  color: var(--bk-ink, #333333);
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Account: the top-up history under the balance. */
+.tu-history {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 18px;
+  text-align: left;
+}
+.tu-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--bk-soft, #666666);
+}
+.tu-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bk-free-bg, #f5f7fa);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.tu-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.tu-meta {
+  font-size: 12px;
+  color: var(--bk-soft, #666666);
+}
+.tu-added {
+  font-weight: 700;
+  white-space: nowrap;
 }
 .bk-warn {
   font-size: 14px;
@@ -1108,7 +1178,154 @@
   cursor: pointer;
 }
 
+/* ---------- Settings: court prices ---------- */
+
+.rt-list,
+.rt-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+  text-align: left;
+}
+.rt-form {
+  margin-bottom: 0;
+  padding-top: 16px;
+  border-top: 1px dashed var(--bk-line, #e1e4e8);
+}
+.rt-list-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--bk-soft, #666666);
+}
+.rt-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--bk-free-bg, #f5f7fa);
+}
+.rt-days {
+  flex: 0 0 120px;
+  font-weight: 700;
+  color: var(--bk-accent, #2c3e50);
+}
+.rt-rows {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rt-row {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.rt-remove {
+  width: 32px;
+  height: 32px;
+  box-sizing: border-box;
+  padding: 0;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--bk-line, #dddddd);
+  background: var(--bk-surface, #ffffff);
+  color: #c0392b;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.rt-remove:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* "Weekly [switch] One-time" */
+.rt-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  align-self: flex-start;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+.rt-switch-side {
+  color: var(--bk-soft, #888888);
+}
+.rt-switch-side.is-on {
+  color: var(--bk-accent, #2c3e50);
+}
+.rt-switch-input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.rt-switch-track {
+  position: relative;
+  width: 48px;
+  height: 26px;
+  box-sizing: border-box;
+  flex: none;
+  border-radius: 13px;
+  background: var(--bk-accent, #3498db);
+}
+.rt-switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  box-sizing: border-box;
+  padding: 0;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: left 0.15s ease;
+}
+.rt-switch-input:checked + .rt-switch-track .rt-switch-thumb {
+  left: 25px;
+}
+.rt-switch-input:focus-visible + .rt-switch-track {
+  outline: 2px solid var(--bk-accent, #3498db);
+  outline-offset: 2px;
+}
+
+.rt-days-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+.rt-day {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.rt-day input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+
 @media (max-width: 480px) {
+  .rt-group {
+    flex-wrap: wrap;
+  }
+  .rt-days {
+    flex-basis: 100%;
+  }
   .bk-days {
     gap: 4px;
   }

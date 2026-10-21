@@ -64,15 +64,22 @@ const paymentLines = (booking) =>
       ]
     : cardLines(booking)
 
+// Moneris's card types, as a receipt names them.
+const CARD_NAMES = { V: 'Visa', M: 'Mastercard', AX: 'Amex', NO: 'Discover', C1: 'JCB', UP: 'UnionPay' }
+
+// "by Visa ending 6120", or "by card" when the card isn't known.
+const byCard = (receipt) =>
+  receipt?.last4 ? `by ${CARD_NAMES[receipt.cardType] || 'card'} ending ${receipt.last4}` : 'by card'
+
 // A card payment: with the club's tax, the subtotal and each tax first.
-const cardLines = (booking) => [
+const cardLines = (booking, cardReceipt = null) => [
   ...(booking.taxes?.length
     ? [
         { label: 'Subtotal', value: formatDollars(booking.subtotalCents, true) },
         ...booking.taxes.map((t) => ({ label: `${t.name} (${t.rate}%)`, value: formatDollars(t.cents, true) })),
       ]
     : []),
-  { label: 'Paid', value: `${formatDollars(booking.amountCents, !!booking.taxes?.length)} by card` },
+  { label: 'Paid', value: `${formatDollars(booking.amountCents, !!booking.taxes?.length)} ${byCard(cardReceipt)}` },
 ]
 
 // The liability waiver the booker accepted (specs/rules/waiver.md), when the
@@ -118,5 +125,28 @@ export const buildReceipt = (booking) => {
       ...waiverLines(booking),
     ],
     doorCode: doorCodeView(booking),
+  }
+}
+
+/**
+ * { title, ref, lines, notes } for a paid top-up (a payment of kind topUp):
+ * what was added, what the card paid, and the balance after.
+ */
+export const buildTopUpReceipt = (payment, { name, balanceAfter } = {}) => {
+  if (!payment?._id) throwError('Payment is required')
+  const ref = bookingRef(payment)
+  return {
+    title: `${club.name} — Top Up`,
+    ref,
+    lines: [
+      { label: 'Top up', value: ref },
+      ...(name ? [{ label: 'Name', value: name }] : []),
+      { label: 'Added to balance', value: balanceAmount(payment.credits) },
+      ...(payment.points ? [{ label: 'Reward points', value: `+${formatCredits(payment.points)}` }] : []),
+      ...cardLines(payment, payment.receipt),
+      ...(balanceAfter != null ? [{ label: 'Balance after', value: balanceAmount(balanceAfter) }] : []),
+      { label: 'Paid on', value: clubDateTime(payment.paidAt || new Date()) },
+    ],
+    notes: ['Top-ups are non-refundable.'],
   }
 }

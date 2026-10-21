@@ -18,6 +18,9 @@ export const DEFAULT_BOOKING = {
   creditsPerSlot: 2500,
   // [{ days: ['mon', 'tue'], from: '09:00', to: '18:00', dollarsPerHour: 30 }]
   rates: [],
+  // One day's own prices, ahead of the weekly ones (bookingRates.js):
+  // [{ date: '2026-11-01', from: '12:00', to: '15:00', dollarsPerHour: 25 }]
+  oneTimeRates: [],
   creditsPerDollar: 100,
   minTopUpDollars: 10,
   // How long a guest's slot is held while they pay.
@@ -53,6 +56,12 @@ export const bookingRules = (config) => {
     creditsPerDollar: c.creditsPerDollar,
     rates: (c.rates || []).map((r) => ({
       days: r.days,
+      fromMinutes: toMinutes(r.from),
+      toMinutes: toMinutes(r.to),
+      dollarsPerHour: r.dollarsPerHour,
+    })),
+    oneTimeRates: (c.oneTimeRates || []).map((r) => ({
+      date: r.date,
       fromMinutes: toMinutes(r.from),
       toMinutes: toMinutes(r.to),
       dollarsPerHour: r.dollarsPerHour,
@@ -142,8 +151,13 @@ export const WEEK_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 export const weekdayOf = (date) =>
   WEEK_DAYS[(new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7]
 
-// The rate that covers a half hour on a day, if one does.
+// The rate that covers a half hour on a day, if one does: that day's own
+// (one-time) price first, then the weekly one.
 export const rateAt = (rules, date, minute) => {
+  const oneTime = (rules.oneTimeRates || []).find(
+    (r) => r.date === date && minute >= r.fromMinutes && minute < r.toMinutes,
+  )
+  if (oneTime) return oneTime
   const day = weekdayOf(date)
   return rules.rates.find(
     (r) =>

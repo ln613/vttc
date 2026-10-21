@@ -39,6 +39,8 @@ export const ACCESS = {
     bookingDay: PUBLIC, // who booked is shown only to them and to admins
     myBookings: USER,
     myCredits: USER,
+    myTopUps: USER, // the caller's own
+    bookingRates: PUBLIC, // the Pricing page
     myWaiver: USER, // whether the caller still has to accept it
     gifts: PUBLIC, // the Rewards page, for anyone to look at
     rewardMembers: ADMIN, // names, club ids and points, for redeeming
@@ -61,6 +63,10 @@ export const ACCESS = {
     googleSignIn: PUBLIC, // a code from Google's popup; exchanged and verified inside
     bookCourt: USER, // paid in the caller's own credits
     bookCourtAsGuest: PUBLIC, // held until paid
+    blockCourt: ADMIN, // takes a time off the calendar, unpaid
+    unblockCourt: ADMIN,
+    saveBookingRate: ADMIN,
+    deleteBookingRate: ADMIN,
     topUpCredits: USER,
     confirmPayment: PUBLIC, // a guest pays too; a top-up is checked against the caller
     renewPaymentTicket: PUBLIC, // a new card form for the same payment; same checks

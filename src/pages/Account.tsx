@@ -15,13 +15,17 @@ import {
   accountPageActions,
 } from '../stores/accountPageStore'
 import { authState, authActions } from '../stores/authStore'
-import { creditsState, creditsActions } from '../stores/creditsStore'
+import {
+  creditsState,
+  creditsActions,
+  type TopUpRecord,
+} from '../stores/creditsStore'
 import { modulesActions } from '../stores/modulesStore'
 import {
   accountSectionsState,
   accountSectionsActions,
 } from '../stores/accountSectionsStore'
-import { formatCredits } from '../../shared/rules/booking'
+import { formatCredits, formatDollars } from '../../shared/rules/booking'
 import { clubIdOf } from '../../shared/rules/wallet'
 import {
   formatBalance,
@@ -231,6 +235,7 @@ const Account = () => {
     accountPageActions.init(params.playerId)
     accountSectionsActions.init(searchParams.open)
     void creditsActions.fetchBalance()
+    void creditsActions.fetchTopUps()
   })
 
   onCleanup(() => {
@@ -591,10 +596,60 @@ const CreditsSection = () => (
       <ThemeButton variant="primary" onClick={creditsActions.openTopUp}>
         {t('account.topUp')}
       </ThemeButton>
+      <TopUpHistory />
       <Show when={pointsModel}>
         <RewardPoints />
       </Show>
     </CollapsibleSection>
+  </Show>
+)
+
+// Moneris's card types as a person reads them.
+const CARD_NAMES: Record<string, string> = {
+  V: 'Visa',
+  M: 'Mastercard',
+  AX: 'Amex',
+  NO: 'Discover',
+  C1: 'JCB',
+  UP: 'UnionPay',
+}
+
+// "Paid $26.25 · Visa ending 6120"
+const topUpPaidLine = (topUp: TopUpRecord) => {
+  const paid = t('account.topUpPaid', {
+    amount: formatDollars(topUp.amountCents, topUp.taxes.length > 0),
+  })
+  if (!topUp.last4) return paid
+  return `${paid} · ${t('account.cardEnding', {
+    card: CARD_NAMES[topUp.cardType ?? ''] ?? t('account.card'),
+    last4: topUp.last4,
+  })}`
+}
+
+// The player's paid top-ups, newest first, under the balance.
+const TopUpHistory = () => (
+  <Show when={creditsState.topUps.length > 0}>
+    <div class="tu-history">
+      <span class="tu-title">{t('account.topUpHistory')}</span>
+      <For each={creditsState.topUps}>
+        {(topUp) => (
+          <div class="tu-row">
+            <span class="tu-main">
+              <span>{langActions.instant(topUp.paidAt)}</span>
+              <span class="tu-meta">{topUpPaidLine(topUp)}</span>
+            </span>
+            <span class="tu-main" style={{ 'align-items': 'flex-end' }}>
+              <span class="tu-added">+{formatBalance(topUp.credits)}</span>
+              <Show when={topUp.points > 0}>
+                <span class="tu-meta">
+                  {t('topUp.bonus', { points: formatPoints(topUp.points) })}
+                </span>
+              </Show>
+            </span>
+          </div>
+        )}
+      </For>
+    </div>
   </Show>
 )
 
