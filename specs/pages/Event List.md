@@ -23,6 +23,7 @@ Vertical
           - time: now + 1 min
           - fee: 30
         - auto register randomly selected qualified players (age ignored)
+        - a simulated league's teams are named "Team A", "Team B"…; a French League's take real French town names instead ("Annecy", "Colmar", "La Rochelle"…, shuffled, never repeated — shared/rules/frenchLeague.js)
 
 - the list of events
   - name on top

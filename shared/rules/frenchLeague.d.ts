@@ -52,3 +52,6 @@ export declare const getFrenchLeagueSubPoints: (
 export declare const getFrenchLeagueTiePoints: (
   subs: ScoredSub[] | null | undefined,
 ) => [number, number]
+
+export declare const FRENCH_TOWNS: string[]
+export declare const simulatedFrenchTeamNames: (count: number, random?: () => number) => string[]

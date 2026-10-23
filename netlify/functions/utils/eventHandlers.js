@@ -30,6 +30,8 @@ import {
   isFrenchLeagueLeagueTie,
   getFrenchLeagueTiePoints,
   teamSubMatchesUnderWay,
+  FRENCH_LEAGUE,
+  simulatedFrenchTeamNames,
 } from '../../../shared/rules/frenchLeague.js'
 import {
   getFixedParticipantIds,
@@ -660,10 +662,11 @@ const simulateLeague = async (body) => {
   if (rosters.length < 2) throwError('Not enough players to fill two teams')
   addSharedPlayers(rosters, Math.max(1, Math.floor(rosters.length / 3)))
 
+  const teamNames = simulatedTeamNames(body.format, rosters.length)
   const participants = rosters.map((roster, i) => ({
     _id: generateId(),
     players: roster,
-    teamName: `Team ${getGroupLetter(i)}`,
+    teamName: teamNames[i],
     rating: calculateParticipantRating(roster, teamSize),
   }))
   const paidPlayerIds = [
@@ -681,6 +684,13 @@ const simulateLeague = async (body) => {
 
   return { ...created, participants, paidPlayerIds, simulated: true }
 }
+
+// A simulated French League's teams are named after real French towns;
+// any other format's are "Team A", "Team B"…
+const simulatedTeamNames = (format, count) =>
+  format === FRENCH_LEAGUE
+    ? simulatedFrenchTeamNames(count)
+    : Array.from({ length: count }, (_, i) => `Team ${getGroupLetter(i)}`)
 
 // Simulating the same format twice in a day is normal while testing, and
 // the name + start date have to stay unique.

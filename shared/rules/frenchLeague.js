@@ -123,3 +123,34 @@ export const getFrenchLeagueTiePoints = (subs) =>
     },
     [0, 0],
   )
+
+// ==================== simulated teams ====================
+
+// Real French towns, so a simulated French League reads like one rather
+// than "Team A", "Team B".
+export const FRENCH_TOWNS = [
+  'Annecy', 'Arras', 'Avignon', 'Bayonne', 'Besançon', 'Biarritz', 'Blois',
+  'Bourges', 'Brest', 'Carcassonne', 'Chambéry', 'Chartres', 'Cognac',
+  'Colmar', 'Dijon', 'Dinan', 'Grenoble', 'Honfleur', 'La Rochelle', 'Lille',
+  'Limoges', 'Lorient', 'Lyon', 'Metz', 'Montpellier', 'Nancy', 'Nantes',
+  'Nice', 'Nîmes', 'Orléans', 'Pau', 'Perpignan', 'Poitiers', 'Quimper',
+  'Reims', 'Rennes', 'Rouen', 'Saint-Malo', 'Strasbourg', 'Toulon',
+  'Toulouse', 'Tours', 'Troyes', 'Valence', 'Vannes', 'Versailles',
+]
+
+/**
+ * `count` different town names in random order. More teams than towns
+ * reuse the list with a number: "Lyon 2".
+ */
+export const simulatedFrenchTeamNames = (count, random = Math.random) => {
+  const towns = [...FRENCH_TOWNS]
+  for (let i = towns.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1))
+    ;[towns[i], towns[j]] = [towns[j], towns[i]]
+  }
+  return Array.from({ length: count }, (_, i) => {
+    const round = Math.floor(i / towns.length)
+    const town = towns[i % towns.length]
+    return round ? `${town} ${round + 1}` : town
+  })
+}
