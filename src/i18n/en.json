@@ -203,7 +203,16 @@
     "paidCard": "{amount} by card",
     "loadFailed": "Could not load your bookings",
     "waiver": "Liability waiver",
-    "waiverAccepted": "Accepted {date} (version {version})"
+    "waiverAccepted": "Accepted {date} (version {version})",
+    "cancel": "Cancel booking",
+    "cancelUntil": "Free to cancel until {time}",
+    "tooLateToCancel": "Bookings can only be cancelled up to {hours} hours before they start.",
+    "cancelTitle": "Cancel this booking?",
+    "cancelNote": "{amount} will go back to your balance, and the door code will stop working.",
+    "keep": "Keep booking",
+    "confirmCancel": "Cancel booking",
+    "cancelled": "Booking cancelled. {amount} is back in your balance.",
+    "cancelFailed": "Could not cancel the booking"
   },
   "settings": {
     "kicker": "Club admin",

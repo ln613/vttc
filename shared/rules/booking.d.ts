@@ -13,6 +13,7 @@ export interface BookingConfig {
   guestHoldMinutes?: number
   doorCodeLeadMinutes?: number
   doorCodeTrailMinutes?: number
+  cancelHoursBefore?: number
 }
 
 export interface BookingRules {
@@ -28,6 +29,7 @@ export interface BookingRules {
   guestHoldMinutes: number
   doorCodeLeadMinutes: number
   doorCodeTrailMinutes: number
+  cancelHoursBefore: number
 }
 
 export declare const DEFAULT_BOOKING: Required<Omit<BookingConfig, 'enabled' | 'courtLabel'>>

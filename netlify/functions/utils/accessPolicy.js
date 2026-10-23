@@ -65,6 +65,7 @@ export const ACCESS = {
     bookCourtAsGuest: PUBLIC, // held until paid
     blockCourt: ADMIN, // takes a time off the calendar, unpaid
     unblockCourt: ADMIN,
+    cancelBooking: USER, // the caller's own booking, refunded to their balance
     saveBookingRate: ADMIN,
     deleteBookingRate: ADMIN,
     topUpCredits: USER,

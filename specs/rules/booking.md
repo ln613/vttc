@@ -62,6 +62,18 @@ Prices follow the day of the week and the time of day. They start from `booking.
 - the balance is taken atomically: it must cover the cost at the moment of booking, otherwise "Not enough credits. Please top up first." ("Not enough balance. Please top up first." on the points model) and nothing is booked
 - every change to a balance is written to a ledger (creditTransactions) with the balance after it
 
+## Cancelling (registered player)
+
+A player can cancel their own booking from My Bookings (specs/pages/Account.md), up to 48 hours before it starts (`booking.cancelHoursBefore`, 48 if not set).
+
+- only a booking paid from the balance; one paid by card: "This booking cannot be cancelled online. Please contact the club." (the club refunds a card from Moneris; nothing is refunded to a card here)
+- less than 48 hours before: "A booking can only be cancelled up to 48 hours before it starts"
+- the balance gets all of it back, with a ledger entry (`kind: "refund"`); the time is free for anyone again
+- its door code stops working at once (the UniFi visitor is deleted). If UniFi can't be reached the cancellation still stands, and the error is kept on the booking (`doorCodeRevokeError`) for the club to remove the visitor by hand
+- a booking is cancelled (and refunded) once only, however many times it is asked
+- an email confirms it: "{club} — Booking Cancelled": Booking, Name, Date, Time, Court, Refunded to balance, Balance after, Cancelled on, and "Your booking is cancelled and its door code no longer works."
+- the booking is kept with status `cancelled`, `cancelledAt`, `refundedCredits`, `balanceAfterRefund`
+
 ## Blocking a time (admin)
 
 An admin can take a time off the calendar without booking it ("Block this time" in the booking dialog), e.g. for maintenance or a private event.

@@ -1,5 +1,6 @@
 import { createStore } from 'solid-js/store'
-import { apiGet } from '../utils/api'
+import { apiGet, apiPost } from '../utils/api'
+import { creditsActions } from './creditsStore'
 import { formatLocalDate } from '../utils/date'
 import type { DoorCode } from './bookingStore'
 import { langActions } from './langStore'
@@ -29,6 +30,9 @@ export interface MyBooking {
   createdAt: string
   doorCode: DoorCode | null
   receipt: { title: string; ref: string; lines: ReceiptLine[] }
+  // Until when the player can cancel it (paid from the balance, 48 hours
+  // before it starts); null when it can't be cancelled online.
+  cancellableUntil: string | null
 }
 
 interface MyBookingsState {
@@ -37,6 +41,12 @@ interface MyBookingsState {
   error: string | null
   // The booking whose receipt is open, if any.
   openReceiptId: string | null
+  // The booking the player is about to cancel, and how that went.
+  cancelling: MyBooking | null
+  busy: boolean
+  cancelError: string | null
+  // What went back to the balance on the last cancellation.
+  refunded: number | null
 }
 
 const getInitialState = (): MyBookingsState => ({
@@ -44,6 +54,10 @@ const getInitialState = (): MyBookingsState => ({
   loading: false,
   error: null,
   openReceiptId: null,
+  cancelling: null,
+  busy: false,
+  cancelError: null,
+  refunded: null,
 })
 
 const [myBookingsState, setMyBookingsState] =
@@ -90,6 +104,45 @@ const init = async () => {
   }
 }
 
+// ==================== cancelling ====================
+
+const canCancel = (b: MyBooking): boolean =>
+  !!b.cancellableUntil && new Date(b.cancellableUntil) > new Date()
+
+// Paid from the balance, still to come, but too close to cancel.
+const isTooLateToCancel = (b: MyBooking): boolean =>
+  b.paidWith === 'credits' && !isPast(b) && !canCancel(b)
+
+const openCancel = (b: MyBooking) =>
+  setMyBookingsState({ cancelling: b, cancelError: null, busy: false })
+
+const closeCancel = () =>
+  setMyBookingsState({ cancelling: null, cancelError: null })
+
+const confirmCancel = async () => {
+  const booking = myBookingsState.cancelling
+  if (!booking) return
+  setMyBookingsState({ busy: true, cancelError: null })
+  try {
+    const result = await apiPost<{ refunded: number; balance: number }>(
+      'cancelBooking',
+      { bookingId: booking._id },
+    )
+    creditsActions.setBalance(result.balance)
+    setMyBookingsState({
+      busy: false,
+      cancelling: null,
+      refunded: result.refunded,
+      bookings: myBookingsState.bookings.filter((b) => b._id !== booking._id),
+    })
+  } catch (err) {
+    setMyBookingsState({
+      busy: false,
+      cancelError: errorMessage(err, langActions.t('myBookings.cancelFailed')),
+    })
+  }
+}
+
 const reset = () => setMyBookingsState(getInitialState())
 
 export const myBookingsActions = {
@@ -101,4 +154,9 @@ export const myBookingsActions = {
   isCodeExpired,
   isReceiptOpen,
   toggleReceipt,
+  canCancel,
+  isTooLateToCancel,
+  openCancel,
+  closeCancel,
+  confirmCancel,
 }

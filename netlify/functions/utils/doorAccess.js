@@ -168,6 +168,16 @@ const validateVisit = (visit) => {
 }
 
 /**
+ * Stops a door code working: its UniFi visitor is deleted. A placeholder
+ * code has nothing to remove. Throws when UniFi refuses.
+ */
+export const revokeDoorCode = async (doorCode) => {
+  if (doorCode?.provider !== 'unifi' || !doorCode.visitorId) return
+  if (!isUnifiConfigured()) throwError('Door access is not set up')
+  await deleteVisitor(doorCode.visitorId)
+}
+
+/**
  * A door code that works from visit.validFrom to visit.validUntil.
  * visit: { firstName, lastName, email, phone, remarks, validFrom, validUntil }
  * Returns { code, visitorId, provider, validFrom, validUntil }.

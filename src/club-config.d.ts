@@ -85,6 +85,8 @@ declare module 'club-config' {
       guestHoldMinutes?: number
     doorCodeLeadMinutes?: number
     doorCodeTrailMinutes?: number
+      /** How long before a booking a player can still cancel it (48). */
+      cancelHoursBefore?: number
       /**
        * Sales tax added to card payments (a guest's booking, a top-up), e.g.
        * [{ name: 'GST', rate: 5 }] — rate in percent. See shared/rules/tax.js.

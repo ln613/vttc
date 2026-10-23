@@ -1,4 +1,4 @@
-import { Show, For, type JSX } from 'solid-js'
+import { Show, For, Switch, Match, type JSX } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import clubConfig from 'club-config'
 import ThemeButton from './ThemeButton'
@@ -9,7 +9,7 @@ import {
 } from '../stores/myBookingsStore'
 import { langActions } from '../stores/langStore'
 import { themed } from '../site/themed'
-import { formatDollars } from '../../shared/rules/booking'
+import { bookingRules, formatDollars } from '../../shared/rules/booking'
 import { formatBalance, walletT } from '../i18n/wallet'
 
 // The signed-in player's court bookings, in the Account page's My Bookings
@@ -27,6 +27,14 @@ const MyBookingsList = () => {
       <Show when={myBookingsState.error}>
         <div style={errorStyle}>{myBookingsState.error}</div>
       </Show>
+      <Show when={myBookingsState.refunded !== null}>
+        <div class="bk-success" style={refundedStyle}>
+          {t('myBookings.cancelled', {
+            amount: formatBalance(myBookingsState.refunded ?? 0),
+          })}
+        </div>
+      </Show>
+      <CancelDialog />
       <Show
         when={!myBookingsState.loading}
         fallback={<div style={emptyStyle}>{t('common.loading')}</div>}
@@ -108,7 +116,92 @@ const BookingCard = (props: { booking: MyBooking }) => (
     <Show when={myBookingsActions.isReceiptOpen(props.booking._id)}>
       <Receipt booking={props.booking} />
     </Show>
+    <CancelLine booking={props.booking} />
   </div>
+)
+
+// A booking paid from the balance can be cancelled until 48 hours before
+// it starts; after that, the card says why it can't.
+const CancelLine = (props: { booking: MyBooking }) => (
+  <Switch>
+    <Match when={myBookingsActions.canCancel(props.booking)}>
+      <div style={cancelRowStyle}>
+        <button
+          type="button"
+          class="bk-btn bk-btn-secondary bk-btn-small"
+          onClick={() => myBookingsActions.openCancel(props.booking)}
+        >
+          {t('myBookings.cancel')}
+        </button>
+        <span style={cancelHintStyle}>
+          {t('myBookings.cancelUntil', {
+            time: langActions.instant(props.booking.cancellableUntil ?? ''),
+          })}
+        </span>
+      </div>
+    </Match>
+    <Match when={myBookingsActions.isTooLateToCancel(props.booking)}>
+      <div style={cancelHintStyle}>
+        {t('myBookings.tooLateToCancel', { hours: cancelHours })}
+      </div>
+    </Match>
+  </Switch>
+)
+
+const cancelHours = bookingRules(clubConfig.booking).cancelHoursBefore
+
+const CancelDialog = () => (
+  <Show when={myBookingsState.cancelling}>
+    {(booking) => (
+      <div
+        class="bk-overlay"
+        onClick={() => !myBookingsState.busy && myBookingsActions.closeCancel()}
+      >
+        <div class="bk-dialog" onClick={(e) => e.stopPropagation()}>
+          <div class="bk-dialog-head">
+            <h2 class="bk-dialog-title">{t('myBookings.cancelTitle')}</h2>
+            <div class="bk-dialog-when">
+              {longDate(booking().date)}
+              <br />
+              <strong>{timeRange(booking())}</strong>
+            </div>
+          </div>
+          <div class="bk-dialog-body">
+            <p class="bk-note">
+              {t('myBookings.cancelNote', {
+                amount: formatBalance(booking().credits ?? 0),
+              })}
+            </p>
+            <Show when={myBookingsState.cancelError}>
+              <p class="bk-error" style={{ 'text-align': 'center', margin: 0 }}>
+                {myBookingsState.cancelError}
+              </p>
+            </Show>
+            <div class="bk-actions">
+              <button
+                type="button"
+                class="bk-btn bk-btn-secondary bk-btn-fill"
+                onClick={myBookingsActions.closeCancel}
+                disabled={myBookingsState.busy}
+              >
+                {t('myBookings.keep')}
+              </button>
+              <button
+                type="button"
+                class="bk-btn bk-btn-primary bk-btn-fill"
+                onClick={() => void myBookingsActions.confirmCancel()}
+                disabled={myBookingsState.busy}
+              >
+                {myBookingsState.busy
+                  ? t('common.pleaseWait')
+                  : t('myBookings.confirmCancel')}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+  </Show>
 )
 
 const DoorCodeLine = (props: { booking: MyBooking }) => (
@@ -316,5 +409,26 @@ const errorStyle: JSX.CSSProperties = {
 }
 
 const actionsStyle: JSX.CSSProperties = { 'margin-top': '16px' }
+
+const cancelRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-wrap': 'wrap',
+  'align-items': 'center',
+  gap: '6px 12px',
+  'margin-top': '10px',
+}
+
+const cancelHintStyle: JSX.CSSProperties = {
+  'margin-top': '8px',
+  'font-size': '13px',
+  color: '#888',
+}
+
+const refundedStyle: JSX.CSSProperties = {
+  'margin-bottom': '12px',
+  'font-size': '14px',
+  'font-weight': 600,
+  color: '#27ae60',
+}
 
 export default MyBookingsList

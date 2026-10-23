@@ -13,8 +13,8 @@
 
 import { getDB, toObjectId } from './db.js'
 import { club, clubDate, clubMinutesOfDay, clubTimeToDate } from './club.js'
-import { issueDoorCode, doorAccessAvailable } from './doorAccess.js'
-import { buildReceipt, buildTopUpReceipt, doorCodeView } from './bookingReceipt.js'
+import { issueDoorCode, doorAccessAvailable, revokeDoorCode } from './doorAccess.js'
+import { buildReceipt, buildTopUpReceipt, buildCancellationReceipt, doorCodeView } from './bookingReceipt.js'
 import { sendBookingReceiptEmail, sendReceiptEmail } from './email.js'
 import { getBookingHours, getTopUpOptions } from './settingsHandlers.js'
 import { loadBookingRates, loadBookingRules } from './bookingRatesHandlers.js'
@@ -278,6 +278,7 @@ export const getMyBookings = async (_params, auth) => {
     waiver: b.waiver ?? null,
     doorCode: doorCodeView(b),
     receipt: buildReceipt(b),
+    cancellableUntil: cancellableUntil(b)?.toISOString() ?? null,
   }))
 }
 
@@ -367,6 +368,110 @@ export const bookCourt = async (body, auth) => {
   await recordLedger({ playerId: player._id, kind: 'booking', credits: -credits, balanceAfter: balance, bookingId })
   const completed = await completeBooking(bookingId)
   return { bookingId: bookingId.toString(), ...request, credits, balance, ...completed }
+}
+
+// ==================== cancelling ====================
+//
+// A player cancels a booking paid from their balance until a set time
+// before it starts (48 hours): the balance gets all of it back, the time is
+// free again, and the door code stops working. Card payments are never
+// refunded here — the club does that from Moneris.
+
+// When a booking stops being cancellable, or null if it never is.
+const cancellableUntil = (booking) => {
+  if (booking.paidWith !== 'credits' || !booking.playerId || !booking.credits) return null
+  const start = clubTimeToDate(booking.date, booking.start)
+  return new Date(start.getTime() - rules().cancelHoursBefore * 60 * 60 * 1000)
+}
+
+const validateCancellable = (booking) => {
+  if (!booking || booking.status !== 'confirmed') throwError('Booking not found')
+  const until = cancellableUntil(booking)
+  if (!until) throwError('This booking cannot be cancelled online. Please contact the club.')
+  if (until <= new Date()) {
+    throwError(`A booking can only be cancelled up to ${rules().cancelHoursBefore} hours before it starts`)
+  }
+}
+
+/** The signed-in player cancels their own booking; the balance is refunded. */
+export const cancelBooking = async (body, auth) => {
+  await requireModules('booking', 'myBooking')
+  validatePlayer(auth)
+  if (!body?.bookingId) throwError('Choose the booking to cancel')
+  const db = getDB()
+  const bookingId = toObjectId(body.bookingId)
+  const booking = await db
+    .collection(BOOKINGS)
+    .findOne({ _id: bookingId, playerId: toObjectId(auth.playerId) })
+  validateCancellable(booking)
+
+  // Only one request gets past here, so the refund is made once.
+  const claimed = await db
+    .collection(BOOKINGS)
+    .updateOne({ _id: bookingId, status: 'confirmed' }, { $set: { status: 'cancelled', cancelledAt: new Date() } })
+  if (!claimed.modifiedCount) throwError('This booking has already been cancelled')
+
+  await releaseSlots(bookingId)
+  const balance = await refundCredits(booking)
+  await db
+    .collection(BOOKINGS)
+    .updateOne({ _id: bookingId }, { $set: { refundedCredits: booking.credits, balanceAfterRefund: balance } })
+  await revokeBookingDoorCode(booking)
+  const cancelled = { ...booking, status: 'cancelled', refundedCredits: booking.credits, balanceAfterRefund: balance }
+  const emailSentTo = await sendCancellation(cancelled)
+  return { bookingId: body.bookingId, refunded: booking.credits, balance, emailSentTo }
+}
+
+const refundCredits = async (booking) => {
+  const result = await getDB()
+    .collection(PLAYERS)
+    .findOneAndUpdate(
+      { _id: booking.playerId },
+      { $inc: { credits: booking.credits } },
+      { returnDocument: 'after', projection: { credits: 1 } },
+    )
+  const after = result?.value !== undefined ? result.value : result
+  await recordLedger({
+    playerId: booking.playerId,
+    kind: 'refund',
+    credits: booking.credits,
+    balanceAfter: after.credits,
+    bookingId: booking._id,
+  })
+  return after.credits
+}
+
+// The code must not open the door for a booking that is gone. If UniFi
+// can't be reached the cancellation still stands; the error is kept on the
+// booking for the club to remove the visitor by hand.
+const revokeBookingDoorCode = async (booking) => {
+  if (!booking.doorCode?.code) return
+  try {
+    await revokeDoorCode(booking.doorCode)
+  } catch (err) {
+    console.error(`Door code for cancelled booking ${booking._id}:`, err.message)
+    await getDB()
+      .collection(BOOKINGS)
+      .updateOne({ _id: booking._id }, { $set: { doorCodeRevokeError: err.message } })
+  }
+}
+
+const sendCancellation = async (booking) => {
+  const { email } = await bookingContact(booking)
+  try {
+    if (!email) throwError('No email address on file')
+    await sendReceiptEmail(email, buildCancellationReceipt(booking))
+    await getDB()
+      .collection(BOOKINGS)
+      .updateOne({ _id: booking._id }, { $set: { cancellationSentTo: email } })
+    return email
+  } catch (err) {
+    console.error(`Cancellation email for booking ${booking._id}:`, err.message)
+    await getDB()
+      .collection(BOOKINGS)
+      .updateOne({ _id: booking._id }, { $set: { cancellationEmailError: err.message } })
+    return null
+  }
 }
 
 // ==================== blocking a time ====================

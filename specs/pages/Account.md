@@ -67,6 +67,9 @@ My Booking module, on the signed-in player's own account (as Credits).
   - door code: "Door code" {code} "Works {from} – {to}"; once that has passed, "Expired" (dimmed)
   - an upcoming booking without a code: "Door code not ready yet. Please check back, or contact the club." (opening the section asks the server to try again — rules/booking.md, Door code)
   - "Receipt" link: shows / hides the receipt (the same lines as the email); one open at a time
+  - paid from the balance, 48 hours or more before it starts: "Cancel booking" button and "Free to cancel until {date, time}"; later: "Bookings can only be cancelled up to 48 hours before they start." (rules/booking.md, Cancelling)
+    - the button opens "Cancel this booking?" with the date and time, "{amount} will go back to your balance, and the door code will stop working.", "Keep booking" and "Cancel booking"
+    - once cancelled: the booking leaves the list, the balance updates, and "Booking cancelled. {amount} is back in your balance." shows above the list
   - no bookings: "You have no bookings yet."
   - "Book a Court" button: go to the Booking page
 

@@ -18,9 +18,24 @@ All refuse with "Court booking is not available at this club" unless `booking.en
 
 ## My bookings (GET myBookings, signed in)
 
-the player's confirmed bookings, newest first: [{ _id, date, court, start, minutes, credits, createdAt, doorCode: { code, validFrom, validUntil, window } | null, receipt: { title, ref, lines: [{ label, value }] } }]
+the player's confirmed bookings, newest first: [{ _id, date, court, start, minutes, credits, createdAt, doorCode: { code, validFrom, validUntil, window } | null, receipt: { title, ref, lines: [{ label, value }] }, cancellableUntil (when it stops being cancellable; null if it can't be cancelled online) }]
 
 - first asks UniFi for a code for any booking still to come that has none (rules/booking.md, Door code)
+
+## Cancel a booking (POST cancelBooking, signed in)
+
+### input
+
+- bookingId* — the caller's own confirmed booking
+
+### Action
+
+- refused unless paid from the balance and 48 hours or more before it starts (rules/booking.md, Cancelling)
+- mark it cancelled (once), free its time, refund the balance (ledger "refund"), stop its door code, email the confirmation
+
+### Output
+
+{ bookingId, refunded (credits), balance (after), emailSentTo | null }
 
 ## Booking prices (GET bookingRates, public)
 

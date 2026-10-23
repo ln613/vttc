@@ -203,7 +203,16 @@
     "paidCard": "{amount}（银行卡）",
     "loadFailed": "无法加载你的预订",
     "waiver": "免责声明",
-    "waiverAccepted": "已于 {date} 接受（版本 {version}）"
+    "waiverAccepted": "已于 {date} 接受（版本 {version}）",
+    "cancel": "取消预订",
+    "cancelUntil": "{time} 前可免费取消",
+    "tooLateToCancel": "预订须在开始前 {hours} 小时以上才能取消。",
+    "cancelTitle": "确定取消此预订？",
+    "cancelNote": "{amount} 将退回您的余额，门禁码将同时失效。",
+    "keep": "保留预订",
+    "confirmCancel": "取消预订",
+    "cancelled": "预订已取消，{amount} 已退回您的余额。",
+    "cancelFailed": "无法取消预订"
   },
   "settings": {
     "kicker": "球馆管理",

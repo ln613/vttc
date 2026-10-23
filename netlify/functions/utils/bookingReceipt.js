@@ -129,6 +129,32 @@ export const buildReceipt = (booking) => {
 }
 
 /**
+ * { title, ref, lines, notes } for a booking the player cancelled: what it
+ * was, and what went back to their balance.
+ */
+export const buildCancellationReceipt = (booking) => {
+  if (!booking?._id) throwError('Booking is required')
+  const ref = bookingRef(booking)
+  return {
+    title: `${club.name} — Booking Cancelled`,
+    ref,
+    lines: [
+      { label: 'Booking', value: ref },
+      { label: 'Name', value: booking.name },
+      { label: 'Date', value: longDate(booking.date) },
+      { label: 'Time', value: `${formatClock(booking.start)} – ${formatClock(booking.start + booking.minutes)}` },
+      { label: 'Court', value: courtName(booking.court) },
+      { label: 'Refunded to balance', value: balanceAmount(booking.refundedCredits ?? booking.credits) },
+      ...(booking.balanceAfterRefund != null
+        ? [{ label: 'Balance after', value: balanceAmount(booking.balanceAfterRefund) }]
+        : []),
+      { label: 'Cancelled on', value: clubDateTime(booking.cancelledAt || new Date()) },
+    ],
+    notes: ['Your booking is cancelled and its door code no longer works.'],
+  }
+}
+
+/**
  * { title, ref, lines, notes } for a paid top-up (a payment of kind topUp):
  * what was added, what the card paid, and the balance after.
  */

@@ -29,6 +29,9 @@ export const DEFAULT_BOOKING = {
   // after it.
   doorCodeLeadMinutes: 15,
   doorCodeTrailMinutes: 15,
+  // A player can cancel a booking paid from their balance until this long
+  // before it starts; the balance gets it all back.
+  cancelHoursBefore: 48,
 }
 
 // "HH:MM" on the 24-hour clock; "24:00" is midnight at the end of the day.
@@ -70,6 +73,7 @@ export const bookingRules = (config) => {
     guestHoldMinutes: c.guestHoldMinutes,
     doorCodeLeadMinutes: c.doorCodeLeadMinutes,
     doorCodeTrailMinutes: c.doorCodeTrailMinutes,
+    cancelHoursBefore: c.cancelHoursBefore,
   }
 }
 
