@@ -23,6 +23,7 @@ Portrait:
 
 Landscape:
 
+- three columns, widths 2:1:2 (score box, info box, score box)
 - score box for participant 1
 - info box (vertical, align center)
   - games won at the top, edge to edge: two white boxes with black numbers, each half the column's width and square, touching in the middle (the left one is the left side's games), the numbers as big as the boxes allow; they replace the games-won badges in the score boxes

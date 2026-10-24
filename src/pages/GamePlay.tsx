@@ -2583,17 +2583,17 @@ const scaledFont = (min: number, vh: number, max: number) =>
   `clamp(${min}px, ${vh}vh, ${max}px)`
 
 // The middle column: games won across the top, then the match details
-// centred in what is left.
+// centred in what is left. Half a score box's width (each is flex 1), so
+// the three columns are 2:1:2 — a fifth of the screen.
 const landscapeInfoColumnStyle: JSX.CSSProperties = {
   display: 'flex',
   'flex-direction': 'column',
-  flex: '0 0 auto',
-  'min-width': '160px',
-  'max-width': 'clamp(160px, 18vw, 340px)',
+  flex: '0.5 1 0%',
+  'min-width': 0,
 }
 
-// Two boxes edge to edge, each half the column and square, with the digit
-// scaled to the box (the column is 160px to 18vw wide).
+// Two boxes edge to edge, each half the column (a tenth of the screen) and
+// square, with the digit scaled to the box.
 const landscapeGamesWonRowStyle: JSX.CSSProperties = {
   display: 'flex',
   flex: 'none',
@@ -2609,7 +2609,7 @@ const getLandscapeGamesWonStyle = (isLeft: boolean): JSX.CSSProperties => ({
   'place-items': 'center',
   'background-color': 'rgba(255, 255, 255, 0.9)',
   color: '#333',
-  'font-size': 'clamp(56px, 6.5vw, 124px)',
+  'font-size': 'clamp(56px, 7.5vw, 220px)',
   'font-weight': 700,
   'line-height': 1,
   'font-variant-numeric': 'tabular-nums',
