@@ -25,6 +25,7 @@ Landscape:
 
 - score box for participant 1
 - info box (vertical, align center)
+  - games won at the top, edge to edge: two white boxes with black numbers, each half the column's width and square, touching in the middle (the left one is the left side's games), the numbers as big as the boxes allow; they replace the games-won badges in the score boxes
   - same as the table section in live score page
   - show game scores:
     11:7
@@ -74,8 +75,8 @@ hamburger icon, show/hide the following menu:
     - huge white number
     - red bg for the serving side, blue for the other
 - "-" button (under the point box, full width, dark red for the serving side, dark blue for the other)
-- show the number of games won at the top-right corner for the left score box, or the top-left corner for the right score box (it will cover part of the "+" button and part of the big point box)
-- show "T" at the top-left corner for the right score box, or the top-right corner for the left score box
+- portrait: show the number of games won at the top-right corner for the left score box, or the top-left corner for the right score box (it will cover part of the "+" button and part of the big point box); "T" at the top-left corner for the right score box, or the top-right corner for the left score box
+- landscape: no games won here (it is in the info box); "T" in the outer top corner — top-left for the left score box, top-right for the right one
 
 ## No Match Assigned Screen
 

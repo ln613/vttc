@@ -773,11 +773,11 @@ const ScoreBoxes = (props: ScoreBoxesProps) => {
   return (
     <div style={scoreBoxesOuterStyle}>
       <div style={scoreBoxesContainerStyle}>
-        <ScoreBox side={leftSide()} isLeft={true} />
+        <ScoreBox side={leftSide()} isLeft={true} landscape={props.landscape} />
         <Show when={props.landscape}>
           <LandscapeInfoBox onExit={props.onExit} />
         </Show>
-        <ScoreBox side={rightSide()} isLeft={false} />
+        <ScoreBox side={rightSide()} isLeft={false} landscape={props.landscape} />
       </div>
       {/* Ending a game or the match is the Scorer's call — a Mirror shows
           the result and offers nothing to press. */}
@@ -879,49 +879,66 @@ const LandscapeInfoBox = (_props: { onExit: () => void }) => {
     return { left, right }
   }
 
+  // Games won, each on its own side of the screen (see leftRightScores).
+  const gamesWon = () => {
+    const leftSideOnScreen = gamePlayActions.displayLeftSide() === 1 ? 2 : 1
+    return {
+      left: gamePlayActions.getGamesWon(leftSideOnScreen),
+      right: gamePlayActions.getGamesWon(leftSideOnScreen === 1 ? 2 : 1),
+    }
+  }
+
   return (
     <Show when={event()}>
-      <div style={landscapeInfoBoxStyle}>
-        <Show when={tableNumber()}>
-          <div style={landscapeTableNumberStyle}>{tableNumber()}</div>
-        </Show>
-        <div style={landscapeEventNameStyle}>{event()!.eventName}</div>
-        <div style={landscapeStageNameStyle}>{stageName()}</div>
-        <Show when={subMatchLabel()}>
-          <div style={landscapeSubMatchStyle}>{subMatchLabel()}</div>
-        </Show>
-        <div style={landscapeGameInfoStyle}>
-          Game {currentGameIndex() + 1} / {numberOfGames()}
+      <div style={landscapeInfoColumnStyle}>
+        {/* Games won, big, across the top of the column — the two boxes
+            meet in the middle, each over its own side's score. */}
+        <div style={landscapeGamesWonRowStyle}>
+          <div style={getLandscapeGamesWonStyle(true)}>{gamesWon().left}</div>
+          <div style={getLandscapeGamesWonStyle(false)}>{gamesWon().right}</div>
         </div>
-        <Show when={visibleGames().length > 0}>
-          <div style={landscapeGameScoresStyle}>
-            <For each={visibleGames()}>
-              {(g) => {
-                // Wrap in accessors so leftSide changes (switch-side)
-                // flow through to the previous-game rows in the
-                // info box — plain `const lr = …` captured the
-                // value at row-creation time and stayed stale.
-                const lr = () => leftRightScores(g)
-                const hSide = () => highlightSide(g)
-                const leftSideOnScreen = () =>
-                  gamePlayActions.displayLeftSide() === 1 ? 2 : 1
-                const leftHighlight = () => hSide() === leftSideOnScreen()
-                const rightHighlight = () => hSide() != null && !leftHighlight()
-                return (
-                  <div style={landscapeGameScoreRowStyle}>
-                    <span style={getLandscapeScoreNumStyle(leftHighlight())}>
-                      {lr().left}
-                    </span>
-                    <span>:</span>
-                    <span style={getLandscapeScoreNumStyle(rightHighlight())}>
-                      {lr().right}
-                    </span>
-                  </div>
-                )
-              }}
-            </For>
+        <div style={landscapeInfoBoxStyle}>
+          <Show when={tableNumber()}>
+            <div style={landscapeTableNumberStyle}>{tableNumber()}</div>
+          </Show>
+          <div style={landscapeEventNameStyle}>{event()!.eventName}</div>
+          <div style={landscapeStageNameStyle}>{stageName()}</div>
+          <Show when={subMatchLabel()}>
+            <div style={landscapeSubMatchStyle}>{subMatchLabel()}</div>
+          </Show>
+          <div style={landscapeGameInfoStyle}>
+            Game {currentGameIndex() + 1} / {numberOfGames()}
           </div>
-        </Show>
+          <Show when={visibleGames().length > 0}>
+            <div style={landscapeGameScoresStyle}>
+              <For each={visibleGames()}>
+                {(g) => {
+                  // Wrap in accessors so leftSide changes (switch-side)
+                  // flow through to the previous-game rows in the
+                  // info box — plain `const lr = …` captured the
+                  // value at row-creation time and stayed stale.
+                  const lr = () => leftRightScores(g)
+                  const hSide = () => highlightSide(g)
+                  const leftSideOnScreen = () =>
+                    gamePlayActions.displayLeftSide() === 1 ? 2 : 1
+                  const leftHighlight = () => hSide() === leftSideOnScreen()
+                  const rightHighlight = () => hSide() != null && !leftHighlight()
+                  return (
+                    <div style={landscapeGameScoreRowStyle}>
+                      <span style={getLandscapeScoreNumStyle(leftHighlight())}>
+                        {lr().left}
+                      </span>
+                      <span>:</span>
+                      <span style={getLandscapeScoreNumStyle(rightHighlight())}>
+                        {lr().right}
+                      </span>
+                    </div>
+                  )
+                }}
+              </For>
+            </div>
+          </Show>
+        </div>
       </div>
     </Show>
   )
@@ -930,6 +947,9 @@ const LandscapeInfoBox = (_props: { onExit: () => void }) => {
 interface ScoreBoxProps {
   side: 1 | 2
   isLeft: boolean
+  // Landscape shows games won in the middle column (LandscapeInfoBox), so
+  // the box keeps only the timeout, in the outer corner.
+  landscape: boolean
 }
 
 const ScoreBox = (props: ScoreBoxProps) => {
@@ -1020,8 +1040,15 @@ const ScoreBox = (props: ScoreBoxProps) => {
             </div>
           </div>
         </div>
-        <GamesWonBadge gamesWon={gamesWon()} isLeft={props.isLeft} />
-        <TimeoutBadge timeout={timeout()} isLeft={props.isLeft} onToggle={handleToggleTimeout} />
+        <Show when={!props.landscape}>
+          <GamesWonBadge gamesWon={gamesWon()} isLeft={props.isLeft} />
+        </Show>
+        <TimeoutBadge
+          timeout={timeout()}
+          isLeft={props.isLeft}
+          outer={props.landscape}
+          onToggle={handleToggleTimeout}
+        />
       </div>
       <Show when={!readOnly()}>
         <button
@@ -1050,12 +1077,14 @@ const GamesWonBadge = (props: GamesWonBadgeProps) => (
 interface TimeoutBadgeProps {
   timeout: boolean
   isLeft: boolean
+  // In the box's outer corner (landscape) rather than its inner one.
+  outer: boolean
   onToggle: () => void
 }
 
 const TimeoutBadge = (props: TimeoutBadgeProps) => (
   <div
-    style={getTimeoutBadgeStyle(props.isLeft, props.timeout)}
+    style={getTimeoutBadgeStyle(props.isLeft, props.timeout, props.outer)}
     onClick={(e) => {
       e.stopPropagation()
       props.onToggle()
@@ -2553,15 +2582,50 @@ const scoreBoxesOuterStyle: JSX.CSSProperties = {
 const scaledFont = (min: number, vh: number, max: number) =>
   `clamp(${min}px, ${vh}vh, ${max}px)`
 
+// The middle column: games won across the top, then the match details
+// centred in what is left.
+const landscapeInfoColumnStyle: JSX.CSSProperties = {
+  display: 'flex',
+  'flex-direction': 'column',
+  flex: '0 0 auto',
+  'min-width': '160px',
+  'max-width': 'clamp(160px, 18vw, 340px)',
+}
+
+// Two boxes edge to edge, each half the column and square, with the digit
+// scaled to the box (the column is 160px to 18vw wide).
+const landscapeGamesWonRowStyle: JSX.CSSProperties = {
+  display: 'flex',
+  flex: 'none',
+}
+
+const getLandscapeGamesWonStyle = (isLeft: boolean): JSX.CSSProperties => ({
+  flex: '1 1 0',
+  'min-width': 0,
+  'aspect-ratio': '1',
+  'box-sizing': 'border-box',
+  padding: 0,
+  display: 'grid',
+  'place-items': 'center',
+  'background-color': 'rgba(255, 255, 255, 0.9)',
+  color: '#333',
+  'font-size': 'clamp(56px, 6.5vw, 124px)',
+  'font-weight': 700,
+  'line-height': 1,
+  'font-variant-numeric': 'tabular-nums',
+  'border-radius': isLeft ? '0 0 0 10px' : '0 0 10px 0',
+  // A hairline where the two meet, so the digits read as two scores.
+  ...(isLeft ? { 'border-right': '1px solid rgba(0, 0, 0, 0.15)' } : {}),
+})
+
 const landscapeInfoBoxStyle: JSX.CSSProperties = {
   display: 'flex',
   'flex-direction': 'column',
   'align-items': 'center',
   'justify-content': 'center',
   gap: '6px',
-  flex: '0 0 auto',
-  'min-width': '160px',
-  'max-width': 'clamp(160px, 18vw, 340px)',
+  flex: 1,
+  'min-height': 0,
   padding: '12px 16px',
   'text-align': 'center',
   'background-color': 'transparent',
@@ -2661,10 +2725,19 @@ const getGamesWonBadgeStyle = (isLeft: boolean): JSX.CSSProperties => ({
   'z-index': 10,
 })
 
-const getTimeoutBadgeStyle = (isLeft: boolean, timeout: boolean): JSX.CSSProperties => ({
+// The "isLeft" box is drawn on the screen's right (row-reverse), so its
+// inner corner is its left one.
+const timeoutCorner = (isLeft: boolean, outer: boolean): 'left' | 'right' =>
+  isLeft === outer ? 'right' : 'left'
+
+const getTimeoutBadgeStyle = (
+  isLeft: boolean,
+  timeout: boolean,
+  outer: boolean,
+): JSX.CSSProperties => ({
   position: 'absolute',
   top: 0,
-  [isLeft ? 'left' : 'right']: 0,
+  [timeoutCorner(isLeft, outer)]: 0,
   'background-color': timeout ? '#333' : 'rgba(255, 255, 255, 0.9)',
   color: timeout ? '#fff' : '#000',
   'font-size': scaledFont(48, 7.5, 104),
@@ -2676,7 +2749,8 @@ const getTimeoutBadgeStyle = (isLeft: boolean, timeout: boolean): JSX.CSSPropert
   flex: 'none',
   display: 'grid',
   'place-items': 'center',
-  'border-radius': isLeft ? '0 0 8px 0' : '0 0 0 8px',
+  'border-radius':
+    timeoutCorner(isLeft, outer) === 'left' ? '0 0 8px 0' : '0 0 0 8px',
   'z-index': 10,
   cursor: 'pointer',
 })
