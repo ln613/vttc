@@ -2592,8 +2592,9 @@ const landscapeInfoColumnStyle: JSX.CSSProperties = {
   'min-width': 0,
 }
 
-// Two boxes edge to edge, each half the column (an eighth of the screen) and
-// square, with the digit scaled to the box.
+// Two boxes edge to edge, each half the column (an eighth of the screen),
+// a third taller than wide, square-cornered, with the digit scaled to the
+// box.
 const landscapeGamesWonRowStyle: JSX.CSSProperties = {
   display: 'flex',
   flex: 'none',
@@ -2602,7 +2603,7 @@ const landscapeGamesWonRowStyle: JSX.CSSProperties = {
 const getLandscapeGamesWonStyle = (isLeft: boolean): JSX.CSSProperties => ({
   flex: '1 1 0',
   'min-width': 0,
-  'aspect-ratio': '1',
+  'aspect-ratio': '3 / 4',
   'box-sizing': 'border-box',
   padding: 0,
   display: 'grid',
@@ -2613,7 +2614,6 @@ const getLandscapeGamesWonStyle = (isLeft: boolean): JSX.CSSProperties => ({
   'font-weight': 700,
   'line-height': 1,
   'font-variant-numeric': 'tabular-nums',
-  'border-radius': isLeft ? '0 0 0 10px' : '0 0 10px 0',
   // A hairline where the two meet, so the digits read as two scores.
   ...(isLeft ? { 'border-right': '1px solid rgba(0, 0, 0, 0.15)' } : {}),
 })

@@ -26,7 +26,7 @@ Landscape:
 - three columns, widths 3:2:3 (score box, info box, score box)
 - score box for participant 1
 - info box (vertical, align center)
-  - games won at the top, edge to edge: two white boxes with black numbers, each half the column's width and square, touching in the middle (the left one is the left side's games), the numbers as big as the boxes allow; they replace the games-won badges in the score boxes
+  - games won at the top, edge to edge: two white boxes with black numbers, each half the column's width and a third taller than wide (3:4), square corners, touching in the middle (the left one is the left side's games), the numbers as big as the boxes allow; they replace the games-won badges in the score boxes
   - same as the table section in live score page
   - show game scores:
     11:7
