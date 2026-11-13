@@ -8,7 +8,7 @@
     "bannerUrlMobile": "https://res.cloudinary.com/ln613/image/upload/f_auto,q_auto/v1794602034/spttc/spttc-banner-mobile.jpg",
     "bannerAlt": "SPTTC Banner",
     "contactName": "SPTTC",
-    "faviconUrl": "/images/logo.png",
+    "faviconUrl": "https://res.cloudinary.com/ln613/image/upload/f_png,w_96,h_96/v1794608803/spttc/spttc-favicon.png",
     "pageTitle": "SPTTC"
   },
   "tables": {
