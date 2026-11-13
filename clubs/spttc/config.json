@@ -1,0 +1,80 @@
+{
+  "slug": "spttc",
+  "name": "SPTTC",
+  "appName": "SPTTC",
+  "timezone": "America/Los_Angeles",
+  "branding": {
+    "bannerUrl": "https://res.cloudinary.com/ln613/image/upload/f_auto,q_auto/v1794602034/spttc/spttc-banner.jpg",
+    "bannerUrlMobile": "https://res.cloudinary.com/ln613/image/upload/f_auto,q_auto/v1794602034/spttc/spttc-banner-mobile.jpg",
+    "bannerAlt": "SPTTC Banner",
+    "contactName": "SPTTC",
+    "faviconUrl": "/images/logo.png",
+    "pageTitle": "SPTTC"
+  },
+  "tables": {
+    "all": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "rows": [
+      [
+        1,
+        2,
+        3,
+        4
+      ],
+      [
+        5,
+        6,
+        7,
+        8
+      ]
+    ],
+    "order": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "lowTierOrder": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "highTierOrder": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "knockoutExcluded": [],
+    "generalExcluded": [],
+    "highTierExcluded": [],
+    "highTierSemifinalExcluded": [],
+    "highTierFinalOnly": [],
+    "lowTierBigMatchPreferred": []
+  },
+  "tiers": {
+    "low": [],
+    "high": []
+  }
+}
