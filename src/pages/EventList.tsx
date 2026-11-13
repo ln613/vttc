@@ -11,7 +11,8 @@ import FeeInfoDialog from '../components/FeeInfoDialog'
 import TeammateSelectDialog from '../components/TeammateSelectDialog'
 import { customConfirm, customAlert } from '../stores/confirmDialogStore'
 import { eventListState, eventListActions } from '../stores/eventListStore'
-import { parseLocalDate, formatLocalDate } from '../utils/date'
+import { parseLocalDate } from '../utils/date'
+import { clubDateTimeInAMinute } from '../utils/clubClock'
 import { authState, authActions } from '../stores/authStore'
 import {
   tournamentState,
@@ -121,15 +122,6 @@ const groupTournaments = (tournaments: Tournament[]) => ({
   teams: tournaments.filter((t) => t.type !== 'Single'),
 })
 
-const formatTimeNowPlus1Min = (): string => {
-  const d = new Date(Date.now() + 60_000)
-  let hours = d.getHours()
-  const minutes = d.getMinutes()
-  const period = hours >= 12 ? 'PM' : 'AM'
-  hours = hours % 12 || 12
-  return `${hours}:${String(minutes).padStart(2, '0')} ${period}`
-}
-
 const SimulateEventDialog = (props: { onClose: () => void }) => {
   const [seriesList, setSeriesList] = createSignal<string[]>([])
   const [selectedSeries, setSelectedSeries] = createSignal('')
@@ -167,13 +159,13 @@ const SimulateEventDialog = (props: { onClose: () => void }) => {
   const seriesOptions = () =>
     seriesList().map((s) => ({ value: s, label: s }))
 
-  // A simulated event starts today, a minute from now, so it can be
-  // umpired straight away.
+  // A simulated event starts a minute from now on the club's clock, so it
+  // can be umpired straight away — the browser's clock would be an hour or
+  // more off for a club in another time zone.
   const commonPayload = () => ({
     maxParticipants:
       maxParticipants() === 'Unlimited' ? 0 : parseInt(maxParticipants(), 10),
-    date: formatLocalDate(new Date()),
-    time: formatTimeNowPlus1Min(),
+    ...clubDateTimeInAMinute(),
     registrationFee: 30,
   })
 
@@ -589,11 +581,8 @@ const handleCloneIconClick = async (e: MouseEvent, event: EventOption) => {
   e.stopPropagation()
   e.preventDefault()
   try {
-    await eventActions.cloneEvent(
-      event._id,
-      formatLocalDate(new Date()),
-      formatTimeNowPlus1Min(),
-    )
+    const { date, time } = clubDateTimeInAMinute()
+    await eventActions.cloneEvent(event._id, date, time)
   } catch (err) {
     await customAlert(
       err instanceof Error ? err.message : 'Failed to clone event',

@@ -1,9 +1,9 @@
-import { formatLocalDate, parseLocalDate } from './date'
+import { clubDateOf, clubMinutesOfDay } from './clubClock'
 
 // Whether an event has begun.
 //
 // Normally this is purely a clock comparison against the scheduled date and
-// time. An explicit "Start Event" records `startedAt`, which wins — so the
+// time — on the club's clock, as the server judges it, not the viewer's. An explicit "Start Event" records `startedAt`, which wins — so the
 // desk can start an event ahead of schedule without rewriting the time
 // players were told. Mirrors isEventStarted / hasEventStarted on the server.
 export interface EventTiming {
@@ -32,21 +32,18 @@ const startedOnAnEarlierDate = (event: EventTiming): boolean => {
   if (!event.startedAt || !event.date) return false
   const startedOn = new Date(event.startedAt)
   if (Number.isNaN(startedOn.getTime())) return false
-  return formatLocalDate(startedOn) < event.date
+  return clubDateOf(startedOn) < event.date
 }
 
 export const isEventStarted = (event: EventTiming): boolean => {
   if (event.startedAt && !startedOnAnEarlierDate(event)) return true
   if (!event.date) return false
 
-  const eventDate = parseLocalDate(event.date)
-  if (event.time) {
-    const timeParts = parseTime(event.time)
-    if (timeParts) {
-      eventDate.setHours(timeParts.hours, timeParts.minutes, 0, 0)
-    }
-  }
-  return new Date() >= eventDate
+  const today = clubDateOf()
+  if (event.date !== today) return event.date < today
+  const timeParts = event.time ? parseTime(event.time) : null
+  if (!timeParts) return true
+  return clubMinutesOfDay() >= timeParts.hours * 60 + timeParts.minutes
 }
 
 // An event scheduled for a later day cannot be started early: the live
@@ -55,5 +52,5 @@ export const isEventStarted = (event: EventTiming): boolean => {
 // offered when pressing it can only fail.
 export const isStartableToday = (event: EventTiming): boolean => {
   if (!event.date) return true
-  return event.date <= formatLocalDate(new Date())
+  return event.date <= clubDateOf()
 }

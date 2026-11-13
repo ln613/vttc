@@ -19,8 +19,8 @@ Vertical
       - on save
         - create an event:
           - name: "{tournament name} - test"
-          - date: today
-          - time: now + 1 min
+          - date: today, on the club's clock (config `timezone`), not the browser's
+          - time: now + 1 min, on the club's clock — the server starts an event by the club's clock, so a viewer in another time zone would otherwise create one that starts hours early or late
           - fee: 30
         - auto register randomly selected qualified players (age ignored)
         - a simulated league's teams are named "Team A", "Team B"…; a French League's take real French town names instead ("Annecy", "Colmar", "La Rochelle"…, shuffled, never repeated — shared/rules/frenchLeague.js)
@@ -49,7 +49,7 @@ Vertical
       - if already registered but still in a partial team
       - on click, show the select teammate dialog (replace the skip button with cancel button)
     - edit icon (admin only): goes to Event Edit page for that event
-    - clone icon (admin and simulation only): clone the event with detail and participants, suffix the name with " - test" and set the start time to be 1 min from now
+    - clone icon (admin and simulation only): clone the event with detail and participants, suffix the name with " - test" and set the start date and time to be 1 min from now on the club's clock
     - delete icon (super admin only): confirm and delete the event completely 
     - multi-user icon (admin only): goes to Event Participant Edit page
   - for past events (before today or already finished), use light gray bg
