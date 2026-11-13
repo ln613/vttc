@@ -24,6 +24,7 @@
     "load:test": "node --dns-result-order=ipv4first --env-file=.env scripts/load-test.mjs",
     "club:new": "node --env-file=.env --env-file=.env.vttc scripts/provision-club.mjs",
     "ratings:sync": "node --env-file=.env scripts/sync-ttcan-ratings.mjs",
+    "ratings:usatt": "node --env-file=.env scripts/sync-usatt-ratings.mjs",
     "seed:series": "node --env-file=.env scripts/seed-event-series.mjs"
   },
   "dependencies": {
